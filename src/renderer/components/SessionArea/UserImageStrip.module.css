@@ -1,0 +1,28 @@
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.frame {
+  display: block;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-bg);
+  max-width: 100%;
+  padding: 0;
+  cursor: zoom-in;
+}
+
+.img {
+  display: block;
+  max-width: min(100%, 220px);
+  max-height: 160px;
+  object-fit: contain;
+  background: var(--color-bg);
+}
+
+.img:hover {
+  filter: brightness(1.05);
+}

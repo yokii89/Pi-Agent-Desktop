@@ -1,0 +1,245 @@
+.view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* 供问题导航分段栏（QuestionRail）的容器查询：宽度由 flex 布局决定、不依赖内容，
+     不影响现有布局；不加 paint containment，故 rail 右侧的预览气泡不会被裁剪。 */
+  container-type: inline-size;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* 常驻滚动条槽：内容不溢出时也保留这 8px，文档流中轴才稳定，
+     悬浮输入栏按 --scrollbar-size 右内缩后与它同轴（见 SessionArea.dockedInput） */
+  scrollbar-gutter: stable;
+  /* follow 期贴底由 useStickToBottom 负责，不与 Chromium 原生滚动锚定叠加（docs/design/10 C5） */
+  overflow-anchor: none;
+}
+
+/* free 期恢复原生锚定：content-visibility 首次实现会把 72px 估计高换成真实高，
+   视口上方条目实现时下方阅读位置被推走；此时无程序贴底，锚定不与状态机抢 scrollTop。
+   不要在 follow 期开：锚定会把贴底结果拽离底部。 */
+.scrollFree {
+  overflow-anchor: auto;
+}
+
+/* 文档流列：限宽居中（列宽随中央区变化，见 tokens 的 --session-stream-column）；
+   底部留白避开悬浮输入框。
+   body 默认 user-select:none，这里对对话内容放开鼠标选取复制。 */
+.inner {
+  max-width: min(100%, var(--session-stream-column));
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--spacing-lg) var(--spacing-xl) var(--session-input-clearance);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  user-select: text;
+}
+
+/* 消息操作条悬浮区（docs/design/13 P1-6）：操作条 height:0 常驻在内容下缘，
+   揭示时按钮向下悬挂进条目间隙。但 .entry 的 content-visibility:auto 自带
+   paint containment（等价 overflow:hidden），条目盒外的绘制一律被裁——不把
+   这段悬挂区划进盒内，用户气泡的底边框/圆角会被削掉，悬浮操作条也不可见。
+   负 margin 精确抵消 padding，margin box 与布局零变化，下方条目间距压缩规则
+   与滚动高度估算均不受影响。（置于间距压缩规则之前，避免 biome 降序专一性警告。） */
+.entry[data-kind="user"],
+.entry[data-kind="assistant"] {
+  padding-bottom: var(--spacing-lg);
+  margin-bottom: calc(-1 * var(--spacing-lg));
+}
+
+/* 悬挂的操作条画在本条目盒下缘之外：条目都是 cv:auto 堆叠上下文、按 DOM 序
+   绘制，后一个条目（尤其 assistant+assistant 压缩到 4px 间距时）会盖住按钮。
+   悬浮/聚焦时抬高层级，保证按钮绘制在相邻条目之上。z-index 对 flex 子项生效；
+   仍低于输入栏悬浮层（--z-input-overlay:10）。 */
+.entry:hover,
+.entry:focus-within {
+  z-index: 1;
+}
+
+/* 同一轮连续的 AI 文档流条目视为一条过程：去掉条目级空隙，只保留块内间距 */
+.entry[data-kind="assistant"] + .entry[data-kind="assistant"] {
+  margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-xs));
+}
+
+/* run 头后紧接工作流：压掉 flex 大间距，只留一小口气 */
+.entry[data-kind="run"] + .entry[data-kind="assistant"] {
+  margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-sm));
+}
+
+/* 连续失败 attempt 的 run 头：压掉 24px 空档，重试过程不刷屏 */
+.entry[data-kind="run"] + .entry[data-kind="run"] {
+  margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-xs));
+}
+
+/* run 头 / 文档流后紧跟错误行：同样收紧，避免 24px 空档把状态和原因撕开 */
+.entry[data-kind="run"] + .entry[data-kind="error"],
+.entry[data-kind="assistant"] + .entry[data-kind="error"] {
+  margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-xs));
+}
+
+/* 控件 chrome 保持不可选，拖选文字时不会误抓按钮文案 */
+.inner button {
+  user-select: none;
+}
+
+/* 图片默认可拖，会打断跨行文本选取 */
+.inner img {
+  -webkit-user-drag: none;
+}
+
+.inner ::selection {
+  background: var(--color-accent-soft);
+}
+
+/* 长会话：视口外条目跳过布局/绘制（Chromium 支持良好） */
+.entry {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
+}
+
+.notice {
+  margin: 0;
+  text-align: center;
+  font-size: var(--session-stream-font-sm);
+  color: var(--color-text-muted);
+  padding: 2px 0;
+}
+
+/* 视觉隐藏的 live region：读屏播报 run 开始/结束边界（docs/design/13 P1-7） */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.jump {
+  position: absolute;
+  right: calc(var(--spacing-xl) + var(--scrollbar-size));
+  bottom: calc(var(--session-input-clearance) + var(--spacing-sm));
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  box-shadow: var(--shadow-overlay);
+}
+
+.jump:hover {
+  color: var(--color-text);
+  background: var(--color-bg-active);
+}
+
+/* 切换会话时的加载骨架：磁盘 transcript 尚未到达 */
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+}
+
+.skeletonTitle {
+  width: 40%;
+  height: 18px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  animation: skeletonPulse 1.2s ease-in-out infinite;
+}
+
+.skeletonLine {
+  width: 100%;
+  height: 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  animation: skeletonPulse 1.2s ease-in-out infinite;
+}
+
+.skeletonLineMid {
+  width: 72%;
+  animation-delay: 80ms;
+}
+
+.skeletonLineShort {
+  width: 48%;
+  animation-delay: 160ms;
+}
+
+@keyframes skeletonPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonTitle,
+  .skeletonLine {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* transcript 已上屏、进程尚未就绪时的顶部细提示 */
+.restoreHint {
+  flex-shrink: 0;
+  text-align: center;
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* "刷新并截图"验证快照（docs/design/05 P1-3） */
+.snapshot {
+  margin: 0;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+
+.snapshotCaption {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.snapshotUrl {
+  overflow: hidden;
+  font-family: var(--font-family-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshotTime {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.snapshotImage {
+  display: block;
+  max-width: 100%;
+  max-height: 420px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}

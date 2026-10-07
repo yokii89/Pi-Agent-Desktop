@@ -1,0 +1,128 @@
+/**
+ * 顶栏中间槽会话身份条：适配 40px titlebar。
+ * Electron 算法：drag 标出可拖矩形并忽略指针事件；no-drag 从该矩形挖洞以恢复交互。
+ * 因此条底/空白保持 drag，标题按钮、只读工作目录胶囊（保留 title 悬浮路径）、
+ * Git 分支、更多菜单一律 no-drag。由 TitleBarCenter 的 glass 底承载观感。
+ */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--spacing-sm) 0 var(--spacing-md);
+  -webkit-app-region: drag;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  flex: 1;
+  -webkit-app-region: drag;
+}
+
+.title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-strong);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.titleButton {
+  composes: title;
+  max-width: min(360px, 52%);
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-strong);
+  text-align: left;
+  cursor: default;
+  -webkit-app-region: no-drag;
+}
+
+.titleButton:hover {
+  background: var(--color-bg-hover);
+}
+
+.titleEdit {
+  min-width: 120px;
+  max-width: min(360px, 52%);
+  padding: 2px 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-strong);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.titleEdit:focus {
+  border-color: var(--color-accent);
+}
+
+/* 只读工作目录锚点：no-drag 才能保留 title 悬浮完整路径（产品约束：悬浮看路径） */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  max-width: 120px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-bg-hover);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  -webkit-app-region: no-drag;
+}
+
+.chipLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.more:hover,
+.moreOpen {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.more:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}

@@ -1,0 +1,68 @@
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* 网关 API 模型可能上百条：限高出滚动条，短列表不受影响 */
+  max-height: min(360px, calc(100vh - 96px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-text-muted) 40%, transparent);
+  border-radius: 4px;
+}
+
+.list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-text-muted) 65%, transparent);
+}
+
+.item {
+  /* 图标与文案紧贴左对齐：条目是"图标 + 文字（+ 可选尾巴提示）"，
+     用 space-between 会把文字顶到最右，图标和文字之间空出一大截。 */
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: 6px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-md);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.item:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+.item:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  /* 尾巴提示仍贴右缘，主体（图标+文字）保持左对齐 */
+  margin-left: auto;
+}
+
+.itemIcon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-muted);
+}
+
+/* 危险操作（删除任务等）：文字与图标同用危险色，悬停仍沿用条目底色 */
+.itemDanger,
+.itemDanger .itemIcon {
+  color: var(--color-danger);
+}

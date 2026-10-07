@@ -1,0 +1,33 @@
+.bar {
+  display: flex;
+  /* 宿主占位是 height:0 的零高线：按钮从该线向下悬挂、完整落入条目间隙。
+     不能用 center——居中会让按钮上半截钻到气泡（position:relative，绘制在上层）
+     底部后面，表现为按钮被遮挡只露下缘。 */
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--spacing-xs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    color 0.12s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.12s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.action:hover {
+  color: var(--color-text);
+  background: var(--color-bg-active);
+}
+
+.action:focus-visible {
+  outline: 1px solid var(--color-accent);
+}

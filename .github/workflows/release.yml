@@ -1,0 +1,80 @@
+# PiDesk Windows 打包分发：tag 推送 → 构建 NSIS 安装包 → 发 GitHub Release。
+#
+# 分发链路只有 GitHub Actions + GitHub Releases 两层，不引入第三方发布 Action：
+# - 推送 `v*` tag（如 v0.2.0）触发构建，产物直接挂到对应 Release；
+#   workflow_dispatch 支持手动触发一次「只出构建工件、不发 Release」的试打包。
+# - 构建命令与本地完全一致（pnpm dist，见 scripts/package.mjs），
+#   其中已显式 --publish=never，electron-builder 不会自己碰 Releases，发布统一由最后的 gh 步骤完成。
+#
+# 已知取舍：产物不做代码签名，用户首次运行会遇到 SmartScreen / 杀软提示
+# （「更多信息 → 仍要运行」可过）。要消除提示需要购买代码签名证书并在构建步骤接入，
+# 接入时在 pnpm dist 前补签名步骤，electron-builder.yml 再加 win.certificateSubjectName 等配置。
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  # gh release create 需要对 Releases 的写权限
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 版本读 package.json 的 packageManager 字段（pnpm@12.4.1），无需在此指定
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 打包（NSIS 安装包）
+        run: pnpm dist
+
+      - name: 检查产物
+        shell: bash
+        run: |
+          ls -lh release/
+          test -f release/PiDesk-Setup-*.exe || { echo "缺少安装包产物"; exit 1; }
+          test -f release/latest.yml || { echo "缺少 latest.yml（electron-updater 元数据）"; exit 1; }
+          ls release/PiDesk-Setup-*.exe.blockmap >/dev/null || { echo "缺少 blockmap（差量更新）"; exit 1; }
+
+      # 每次构建都上传工件，便于手动触发试打包时直接下载验收
+      # latest.yml + blockmap 是 electron-updater 发现/差量更新的必需产物（docs/design/35）
+      - name: 上传构建工件
+        uses: actions/upload-artifact@v4
+        with:
+          name: PiDesk-windows-x64
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
+            release/SHASUMS256.txt
+          if-no-files-found: error
+
+      # 仅 tag 构建发布 Release；--generate-notes 用提交历史自动生成说明
+      # 必须带上 latest.yml / blockmap，已装客户端的 electron-updater 才能发现并差量升级
+      - name: 发布 GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "PiDesk ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            release/PiDesk-Setup-*.exe \
+            release/PiDesk-Setup-*.exe.blockmap \
+            release/latest.yml \
+            release/SHASUMS256.txt

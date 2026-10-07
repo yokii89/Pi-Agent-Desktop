@@ -1,0 +1,36 @@
+appId: dev.pidesk.app
+productName: PiDesk
+# Windows 原生图标格式：多尺寸 ICO（16/24/32/48/64/128/256）。
+# 不要直接指向单尺寸 PNG——任务栏/Alt+Tab 各档尺寸会出现模糊或回退到默认图标。
+# 生成方式见 build/README.md。
+icon: build/icon.ico
+directories:
+  output: release
+files:
+  - dist/**/*
+  # 需与 createMainWindow.ts 的 resolveAppIcon() 查找路径一致；
+  # 窗口/任务栏/安装包图标的实际来源是上面的 icon 字段（由 electron-builder 编译进 EXE 资源）。
+  - build/icon.ico
+  - build/icon.png
+# node-pty 的 win32 prebuilds 含 .node / winpty.dll / winpty-agent.exe 等 PE 文件：
+# Windows 无法从 asar 归档内加载原生模块、也无法拉起归档内的 agent 进程，必须整体解包成真实文件。
+asarUnpack:
+  - "**/node_modules/node-pty/**"
+# node-pty 1.1.0 自带的 prebuilds 是 N-API（跨 Node / Electron ABI 通用，打包前由 scripts/package.mjs 预检在位），
+# 不需要 electron-builder 再按 Electron ABI 重编 node-gyp——那一步在 pnpm 布局下既慢又容易失败。
+npmRebuild: false
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: PiDesk-Setup-${version}.${ext}
+# 显式 GitHub 发布源：electron-updater 读 app-update.yml / latest.yml（docs/design/35）。
+# 构建仍用 --publish=never，发布统一由 CI 的 gh release 完成。
+publish:
+  provider: github
+  owner: yokii89
+  repo: Pi-Agent-Desktop

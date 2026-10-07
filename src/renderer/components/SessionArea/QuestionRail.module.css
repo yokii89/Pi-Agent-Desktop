@@ -1,0 +1,193 @@
+/**
+ * 对话问题导航分段栏样式（docs/design/34）。颜色/阴影/层级全走 tokens，不写死色值。
+ * rail 挂在 SessionView .view（position:relative + container-type:inline-size）下，
+ * absolute 左缘垂直居中；容器宽 < 960px 时通过 container query 隐藏（gutter 不够时
+ * 避免压住文档流文字）。气泡在 rail 右侧、pointer-events:none，不被 track 的
+ * overflow 裁剪（气泡是 nav 的子元素，nav 不裁剪）。
+ */
+
+.rail {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  max-height: calc(100% - 96px);
+  flex-direction: column;
+  /* 浮在文档流之上、但低于输入栏悬浮层（--z-input-overlay:10） */
+  z-index: 2;
+  /* 默认隐藏；容器够宽才现身（见文件末 @container） */
+  display: none;
+}
+
+.track {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* 上下留出峰值标记的溢出余量：overflow 两轴都会裁剪，贴边段会被削半 */
+  padding: 8px 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* 隐藏滚动条：分段多时仍可滚，视觉保持干净 */
+  scrollbar-width: none;
+}
+
+.track::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* 分段按钮：命中区默认 36×10px（横向短线够用），视觉标记居左 */
+.seg {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+
+/* 二维放大（圆/环/菱）峰值会撑高标记：加高行距，避免邻段挤成一团 */
+.rail[data-style="dot"] .seg,
+.rail[data-style="ring"] .seg,
+.rail[data-style="diamond"] .seg {
+  height: 16px;
+}
+
+.rail[data-style="tick"] .seg,
+.rail[data-style="pill"] .seg {
+  height: 12px;
+}
+
+.seg:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+/* 标记基类：形状由各样式变体决定；缩放轴交给 --seg-scale，150ms 过渡（尊重 prefers-reduced-motion）。
+   默认 origin 左中（横向条从左生长）；圆形/竖刻度在变体里改 center，避免向右下单侧撑开。 */
+.marker {
+  display: block;
+  background: var(--color-text-muted);
+  transform-origin: left center;
+  transition:
+    transform 150ms ease-out,
+    opacity 150ms ease-out,
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+/* 峰值档 / hover / 键盘焦点段：用前景色强调 */
+.markerFocus {
+  background: var(--color-text);
+}
+
+/* 7 款形状变体（设置 → 个性化 切换）：缩放山机制不变，只换几何与缩放轴。
+   横向类（line/bar/pill）用 scaleX；圆形类（dot/diamond/ring）用 uniform scale；
+   竖刻度（tick）用 scaleY。--seg-scale 缺省 1，未拿到视觉态时不塌陷。
+
+   峰值档是 2.6×：对只横向生长的短线无妨，但对二维放大的形状会撑到 15–25px，
+   在窄轨上挤叠、贴边被裁。故二维类按形状衰减幅度（保留缩放山的相对层级，
+   只压外接尺寸），菱形基础边长同步收 1px 控制对角线外接。 */
+.mLine {
+  width: 12px;
+  height: 2px;
+  border-radius: 999px;
+  transform: scaleX(var(--seg-scale, 1));
+}
+
+.mBar {
+  width: 12px;
+  height: 4px;
+  border-radius: 999px;
+  transform: scaleX(var(--seg-scale, 1));
+}
+
+.mPill {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  transform: scaleX(var(--seg-scale, 1));
+}
+
+.mTick {
+  width: 2px;
+  height: 8px;
+  border-radius: 999px;
+  transform-origin: center;
+  transform: scaleY(calc(1 + (var(--seg-scale, 1) - 1) * 0.55));
+}
+
+.mDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  transform-origin: center;
+  transform: scale(calc(1 + (var(--seg-scale, 1) - 1) * 0.5));
+}
+
+.mDiamond {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  transform-origin: center;
+  transform: rotate(45deg) scale(calc(1 + (var(--seg-scale, 1) - 1) * 0.45));
+}
+
+.mRing {
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--color-text-muted);
+  border-radius: 50%;
+  background: transparent;
+  transform-origin: center;
+  transform: scale(calc(1 + (var(--seg-scale, 1) - 1) * 0.5));
+}
+
+/* 空心环的激活/hover：从描边变实心 */
+.mRing.markerFocus {
+  background: var(--color-text);
+  border-color: var(--color-text);
+}
+
+/* 悬停预览气泡：320px 宽，弹在分段右侧，pointer-events:none */
+.bubble {
+  position: absolute;
+  left: calc(100% + 8px);
+  width: 320px;
+  max-width: calc(100vw - 2rem);
+  /* 垂直居中对齐触发它的分段（top 由组件按实测位置写入） */
+  transform: translateY(-50%);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-overlay);
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marker {
+    transition: none;
+  }
+}
+
+/* 容器够宽（.view inline-size ≥ 960px）才显示 rail */
+@container (min-width: 960px) {
+  .rail {
+    display: flex;
+  }
+}

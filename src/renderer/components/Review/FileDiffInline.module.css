@@ -1,0 +1,47 @@
+/* 文件行展开的内联 Diff 区：水平可滚，高度受限以免撑爆侧栏列表 */
+
+.wrap {
+  margin: 2px 0 var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.scroll {
+  max-height: min(48vh, 420px);
+  overflow: auto;
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.noticeHint {
+  overflow-wrap: anywhere;
+  opacity: 0.85;
+}
+
+.truncated {
+  margin: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-warning);
+}
+
+.spin {
+  animation: inline-diff-spin 0.9s linear infinite;
+}
+
+@keyframes inline-diff-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

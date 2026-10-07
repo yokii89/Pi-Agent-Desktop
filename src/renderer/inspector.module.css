@@ -1,0 +1,88 @@
+/* 检查器系统级浮窗壳（docs/design/38）：无边框窗口的自绘标题条 + 内容。 */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+}
+
+.titleBar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--spacing-sm);
+  height: 36px;
+  padding: 0 var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  cursor: grab;
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+.titleBar:active {
+  cursor: grabbing;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titleActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.titleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.titleBtn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.titleBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.titleBtn:disabled:hover {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 浮窗内检查器占满高度，去掉停靠态的外边框感 */
+.body > section {
+  flex: 1;
+  min-height: 0;
+  border-top: none;
+}

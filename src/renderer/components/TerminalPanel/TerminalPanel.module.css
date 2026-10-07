@@ -1,0 +1,138 @@
+/* 中央工作区底部终端面板：高度由内联样式控制，隐藏时 display:none（pty 保持存活） */
+.panel {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-height: 0;
+  max-height: 70%;
+  border-top: 1px solid var(--color-border);
+  background: var(--terminal-bg);
+}
+
+.panelHidden {
+  display: none;
+}
+
+/* 拖拽把手：面板顶部边界，向上拖增高、向下拖变矮 */
+.resizeHandle {
+  flex: none;
+  height: 5px;
+  cursor: row-resize;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+.resizeHandle:hover,
+.resizeHandleDragging {
+  background: var(--color-accent-soft);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  min-height: 30px;
+  padding: 2px var(--spacing-sm);
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding-right: var(--spacing-xs);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 6px 3px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.tab:hover {
+  background: var(--color-bg-hover);
+}
+
+.tabActive {
+  background: var(--color-bg-active);
+  color: var(--color-text-strong);
+}
+
+.tabTitle {
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.tabClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+}
+
+.tabClose:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-strong);
+}
+
+/* 内联重命名输入框：替换 Tab 标题时展示 */
+.renameInput {
+  width: 96px;
+  padding: 1px 4px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-strong);
+  font-size: var(--font-size-sm);
+  outline: none;
+}
+
+/* xterm 视图容器：占满工具条以下区域 */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.emptyState,
+.exitState {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  background: var(--terminal-bg);
+}

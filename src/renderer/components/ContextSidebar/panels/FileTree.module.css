@@ -1,0 +1,97 @@
+.tree {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/*
+ * 层级缩进公式集中在此：每级步长 = caret 列宽 + 与图标的间距，
+ * 使子级 caret 落在父级图标列上；文件行用同宽 caret 占位，图标与文件夹对齐。
+ */
+.row,
+.emptyDir,
+.placeholder {
+  --tree-caret: 12px;
+  --tree-gap: 6px;
+  --tree-step: calc(var(--tree-caret) + var(--tree-gap));
+  --tree-indent: calc(var(--spacing-sm) + var(--tree-depth, 0) * var(--tree-step));
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tree-gap);
+  width: 100%;
+  padding: 4px var(--spacing-sm);
+  padding-left: var(--tree-indent);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  text-align: left;
+}
+
+.row:hover {
+  background: var(--color-bg-hover);
+}
+
+.selected,
+.selected:hover {
+  background: var(--color-bg-active);
+  color: var(--color-text-strong);
+}
+
+/* caret 列：目录放展开箭头，文件放同宽占位，保证同级图标纵向对齐 */
+.caretSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tree-caret);
+  height: var(--tree-caret);
+  flex-shrink: 0;
+}
+
+.caret {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  transition: transform 0.12s ease;
+}
+
+.caretOpen {
+  transform: rotate(90deg);
+}
+
+.dirIcon {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+/* 文件类型图标为资源型 SVG（fileIcons/），固定 16px 与 Phosphor 行内档位一致 */
+.fileIcon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.emptyDir,
+.placeholder {
+  display: block;
+  width: 100%;
+  padding: 2px var(--spacing-sm);
+  padding-left: var(--tree-indent);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}

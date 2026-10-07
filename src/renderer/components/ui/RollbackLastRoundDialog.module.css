@@ -1,0 +1,62 @@
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.lead {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.bullets {
+  margin: 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bullets strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.conflict {
+  margin-top: 4px;
+  padding: var(--spacing-sm);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-bg-surface));
+}
+
+.conflictTitle {
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+.pathList {
+  margin: 0;
+  padding-left: 1.1em;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.pathItem {
+  word-break: break-all;
+}
+
+.more {
+  margin: 4px 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.risk {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}

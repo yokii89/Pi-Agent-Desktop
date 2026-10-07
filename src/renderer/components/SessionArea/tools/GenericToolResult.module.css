@@ -1,0 +1,36 @@
+.generic {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.label {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  padding-top: 4px;
+}
+
+.body {
+  font-family: var(--font-family-mono);
+  font-size: var(--session-tool-detail-font);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 140px;
+  overflow: auto;
+  color: var(--color-text-muted);
+}
+
+.errorBody {
+  color: var(--color-danger);
+}
+
+.k {
+  color: var(--color-text-muted);
+}
+
+.v {
+  color: var(--color-text);
+}

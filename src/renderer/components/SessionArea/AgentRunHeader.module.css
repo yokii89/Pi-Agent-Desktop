@@ -1,0 +1,67 @@
+.run {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 4px;
+  position: relative;
+}
+
+.usage {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: default;
+}
+
+/* 时间/用时/操作贴在 π 状态点右侧，不推到行末 */
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.elapsed {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.retry {
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.retryFailed {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  white-space: nowrap;
+}
+
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ghost:hover {
+  color: var(--color-text);
+  background: var(--color-bg-active);
+}
+
+.ghost:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}

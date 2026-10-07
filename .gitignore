@@ -1,0 +1,17 @@
+node_modules/
+dist/
+out/
+coverage/
+*.tsbuildinfo
+release/
+*.log
+.DS_Store
+.idea/
+.workbuddy/
+.cross-*.json
+packages/view-sdk/dist/
+.zcode/
+
+# local docs (not for repo)
+docs/
+

@@ -1,0 +1,28 @@
+.link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-family-mono);
+  font-size: var(--session-stream-font-sm);
+  color: var(--color-accent);
+  border-bottom: 1px dashed color-mix(in srgb, var(--color-accent) 55%, transparent);
+  cursor: pointer;
+  word-break: break-all;
+  border-radius: 2px;
+  text-align: left;
+  line-height: inherit;
+  transition:
+    background 120ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 120ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.link:hover {
+  border-bottom-style: solid;
+  background: var(--color-accent-soft);
+}
+
+.link:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}

@@ -1,0 +1,7 @@
+allowBuilds:
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  node-pty: true
+patchedDependencies:
+  node-pty@1.1.0: patches/node-pty@1.1.0.patch

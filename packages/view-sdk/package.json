@@ -1,0 +1,45 @@
+{
+  "name": "@pidesk/view-sdk",
+  "version": "0.2.0",
+  "description": "Client SDK for the PiDesk extension View protocol (view/v1). Lets pi extensions present serializable desktop UIs without touching pi core.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "pidesk",
+    "pi",
+    "extension",
+    "view-sdk",
+    "desktop-ui"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/earendil-works/pi",
+    "directory": "packages/view-sdk"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "prepare": "pnpm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}

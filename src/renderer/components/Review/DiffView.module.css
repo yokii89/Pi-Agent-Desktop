@@ -1,0 +1,65 @@
+/* 侧栏内联 diff：hunk 间隙折叠条 + 单列行号 + 左缘增删色条 */
+
+.diff {
+  width: max-content;
+  min-width: 100%;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+
+.gap {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin: 2px var(--spacing-xs);
+  padding: 3px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.gapCaret {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.row {
+  display: flex;
+  min-width: max-content;
+  border-left: 3px solid transparent;
+}
+
+.num {
+  flex: none;
+  width: 40px;
+  padding: 0 var(--spacing-xs) 0 var(--spacing-sm);
+  text-align: right;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  user-select: none;
+}
+
+.code {
+  flex: none;
+  padding: 0 var(--spacing-md) 0 var(--spacing-sm);
+  white-space: pre;
+  tab-size: 4;
+}
+
+.rowAdd {
+  background: var(--diff-add-bg);
+  border-left-color: var(--color-success);
+}
+
+.rowDel {
+  background: var(--diff-del-bg);
+  border-left-color: var(--color-danger);
+}

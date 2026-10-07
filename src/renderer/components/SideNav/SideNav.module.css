@@ -1,0 +1,531 @@
+.nav {
+  /* 磨砂玻璃：半透明底 + 背景模糊 + 颗粒（配方与令牌见 styles/glass.module.css） */
+  composes: glass from "../../styles/glass.module.css";
+  grid-area: nav;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* 填满网格轨道（--nav-track）；收起/展开瞬时切换轨道宽 */
+  width: 100%;
+  min-width: 0;
+  padding: var(--spacing-sm);
+  /* 玻璃面板与中央区之间只留一线描边，靠材质而非重色块区分两栏 */
+  border-right: 1px solid var(--glass-border);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 收起态：图标列水平居中，与顶栏开关同一中轴（TitleBar .leftCollapsed） */
+.collapsed {
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+}
+
+/* 扩展 View sidebar 槽：纵向堆叠卡片，整体限高避免挤掉项目树 */
+.extSlots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: 220px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-md);
+}
+
+/* 与 IconButton 同宽同行高：收起后「P」和图标按钮共用一条垂直中轴 */
+.brandMini {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: var(--spacing-xs) 0 var(--spacing-sm);
+  color: var(--color-text-strong);
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+}
+
+.brandName {
+  color: var(--color-text-strong);
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+  letter-spacing: 0.5px;
+}
+
+.beta {
+  padding: 0 6px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.newTask {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  /* 垂直内边距与 .navItem 对齐（7px）：三行导航的行距才一致，
+     margin/padding 任一方不对称都会让「New task ↔ Extensions」比后续行距宽 */
+  padding: 7px var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-strong);
+  font-size: var(--font-size-md);
+  transition: background-color 0.12s ease;
+}
+
+.newTask:hover {
+  background: var(--color-bg-hover);
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: 7px var(--spacing-sm);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  text-align: left;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.navItem:hover {
+  background: var(--color-bg-hover);
+}
+
+.navItemActive {
+  background: var(--color-bg-active);
+  color: var(--color-text-strong);
+}
+
+.divider {
+  height: 1px;
+  margin: var(--spacing-sm) 0;
+  background: var(--color-border);
+}
+
+.spacer {
+  flex: 1;
+  min-height: var(--spacing-lg);
+}
+
+/* 分区头（项目 / 任务）：标题 + 箭头 + 右侧动作按钮 */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding-right: var(--spacing-xs);
+}
+
+.sectionHeaderMain {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  padding: 6px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  text-align: left;
+}
+
+.sectionHeaderMain:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+/* 箭头容器：旋转由 GSAP 写内联 transform，这里只固定尺寸与基点 */
+.caretBox {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: inherit;
+  transform-origin: 50% 50%;
+}
+
+/* 行内小图标按钮（分区头 / 项目行 / 历史条目共用） */
+.rowButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.rowButton:hover {
+  background: var(--color-bg-active);
+  color: var(--color-text-strong);
+}
+
+/* 触发中的按钮（菜单已展开）：高亮表示"这个入口是开着的"，
+   同时作为 RevealOnRowHover 判定"锁定常驻"的标记类，勿删。 */
+.rowButtonOpen {
+  background: var(--color-bg-active);
+  color: var(--color-text-strong);
+}
+
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.itemText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 历史会话条目（"任务"与项目子列表共用）：单行 = 标题 + 右槽（时间 / 操作按钮原位互换） */
+.historyItem {
+  /* 右侧动作槽宽度：⋯ 与置顶两个 24px 按钮 + 2px 间距 + 4px 右缘留白。
+     标题在该边界截断，时间与操作按钮同在槽内右对齐——悬浮时原位 crossfade，
+     而不是按钮盖在时间上（那会在交接的一瞬叠印，见旧版缺陷） */
+  --row-slot: 58px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-md);
+  /* 只用颜色过渡；位移由 GSAP 负责，避免两条动画链路打架 */
+  transition: background-color 0.12s ease;
+}
+
+.historyItem:hover {
+  background: var(--color-bg-hover);
+}
+
+.historyItemActive,
+.historyItemActive:hover {
+  background: var(--color-bg-active);
+}
+
+/* 活动行左缘的强调条：灰底之外多一道可扫视的锚点；树线行上由它接管该行的线段 */
+.historyItemActive::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-accent);
+  /* 盖过 TreeGuideLines（z-auto），强调条完整覆盖该行的树线段 */
+  z-index: 1;
+}
+
+.historyMain {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  /* 右内边距 = 动作槽宽：标题永远在槽界截断，悬浮时不会因按钮浮现而 reflow */
+  padding: 7px var(--row-slot) 7px var(--spacing-md);
+  text-align: left;
+}
+
+.historyTitle {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  /* 单行截断：全文与元信息交给悬浮详情卡（HistoryHoverCard），不再滚动标题 */
+  text-overflow: ellipsis;
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  /* 悬浮时标题右移 2px 提示"这条可点"。位移放在标题上而不是 historyMain 上：
+     时间戳绝对定位于 .historyItem，historyMain 一旦带 transform 就会成为
+     它的包含块，悬浮瞬间时间会跟着歪 2px */
+  transition: transform 0.16s ease;
+}
+
+/* 条目左侧状态指示：AI 输出中（旋转）/ 完成未读（绿点） */
+.historyStatus {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: var(--color-text-muted);
+}
+
+.historyItemActive .historyStatus {
+  color: var(--color-text);
+}
+
+.statusSpin {
+  animation: statusSpin 1.1s linear infinite;
+}
+
+@keyframes statusSpin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.doneDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+.historyItemActive .historyTitle {
+  color: var(--color-text-strong);
+}
+
+.historyItem:hover .historyTitle,
+.historyItem:focus-within .historyTitle {
+  transform: translateX(2px);
+}
+
+.historyDots {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: inline-flex;
+  gap: 2px;
+  transform: translateY(-50%);
+}
+
+/* 行内重命名输入框：原位替换标题按钮，右侧留出动作槽宽度避免被悬浮按钮压住 */
+.renameInput {
+  flex: 1;
+  min-width: 0;
+  margin: 3px var(--row-slot) 3px var(--spacing-md);
+  padding: 2px var(--spacing-xs);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  color: var(--color-text-strong);
+  font-size: var(--font-size-md);
+}
+
+/* 行内操作按钮的显隐。悬浮/聚焦由 GSAP 播补间（见 RevealOnRowHover），
+   补间只改 --reveal 这个自定义属性，可见性由 CSS 统一决定——
+   避免内联 opacity 与 :focus-within 规则互相压制（后者需要 !important 才能赢）。
+
+   键盘聚焦态必须独立可用：若只依赖 JS，一旦动画被打断或首帧未执行，
+   用户会聚焦到一个完全透明的按钮上——这是无障碍硬伤。 */
+.hoverReveal {
+  display: inline-flex;
+  opacity: var(--reveal, 0);
+  pointer-events: none;
+}
+
+.historyItem:hover .hoverReveal,
+.historyItem:focus-within .hoverReveal,
+.projectRow:hover .hoverReveal,
+.projectRow:focus-within .hoverReveal,
+.hoverReveal[data-locked] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.historyMeta {
+  overflow: hidden;
+  padding: 6px var(--spacing-sm) 6px var(--spacing-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* 超出条数的折叠入口 */
+.showMore {
+  width: 100%;
+  padding: 6px var(--spacing-sm) 6px var(--spacing-md);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  text-align: left;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.showMore:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+/* 树线收尾行（空态文案 / "显示更多"）：作为 TreeGuideLines 的定位容器 */
+.guideRow {
+  position: relative;
+}
+
+/* 项目行：主体（图标 + 名称）+ 右缘信息区（时间 / 悬浮操作 / 展开箭头）；
+   整行为历史会话的展开/收起开关 */
+.projectRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* 行右缘固定留给展开箭头：各项目行的箭头横向对齐，不再跟着名称长度漂移 */
+  padding-right: 4px;
+  border-radius: var(--radius-md);
+  transition: background-color 0.12s ease;
+}
+
+.projectRow:hover {
+  background: var(--color-bg-hover);
+}
+
+/* 项目行不再有"选中底色"：整行点击 = 展开/收起，底色变化会和展开态打架
+   （展开着的项目看着像被选中的按钮）。当前项目改由文件夹图标（Folder / FolderOpen）
+   与文字颜色区分，见 .projectRowActive .projectMain。 */
+
+/* 铺满整行的透明开关按钮：真正的点击目标；操作按钮与菜单浮在其上层。
+   z-index 必须压过 .projectMain——悬浮时 .projectMain 带 transform（右移 2px），
+   而带 transform 的元素会被提升到 z-index:0 那一层并按 DOM 顺序排在按钮之上，
+   于是"只要鼠标移上来、点名称就落在文字上"，整行点击会失效（事件不经过这个按钮）。 */
+.projectRowHit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.projectMain {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  padding: 7px var(--spacing-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  text-align: left;
+  /* 悬浮时整行内容右移，为右侧滑入的操作按钮腾出视觉通道 */
+  transition: transform 0.16s ease;
+}
+
+/* 项目图标：切换 Folder/FolderOpen 时由 GSAP 写内联 scale，这里固定基准点 */
+.projectGlyph {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  transform-origin: 50% 50%;
+}
+
+/* 项目名后的展开箭头（收起 →、展开 ↓）：固定在行最右缘，
+   与操作按钮构成统一的右缘信息区，装饰元素不参与点击（整行开关接管） */
+.projectCaret {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: var(--color-text-muted);
+}
+
+.projectRowActive .projectMain {
+  color: var(--color-text-strong);
+}
+
+.projectActions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 2px;
+}
+
+.projectRow:hover .projectMain,
+.projectRow:focus-within .projectMain {
+  transform: translateX(2px);
+}
+
+/* 项目名下的会话子列表容器：本身不参与布局，只承载折叠动画 */
+.nestedWrap {
+  display: block;
+}
+
+/* 项目名下的历史会话缩进展示：由 TreeGuideLines 画树线，缩进量需容纳引导线宽度 */
+.nestedList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  margin: 0;
+  padding-left: calc(var(--spacing-md) + 4px);
+}
+
+/* 折叠容器（分区列表 / 项目子列表）：外层承载高度补间，内层列表负责测量内容高度。
+   内容间距一律用 padding / gap（margin 不计入 scrollHeight，会造成折叠后残留空隙）。 */
+.collapseRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0 0 var(--spacing-xs);
+  overflow: hidden;
+}
+
+/* 树状引导线：一条 1px 竖线，末条收尾为指向条目的分支钩 */
+.guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(var(--spacing-md) + 6px);
+  pointer-events: none;
+}
+
+.guideLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-border);
+}
+
+/* 分支钩（对应 └ 的横杠）：只在最内侧那条线上出现，
+   最后一项竖线只画到中线，形成"└"；中间项画满形成"├"。 */
+.guideBranch::after,
+.guideBranchLast::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 6px;
+  height: 1px;
+  background: inherit;
+}
+
+/* 最后一项：竖线收在半高，与分支钩组成 └ */
+.guideBranchLast {
+  bottom: 50%;
+}
+
+/* 无障碍：系统开启"减少动效"时关闭纯 CSS 动画 */
+@media (prefers-reduced-motion: reduce) {
+  .statusSpin {
+    animation: none;
+  }
+}

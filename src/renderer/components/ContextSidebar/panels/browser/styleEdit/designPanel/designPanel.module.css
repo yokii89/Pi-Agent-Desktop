@@ -1,0 +1,576 @@
+/* 设计面板（Figma 检查器观感 × PiDesk tokens）。
+   对照 docs/浏览器拾取功能/拾取元素后用户手动改css的前端封装.png：
+   分组标题加重 · 字段浅底圆角 · 单位右缀灰色 · 分段按钮无框/选中浅底。 */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--spacing-md);
+}
+
+.empty {
+  margin: 0;
+  padding: var(--spacing-sm) 2px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* ── 分组 ─────────────────────────────────────────── */
+
+.section {
+  padding: 12px 0 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.section:first-child {
+  padding-top: 4px;
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-bottom: 10px;
+}
+
+.sectionTitle {
+  flex: 1;
+  margin: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.sectionActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 紧凑单行：标签 + 控件 + 控件…（Padding/Margin、外观…） */
+.denseRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+
+.denseLabel {
+  flex: 0 0 auto;
+  min-width: 28px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.subSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subHead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-height: 24px;
+}
+
+.subTitle {
+  flex: 1;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ── 字段行 ───────────────────────────────────────── */
+
+.fieldRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+
+.fieldBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  flex: 0 0 36px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fieldLabelShort {
+  flex-basis: 14px;
+  min-width: 14px;
+}
+
+.fieldLabelAuto {
+  flex-basis: auto;
+  min-width: 0;
+}
+
+.fieldBlockLabel {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.fieldControl {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fieldControl > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.fieldPair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.fieldTriple {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.fieldPair .fieldLabel,
+.fieldTriple .fieldLabel {
+  flex-basis: 16px;
+}
+
+/* ── 单位输入 ─────────────────────────────────────── */
+
+.unitField {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+
+.unitField:hover:not(.unitFieldDisabled) {
+  border-color: var(--color-border-strong);
+}
+
+.unitField:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
+}
+
+.unitFieldAdjusted {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+}
+
+.unitFieldDisabled {
+  opacity: 0.55;
+}
+
+.unitDot {
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.unitFieldAdjusted .unitDot {
+  background: var(--color-accent);
+}
+
+.unitLabel {
+  flex-shrink: 0;
+  padding-left: 10px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.unitIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding-left: 8px;
+  color: var(--color-text-muted);
+}
+
+.unitInput {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  outline: none;
+  cursor: ew-resize;
+}
+
+.unitInput::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+.unitField[data-dragging="1"] .unitInput {
+  color: var(--color-accent);
+}
+
+.unitSuffix {
+  flex-shrink: 0;
+  padding-right: 10px;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-ui);
+  font-size: 11px;
+}
+
+/* ── 文本 / 选择 / 颜色外壳 ───────────────────────── */
+
+.textInput {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  outline: none;
+}
+
+.textInput::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+.textInput:hover {
+  border-color: var(--color-border-strong);
+}
+
+.textInput:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
+}
+
+.selectShell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+
+.selectShell:hover {
+  border-color: var(--color-border-strong);
+}
+
+.selectShell:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
+}
+
+.selectInput {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0 28px 0 10px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.selectCaret {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+  color: var(--color-text-muted);
+}
+
+.colorShell {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+
+.colorShell:hover {
+  border-color: var(--color-border-strong);
+}
+
+.colorShell:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
+}
+
+/* 背景色：仅色块 */
+.swatchOnly {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background:
+    linear-gradient(45deg, #666 25%, transparent 25%),
+    linear-gradient(-45deg, #666 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #666 75%),
+    linear-gradient(-45deg, transparent 75%, #666 75%);
+  background-size: 8px 8px;
+  background-position:
+    0 0,
+    0 4px,
+    4px -4px,
+    -4px 0;
+  background-color: var(--color-bg-hover);
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.swatchOnly:hover {
+  border-color: var(--color-border-strong);
+}
+
+.swatchOnlyInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.swatchOnlyFill {
+  position: absolute;
+  inset: 3px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* ── 分段按钮（Flow / 对齐）───────────────────────── */
+
+.segmentRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.segmentBordered {
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-surface);
+}
+
+.segmentBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.segmentBtn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.segmentBtnOn {
+  background: var(--color-bg-active);
+  color: var(--color-text);
+}
+
+.segmentBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.segmentAside {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── 图标按钮 ─────────────────────────────────────── */
+
+.iconBtn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 分组标题右侧：描边小方钮（设计图位置/背景旁） */
+.iconBtnBordered {
+  border-color: var(--color-border);
+  background: var(--color-bg-surface);
+}
+
+.iconBtnBordered:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-hover);
+}
+
+.asideBtn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.asideBtn:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.asideBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── 复选 ─────────────────────────────────────────── */
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--color-text);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-success);
+  cursor: pointer;
+}
+
+/* ── 背景行 / 旋转行 ──────────────────────────────── */
+
+.bgRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bgRow .unitField {
+  flex: 0 0 88px;
+}
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actionRow .unitField {
+  flex: 1;
+}

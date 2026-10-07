@@ -1,0 +1,289 @@
+/**
+ * PiDesk 颜色/设计令牌。
+ * 色板对齐 MiMo 暗色观感（docs/design/02-界面布局与视觉规范.md §4）。
+ * 主题通过根元素 data-theme="dark" | "light" 切换，两套主题变量名必须一一对应。
+ * 组件内禁止写死色值，只允许引用此处的变量。
+ */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* 背景层 */
+  --color-bg: #111113;
+  --color-bg-elevated: #18181b;
+  --color-bg-surface: #202024;
+  --color-bg-hover: rgba(255, 255, 255, 0.06);
+  --color-bg-active: rgba(255, 255, 255, 0.1);
+
+  /* 边框 */
+  --color-border: #2a2a2e;
+  --color-border-strong: #3f3f45;
+
+  /* 文字：对齐 ZCode zai-dark 的正文层级——正文 #d4d4d4（Tailwind neutral-300），
+     纯白只留给彩色底上的反白字；strong 仅比正文亮一档，深底上不刺眼 */
+  --color-text: #d4d4d4;
+  --color-text-muted: #8a8a90;
+  --color-text-strong: #e6e6e9;
+
+  /* 主色 / 强调 */
+  --color-accent: #4a8cff;
+  --color-accent-hover: #6aa3ff;
+  --color-accent-text: #0b1a2b;
+  --color-accent-soft: rgba(74, 140, 255, 0.16);
+  /* 代码底（行内 code / pre / fence 共用）：与 bg-surface 同档，
+     深底上"浮起一档"，对齐 ZCode 代码卡对比度（docs/design/33） */
+  --color-code-bg: #202024;
+
+  /* 运行态文字扫光（docs/design/26）：strong/soft 同族，
+     soft 取 22% 与 PiStateMark .ghost 的 opacity 同值 */
+  --tool-flow-strong: var(--color-accent);
+  --tool-flow-soft: color-mix(in oklab, var(--color-accent) 22%, transparent);
+  --tool-flow-duration: 1550ms; /* 与 pi-flow 同周期，避免两处异频 */
+
+  /* 状态色 */
+  --color-success: #4ec9b0;
+  --color-warning: #dcb67a;
+  --color-danger: #f14c4c;
+  --color-on-danger: #ffffff;
+
+  /* Git diff（审查视图的行底色，docs/design/04 §3） */
+  --diff-add-bg: rgba(78, 201, 176, 0.14);
+  --diff-del-bg: rgba(241, 76, 76, 0.14);
+
+  /* Git 图谱泳道（循环 6 色，按列号取模） */
+  --graph-lane-0: #4a8cff;
+  --graph-lane-1: #4ec9b0;
+  --graph-lane-2: #dcb67a;
+  --graph-lane-3: #c678dd;
+  --graph-lane-4: #56b6c2;
+  --graph-lane-5: #e06c75;
+
+  /* 元素拾取芯片 · 标签语义色（方案 B 类型徽章）
+     4+1 类：可交互 / 文本 / 容器 / 媒体 / 其它；色相同族取自 graph-lane，不新造色相 */
+  --el-tag-interactive: #4a8cff;
+  --el-tag-interactive-bg: rgba(74, 140, 255, 0.16);
+  --el-tag-text: #dcb67a;
+  --el-tag-text-bg: rgba(220, 182, 122, 0.16);
+  --el-tag-structure: #c678dd;
+  --el-tag-structure-bg: rgba(198, 120, 221, 0.16);
+  --el-tag-media: #56b6c2;
+  --el-tag-media-bg: rgba(86, 182, 194, 0.16);
+  --el-tag-other: #8a8a90;
+  --el-tag-other-bg: rgba(138, 138, 144, 0.16);
+
+  /* 用量热力图色阶（设置页「全部」档；空档 + 当日 output 强度 4 档，强调色派生） */
+  --heat-empty: #1e1e23;
+  --heat-1: #17335c;
+  --heat-2: #1f4a85;
+  --heat-3: #316fd2;
+  --heat-4: #6aa3ff;
+
+  /* 终端（比主背景更深） */
+  --terminal-bg: #0d0d0f;
+  --terminal-fg: #cccccc;
+
+  /* 会话工具流（中间栏事件流，docs 中间栏对话流设计 v3） */
+  --color-tool-bg: rgba(255, 255, 255, 0.03);
+  --color-tool-rail: #26262b;
+  --color-danger-soft: rgba(241, 76, 76, 0.16);
+  --color-warning-soft: rgba(220, 182, 122, 0.16);
+  --color-success-soft: rgba(78, 201, 176, 0.14);
+  --color-muted-soft: rgba(138, 138, 144, 0.16);
+
+  /* 间距（4px 基准） */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* 圆角 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* 字号（三档 + 欢迎语大标题）——固定 chrome 用绝对 px；
+     缩放敏感的文档流尺寸见下方 --md-* em 令牌（docs/design/29 §3.1） */
+  --font-size-sm: 12px;
+  --font-size-md: 14px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+
+  /* 文档流阶梯（em，随包装层字号缩放；对齐 ZCode zai-dark：h1 = 正文+4px、
+     h2 = 正文+2px、h3 起与正文同号，层级靠标题 24px 上间距撑起（docs/design/33）。
+     16px 正文下 = 20 / 18 / 16，绝不小于正文（docs/design/29 防倒挂原则保留） */
+  --md-font-h1: 1.25em;
+  --md-font-h2: 1.125em;
+  --md-font-h3: 1em;
+  /* 列表缩进：1.5em 在 16px 档 = 24px（= --spacing-lg），随四档字号等比缩放 */
+  --md-list-indent: 1.5em;
+  --font-family-ui: "OPPO Sans", system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+  --font-family-mono: "Cascadia Code", Consolas, monospace;
+
+  /* 布局尺寸 */
+  --titlebar-height: 40px;
+  --nav-width: 248px;
+  --nav-width-collapsed: 56px;
+  /** 右侧上下文侧栏（审查/文件）宽度。 */
+  --context-sidebar-width: 300px;
+  /**
+   * 悬浮输入栏实测高度（SessionArea 运行时写入 --session-input-height）。
+   * 此默认值仅作首帧兜底；多行/附件/建议面板长高后必须跟上，否则末尾正文会被压住（docs/design/10 C4）。
+   */
+  --session-input-height: 120px;
+  /** 会话流末尾正文与输入栏上沿的呼吸间距（在输入栏高度与停靠偏移之外额外留出）。 */
+  --session-input-gap: 128px;
+  /**
+   * 会话文档流底部留白 = 输入栏高度 + 停靠偏移(--spacing-lg) + 呼吸间距。
+   * 贴底时最后一段停在输入栏上沿之上，且保留可上滑的滚动余量。
+   */
+  --session-input-clearance: calc(
+    var(--session-input-height) +
+    var(--spacing-lg) +
+    var(--session-input-gap)
+  );
+  /**
+   * 会话内容列宽（随中央区宽度变化）：下限=窄栏时的可读宽度，上限=超宽屏的行长上限，
+   * 中间按中央区宽度的 88% 增长。写死单一 px 会让宽屏下文字区永远是一条窄栏。
+   */
+  --session-stream-column: clamp(860px, 88%, 1160px);
+  /** 会话输入框列宽：与文档流同一增长策略，整体略窄于文档流（悬浮卡视觉，见 02 §2）。 */
+  --session-input-column: clamp(760px, 88%, var(--session-input-column-cap));
+  /**
+   * 输入框列宽上限。会话流里需要与输入栏边界对齐的整宽卡片（本轮变更汇总卡）引用它，
+   * 而不是 `--session-input-column`：后者的 88% 按各自包含块求值，宽屏下会算出更窄的值。
+   */
+  --session-input-column-cap: 1060px;
+  /**
+   * 对话流字号（比全局 md/sm 各大 2px，只作用中间会话区）。
+   * md/sm 的运行时覆盖由 uiStore 写在 documentElement（设置 → 个性化 → 对话流字号）；
+   * 此处默认值仅作首帧与未水合时的兜底，勿在组件内直接改写。
+   */
+  --session-stream-font-md: 16px;
+  --session-stream-font-sm: 14px;
+  /**
+   * 工具调用展开区字号：恒定比正文流（--session-stream-font-md）小一号（-2px）。
+   * 从 md 推导而不是复用 sm——sm 是独立档位，改 md 时不会跟，展开区会和正文同号。
+   */
+  --session-tool-detail-font: calc(var(--session-stream-font-md) - 2px);
+  /** 细滚动条尺寸：global.css 的 ::-webkit-scrollbar 与悬浮输入栏的右内缩共用它（两者必须同值才能对齐中轴）。 */
+  --scrollbar-size: 8px;
+
+  /* 层级 */
+  --z-input-overlay: 10;
+  /* 非模态工具浮窗（如代码审查）：浮在面板之上，但必须低于 modal——
+     浮窗里发起的确认弹窗（ConfirmDialog/--z-modal）要压在浮窗上方。 */
+  --z-float: 40;
+  --z-modal: 150;
+  /* Menu/Popover 必须高于 Modal：设置浮窗里的「选择」菜单 portal 到 body，
+     若仍低于 modal 遮罩会被完全盖住（表现为按钮点了没反应）。 */
+  --z-menu: 160;
+  --z-toast: 200;
+
+  /* 阴影 */
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  /* 磨砂玻璃（顶栏 + 左右侧栏）：配方见 styles/glass.module.css */
+  --glass-bg: rgba(24, 24, 27, 0.5);
+  /** 吸顶/覆盖类玻璃层：要盖住下层滚动内容，所以比 --glass-bg 实 */
+  --glass-bg-strong: rgba(24, 24, 27, 0.86);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  /** 玻璃上缘的一线高光 */
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  /** 顶部柔光渐隐 */
+  --glass-sheen: rgba(255, 255, 255, 0.04);
+  /** 磨砂颗粒：feTurbulence 生成的灰度噪点平铺（不是色值，故与主题无关）。
+      opacity 控制颗粒强度——太高会在玻璃上叠出一层均匀灰雾把面板整体提亮，
+      实测 0.10 时纹理清晰可见、整体亮度只上浮约 +8/255。 */
+  --glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23g)' opacity='0.1'/%3E%3C/svg%3E");
+  /* 模糊强度与饱和度增强：与主题无关，亮色沿用 */
+  --glass-blur: 24px;
+  --glass-saturate: 150%;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* 背景层（亮色 P2 校色，先保持同名变量可用） */
+  --color-bg: #f5f5f7;
+  --color-bg-elevated: #ffffff;
+  --color-bg-surface: #ececef;
+  --color-bg-hover: rgba(0, 0, 0, 0.05);
+  --color-bg-active: rgba(0, 0, 0, 0.09);
+
+  /* 边框 */
+  --color-border: #d8d8dc;
+  --color-border-strong: #b4b4ba;
+
+  /* 文字 */
+  --color-text: #2c2c30;
+  --color-text-muted: #7d7d84;
+  --color-text-strong: #000000;
+
+  /* 主色 / 强调 */
+  --color-accent: #2f6fe0;
+  --color-accent-hover: #1f5ecb;
+  --color-accent-text: #ffffff;
+  --color-accent-soft: rgba(47, 111, 224, 0.12);
+  --color-code-bg: #e2e2e6;
+
+  /* 状态色 */
+  --color-success: #0f7b6c;
+  --color-warning: #b06c00;
+  --color-danger: #c42b1c;
+  --color-on-danger: #ffffff;
+
+  /* Git diff */
+  --diff-add-bg: rgba(15, 123, 108, 0.12);
+  --diff-del-bg: rgba(196, 43, 28, 0.12);
+
+  /* Git 图谱泳道 */
+  --graph-lane-0: #2f6fe0;
+  --graph-lane-1: #0f7b6c;
+  --graph-lane-2: #b06c00;
+  --graph-lane-3: #8b3fbf;
+  --graph-lane-4: #0e7490;
+  --graph-lane-5: #c42b1c;
+
+  /* 元素拾取芯片 · 标签语义色（与暗色同名变量一一对应） */
+  --el-tag-interactive: #2f6fe0;
+  --el-tag-interactive-bg: rgba(47, 111, 224, 0.12);
+  --el-tag-text: #b06c00;
+  --el-tag-text-bg: rgba(176, 108, 0, 0.12);
+  --el-tag-structure: #8b3fbf;
+  --el-tag-structure-bg: rgba(139, 63, 191, 0.12);
+  --el-tag-media: #0e7490;
+  --el-tag-media-bg: rgba(14, 116, 144, 0.12);
+  --el-tag-other: #7d7d84;
+  --el-tag-other-bg: rgba(125, 125, 132, 0.14);
+
+  /* 用量热力图色阶（亮色向深/饱和递进） */
+  --heat-empty: #e3e3e8;
+  --heat-1: #cbdcf5;
+  --heat-2: #93b9ec;
+  --heat-3: #4f86e0;
+  --heat-4: #2359ad;
+
+  /* 终端 */
+  --terminal-bg: #ffffff;
+  --terminal-fg: #1e1e1e;
+
+  /* 会话工具流 */
+  --color-tool-bg: rgba(0, 0, 0, 0.02);
+  --color-tool-rail: #dedee3;
+  --color-danger-soft: rgba(196, 43, 28, 0.12);
+  --color-warning-soft: rgba(176, 108, 0, 0.12);
+  --color-success-soft: rgba(15, 123, 108, 0.12);
+  --color-muted-soft: rgba(125, 125, 132, 0.14);
+
+  /* 磨砂玻璃（亮色：白玻璃；blur / saturate / grain 沿用根定义） */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-strong: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(0, 0, 0, 0.07);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+  --glass-sheen: rgba(255, 255, 255, 0.5);
+
+  /* 阴影 */
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.15);
+}

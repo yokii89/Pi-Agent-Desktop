@@ -1,0 +1,34 @@
+/**
+ * 磨砂玻璃配方：顶栏与左右侧栏共用，通过 CSS Modules 的 `composes` 引入。
+ *
+ * 只负责"玻璃"本身的观感——半透明底 + 背景模糊 + 磨砂颗粒 + 上缘高光；
+ * 尺寸、边框、滚动等几何属性留给使用方，否则两块侧栏会被强行同构。
+ *
+ * 依赖：tokens.css 的 --glass-* 令牌（色值只在那里定义）。
+ *
+ * 背景不再铺环境光（--ambient-glow-* 已移除，见 App.module.css）：应用底色是
+ * 一块纯平色，backdrop-filter 在这里只用于柔化面板下方滚过去的真实内容，
+ * 不再产出彩色柔光。面板与中央区的分界由使用方各自的 --glass-border 细线承担。
+ */
+
+.glass {
+  background-color: var(--glass-bg);
+  /* 第一层是磨砂颗粒（background-attachment 默认 scroll，颗粒不随滚动内容移动），
+     第二层是顶部柔光，往下的 15% 内渐隐 */
+  background-image:
+    var(--glass-grain), linear-gradient(180deg, var(--glass-sheen), transparent 15%);
+  background-repeat: repeat, no-repeat;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* 无障碍：系统开启"减少透明度"时退回不透明面板，避免文字压在模糊底上 */
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background-color: var(--color-bg-elevated);
+    background-image: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

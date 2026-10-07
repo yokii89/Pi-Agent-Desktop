@@ -1,0 +1,15 @@
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm) 0;
+}
+
+/* 软门禁角标：目录未声明视觉，不阻止发送（docs/design/21） */
+.hint {
+  color: var(--color-text-muted);
+  font-size: var(--session-stream-font-sm);
+  max-width: 14rem;
+  line-height: 1.4;
+}

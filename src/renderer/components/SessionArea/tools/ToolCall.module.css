@@ -1,0 +1,158 @@
+.call {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.railed::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 13px;
+  width: 5px;
+  height: 1px;
+  background: var(--color-tool-rail);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: var(--session-stream-font-md);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 120ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.glyph {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.action {
+  flex-shrink: 0;
+  color: var(--color-text);
+  font-size: var(--session-stream-font-md);
+  white-space: nowrap;
+}
+
+.actionRun {
+  color: var(--color-accent);
+}
+
+.actionMuted {
+  color: var(--color-text-muted);
+}
+
+.actionErr {
+  color: var(--color-danger);
+}
+
+/* 路径 / 命令芯片（Codex 深底等宽）；不拉伸占满，让箭头贴住左侧文案 */
+.subjectChip {
+  font-family: var(--font-family-mono);
+  font-size: var(--session-stream-font-sm);
+  line-height: 1.5;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: min(100%, 520px);
+}
+
+.stats {
+  flex-shrink: 0;
+  font-family: var(--font-family-mono);
+  font-size: var(--session-stream-font-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.statRun {
+  color: var(--color-accent);
+}
+
+.statErr {
+  color: var(--color-danger);
+}
+
+.statAdd {
+  color: var(--color-success);
+}
+
+.statDel {
+  color: var(--color-danger);
+}
+
+.caret {
+  width: 0;
+  height: 0;
+  flex-shrink: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  opacity: 0.75;
+  color: var(--color-text-muted);
+  transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.row:hover {
+  background: var(--color-bg-hover);
+}
+
+.row:active {
+  background: var(--color-bg-active);
+}
+
+.row:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.row.plain {
+  cursor: default;
+}
+
+.row.plain:hover {
+  background: transparent;
+}
+
+.row:disabled {
+  opacity: 1;
+  color: inherit;
+}
+
+.open > .row .caret {
+  transform: rotate(90deg);
+}
+
+.detailWrap {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.detail {
+  padding: 2px 8px 8px 26px;
+  /* 展开区统一走「比正文流小一号」；子结果组件不再各自写死 sm */
+  font-size: var(--session-tool-detail-font);
+}
+
+/* 收起态不残留内边距占位（rendered=false 时 detail 不挂载，这里兜底） */
+.call:not(.open) > .detailWrap {
+  height: auto;
+}

@@ -1,0 +1,153 @@
+/* 全局基础样式：重置 + 应用级外观。业务组件样式请跟随组件的 *.module.css。 */
+
+/* OPPO Sans 4.0：可变字体（Light→Bold 多字重，wght 轴 0–200）。
+   文件从 src/shared/font 迁入 src/renderer/assets/fonts —— Vite 资源管线只覆盖 src/renderer，
+   故不能留在 src/shared。font-weight 声明为 1 1000 以映射整条可变轴，bold 为真实粗体而非合成。 */
+@font-face {
+  font-family: "OPPO Sans";
+  src: url(../assets/fonts/OPPO-Sans-4.0.ttf) format("truetype");
+  font-weight: 1 1000;
+  font-style: normal;
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* 输入类控件允许文本选择 */
+input,
+textarea {
+  user-select: text;
+  font-family: inherit;
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* 细滚动条，贴合暗色外壳；尺寸见 tokens 的 --scrollbar-size（悬浮输入栏右内缩按它对齐） */
+::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 公用工具类 */
+.demo-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* 运行态文字扫光（docs/design/26）：配方集中，ToolCall / ToolCallGroup 共用。
+   三处刻意偏离 ZCode 原件：
+   ① 不写 display:inline-block —— 目标元素都是 flex item，本已被 blockify；
+   ② 不带 will-change/translateZ —— 避免 N 个并发 running 各提一层；
+   ③ 用 animation-play-state 门控（.toolFlowRunning 祖先），对齐 PiStateMark。
+   选择器带 :root 前缀：必须盖过同元素上的 .actionRun / .summary 的 color，
+   否则实心色会画在 background-clip:text 之上，扫光被完全遮住。 */
+:root .toolFlow {
+  background-image: linear-gradient(
+    90deg,
+    var(--tool-flow-strong) 0%,
+    var(--tool-flow-strong) 34%,
+    var(--tool-flow-soft) 50%,
+    var(--tool-flow-strong) 66%,
+    var(--tool-flow-strong) 100%
+  );
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: tool-flow var(--tool-flow-duration) linear infinite;
+  animation-play-state: paused;
+}
+
+:root .toolFlowRunning .toolFlow {
+  animation-play-state: running;
+}
+
+/* ZCode 原 keyframes 是 100% → 0% → 0%：后半场停在 0%，"扫一下、歇一下" */
+@keyframes tool-flow {
+  0% {
+    background-position: 100% 0;
+  }
+  50%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+/* AGENTS.md 动效规范：命中 prefers-reduced-motion 直接落到终态、不播 */
+@media (prefers-reduced-motion: reduce) {
+  :root .toolFlow {
+    animation: none;
+    background-image: none;
+    color: var(--color-accent);
+  }
+}
+
+/* 本项目是 Windows 专用客户端，forced-colors 是硬性项：
+   background-clip:text + color:transparent 在高对比度下会让文字彻底消失。
+   必须排在 reduced-motion 之后：两者同时命中时要以 CanvasText 为准。 */
+@media (forced-colors: active) {
+  :root .toolFlow {
+    background-image: none;
+    color: CanvasText;
+    animation: none;
+  }
+}

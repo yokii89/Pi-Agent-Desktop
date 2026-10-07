@@ -1,0 +1,195 @@
+/* 上下文用量：模型名左侧的纯圆环，明细靠 CSS tooltip + Popover（docs/design/28） */
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.chip:hover {
+  background: var(--color-bg-hover);
+}
+
+.chip:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+/* 16px 进度环：conic-gradient 自绘，数据可视化而非 UI 图标 */
+.ring {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--ring-color, var(--color-accent)) var(--ring-pct, 0%),
+    var(--color-border) 0
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 2.5px),
+    #000 calc(100% - 2px)
+  );
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+}
+
+/* 悬浮快览：居中三行；Popover 打开时收起，避免叠两层 */
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 168px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.chip:hover:not(.chipOpen) .tooltip,
+.chip:focus-visible:not(.chipOpen) .tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.tooltipTitle {
+  color: var(--color-text-muted);
+}
+
+.tooltipMain {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.tooltipDetail {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.warning .ring {
+  --ring-color: var(--color-warning);
+}
+
+.danger .ring {
+  --ring-color: var(--color-danger);
+}
+
+/* —— Popover 面板：总量 + 堆叠条 + 图例（只给百分比）—— */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 4px 2px;
+}
+
+.panelTitle {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.panelMain {
+  font-weight: 500;
+  font-size: var(--font-size-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.panelDetail {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-border);
+}
+
+.seg {
+  display: block;
+  height: 100%;
+  min-width: 0;
+}
+
+.segUser,
+.swatch.segUser {
+  background: var(--graph-lane-0);
+}
+.segAssistant,
+.swatch.segAssistant {
+  background: var(--graph-lane-1);
+}
+.segThinking,
+.swatch.segThinking {
+  background: var(--graph-lane-3);
+}
+.segTool,
+.swatch.segTool {
+  background: var(--graph-lane-2);
+}
+.segSummary,
+.swatch.segSummary {
+  background: var(--graph-lane-4);
+}
+.segSkills,
+.swatch.segSkills {
+  background: var(--graph-lane-5);
+}
+.segOther,
+.swatch.segOther {
+  background: var(--color-text-muted);
+}
+
+.legend {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-sm);
+}
+
+.swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legendName {
+  flex: 1;
+  color: var(--color-text);
+}
+
+.legendPct {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}

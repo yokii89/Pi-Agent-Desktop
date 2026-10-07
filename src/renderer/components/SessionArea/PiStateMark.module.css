@@ -1,0 +1,198 @@
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mark {
+  position: relative;
+  display: inline-block;
+  width: var(--size, 18px);
+  height: var(--size, 18px);
+  flex: 0 0 auto;
+  vertical-align: middle;
+  contain: layout paint;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.layer {
+  opacity: 0;
+  transform: scale(0.94);
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transition:
+    opacity 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.isRunning .running,
+.isCompleted .completed,
+.isFailed .failed,
+.isInterrupted .interrupted {
+  opacity: 1;
+  transform: none;
+}
+
+.isRunning {
+  color: var(--color-accent);
+}
+.isCompleted {
+  color: var(--color-success);
+}
+.isFailed {
+  color: var(--color-danger);
+}
+.isInterrupted {
+  color: var(--color-warning);
+}
+
+.line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 4.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ghost {
+  opacity: 0.22;
+}
+
+.flow {
+  stroke-dasharray: 0.26 0.74;
+  stroke-dashoffset: 0;
+  animation: pi-flow 1550ms linear infinite;
+  animation-play-state: paused;
+}
+
+.isRunning .flow {
+  animation-play-state: running;
+}
+
+.flowLeft {
+  animation-delay: -520ms;
+}
+.flowRight {
+  animation-delay: -1030ms;
+}
+
+@keyframes pi-flow {
+  to {
+    stroke-dashoffset: -1;
+  }
+}
+
+.draw {
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.isCompleted .draw,
+.isFailed .draw,
+.isInterrupted .draw {
+  stroke-dashoffset: 0;
+}
+
+.halo {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 0;
+  opacity: 0;
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+
+.isCompleted .halo {
+  animation: settle-halo 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes settle-halo {
+  0% {
+    opacity: 0;
+    transform: scale(0.64);
+  }
+  25% {
+    opacity: 0.42;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
+.failedLeg {
+  transform: translate(0, 0) rotate(0deg);
+  transform-box: view-box;
+  transform-origin: 65% 40%;
+  transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.isFailed .failedLeg {
+  transform: translate(3px, 2px) rotate(7deg);
+}
+
+.pauseMemory {
+  opacity: 0.16;
+  stroke-width: 3;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 0;
+}
+
+.pauseBars {
+  stroke-width: 4.2;
+}
+
+.compact .line {
+  stroke-width: 5.6;
+}
+.compact .pauseMemory {
+  stroke-width: 4;
+}
+.compact .pauseBars {
+  stroke-width: 5.6;
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+.isRunning .label {
+  color: var(--color-accent);
+}
+.isCompleted .label {
+  color: var(--color-success);
+}
+.isFailed .label {
+  color: var(--color-danger);
+}
+.isInterrupted .label {
+  color: var(--color-warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow {
+    animation: none;
+    stroke-dasharray: none;
+  }
+  .halo {
+    animation: none;
+    opacity: 0;
+  }
+  .layer,
+  .draw,
+  .failedLeg {
+    transition: none;
+  }
+}

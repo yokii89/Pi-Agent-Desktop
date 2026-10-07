@@ -1,0 +1,196 @@
+/* 盒模型（DevTools 示意图观感 × PiDesk tokens）。
+   同心色带：margin 琥珀 / border 蓝 / padding 青绿 / content 中性。 */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.7;
+}
+
+/* ── 示意图 ───────────────────────────────────────── */
+
+.diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xs) 0 var(--spacing-sm);
+}
+
+.band {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: 3px;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.margin {
+  background: color-mix(in srgb, var(--color-warning) 14%, var(--color-bg-surface));
+  color: var(--color-warning);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+
+.border {
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-bg-surface));
+  color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+.padding {
+  background: color-mix(in srgb, var(--color-success) 16%, var(--color-bg-surface));
+  color: var(--color-success);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-success) 40%, transparent);
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 28px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: var(--color-bg-elevated);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.edgeTop,
+.edgeRight,
+.edgeBottom,
+.edgeLeft {
+  position: absolute;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.edgeTop {
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.edgeBottom {
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.edgeLeft {
+  top: 50%;
+  left: 4px;
+  transform: translateY(-50%);
+}
+
+.edgeRight {
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+}
+
+/* 宽侧栏不够时的紧凑降级（放在基础规则之后，避免降序特异） */
+.rootCompact .band {
+  padding: 10px;
+}
+
+.rootCompact .diagram {
+  justify-content: flex-start;
+}
+
+/* ── 图例明细 ─────────────────────────────────────── */
+
+.legend {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.legendRow {
+  display: grid;
+  grid-template-columns: 10px 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-surface);
+}
+
+.swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.swatchMargin {
+  background: var(--color-warning);
+}
+
+.swatchBorder {
+  background: var(--color-accent);
+}
+
+.swatchPadding {
+  background: var(--color-success);
+}
+
+.swatchContent {
+  background: var(--color-text-muted);
+}
+
+.legendLabel {
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+}
+
+.legendValue {
+  min-width: 0;
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sides {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sideChip {
+  min-width: 22px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--color-bg-hover);
+  text-align: center;
+}
+
+.contentValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.times {
+  opacity: 0.5;
+}

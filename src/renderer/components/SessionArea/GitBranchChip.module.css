@@ -1,0 +1,165 @@
+/** 空态输入栏：与工作区芯片同构（无底、正文字号）。 */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 6px var(--spacing-sm);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+
+/** 会话 header（顶栏 40px）：紧凑元信息胶囊，与工作区目录芯片同构。 */
+.chipMeta {
+  composes: chip;
+  max-width: 140px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-bg-hover);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  -webkit-app-region: no-drag;
+}
+
+.chip:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.chip:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.chipLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  max-height: 360px;
+  gap: 2px;
+}
+
+.searchRow {
+  padding: 2px 2px 6px;
+}
+
+.search {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  outline: none;
+}
+
+.search:focus {
+  border-color: var(--color-border-strong);
+}
+
+.search::placeholder {
+  color: var(--color-text-muted);
+}
+
+.sectionLabel {
+  padding: 6px 8px 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  text-align: left;
+}
+
+.row:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+.row:disabled {
+  cursor: default;
+}
+
+.rowActive {
+  background: var(--color-bg-hover);
+}
+
+.rowLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.hint {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.check {
+  margin-left: auto;
+  color: var(--color-text);
+}
+
+.empty {
+  padding: 8px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--color-border);
+}
+
+.createRow {
+  display: flex;
+  gap: var(--spacing-xs);
+  padding: 4px 2px;
+}
+
+.createBtn {
+  flex-shrink: 0;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-size: var(--font-size-sm);
+}
+
+.createBtn:disabled {
+  opacity: 0.45;
+}

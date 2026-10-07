@@ -1,0 +1,176 @@
+/* 右侧上下文侧栏：审查 / 文件 三个 Tab 共用一个框架；宽度可拖拽（App 根元素覆盖该变量） */
+.sidebar {
+  /* 磨砂玻璃：半透明底 + 背景模糊 + 颗粒（配方与令牌见 styles/glass.module.css） */
+  composes: glass from "../../styles/glass.module.css";
+  grid-area: aside;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--context-sidebar-width);
+  min-width: 0;
+  /* overflow ≠ visible 使网格项的自动最小尺寸归零：
+     否则长列表会把自身 min-content 高度带入网格行，行被撑爆后内部无法滚动 */
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--glass-border);
+}
+
+/* 拖拽把手：侧栏左缘，向左拖增宽、向右拖变窄 */
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+.resizeHandle:hover,
+.resizeHandleDragging {
+  background: var(--color-accent-soft);
+}
+
+.tabBar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* 单行可滚动 tab 区：永不换行；放不下先由 JS 收成纯图标，仍放不下再横向滚动 */
+.tabScroller {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex: 1;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabScroller::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 5px var(--spacing-sm);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  /* CJK 标签禁止逐字折行；放不下时收成纯图标 */
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.tabLabel {
+  white-space: nowrap;
+}
+
+/* 侧栏放不下文案时只留图标，避免换行/挤压 */
+.iconOnly .tabLabel {
+  display: none;
+}
+
+.iconOnly .tab {
+  padding: 5px 6px;
+}
+
+/* 测量「带文案」自然宽时强制展开完整形态（文案 + 标准 padding，覆盖 iconOnly 的收窄），
+   量完立刻撤掉。只还原文案不还原 padding 会让临界宽度量偏小，在带/不带文案之间来回改判。 */
+.tabScroller.measuring .tabLabel {
+  display: inline;
+}
+
+.tabScroller.measuring .tab {
+  padding: 5px var(--spacing-sm);
+}
+
+.tab:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.tabActive {
+  background: var(--color-bg-active);
+  color: var(--color-text-strong);
+}
+
+/* Catalog-only panel 占位 Tab 激活中（docs/design/19 §10.1） */
+.tabPending {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+/* Tab 内容区：面板在此自行铺满 */
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panelBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-sm);
+}
+
+/* 文件面板保活壳：可见时 display:contents 让壳对布局透明（FilePanel 的
+   头部与 panelBody 直接参与 .body 的 flex 排版），隐藏时整体 display:none，
+   组件状态与 DOM 全保留（docs/文件面板文件渲染方案.md §8 动线补强）。 */
+.panelAlive {
+  display: contents;
+}
+
+.panelAliveHidden {
+  display: none;
+}
+
+/* Catalog-only panel 占位体（docs/design/19 §10.1） */
+.catalogPanelPending {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg);
+  color: var(--color-text-muted);
+}
+
+.catalogPanelTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.catalogPanelHint {
+  margin: 0;
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+}
+
+.catalogPanelAction {
+  padding: 6px var(--spacing-md);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-active);
+  color: var(--color-text-strong);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+
+.catalogPanelAction:hover {
+  background: var(--color-bg-hover);
+}

@@ -1,0 +1,60 @@
+.area {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-bg);
+}
+
+.splash {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xl);
+  padding: var(--spacing-xl);
+}
+
+.running {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /*
+   * 底部留白按输入栏实测高度重算（useInputClearance 写入 --session-input-height）。
+   * tokens 的缺省 calc 绑在 :root，子元素继承的是已代入后的值；必须在写入高度的
+   * 同一元素上重定义，才能随输入栏长高而变（docs/design/10 C4）。
+   */
+  --session-input-clearance: calc(
+    var(--session-input-height) +
+    var(--spacing-lg) +
+    var(--session-input-gap)
+  );
+}
+
+/* 会话进行中，输入框悬浮停靠在底部。
+   右内缩一个滚动条槽宽：文档流内容区被 .scroll 的 scrollbar-gutter 让掉了这 8px，
+   不补的话输入栏比会话列整体偏右 4px，同宽的卡片边界对不齐。 */
+.dockedInput {
+  position: absolute;
+  left: 0;
+  right: var(--scrollbar-size);
+  bottom: var(--spacing-lg);
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--spacing-xl);
+  z-index: var(--z-input-overlay);
+}
+
+/* 扩展 widget 槽与输入框的纵向栈：与 TaskInput 同宽（对齐 --session-input-column）。
+   position:relative 供 floating widget 作 absolute 锚点（对齐 suggestPanel）。 */
+.inputStack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: min(100%, var(--session-input-column));
+  min-width: 0;
+}

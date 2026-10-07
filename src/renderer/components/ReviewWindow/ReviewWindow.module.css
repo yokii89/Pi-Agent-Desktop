@@ -1,0 +1,171 @@
+/* 代码审查浮窗：非模态工具窗（docs/design 30 §2.1 的 UI 形态升级）。
+   无遮罩、可拖拽缩放、点外部不关闭；z-index 用 --z-float（低于 modal，
+   保证浮窗里发起的 ConfirmDialog 压在浮窗上方）。 */
+
+.window {
+  position: fixed;
+  z-index: var(--z-float);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+  animation: window-in 0.14s ease;
+}
+
+.window:focus {
+  outline: none;
+}
+
+@keyframes window-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985) translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .window {
+    animation: none;
+  }
+}
+
+/* —— 头部：拖拽把手 + 标题 + 分支 + 视图切换 + 汇总 + 操作 —— */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+  touch-action: none;
+}
+
+.header:active {
+  cursor: grabbing;
+}
+
+.title {
+  flex-shrink: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.branchChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 180px;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+}
+
+/* 视图切换（变更 / 图谱） */
+.tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  flex-shrink: 0;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: calc(var(--radius-md) - 2px);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.tab:hover {
+  color: var(--color-text);
+}
+
+.tabActive {
+  background: var(--color-bg-active);
+  color: var(--color-text-strong);
+}
+
+.spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.summaryChip {
+  /* 可收缩 + 省略号：停靠态 300px 窄栏头部放不下完整汇总时优雅截断 */
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* —— 右下角缩放把手 —— */
+
+.resizeHandle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.resizeHandle::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-border-strong);
+  border-bottom: 2px solid var(--color-border-strong);
+  border-bottom-right-radius: 3px;
+  opacity: 0.7;
+}
+
+.spin {
+  animation: review-spin 0.9s linear infinite;
+}
+
+@keyframes review-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

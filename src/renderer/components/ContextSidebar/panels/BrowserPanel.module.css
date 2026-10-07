@@ -1,0 +1,341 @@
+/* 浏览器面板（docs/design/05）：页面内容由主进程 WebContentsView 覆盖渲染，
+   浮层（最近地址/错误/托盘）一律文档流布局，避免被视图遮挡。 */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel.picking {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+/* 多页面页签条：与终端页签同一节奏，贴在工具栏上方 */
+.pageTabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 30px;
+  padding: 2px var(--spacing-xs);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.pageTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  max-width: 140px;
+  padding-right: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.pageTab:hover {
+  background: var(--color-bg-hover);
+}
+
+.pageTabActive {
+  background: var(--color-bg-active);
+  color: var(--color-text-strong);
+}
+
+.pageTabButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  padding: 3px 4px 3px var(--spacing-xs);
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.pageTabLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pageTabClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pageTabClose:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-strong);
+}
+
+/* 工具栏；面板较窄时允许换行，避免内容溢出侧栏 */
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.spacer {
+  flex: 1;
+  min-width: var(--spacing-sm);
+}
+
+/* 地址栏后的动作区：整组不换行不压缩，窄侧栏时优先让地址栏收缩 */
+.trailingActions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.spinning {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 地址栏 */
+.addressWrap {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.addressWrap:focus-within {
+  border-color: var(--color-accent);
+}
+
+.address {
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--spacing-sm);
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.recentToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.recentToggle:hover {
+  color: var(--color-text);
+}
+
+.caretUp {
+  transform: rotate(180deg);
+}
+
+/* 工具按钮 */
+.errorButton {
+  color: var(--color-danger);
+}
+
+/* 角标叠在 IconButton 右上角；父级 .button 已 position: relative */
+.errorBadge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* 文档流内的展开 section（最近地址 / 控制台错误） */
+.section {
+  padding: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--spacing-xs);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.sectionHead .sectionTitle {
+  margin: 0;
+}
+
+.recentList,
+.errorList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recentItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: 4px var(--spacing-xs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.recentItem:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.recentLocal {
+  color: var(--color-accent);
+}
+
+.recentUrl {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.errorItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+}
+
+.errorItem:hover {
+  background: var(--color-bg-hover);
+}
+
+.errorMessage {
+  color: var(--color-danger);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+}
+
+.errorSource {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.emptyNote {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.linkButton:hover {
+  background: var(--color-accent-soft);
+}
+
+/* 页面宿主区域：WebContentsView 覆盖渲染于此 */
+.host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background:
+    repeating-conic-gradient(var(--color-bg-surface) 0% 25%, var(--color-bg-elevated) 0% 50%) 0 0 /
+    16px 16px;
+  transition: outline-color 0.12s ease;
+}
+
+.hostPicking {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  color: var(--color-text-muted);
+}
+
+.emptyHint {
+  max-width: 80%;
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+/* 浮层抑制期间的页面冻结帧（更多菜单等）：铺满宿主区，视觉上等同原页面 */
+.overlayFreeze {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* 与宿主区 1:1 铺满，避免 cover 裁切导致与真实页面错位闪烁 */
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}

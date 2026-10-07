@@ -1,0 +1,236 @@
+/* 用量统计面板：汇总卡片 + 趋势柱状图 + 模型明细表（颜色/间距一律走 tokens.css） */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.stateText {
+  margin: var(--spacing-md) 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}
+
+.empty {
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-lg);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0 0 var(--spacing-xs);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+}
+
+.emptyText {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* 数据保留加载：切档/刷新期间旧内容降透明度占位，避免整块卸载重挂的闪烁 */
+
+.body {
+  transition: opacity 120ms ease;
+}
+
+.bodyPending {
+  opacity: 0.55;
+  transition: opacity 120ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .body,
+  .bodyPending {
+    transition: none;
+  }
+}
+
+/* 汇总卡片行 */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-tool-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+
+.cardLabel {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.cardValue {
+  color: var(--color-text-strong);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.cardSub {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 热力图工具栏：左项目筛选、右色阶图例（图例原在图底，上移省一行） */
+
+.heatmapToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.heatmapToolbar select {
+  min-width: 0;
+  max-width: 280px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* 趋势图（纯 CSS 堆叠柱） */
+
+.granularityHint {
+  margin: 0 0 var(--spacing-xs);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.bars {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 120px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.barSlot {
+  flex: 1 1 0;
+  min-width: 2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.segInput,
+.segOutput {
+  display: block;
+  width: 100%;
+}
+
+.segInput {
+  background: var(--tool-flow-soft);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+}
+
+.segOutput {
+  background: var(--tool-flow-strong);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+}
+
+.axis {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.dotInput {
+  background: var(--tool-flow-soft);
+}
+
+.dotOutput {
+  background: var(--tool-flow-strong);
+}
+
+/* 模型明细表 */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.table th {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-weight: 400;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.modelCell {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footnote {
+  margin: var(--spacing-md) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}

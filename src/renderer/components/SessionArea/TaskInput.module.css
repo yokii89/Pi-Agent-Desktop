@@ -1,0 +1,130 @@
+/* 外层定位锚点：浮层贴在输入卡上方，不撑开卡片。
+   列宽只由 SessionArea 的 .inputStack 约束（--session-input-column）；
+   这里再套一层 max-width 会在 flex 列里把卡片压窄并靠左，破坏居中。 */
+.wrap {
+  position: relative;
+  width: 100%;
+}
+
+.inputBox {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  overflow: visible;
+  /* 浮层 z-index 相对本卡 */
+  position: relative;
+  z-index: 1;
+}
+
+.inputSession {
+  /* 会话态无 ContextBar，表面即整卡 */
+}
+
+.surface {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.staleConfirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-warning);
+  font-size: var(--font-size-sm);
+}
+
+.staleActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-left: auto;
+}
+
+/* @ / / 建议：悬浮在输入卡上方，不参与卡片布局 */
+.suggestPanel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-xs);
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-overlay);
+  z-index: var(--z-menu);
+}
+
+.suggestTitle {
+  padding: 4px 8px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.suggestRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  text-align: left;
+}
+
+.suggestRow img,
+.suggestIcon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.suggestActive {
+  background: var(--color-bg-hover);
+}
+
+/* 文件名主文案 */
+.suggestName {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* 相对路径（次要信息） */
+.suggestPath {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  direction: rtl;
+  text-align: left;
+}
+
+.suggestFooter {
+  padding: 6px 8px 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}

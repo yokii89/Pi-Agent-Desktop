@@ -1,0 +1,905 @@
+/* 样式热更改（docs/design/22 UI 重设计）。
+   观感：DevTools Styles 的信息层级 × MiMo 浮起卡片。
+   令牌一律走 tokens.css；控件统一 28px 命中高度。 */
+
+/* ── 设计 | CSS 模式切换（设计图分段胶囊） ───────── */
+
+.modeSwitch {
+  display: flex;
+  gap: 3px;
+  margin: 0 0 var(--spacing-sm);
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-surface);
+}
+
+.modeTab {
+  flex: 1;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.modeTab:hover {
+  color: var(--color-text);
+}
+
+.modeTabOn {
+  background: var(--color-bg-active);
+  color: var(--color-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* ── 目标栏 ───────────────────────────────────────── */
+
+.targetBar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin: 0 0 var(--spacing-xs);
+  padding: 4px 0 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.targetChip {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-accent);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+}
+
+.targetChipEmpty {
+  color: var(--color-text-muted);
+}
+
+.targetLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.liveBadge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.liveBadgeIdle {
+  background: var(--color-muted-soft);
+  color: var(--color-text-muted);
+}
+
+.liveBadgeWarn {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 25%, transparent);
+}
+
+.liveBadgeApplying {
+  animation: livePulse 0.9s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveBadgeApplying {
+    animation: none;
+  }
+}
+
+.targetActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.iconBtnDanger:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+
+/* ── 调整卡片 ─────────────────────────────────────── */
+
+.adjustCard {
+  margin: 0 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  overflow: visible;
+}
+
+.adjustCardLive {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.adjustCardMuted {
+  border-color: var(--color-border);
+  background: var(--color-bg-hover);
+}
+
+.adjustHead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 8px 10px 6px;
+}
+
+.adjustTitle {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.adjustMeta {
+  flex: 1;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.adjustHeadActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.adjustNote {
+  margin: 0;
+  padding: 0 10px 8px;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.adjustError {
+  margin: 0 10px 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.noticeStrip {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: 0 0 var(--spacing-sm);
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-hover);
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.noticeStripText {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.ghostBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ghostBtn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.ghostBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── 属性行 ───────────────────────────────────────── */
+
+.adjustList {
+  margin: 0;
+  padding: 0 6px;
+  list-style: none;
+}
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "toggle name actions"
+    "toggle value actions";
+  column-gap: 6px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 6px 6px 6px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.row:hover {
+  background: var(--color-bg-hover);
+}
+
+.rowDisabled {
+  opacity: 0.5;
+}
+
+.rowToggle {
+  grid-area: toggle;
+  align-self: start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  appearance: none;
+}
+
+.rowToggle:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.rowToggle::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg) translate(0.5px, -1px);
+  opacity: 0;
+}
+
+.rowToggle:checked::after {
+  opacity: 1;
+}
+
+.rowName {
+  grid-area: name;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+}
+
+.rowDisabled .rowName {
+  text-decoration: line-through;
+  text-decoration-color: var(--color-text-muted);
+}
+
+.rowNameText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowColon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.impBadge {
+  flex-shrink: 0;
+  padding: 0 4px;
+  border: 1px solid var(--color-warning);
+  border-radius: 4px;
+  color: var(--color-warning);
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  line-height: 14px;
+}
+
+.rowValueWrap {
+  grid-area: value;
+  min-width: 0;
+}
+
+.rowDisabled .rowValueWrap {
+  text-decoration: line-through;
+  text-decoration-color: var(--color-text-muted);
+}
+
+.rowActions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.row:hover .rowActions,
+.row:focus-within .rowActions {
+  opacity: 1;
+}
+
+/* 无 hover 的环境（触屏/键盘）仍可通过 focus-within 看到 */
+@media (hover: none) {
+  .rowActions {
+    opacity: 1;
+  }
+}
+
+.rowIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.rowIcon:hover {
+  background: var(--color-bg-active);
+  color: var(--color-text);
+}
+
+.rowIconOn {
+  color: var(--color-warning);
+}
+
+.rowIconDanger:hover {
+  color: var(--color-danger);
+}
+
+/* ── 值控件 ───────────────────────────────────────── */
+
+.field {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  overflow: hidden;
+}
+
+.field:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
+}
+
+.fieldDisabled {
+  opacity: 0.65;
+}
+
+/* 值控件铺满 .field（flex 下 width:100% 不够稳） */
+.field > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.textInput {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  outline: none;
+}
+
+.colorRoot > .textInput {
+  flex: 1;
+  min-width: 0;
+}
+
+.lengthRoot {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+
+.lengthNum {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  outline: none;
+  cursor: ew-resize;
+}
+
+.lengthDragging .lengthNum {
+  color: var(--color-accent);
+}
+
+.lengthUnit {
+  flex: 0 0 auto;
+  height: 100%;
+  max-width: 52px;
+  padding: 0 4px;
+  border: none;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+}
+
+.colorRoot {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  gap: 0;
+}
+
+.colorSwatchWrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 28px;
+  height: 100%;
+  border-right: 1px solid var(--color-border);
+  background:
+    linear-gradient(45deg, #666 25%, transparent 25%),
+    linear-gradient(-45deg, #666 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #666 75%),
+    linear-gradient(-45deg, transparent 75%, #666 75%);
+  background-size: 8px 8px;
+  background-position:
+    0 0,
+    0 4px,
+    4px -4px,
+    -4px 0;
+  background-color: #999;
+}
+
+.colorSwatch {
+  position: absolute;
+  inset: 3px;
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.enumSelect {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* ── 添加属性（幽灵声明行） ───────────────────────── */
+
+.addForm {
+  position: relative;
+  padding: 4px 10px 10px;
+}
+
+.addGhost {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 2px 6px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+}
+
+.addGhost:focus-within {
+  border-color: var(--color-accent);
+  border-style: solid;
+  color: var(--color-text);
+}
+
+.addName,
+.addValue {
+  min-width: 0;
+  height: 26px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  outline: none;
+}
+
+.addName {
+  flex: 1.1;
+}
+
+.addValue {
+  flex: 1.4;
+}
+
+.addColon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.addSubmit {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.addSubmit:hover:not(:disabled) {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.addSubmit:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.suggestList {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  z-index: 5;
+  margin: 2px 0 0;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  list-style: none;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.suggestItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestItem:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+.suggestItem:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.suggestName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestMeta {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-ui);
+  font-size: 10px;
+}
+
+.addHint {
+  margin: 6px 2px 0;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* ── computed / matched 只读区 ────────────────────── */
+
+.readonlySection {
+  margin-bottom: var(--spacing-sm);
+}
+
+.computedFilterRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin: 0 0 4px;
+  padding: 0 4px;
+}
+
+.computedFilterIcon {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.computedFilter {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  outline: none;
+}
+
+.computedFilter:focus {
+  border-color: var(--color-accent);
+}
+
+.computedFilter::placeholder {
+  color: var(--color-text-muted);
+  font-family: var(--font-family-ui);
+}
+
+.computedFilterClear {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.computedFilterClear:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: 6px 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sectionHead:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.sectionTitle {
+  flex-shrink: 0;
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+}
+
+.sectionMeta {
+  flex: 1;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-ui);
+  font-size: 10px;
+}
+
+.readonlyList {
+  margin: 0;
+  padding: 2px 0 0 4px;
+  list-style: none;
+}
+
+.readonlyRow {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 28px 3px 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.readonlyRow:hover {
+  background: var(--color-bg-hover);
+}
+
+.readonlyRowAdjusted {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+  color: var(--color-accent);
+}
+
+.readonlyName {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.readonlyRowAdjusted .readonlyName {
+  color: var(--color-accent);
+}
+
+.readonlyValue {
+  min-width: 0;
+  color: var(--color-text);
+  word-break: break-all;
+}
+
+.readonlyRowAdjusted .readonlyValue {
+  color: var(--color-accent);
+}
+
+.promoteBtn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s ease;
+}
+
+.readonlyRow:hover .promoteBtn,
+.readonlyRow:focus-within .promoteBtn {
+  opacity: 1;
+}
+
+.promoteBtn:hover:not(:disabled) {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+/* 已在调整中的行悬停也不露出幽灵 +（避免点到 disabled） */
+.readonlyRow:hover .promoteBtn:disabled,
+.readonlyRow:focus-within .promoteBtn:disabled {
+  opacity: 0;
+}
+
+.emptyNote {
+  margin: 0;
+  padding: 8px 6px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.hintNote {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}

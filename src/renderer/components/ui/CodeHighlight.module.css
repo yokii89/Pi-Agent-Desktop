@@ -1,0 +1,119 @@
+.block {
+  margin: 0;
+  padding: var(--spacing-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-text);
+  white-space: pre;
+  overflow: auto;
+  counter-reset: line;
+}
+
+.block:focus-visible {
+  outline: 1px solid var(--color-border-strong);
+  outline-offset: -1px;
+}
+
+.block .line {
+  display: inline-block;
+  width: 100%;
+  min-height: 1.5em;
+}
+
+.block .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  box-sizing: border-box;
+  width: var(--gutter-w, 3ch);
+  padding-right: var(--spacing-sm);
+  margin-right: var(--spacing-sm);
+  border-right: 1px solid var(--color-border);
+  text-align: right;
+  color: var(--color-text-muted);
+  user-select: none;
+  /* 横向滚动时行号粘在左侧，代码从号槽下穿过 */
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-bg-elevated);
+}
+
+.host {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  overflow: auto;
+}
+
+/* shiki 输出的 pre 默认带主题背景；侧栏要透明以贴合玻璃面板 */
+.host :global(.shiki) {
+  margin: 0;
+  padding: var(--spacing-sm);
+  white-space: pre;
+  overflow: visible;
+  background-color: transparent;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  counter-reset: line;
+}
+
+.host :global(.shiki .line) {
+  display: inline-block;
+  width: 100%;
+  min-height: 1.5em;
+}
+
+/* 行号槽：CSS counter，宽度随总行数位数变化（--gutter-w） */
+.host :global(.shiki .line::before) {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  box-sizing: border-box;
+  width: var(--gutter-w, 3ch);
+  padding-right: var(--spacing-sm);
+  margin-right: var(--spacing-sm);
+  border-right: 1px solid var(--color-border);
+  text-align: right;
+  color: var(--color-text-muted);
+  user-select: none;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-bg-elevated);
+}
+
+/*
+ * 双主题：shiki 以 defaultColor:false 同时吐出 --shiki-light / --shiki-dark，
+ * 此处按 data-theme 选用对应变量（与 tokens.css 主题切换机制一致）。
+ * 行号 ::before 不在此列，保持 --color-text-muted。
+ */
+.host :global(.shiki),
+.host :global(.shiki span) {
+  color: var(--shiki-light);
+}
+
+:global([data-theme="dark"]) .host :global(.shiki),
+:global([data-theme="dark"]) .host :global(.shiki span) {
+  color: var(--shiki-dark);
+}
+
+/* 优先级高于上面的 .shiki span，行号不跟随主题 token 色 */
+.host :global(.shiki .line::before) {
+  color: var(--color-text-muted);
+}
+
+/* path:line 打开时的目标行：整行底色提示，行号槽同步 */
+.block .lineFocus,
+.host :global(.shiki .lineFocus) {
+  background: var(--color-accent-soft);
+}
+
+.block .lineFocus::before,
+.host :global(.shiki .lineFocus::before) {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+}

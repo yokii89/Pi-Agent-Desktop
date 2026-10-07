@@ -1,0 +1,80 @@
+/*
+ * 顶栏三段 + chrome。
+ * 三段是 App 网格的直接子项（grid-area: titleL / titleC / titleR），
+ * 列宽完全由 App.module.css 的 grid-template-columns 决定——与正文
+ * nav / main / aside 同轨，收放同帧，不再自建第二套栅格。
+ */
+
+/* 左端：与 SideNav 同列；右边线与 SideNav.border-right 连成一条 */
+.left {
+  composes: glass from "../../styles/glass.module.css";
+  grid-area: titleL;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  padding-left: var(--spacing-sm);
+  border-right: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
+  overflow: hidden;
+  -webkit-app-region: drag;
+}
+
+/* 侧栏收起：开关与 SideNav 图标列共用同一条垂直中轴（居中，取消左内边距） */
+.leftCollapsed {
+  justify-content: center;
+  padding-left: 0;
+}
+
+/* 中端：与中央会话区同列；空槽时整段可拖拽 */
+.center {
+  composes: glass from "../../styles/glass.module.css";
+  grid-area: titleC;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  border-bottom: 1px solid var(--glass-border);
+  -webkit-app-region: drag;
+}
+
+/* 侧栏收起时 titleR 为 0，chrome 叠到中列右端，内容需要避让 */
+.centerUnderChrome {
+  padding-right: var(--titlebar-chrome-width, 200px);
+  justify-content: flex-end;
+}
+
+/* 会话态：身份条左对齐占满中列，右侧「更多」仍由 SessionHeader 自己推到末尾 */
+.centerSession {
+  justify-content: flex-start;
+}
+
+/* 右端：与 ContextSidebar 同列；左边线与侧栏.border-left 连成一条。
+   右侧避让 chrome，避免扩展槽被窗控压住。 */
+.right {
+  composes: glass from "../../styles/glass.module.css";
+  grid-area: titleR;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  padding-right: var(--titlebar-chrome-width, 200px);
+  border-left: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+}
+
+/* chrome：绝对定位叠在 .app 右上，不进入 grid 轨道 */
+.chrome {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-xs);
+  height: var(--titlebar-height);
+  -webkit-app-region: no-drag;
+}

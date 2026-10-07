@@ -1,0 +1,35 @@
+# 换行策略：仓库内统一 LF，检出到工作区也是 LF。
+#
+# 为什么需要它：本机 gitconfig（PortableGit 机器级）里 `core.autocrlf=true`，仓库又没有别的归一约束，
+# 于是「文件是 LF 还是 CRLF」取决于哪台机器、哪个编辑器写的。实测（2026-09-14）工作区混着 8 个 CRLF
+# 文件，其中 `package.json` / `vite.config.ts` 让 `biome check .` 在 format 规则上报红——错误信息里
+# 只有 CR 字符，与代码无关。
+#
+# 它挡的是什么、挡不住什么（探针文件内容 "a\r\nb\r\n"，看入库 blob 的字节）：
+#   无本文件 + autocrlf=false → blob=CRLF  ← 本文件要挡的就是这个
+#   无本文件 + autocrlf=true  → blob=LF
+#   有本文件 + 任意 autocrlf  → blob=LF
+# 也就是说**本机加不加它都一样**（autocrlf=true 恰好也归一），价值在别的机器 / CI 上。
+# 另外要注意：本例的 CRLF 不是 checkout 带出来的——blob 本来就是 LF，autocrlf=true 不会给
+# 「index 里不含 CR」的文件反向补 CR（`git read-tree` 清缓存后 rm + `checkout --` 做对照组，
+# 拿到的仍是 LF）。CRLF 来自写文件的工具。所以本文件管不住编辑器往工作区写 CRLF，
+# 而 Biome 读的正是工作区文件（`git ls-files --eol | grep w/crlf` 能看到）；那一层要靠仓库根
+# `.editorconfig` 的 `end_of_line = lf`（已提供）。两者互补，本文件不替代后者。
+#
+# 新增文件若确实需要 CRLF，单独加一条规则覆盖，不要改这一行。
+* text=auto eol=lf
+
+# 二进制资源：显式标注，避免被 text=auto 误判后做换行归一
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.tar binary
+*.gz binary

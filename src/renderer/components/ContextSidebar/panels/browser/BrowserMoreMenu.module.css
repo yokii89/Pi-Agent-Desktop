@@ -1,0 +1,161 @@
+/* 「更多」菜单浮层：portal + fixed，不占文档流，不把页面区挤矮。
+   打开期间主进程已抑制 WebContentsView，浮层不会被原生视图盖住。 */
+
+.panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--z-menu);
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 220px;
+  max-width: calc(100vw - 16px);
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-overlay);
+}
+
+.action {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: 6px var(--spacing-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+.action:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.actionIcon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-muted);
+}
+
+.actionDanger,
+.actionDanger .actionIcon {
+  color: var(--color-danger);
+}
+
+.divider {
+  height: 1px;
+  margin: var(--spacing-xs) 0;
+  border: none;
+  background: var(--color-border);
+}
+
+.zoomRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 4px var(--spacing-sm);
+}
+
+.zoomLabel {
+  flex: 1;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+}
+
+.zoomValue {
+  min-width: 48px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.zoomButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.zoomButton:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.zoomButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.viewportRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 4px var(--spacing-sm);
+}
+
+.viewportLabel {
+  flex-basis: 100%;
+  margin-bottom: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.viewportButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.viewportButton:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.viewportActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.viewportInput {
+  width: 48px;
+  height: 24px;
+  margin-left: 2px;
+  padding: 0 var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}

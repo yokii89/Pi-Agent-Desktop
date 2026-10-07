@@ -1,0 +1,33 @@
+.preview {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--terminal-bg);
+  overflow: hidden;
+}
+
+.err {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--color-danger);
+  font-size: var(--session-tool-detail-font);
+}
+
+.muted {
+  margin: 0;
+  padding: 0 10px 6px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.pre {
+  margin: 0;
+  padding: 8px 10px;
+  font-family: var(--font-family-mono);
+  font-size: var(--session-tool-detail-font);
+  line-height: 1.65;
+  color: var(--color-text);
+  white-space: pre;
+  overflow-x: auto;
+  max-height: 148px;
+  overflow-y: auto;
+}

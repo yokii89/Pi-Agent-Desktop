@@ -1,0 +1,235 @@
+/* Markdown 文档流共享样式（会话区与文件面板复用）。
+   正文字号由包装层决定（.md 根 font-size: inherit）：
+   会话区 16px（--session-stream-font-md），文件面板给紧凑档位；
+   其余间距/行高用相对单位与 tokens 变量，两处视觉一致地缩放。 */
+
+.md {
+  font-size: inherit;
+  line-height: 1.7;
+  /* 正文色由包装层决定（会话区 .session / 思考流 mutedMd / 面板 .body），
+     不在此写死：否则调用方的 muted 覆盖要依赖 CSS 打包顺序取胜 */
+  overflow-wrap: anywhere;
+}
+
+.md > :first-child {
+  margin-top: 0;
+}
+
+.md > :last-child {
+  margin-bottom: 0;
+}
+
+.md p {
+  margin: 0 0 var(--spacing-sm);
+}
+
+.md ul,
+.md ol {
+  margin: 0 0 var(--spacing-sm);
+  padding-left: var(--md-list-indent);
+}
+
+.md li {
+  margin: 0 0 var(--spacing-xs);
+}
+
+/* 松散列表项内末个 <p> 不再自带尾间距，项间距回到 4px 一档（docs/design/29 缺陷 F） */
+.md li > p:last-child {
+  margin-bottom: 0;
+}
+
+/* 序号读作"结构标记"而非正文，弱化数字抢戏 */
+.md li::marker {
+  color: var(--color-text-muted);
+}
+
+.md h1,
+.md h2,
+.md h3,
+.md h4,
+.md h5,
+.md h6 {
+  /* 对齐 ZCode：标题 mt-6(24px) mb-4(16px)，上间距撑层级——字号阶梯收敛后
+     （docs/design/33），呼吸感替代大字号承担小节分节 */
+  margin: var(--spacing-lg) 0 var(--spacing-md);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* 阶梯用 em：随包装层（正文 14/16/18/20 四档）等比缩放，绝不倒挂（docs/design/29）。
+   档位对齐 ZCode zai-dark：h1 = 正文+4px、h2 = +2px、h3 起同正文（docs/design/33）。
+   16px 正文下 = 20 / 18 / 16。 */
+.md h1 {
+  font-size: var(--md-font-h1);
+}
+
+.md h2 {
+  font-size: var(--md-font-h2);
+}
+
+.md h3 {
+  font-size: var(--md-font-h3);
+}
+
+/* h4–h6 与正文同号、靠字重与间距分级：中文没有 small-caps 可退，
+   再往下缩只会读成"被降级的正文"，而不是"更低一级的标题"。
+   h3 同号（对齐 ZCode）后与 h4 的区分交给 24px 上间距 + 文档语义。 */
+.md h4,
+.md h5,
+.md h6 {
+  font-size: 1em;
+}
+
+.md blockquote {
+  margin: 0 0 var(--spacing-sm);
+  padding: 0 var(--spacing-sm);
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+
+.md code {
+  font-family: var(--font-family-mono);
+  /* 与会话区 14/16 比例一致（--session-stream-font-sm / -md），随包装层缩放 */
+  font-size: 0.875em;
+  background: var(--color-code-bg);
+  border-radius: var(--radius-sm);
+  padding: 0.125em 0.375em;
+}
+
+.md pre {
+  /* 对齐 ZCode 代码卡：my-4(16px) 上下呼吸 + rounded-xl(12px)（docs/design/33） */
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-sm);
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+}
+
+.md pre code {
+  background: transparent;
+  padding: 0;
+  line-height: 1.6;
+}
+
+/* 宽表格在自身容器内横向滚动，不撑破会话列宽（docs/design/13 P0-3）：
+   table 无法直接 overflow，升级为块级滚动容器 */
+.md table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0 0 var(--spacing-sm);
+}
+
+.md th,
+.md td {
+  border: 1px solid var(--color-border);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  text-align: left;
+}
+
+.md th {
+  background: var(--color-bg-surface);
+}
+
+.md a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.md a:hover {
+  text-decoration: underline;
+}
+
+.md hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: var(--spacing-md) 0;
+}
+
+.md img {
+  max-width: 100%;
+}
+
+/* 围栏代码块（CodeHighlight 外壳）：会话区沿用 .md pre 的观感 */
+.fence {
+  margin: var(--spacing-md) 0;
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* 围栏外壳头部（docs/design/13 P1-5）：语言标签 + 复制按钮；
+   对齐 ZCode 无分隔线头部，靠留白分区；复制按钮可见性交给 CSS hover/focus */
+.fenceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) var(--spacing-md);
+}
+
+.fenceLang {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+.fenceCopy {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.fenceCopy:hover {
+  color: var(--color-text-strong);
+}
+
+.fenceCopy:focus-visible {
+  outline: 1px solid var(--color-accent);
+}
+
+/* 壳内 pre 交出自身 chrome（bg/border 由 .fence 提供）；.md pre 同特异度靠后生效。
+   头部已给上方留白：代码区只留左右 8px、底部 12px（对齐 ZCode p-2 pt-0 pb-3） */
+.fence pre,
+.fence pre code {
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.fence pre {
+  padding: 0 var(--spacing-sm) var(--spacing-md);
+}
+
+/* Markdown 里解析成功的本地图片 */
+.mdImg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 0 var(--spacing-sm);
+  border-radius: var(--radius-sm);
+}
+
+/* 远程图（生产 CSP 不放行）/ 读取失败 / 非图片：占位提示 */
+.mdImgBroken {
+  display: block;
+  margin: 0 0 var(--spacing-sm);
+  color: var(--color-warning);
+  font-size: 0.875em;
+}
+
+/* 锚点、mailto 等本预览无法处理的引用降级为普通文字 */
+.mdLinkDead {
+  color: var(--color-text-muted);
+}

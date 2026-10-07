@@ -1,0 +1,150 @@
+/* 中央会话区右上角后台进程悬浮卡片（docs/design/37 §4.3）。
+   视觉只用 tokens；贴 .running 右上，不挤压正文列宽。 */
+.card {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-lg);
+  z-index: calc(var(--z-input-overlay) - 1);
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  max-width: calc(100% - var(--spacing-xl) * 2);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.title {
+  color: var(--color-text-strong);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+}
+
+.sessionEnded {
+  margin: 0;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.count {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.list {
+  margin: 0;
+  padding: var(--spacing-xs) 0;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.row:hover {
+  background: var(--color-bg-hover);
+}
+
+.rowIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+}
+
+.rowBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rowTitle {
+  overflow: hidden;
+  color: var(--color-text-strong);
+  font-size: var(--font-size-md);
+  font-family: var(--font-family-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.rowError {
+  color: var(--color-danger, var(--color-text-muted));
+}
+
+.rowActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.action {
+  visibility: hidden;
+  padding: 2px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.row:hover .action,
+.row:focus-within .action {
+  visibility: visible;
+}
+
+.action:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-strong);
+}
+
+.stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  color: var(--color-text-strong);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.stop:hover:not(:disabled) {
+  background: var(--color-bg-active);
+}
+
+.stop:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
