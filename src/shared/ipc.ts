@@ -1166,6 +1166,8 @@ export const FS_IPC = {
   pickFile: "pidesk:fs:pickFile",
   /** 用系统默认应用打开路径（目录/文件均可；会话 FileLink 与侧栏共用）。 */
   openPath: "pidesk:fs:openPath",
+  /** 把 data URL 图片落盘到系统「下载」目录（lightbox 右键「保存图片」）。 */
+  saveImageToDownloads: "pidesk:fs:saveImageToDownloads",
   /** 订阅目录变动：开始监听某个已展开目录（主进程引用计数）。 */
   watch: "pidesk:fs:watch",
   /** 取消监听某目录（引用计数归零时关闭 watcher）。 */
@@ -1183,6 +1185,19 @@ export interface FsWatchRequest {
 /** 目录变动推送：受影响目录的绝对路径集合（渲染层据此局部失效文件树缓存）。 */
 export interface FsWatchPushMessage {
   dirs: string[];
+}
+
+/** 保存图片请求：`dataUrl` 必须是 `data:image/...;base64,`；`name` 为用户可见文件名，属不可信输入，由主进程净化。 */
+export interface FsSaveImageRequest {
+  dataUrl: string;
+  name?: string;
+}
+
+/** 保存图片结果：落盘绝对路径、实际写入的文件名、所在目录（供「在文件夹中显示」直接喂 openPath）。 */
+export interface FsSaveImageResult {
+  path: string;
+  name: string;
+  dir: string;
 }
 
 // ---------------------------------------------------------------------------

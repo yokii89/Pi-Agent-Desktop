@@ -71,7 +71,8 @@ export function Modal({ open, onClose, panelClassName, ariaLabel, children }: Mo
     const backdrop = backdropRef.current;
     if (!backdrop) return;
     const onMouseDown = (event: MouseEvent): void => {
-      if (event.target === backdrop) onClose();
+      // 只认左键：右键是浮层内部的「呼出菜单」手势（如 lightbox 保存图片），不该顺手关掉浮窗
+      if (event.button === 0 && event.target === backdrop) onClose();
     };
     backdrop.addEventListener("mousedown", onMouseDown);
     return () => backdrop.removeEventListener("mousedown", onMouseDown);

@@ -1,9 +1,17 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { dialog, shell } from "electron";
-import { IMAGE_EXTS } from "../../shared/fileKinds";
-import type { FsEntry, FsListResult, FsReadResult, FsSearchHit } from "../../shared/ipc";
+import { app, dialog, shell } from "electron";
+import { IMAGE_EXTS, IMAGE_MIME, type ImageExt } from "../../shared/fileKinds";
+import type {
+  FsEntry,
+  FsListResult,
+  FsReadResult,
+  FsSaveImageRequest,
+  FsSaveImageResult,
+  FsSearchHit,
+} from "../../shared/ipc";
+import { parseImageDataUrl, pickAvailablePath, toSaveFileName } from "./saveImageName";
 import { matchesFileQuery } from "./searchMatch";
 
 /** 单目录列出上限（docs/design/03 §5：超出折叠为"展开更多"）。 */
@@ -20,23 +28,6 @@ const MAX_SEARCH_VISITS = 5000;
 const SEARCH_SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", ".next", "out"]);
 /** 搜索最大递归深度。 */
 const MAX_SEARCH_DEPTH = 8;
-
-/**
- * 图片扩展名 → MIME。键集必须与 shared/fileKinds 的 IMAGE_EXTS 完全一致：
- * 类型标注 Record<ImageExt, string> 会让漏键/多键都在 typecheck 报错，防止两处漂移。
- */
-type ImageExt = (typeof IMAGE_EXTS)[number];
-const IMAGE_MIME: Record<ImageExt, string> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  gif: "image/gif",
-  webp: "image/webp",
-  bmp: "image/bmp",
-  ico: "image/x-icon",
-  avif: "image/avif",
-  svg: "image/svg+xml",
-};
 
 /** 列出目录：文件夹在前、字母序（docs/design/03 §5）。 */
 export function listDirectory(dir: string): FsListResult {
@@ -202,4 +193,23 @@ export async function openDirectory(target: string): Promise<void> {
   }
   const failure = await shell.openPath(target);
   if (failure) throw new Error(failure);
+}
+
+// ---------------------------------------------------------------------------
+// 保存图片到「下载」（文件名净化与 data URL 解析见 saveImageName.ts）
+// ---------------------------------------------------------------------------
+
+/**
+ * 把 data URL 图片写入系统「下载」目录（lightbox 右键「保存图片」）。
+ * 只在 downloads 段内拼文件名：渲染层传来的 name 永不参与目录选择。
+ */
+export async function saveImageToDownloads(req: FsSaveImageRequest): Promise<FsSaveImageResult> {
+  const parsed = parseImageDataUrl(req.dataUrl);
+  if (!parsed) throw new Error("图片数据不可用");
+  // base64 长度 ×3/4 ≈ 字节数；沿用图片预览的 10MB 上限
+  if (parsed.base64.length * 0.75 > MAX_IMAGE_BYTES) throw new Error("图片过大，无法保存");
+  const dir = app.getPath("downloads");
+  const target = pickAvailablePath(dir, toSaveFileName(req.name, parsed.mimeType));
+  await fsp.writeFile(target, Buffer.from(parsed.base64, "base64"));
+  return { path: target, name: path.basename(target), dir };
 }

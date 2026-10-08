@@ -44,6 +44,8 @@ import type {
   ExtensionPushMessage,
   FsListResult,
   FsReadResult,
+  FsSaveImageRequest,
+  FsSaveImageResult,
   FsSearchHit,
   FsWatchPushMessage,
   GitBranchesResult,
@@ -409,6 +411,9 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 在系统文件管理器中打开目录（项目目录 / 会话工作目录）。 */
     openPath: (dir: string): Promise<IpcResult<null>> =>
       ipcRenderer.invoke(FS_IPC.openPath, { dir }),
+    /** 把 data URL 图片存到系统「下载」目录（lightbox 右键「保存图片」）。 */
+    saveImageToDownloads: (req: FsSaveImageRequest): Promise<IpcResult<FsSaveImageResult>> =>
+      ipcRenderer.invoke(FS_IPC.saveImageToDownloads, req),
     /** 订阅目录变动（引用计数 +1）；仅监听文件树中已展开的目录。 */
     watch: (dir: string): Promise<IpcResult<null>> => ipcRenderer.invoke(FS_IPC.watch, { dir }),
     /** 退订目录变动（引用计数 -1）。 */

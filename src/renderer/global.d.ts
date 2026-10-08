@@ -41,6 +41,8 @@ import type {
   ExtensionPushMessage,
   FsListResult,
   FsReadResult,
+  FsSaveImageRequest,
+  FsSaveImageResult,
   FsSearchHit,
   FsWatchPushMessage,
   GitBranchesResult,
@@ -251,6 +253,7 @@ export interface PideskGlobalApi {
     search(dir: string, query: string): Promise<IpcResult<FsSearchHit[]>>;
     pickFile(): Promise<IpcResult<string | null>>;
     openPath(dir: string): Promise<IpcResult<null>>;
+    saveImageToDownloads(req: FsSaveImageRequest): Promise<IpcResult<FsSaveImageResult>>;
     /** 订阅目录变动（引用计数 +1）；仅监听已展开目录。 */
     watch(dir: string): Promise<IpcResult<null>>;
     /** 退订目录变动（引用计数 -1）。 */

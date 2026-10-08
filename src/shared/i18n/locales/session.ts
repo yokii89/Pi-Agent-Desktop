@@ -623,6 +623,16 @@ export const sessionMessages = defineMessages({
     "zh-CN": "预览 {name}",
     "en-US": "Preview {name}",
   },
+  "session.image.save": { "zh-CN": "保存图片", "en-US": "Save image" },
+  "session.image.saved": {
+    "zh-CN": "已保存到「下载」：{name}",
+    "en-US": "Saved to Downloads: {name}",
+  },
+  "session.image.revealFolder": { "zh-CN": "打开下载文件夹", "en-US": "Open Downloads" },
+  "session.image.saveFailed": {
+    "zh-CN": "保存失败：{error}",
+    "en-US": "Save failed: {error}",
+  },
 
   "session.file.attachment": { "zh-CN": "附件文件", "en-US": "Attached file" },
   "session.file.noPath": {

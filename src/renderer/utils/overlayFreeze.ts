@@ -17,6 +17,9 @@ function waitForPaint(): Promise<void> {
  * 3. 再抑制/隐藏 WebContentsView
  *
  * 若先藏视图再 setState，中间会露一帧宿主底色（闪烁）。
+ *
+ * resolve 时视图已从窗口摘除，调用方可以安全地绘制浮层；
+ * 否则浮层会先被原生视图盖住一两帧再突然露出来。
  */
 export async function prepareOverlayFreeze(
   reason: string,
@@ -27,7 +30,7 @@ export async function prepareOverlayFreeze(
     applyFreeze(freeze);
   });
   if (freeze) await waitForPaint();
-  browserService.setOverlaySuppressed(true, reason);
+  await browserService.setOverlaySuppressed(true, reason);
 }
 
 /**

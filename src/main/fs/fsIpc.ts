@@ -2,13 +2,22 @@ import { ipcMain } from "electron";
 import type {
   FsListResult,
   FsReadResult,
+  FsSaveImageRequest,
+  FsSaveImageResult,
   FsSearchHit,
   FsWatchRequest,
   IpcResult,
 } from "../../shared/ipc";
 import { FS_IPC } from "../../shared/ipc";
 import { envelope, envelopeAsync } from "../ipc/envelope";
-import { listDirectory, openDirectory, pickFile, readFile, searchFiles } from "./fsService";
+import {
+  listDirectory,
+  openDirectory,
+  pickFile,
+  readFile,
+  saveImageToDownloads,
+  searchFiles,
+} from "./fsService";
 import { unwatchDirectory, watchDirectory } from "./watcher";
 
 /** 注册文件系统 IPC（docs/design/03 §5 / §8）。 */
@@ -42,6 +51,12 @@ export function registerFsIpc(): void {
         await openDirectory(req.dir);
         return null;
       }),
+  );
+
+  ipcMain.handle(
+    FS_IPC.saveImageToDownloads,
+    (_event, req: FsSaveImageRequest): Promise<IpcResult<FsSaveImageResult>> =>
+      envelopeAsync(() => saveImageToDownloads(req)),
   );
 
   ipcMain.handle(

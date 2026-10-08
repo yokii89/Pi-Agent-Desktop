@@ -620,12 +620,15 @@ export async function clearBrowserCache(): Promise<void> {
  * 截取当前页冻结帧（视图仍保持可见）。
  * 浮层应：先截帧 → 渲染层画上垫底 → 再 setOverlaySuppressed，
  * 避免「先藏视图、下一帧才显示冻结帧」造成的闪烁。
+ *
+ * 视图此刻没有挂在窗口上则直接返回 null：没有画面会被摘掉，就没有需要垫的底，
+ * 而为一个不可见的 widget 调 capturePage 只会白拖慢浮层打开（docs/design/43 F1）。
  */
 export async function captureBrowserOverlayFreeze(): Promise<{ freeze: string | null }> {
-  const view = getActive()?.view;
-  if (!view) return { freeze: null };
+  const entry = getActive();
+  if (!entry?.view || !entry.addedToWindow) return { freeze: null };
   try {
-    const image = await view.webContents.capturePage();
+    const image = await entry.view.webContents.capturePage();
     return { freeze: image.toDataURL() };
   } catch {
     return { freeze: null };
