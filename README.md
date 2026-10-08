@@ -4,7 +4,7 @@
 
 **A Windows desktop client for [pi](https://github.com/earendil-works/pi)** · **[pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户端**
 
-[![Release](https://github.com/yokii89/PiDesk/actions/workflows/release.yml/badge.svg)](https://github.com/yokii89/PiDesk/releases)
+[![Release](https://github.com/yokii89/Pi-Agent-Desktop/actions/workflows/release.yml/badge.svg)](https://github.com/yokii89/Pi-Agent-Desktop/releases)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-0078D4?logo=windows11&logoColor=white)
 ![Electron](https://img.shields.io/badge/Electron%20%7C%20React%2019%20%7C%20TypeScript-19354C?logo=electron&logoColor=9FEAF9)
 [![License: MIT](https://img.shields.io/badge/license-MIT-3DA639)](./LICENSE)
@@ -30,7 +30,7 @@ PiDesk runs pi as a `--mode rpc` child process (JSONL over stdio) and wraps it i
 
 ### Getting started
 
-Download the NSIS installer from [Releases](https://github.com/yokii89/PiDesk/releases), install the [pi](https://github.com/earendil-works/pi) CLI, point PiDesk at the pi executable, and start a task.
+Download the NSIS installer from [Releases](https://github.com/yokii89/Pi-Agent-Desktop/releases), install the [pi](https://github.com/earendil-works/pi) CLI, point PiDesk at the pi executable, and start a task.
 
 For development (Windows 10/11, Node.js ≥ 20, pnpm):
 
@@ -117,7 +117,7 @@ PiDesk 把开源 coding agent [pi](https://github.com/earendil-works/pi) 装进�
 
 ## 📦 下载安装
 
-从 [Releases](https://github.com/yokii89/PiDesk/releases) 下载 NSIS 安装包（附 SHA-256 校验和）。
+从 [Releases](https://github.com/yokii89/Pi-Agent-Desktop/releases) 下载 NSIS 安装包（附 SHA-256 校验和）。
 
 首次使用：
 
@@ -165,7 +165,7 @@ pnpm dist                # 产出 Windows NSIS 安装包与 SHA-256 校验和（
 | `pnpm dev:renderer` | 只起 Vite dev server（纯浏览器调试渲染层） |
 | `pnpm build` / `pnpm start` | 构建产物并以产物启动 |
 | `pnpm dist` / `pnpm release` | 打 NSIS 包 / bump+tag 触发 CI 发版 |
-| `pnpm sync:public` | 把 main 快照同步到公开镜像仓库 [Pi-Agent-Desktop](https://github.com/yokii89/Pi-Agent-Desktop)（`-- --tag x.y.z` 可同时在镜像上发版） |
+| `pnpm sync:public` | 把 main 快照同步到发布仓库 [Pi-Agent-Desktop](https://github.com/yokii89/Pi-Agent-Desktop)（`-- --tag x.y.z` 同时推 tag 触发 CI 发版） |
 | `pnpm typecheck` / `pnpm lint` | tsc strict 检查 / Biome 格式化与 Lint |
 | `pnpm test:view` | view-sdk 与主进程协议逻辑测试 |
 | `pnpm test:sdk:coverage` | view-sdk 行/分支覆盖率 |

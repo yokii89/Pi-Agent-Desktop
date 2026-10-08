@@ -37,11 +37,11 @@ export const UPDATE_IPC = {
 } as const;
 
 /** 发布页 URL（开发模式降级「打开下载页」、错误兜底）。 */
-export const UPDATE_RELEASES_URL = "https://github.com/yokii89/PiDesk/releases";
+export const UPDATE_RELEASES_URL = "https://github.com/yokii89/Pi-Agent-Desktop/releases";
 
 /** GitHub Releases API（开发模式检查用；仓库需可匿名读 Releases）。 */
 export const UPDATE_GITHUB_LATEST_API =
-  "https://api.github.com/repos/yokii89/PiDesk/releases/latest";
+  "https://api.github.com/repos/yokii89/Pi-Agent-Desktop/releases/latest";
 
 /**
  * 解析 `v1.2.3` / `1.2.3-beta.1` 为数值段。
