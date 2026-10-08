@@ -1,0 +1,42 @@
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  width: 100%;
+  /* 短消息气泡宽度由文本决定，空段轨道自身 max-content 近乎为 0，
+     不设下限的话 24 段会塌缩成一条缝隙 */
+  min-width: 220px;
+}
+
+.track {
+  display: flex;
+  gap: 2px;
+  box-sizing: border-box;
+  height: 16px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-muted-soft);
+}
+
+.segment {
+  flex: 1;
+  border-radius: 1px;
+  background: transparent;
+  transition: background 0.1s ease;
+}
+
+/* 点亮段：accent + 辉光（沿用原型分段轨道的点亮语言，色值换 tokens） */
+.segmentActive {
+  background: var(--color-accent);
+  box-shadow:
+    0 0 6px var(--color-accent-soft),
+    0 0 2px var(--color-accent);
+}
+
+.label {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+}

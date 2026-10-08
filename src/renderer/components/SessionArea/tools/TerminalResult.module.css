@@ -1,0 +1,184 @@
+/* Codex 式终端卡：命令栏 + 输出栏 + 细操作条 */
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 4%, transparent);
+}
+
+/* 命令栏：略浅底，展示完整命令原文 */
+.cmdPane {
+  padding: 10px 12px;
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cmdText {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: var(--session-tool-detail-font);
+  line-height: 1.65;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 输出栏：终端深底 + ANSI */
+.outPane {
+  padding: 10px 12px;
+  font-family: var(--font-family-mono);
+  font-size: var(--session-tool-detail-font);
+  line-height: 1.65;
+  color: var(--color-terminal-fg, var(--color-text));
+  background: var(--terminal-bg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: auto;
+  position: relative;
+}
+
+.clamped::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 36px;
+  background: linear-gradient(to bottom, transparent, var(--terminal-bg));
+  pointer-events: none;
+}
+
+.pre {
+  margin: 0;
+  font: inherit;
+  white-space: inherit;
+  overflow-wrap: inherit;
+}
+
+.empty {
+  display: block;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--session-tool-detail-font);
+}
+
+.streaming {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  font-size: var(--session-tool-detail-font);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: var(--session-tool-detail-font);
+  font-family: var(--font-family-mono);
+  border: 1px solid var(--color-border);
+  background: var(--color-tool-bg);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.err {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+  background: var(--color-danger-soft);
+}
+
+.truncated {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  font-size: var(--session-tool-detail-font);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ghost:hover {
+  color: var(--color-text);
+  background: var(--color-bg-active);
+}
+
+.ghost:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+/* ANSI 基础 16 色（tokenizeAnsi 输出的 class 为全局名） */
+:global(.ansiBold) {
+  font-weight: 700;
+}
+:global(.ansiBlack) {
+  color: var(--color-text-muted);
+}
+:global(.ansiRed) {
+  color: var(--color-danger);
+}
+:global(.ansiGreen) {
+  color: var(--color-success);
+}
+:global(.ansiYellow) {
+  color: var(--color-warning);
+}
+:global(.ansiBlue) {
+  color: var(--color-accent);
+}
+:global(.ansiMagenta) {
+  color: color-mix(in srgb, var(--color-accent) 70%, #d2a8ff);
+}
+:global(.ansiCyan) {
+  color: color-mix(in srgb, var(--color-success) 70%, var(--color-accent));
+}
+:global(.ansiWhite) {
+  color: var(--color-text);
+}
+:global(.ansiBrightBlack) {
+  color: var(--color-text-muted);
+  opacity: 0.85;
+}
+:global(.ansiBrightRed) {
+  color: var(--color-danger);
+}
+:global(.ansiBrightGreen) {
+  color: var(--color-success);
+}
+:global(.ansiBrightYellow) {
+  color: var(--color-warning);
+}
+:global(.ansiBrightBlue) {
+  color: var(--color-accent);
+}
+:global(.ansiBrightMagenta) {
+  color: color-mix(in srgb, var(--color-accent) 70%, #d2a8ff);
+}
+:global(.ansiBrightCyan) {
+  color: color-mix(in srgb, var(--color-success) 70%, var(--color-accent));
+}
+:global(.ansiBrightWhite) {
+  color: var(--color-text-strong);
+}

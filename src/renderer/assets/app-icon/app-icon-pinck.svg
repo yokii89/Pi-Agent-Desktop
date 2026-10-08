@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="100%" height="100%">
+  <title>PiDesk</title>
+  <defs>
+    <linearGradient id="warmGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff9a9e; stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fecfef; stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- 带圆角的浅色背景 -->
+  <rect width="300" height="300" fill="#f7f7fa" rx="20" />
+  
+  <!-- 利用 stroke-linejoin="round" 实现内外圆角平滑过渡 -->
+  <path d="M 50,50 H 200 V 150 H 150 V 200 H 100 V 250 H 50 Z M 100,100 H 150 V 150 H 100 Z M 200,150 H 250 V 250 H 200 Z" 
+        fill="url(#warmGrad)" 
+        fill-rule="evenodd" 
+        stroke="url(#warmGrad)" 
+        stroke-width="12" 
+        stroke-linejoin="round" />
+</svg>

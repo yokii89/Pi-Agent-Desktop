@@ -1,0 +1,54 @@
+/**
+ * 会话流内错误提示：LLM 调用失败 / 进程异常 / 压缩失败。
+ * 纯文字行内流，不使用底色卡片 chrome，避免错误态过度抢视觉。
+ */
+.card {
+  font-size: var(--session-stream-font-sm);
+  line-height: 1.6;
+  color: var(--color-text);
+}
+
+/* 内联流：首行「标题 + 详情」，续行与内容区左侧对齐 */
+.body {
+  max-height: 200px;
+  overflow: auto;
+}
+
+.title {
+  font-weight: 600;
+  color: var(--color-danger);
+  margin-right: var(--spacing-sm);
+}
+
+.message {
+  font-family: var(--font-family-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 内联重试（docs/design/13 P1-6）：错误发生的现场就有出口 */
+.retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: var(--spacing-sm);
+  padding: 1px var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--session-stream-font-sm);
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.retry:hover {
+  color: var(--color-text);
+  background: var(--color-bg-active);
+}
+
+.retry:focus-visible {
+  outline: 1px solid var(--color-accent);
+}

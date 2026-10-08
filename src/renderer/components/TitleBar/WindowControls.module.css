@@ -1,0 +1,25 @@
+.controls {
+  display: flex;
+  align-items: stretch;
+  height: var(--titlebar-height);
+  -webkit-app-region: no-drag;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  color: var(--color-text-muted);
+  transition: background-color 0.12s ease;
+}
+
+.button:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.close:hover {
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+}

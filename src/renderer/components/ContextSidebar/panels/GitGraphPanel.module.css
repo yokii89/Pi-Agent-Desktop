@@ -1,0 +1,156 @@
+/* 只读 Git 图谱：单行紧凑提交流（对齐 docs/gitGraph.jpg 的 VS Code 观感） */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: var(--spacing-xs) 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  padding: 0 var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.row:hover {
+  background: var(--color-bg-hover);
+}
+
+.rowExpanded,
+.rowExpanded:hover {
+  background: var(--color-bg-active);
+}
+
+.graphCell {
+  flex-shrink: 0;
+  display: block;
+  line-height: 0;
+}
+
+.dot {
+  stroke: none;
+}
+
+/* merge 提交：空心环，底色遮住竖线中心 */
+.dotMerge {
+  fill: var(--color-bg);
+  stroke-width: 1.75;
+}
+
+.subject {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.chips {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.refChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  max-width: 96px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  font-size: 10px;
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.refChipIcon {
+  flex-shrink: 0;
+}
+
+.refChipArrow {
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.refChipHead {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 28%, transparent);
+  color: var(--color-text-strong);
+  font-weight: 600;
+}
+
+.avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-text-strong);
+  /* 色块上保证字重可读：略压透明度贴近参考图头像 */
+  opacity: 0.92;
+  text-shadow: 0 0 2px rgb(0 0 0 / 0.35);
+}
+
+/* 真实头像（data URL）盖满圆形色块 */
+.avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.detail {
+  margin: 2px var(--spacing-sm) var(--spacing-xs);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detailStrong {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.truncNote {
+  padding: var(--spacing-sm);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}

@@ -1,0 +1,562 @@
+/* 浏览器面板「检查器区」（docs/design/06 §3.2 ④）：
+   拖拽把手 + 二级 tab + 只读三件套内容。与页面宿主区共处一个纵向 flex 面板，
+   宽度不足时的降级样式集中在这里（compact* 前缀）。 */
+
+.inspector {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+/* 收起态：只保留 tab 条，高度由内容撑开（JS 侧不再写 inline height） */
+.inspectorCollapsed {
+  height: auto;
+}
+
+/* 拖拽把手：检查器区上边界，向上拖变高、向下拖变矮 */
+.resizeHandle {
+  flex: none;
+  height: 5px;
+  cursor: row-resize;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+.resizeHandle:hover,
+.resizeHandleDragging {
+  background: var(--color-accent-soft);
+}
+
+/* 二级 tab 条 */
+.paneTabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.paneTab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 3px var(--spacing-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.paneTab:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.paneTabActive {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.paneSpacer {
+  flex: 1;
+  min-width: var(--spacing-xs);
+}
+
+.refreshButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.refreshButton:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-sm);
+}
+
+/* 失效与加宽提示：文档流布局 —— 页面视图是原生层，浮层会被它盖住 */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: 0 0 var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+  color: var(--color-warning);
+  font-size: var(--font-size-sm);
+}
+
+.hint {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: 0 0 var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.noticeText,
+.hintText {
+  flex: 1;
+}
+
+.widenButton,
+.noticeButton {
+  flex-shrink: 0;
+  padding: 2px var(--spacing-sm);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.widenButton:hover,
+.noticeButton:hover {
+  background: var(--color-bg-hover);
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.7;
+}
+
+/* 元素摘要（拾取 tab / 结构 tab 共用） */
+.summary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.thumb {
+  width: 56px;
+  height: 40px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+}
+
+.summaryIcon {
+  flex-shrink: 0;
+  color: var(--color-success);
+}
+
+.summaryMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.targetLabel {
+  overflow: hidden;
+  color: var(--color-accent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.targetSize {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.sectionTitle {
+  margin: 0 0 var(--spacing-xs);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* 模式开关（圈选 / 浏览） */
+.modeSwitch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.modeButton {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: 4px var(--spacing-xs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.modeButton:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.modeButtonActive {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.modeHint {
+  margin: var(--spacing-xs) 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+}
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 4px var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.actionButton:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.actionPrimary {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.actionPrimary:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.actionHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  opacity: 0.7;
+  font-size: 10px;
+  font-family: var(--font-family-mono);
+}
+
+.detailList {
+  margin: var(--spacing-sm) 0 0;
+}
+
+.detailRow {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: 2px;
+  font-size: var(--font-size-sm);
+}
+
+.detailKey {
+  flex-shrink: 0;
+  width: 52px;
+  color: var(--color-text-muted);
+}
+
+.detailValue {
+  min-width: 0;
+  color: var(--color-text);
+  word-break: break-all;
+}
+
+.mono {
+  font-family: var(--font-family-mono);
+}
+
+/* 可折叠分组（computed / matched / 单条规则 / 树节点） */
+.group {
+  margin-bottom: var(--spacing-xs);
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: 3px var(--spacing-xs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.groupHead:hover {
+  background: var(--color-bg-hover);
+}
+
+.groupTitle {
+  flex-shrink: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.groupSelector {
+  flex: 1;
+  overflow: hidden;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupMeta {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.originTag {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.inheritedTag {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border: 1px solid var(--color-warning);
+  border-radius: 8px;
+  color: var(--color-warning);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.propertyList {
+  margin: 0 0 var(--spacing-xs) var(--spacing-md);
+  padding: 0;
+  list-style: none;
+}
+
+.property {
+  display: flex;
+  gap: var(--spacing-xs);
+  padding: 1px 0;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.propertyName {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.propertyImportant {
+  color: var(--color-warning);
+}
+
+.propertyValue {
+  min-width: 0;
+  color: var(--color-text);
+  word-break: break-all;
+}
+
+/* 盒模型四区示意 */
+.boxModel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm) 0;
+}
+
+.boxBand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15px;
+  border: 1px dashed;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.boxMargin {
+  border-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+  color: var(--color-warning);
+}
+
+.boxBorder {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+}
+
+.boxPadding {
+  border-color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
+}
+
+.boxContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 6px var(--spacing-sm);
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+}
+
+/* 宽侧栏不够时的紧凑降级（06 §3.2） */
+.compactBox .boxBand {
+  padding: 10px;
+}
+
+.compactBox .boxModel {
+  justify-content: flex-start;
+}
+
+.boxEdge {
+  position: absolute;
+  color: inherit;
+}
+
+.boxEdgeTop {
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.boxEdgeBottom {
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.boxEdgeLeft {
+  top: 50%;
+  left: 3px;
+  transform: translateY(-50%);
+}
+
+.boxEdgeRight {
+  top: 50%;
+  right: 3px;
+  transform: translateY(-50%);
+}
+
+/* 元素树 */
+.treeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: 2px var(--spacing-xs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.treeRow:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.treeRowCurrent {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.treeIndent {
+  flex-shrink: 0;
+  color: var(--color-border-strong);
+}
+
+.treeTag {
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.treeLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.treeId {
+  color: var(--color-warning);
+}
+
+.treeClass {
+  color: var(--color-success);
+}
+
+.treeCount {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: 10px;
+}

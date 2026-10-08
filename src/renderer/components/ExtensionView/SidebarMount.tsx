@@ -1,0 +1,55 @@
+import { X } from "@phosphor-icons/react";
+import { useMemo } from "react";
+import { useT } from "../../hooks/useT";
+import type { ExtensionViewEntry } from "../../stores/extensionViewStore";
+import { useExtensionViewStore } from "../../stores/extensionViewStore";
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
+import styles from "./ExtensionView.module.css";
+import { type ViewFormBridge, ViewNodeRenderer } from "./ViewNodeRenderer";
+
+/**
+ * sidebar 挂载：左侧导航内嵌卡片（仅展开态）。
+ * 高度受限内部滚动；关闭 = dismiss；不与系统导航抢路由。
+ */
+export function SidebarMount({ entry }: { entry: ExtensionViewEntry }) {
+  const t = useT();
+  const { dismiss, changeValue, sendAction } = useExtensionViewStore();
+
+  const bridge = useMemo<ViewFormBridge>(
+    () => ({
+      values: entry.values,
+      onChange: (nodeId, value) => changeValue(entry.id, nodeId, value),
+      onButtonAction: (buttonId) => sendAction(entry.id, buttonId, entry.values),
+    }),
+    [entry.id, entry.values, changeValue, sendAction],
+  );
+
+  return (
+    <div className={styles.sidebarCard} data-view-id={entry.id}>
+      <div className={styles.sidebarHeader}>
+        <span className={styles.sidebarTitle}>{entry.title || t("ui.view.fallbackTitle")}</span>
+        <IconButton title={t("common.close")} onClick={() => dismiss(entry.id)}>
+          <X size={14} weight="regular" />
+        </IconButton>
+      </div>
+      <div className={styles.sidebarBody}>
+        <ViewNodeRenderer node={entry.root} bridge={bridge} />
+      </div>
+      {entry.actions.length > 0 ? (
+        <div className={styles.sidebarFooter}>
+          {entry.actions.map((action) => (
+            <Button
+              key={action.id}
+              variant={action.variant === "primary" ? "primary" : "default"}
+              disabled={action.disabled}
+              onClick={() => sendAction(entry.id, action.id, entry.values, action.kind)}
+            >
+              {action.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}

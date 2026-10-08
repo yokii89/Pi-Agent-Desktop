@@ -1,0 +1,47 @@
+.app {
+  position: relative;
+  display: grid;
+  height: 100%;
+  /* 顶栏三段与正文三栏共用同一套列轨道（titleL|titleC|titleR / nav|main|aside）。
+     列宽变化时上下同帧收放，不存在第二套栅格的错位或延迟。 */
+  grid-template-areas:
+    "titleL titleC titleR"
+    "nav    main   aside";
+  /* minmax(0,1fr)：行高锁定为视口剩余空间。1fr 隐含 minmax(auto,1fr)，
+     侧栏长列表会把行撑到内容高度，导致中央区被推出视口（主界面空白）
+     且面板永不溢出（无法滚动）。 */
+  grid-template-rows: var(--titlebar-height) minmax(0, 1fr);
+  /* 左栏轨道宽：收起/展开瞬时切换（不做补间，避免 grid 轨道动画弹跳）。
+     拖拽调右栏宽由 ContextSidebar 直接写 --context-sidebar-width。 */
+  --nav-track: var(--nav-width);
+  grid-template-columns: var(--nav-track) 1fr var(--context-sidebar-width);
+  /* chrome（窗控+开关）绝对定位宽度，顶栏中/右段内容避让用 */
+  --titlebar-chrome-width: 200px;
+  /* 背景保持纯平色，不铺任何径向渐变/环境光——否则四角会透出彩色光斑。
+     顶栏与左右侧栏虽为磨砂玻璃，但这里已没有可变像素可"透"，backdrop-filter
+     仅用于柔化其下方滚动内容；面板与中央区的分界改由各面板自身的
+     --glass-border 细线承担（SideNav 右、ContextSidebar 左、TitleBar 下）。 */
+  background: var(--color-bg);
+}
+
+.navCollapsed {
+  --nav-track: var(--nav-width-collapsed);
+}
+
+/* 右侧侧栏收起：中央区占满释放出的空间（titleR 与 aside 同列，一并收为 0） */
+.sidebarClosed {
+  grid-template-columns: var(--nav-track) 1fr 0;
+}
+
+.main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pageArea {
+  flex: 1;
+  min-height: 0;
+}

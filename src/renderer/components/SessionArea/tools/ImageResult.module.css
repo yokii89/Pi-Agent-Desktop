@@ -1,0 +1,26 @@
+.wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.frame {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-surface);
+}
+
+.img {
+  display: block;
+  max-width: min(100%, 360px);
+  max-height: 160px;
+  object-fit: contain;
+  background: var(--color-bg);
+}
+
+.img:hover {
+  filter: brightness(1.05);
+}

@@ -1,0 +1,97 @@
+/* 年度用量热力图：列=周（周一起）、行=周一..周日；色阶令牌 --heat-* 见 tokens.css。
+   几何尺寸为图表测量值（10px 格 + 2px 间距 × 53 列 ≈ 665px，随内容区 overflow-x 兜底）。 */
+
+.heatmap {
+  --heat-cell: 10px;
+  --heat-gap: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  overflow-x: auto;
+  padding-bottom: var(--spacing-xs);
+}
+
+/* 月份标签行：首列与星期列同宽（28px + 间距 2px），其后 53 列与格子逐列对齐 */
+
+.monthRow {
+  display: grid;
+  grid-template-columns: 30px repeat(53, var(--heat-cell));
+  column-gap: var(--heat-gap);
+  min-width: max-content;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.body {
+  display: flex;
+  gap: var(--heat-gap);
+  min-width: max-content;
+}
+
+.weekCol {
+  display: grid;
+  grid-template-rows: repeat(7, var(--heat-cell));
+  row-gap: var(--heat-gap);
+  width: 28px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.cells {
+  display: grid;
+  grid-template-rows: repeat(7, var(--heat-cell));
+  grid-template-columns: repeat(53, var(--heat-cell));
+  /* 列优先铺放：日内自上而下（周一..周日），再横向进下一周 */
+  grid-auto-flow: column;
+  gap: var(--heat-gap);
+}
+
+.cell {
+  width: var(--heat-cell);
+  height: var(--heat-cell);
+  border-radius: 2px;
+}
+
+.cell:hover {
+  outline: 1px solid var(--color-border-strong);
+}
+
+.l0 {
+  background: var(--heat-empty);
+}
+
+.l1 {
+  background: var(--heat-1);
+}
+
+.l2 {
+  background: var(--heat-2);
+}
+
+.l3 {
+  background: var(--heat-3);
+}
+
+.l4 {
+  background: var(--heat-4);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-xs);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}

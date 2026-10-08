@@ -1,0 +1,45 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+/* 预览 / 源码两态切换：紧凑分段按钮，常显（不依赖 hover）。
+   不加横向 padding：panelBody 已有，与代码预览 previewContent 对齐 */
+.modeBar {
+  display: flex;
+  gap: var(--spacing-xs);
+  padding: 0 0 var(--spacing-xs);
+}
+
+.modeBtn {
+  padding: 2px var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.modeBtn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.modeBtnActive,
+.modeBtnActive:hover {
+  background: var(--color-bg-active);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* 侧栏窄幅紧凑档位：共享 .md 文档流样式随此字号缩放 */
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+}

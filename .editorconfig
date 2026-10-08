@@ -1,0 +1,36 @@
+# 编辑器层的空白约定。与仓库根 `.gitattributes` 配套，管的是两件不同的事：
+#   .gitattributes → git 入库/检出时的归一（跨机器、跨 CI 一致）
+#   .editorconfig  → 编辑器「保存」时写出什么（防止 CRLF 与行尾空白被写进工作区）
+#
+# 为什么两者都要：`biome check` 读的是**工作区文件**。本机 `core.autocrlf=true`、
+# 编辑器默认又可能写 CRLF，于是纯换行差异会让 format 规则报红——报错信息里只有 CR 字符
+# （2026-09-14 踩过：package.json、vite.config.ts）。.gitattributes 管不到编辑器的写入，
+# 只有本文件能挡住它。
+#
+# 各项与 biome.json 的 formatter 配置保持一致（space / 2），避免两个工具互相打架。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_width = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Markdown 里行尾两个空格是硬换行，裁掉会改变渲染结果
+[*.md]
+trim_trailing_whitespace = false
+
+# 第三方图标资产（JetBrains 图标集，`pnpm run gen:file-icons` 生成，见 AGENTS.md）：
+# 生成物 + 单行 SVG，不做空白归一，免得重新生成时产生无意义 diff
+[src/renderer/fileIcons/assets/**]
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+# 许可与出处原文：内容是上游原文，只读不改（AGENTS.md 要求不得删除）
+[src/renderer/fileIcons/LICENSE.md]
+trim_trailing_whitespace = false
+
+[src/renderer/fileIcons/NOTICE.md]
+trim_trailing_whitespace = false

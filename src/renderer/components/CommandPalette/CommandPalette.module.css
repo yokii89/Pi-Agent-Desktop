@@ -1,0 +1,332 @@
+/* 命令面板浮层（docs/design 30 §2.2）：全部走 tokens.css 变量，暗/亮双主题自适应。 */
+
+.palette {
+  /* 顶部锚定（覆盖 Modal 的居中），宽度与高度受视口约束 */
+  align-self: flex-start;
+  margin-top: 10vh;
+  width: min(640px, 92vw);
+  max-height: min(70vh, 560px);
+}
+
+/* —— 搜索栏 —— */
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.searchIcon {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-lg);
+  line-height: 1.4;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* —— 作用域 Tab —— */
+.scopeTabs {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.scopeTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full, 999px);
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.scopeTab:hover {
+  color: var(--color-text);
+  background: var(--color-bg-hover);
+}
+
+.scopeTabActive,
+.scopeTabActive:hover {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+/* —— 结果列表 —— */
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-xs) var(--spacing-xs) var(--spacing-sm);
+}
+
+.placeholderHint {
+  margin: 0;
+  padding: var(--spacing-lg) var(--spacing-md);
+  text-align: center;
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+}
+
+.errorHint {
+  margin: 0;
+  padding: var(--spacing-lg) var(--spacing-md);
+  text-align: center;
+  font-size: var(--font-size-md);
+  color: var(--color-danger);
+}
+
+/* —— 行内命中高亮 —— */
+.highlightMark {
+  background: none;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* —— 行右侧普通说明（相对时间 / +N -N）—— */
+.rowMeta {
+  flex-shrink: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* —— 搜索历史 —— */
+.history {
+  border-top: 1px solid var(--color-border);
+  padding: var(--spacing-xs) var(--spacing-md) var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.historyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.historyClear {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.historyClear:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.historyChips {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: var(--spacing-xs) 26px var(--spacing-xs) 0;
+}
+
+.historyChipsCollapsed {
+  max-height: 30px;
+  overflow: hidden;
+}
+
+.historyChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 200px;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full, 999px);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.historyChip:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.historyChipPrefix {
+  flex-shrink: 0;
+  font-family: var(--font-family-mono);
+  color: var(--color-accent);
+}
+
+.historyChipText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyToggle {
+  position: absolute;
+  top: var(--spacing-xs);
+  right: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.historyToggle:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.historyToggleOpen {
+  transform: rotate(180deg);
+}
+
+.section {
+  padding-top: var(--spacing-xs);
+}
+
+.sectionHeader {
+  padding: var(--spacing-xs) var(--spacing-sm) 4px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 7px var(--spacing-sm);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.rowActive {
+  background: var(--color-bg-active);
+}
+
+.rowIcon {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.rowActive .rowIcon {
+  color: var(--color-text);
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+}
+
+.rowTitle {
+  flex-shrink: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+}
+
+.rowSubtitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.moreRow {
+  display: block;
+  width: 100%;
+  padding: 6px var(--spacing-sm);
+  border-radius: var(--radius-md);
+  text-align: left;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.moreRow:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+/* —— 键位胶囊 —— */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* —— 底部提示 —— */
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.footerHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}

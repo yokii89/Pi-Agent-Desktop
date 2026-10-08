@@ -1,0 +1,243 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+}
+
+.cardReadOnly {
+  background: var(--color-bg-surface);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.name {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerSpacer {
+  flex: 1;
+}
+
+.badge,
+.badgeMuted {
+  flex-shrink: 0;
+  padding: 1px var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.badge {
+  background: var(--color-accent-soft);
+  color: var(--color-text-strong);
+}
+
+.badgeMuted {
+  background: var(--color-bg-hover);
+  color: var(--color-text-muted);
+}
+
+.stateBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.stateDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.stateConnected {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.stateAttention {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.stateMuted {
+  background: var(--color-bg-hover);
+  color: var(--color-text-muted);
+}
+
+.transport {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.exposureLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.exposureSelect {
+  height: 28px;
+  padding: 0 var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  outline: none;
+}
+
+.exposureSelect:focus {
+  border-color: var(--color-border-strong);
+}
+
+.exposureValue {
+  color: var(--color-text);
+}
+
+.tools {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.toolChipsBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+}
+
+.toolChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.toolChip {
+  max-width: 100%;
+  padding: 1px var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 收起态行：chips 单行截断 + 行尾「展开全部」按钮（docs/design/40 §三.A）。
+   width:100% 必须显式声明：父块 align-items:flex-start 下 flex item 按内容收缩，
+   内层 max-content 会把整行撑到内容宽，裁切壳随之变宽、溢出判定永远不触发。 */
+.toolChipsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  min-width: 0;
+}
+
+/* 裁切壳：占「展开全部」按钮以外的全部宽度，chips 溢出部分直接裁掉 */
+.toolChipsClip {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* width: max-content 让内层保持单行自然宽度：既保证被裁切成单行，offsetWidth 也可用于溢出测量 */
+.toolChipsFit {
+  width: max-content;
+}
+
+.toolChipsToggle {
+  flex-shrink: 0;
+  white-space: nowrap;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.toolChipsToggle:hover {
+  text-decoration: underline;
+}
+
+.noTools {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.enabledLabel {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.enabledText {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.hintLine {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.errorLine {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.errorLine svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}

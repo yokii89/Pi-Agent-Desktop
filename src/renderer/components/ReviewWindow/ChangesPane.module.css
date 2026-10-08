@@ -1,0 +1,236 @@
+/* 代码审查浮窗的变更区：分段筛选 + 左列表右详情双栏 + 底部提交栏。
+   颜色/间距全部走 tokens.css，不写死色值。 */
+
+.root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* 容器查询锚点：内容区按可用宽度自适应双栏/堆叠（浮窗宽 → 双栏，侧栏窄 → 堆叠） */
+  container: review-pane / inline-size;
+}
+
+/* 「上一轮更改」的回滚条：横跨列表与详情上方 */
+.rollbackBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-xs) var(--spacing-sm) 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  flex-shrink: 0;
+}
+
+.rollbackText {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.rollbackBtn {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.rollbackBtn:hover:not(:disabled) {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-on-danger);
+}
+
+.rollbackBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* —— 内容区：默认窄容器上下堆叠，≥560px 切左右双栏 —— */
+
+.content {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.listCol {
+  flex: 1 1 44%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* 分段筛选：全部 / 未暂存 / 已暂存 / 上一轮 */
+.filterRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: var(--spacing-xs) var(--spacing-xs) calc(var(--spacing-xs) - 1px);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.filterChip:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.filterChipActive,
+.filterChipActive:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-text-strong);
+}
+
+.filterCount {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.filterChipActive .filterCount {
+  color: var(--color-accent);
+}
+
+/* —— 详情栏 —— */
+
+.detailCol {
+  flex: 1 1 56%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 容器够宽（浮窗或被拖宽的侧栏）→ 回到「左列表右详情」双栏 */
+@container review-pane (min-width: 560px) {
+  .content {
+    flex-direction: row;
+  }
+
+  .listCol {
+    flex: 0 0 268px;
+    border-bottom: none;
+    border-right: 1px solid var(--color-border);
+  }
+}
+
+.detailHead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.detailPath {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.layerChip {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+.layerStaged {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.layerUnstaged {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.layerUntracked {
+  background: var(--color-muted-soft);
+  color: var(--color-text-muted);
+}
+
+.detailBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--spacing-sm);
+}
+
+/* —— 空态 / 加载 / 错误 —— */
+
+.state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg);
+  text-align: center;
+}
+
+.stateIcon {
+  color: var(--color-text-muted);
+}
+
+.stateText {
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+}
+
+.stateHint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.stateError .stateText {
+  color: var(--color-danger);
+}
+
+.spin {
+  animation: changes-spin 0.9s linear infinite;
+}
+
+@keyframes changes-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,37 @@
+.button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  -webkit-app-region: no-drag;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.button:active:not(:disabled) {
+  background: var(--color-bg-active);
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.active {
+  color: var(--color-accent);
+}
+
+.active:hover:not(:disabled) {
+  color: var(--color-accent-hover);
+  background: var(--color-bg-hover);
+}

@@ -1,0 +1,192 @@
+/* 变更文件列表行：状态字母章（VS Code SCM 风格）+ 文件名/目录 + 增删统计，
+   hover 浮现暂存/丢弃操作簇（复用侧栏审查面板的既有交互语法）。 */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* 列表滚动容器：撑满左栏剩余高度 */
+.listScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-xs);
+}
+
+.item {
+  border-bottom: 1px solid transparent;
+}
+
+.rowWrap {
+  position: relative;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  min-width: 0;
+  padding: 6px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+
+.row:hover {
+  background: var(--color-bg-hover);
+}
+
+.rowSelected,
+.rowSelected:hover {
+  background: var(--color-bg-active);
+}
+
+/* 状态字母章：底色走对应语义 token 的 soft 档 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.badgeAdd {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.badgeMod {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.badgeDel {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.badgeRen {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.badgeUntracked {
+  background: var(--color-muted-soft);
+  color: var(--color-text-muted);
+}
+
+.fileCol {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fileLine {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fileName {
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.filePath {
+  flex-shrink: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.stats {
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+}
+
+.statAdd {
+  color: var(--color-success);
+}
+
+.statDel {
+  color: var(--color-danger);
+}
+
+.statMuted {
+  color: var(--color-text-muted);
+}
+
+/* 行内悬停动作簇（暂存 / 取消暂存 / 丢弃） */
+.rowActions {
+  position: absolute;
+  top: 50%;
+  right: var(--spacing-xs);
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.rowWrap:hover .rowActions,
+.rowWrap:focus-within .rowActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 悬停时淡出统计，给动作簇让位 */
+.rowWrap:hover .stats {
+  opacity: 0;
+}
+
+.rowAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.rowAction:hover:not(:disabled) {
+  background: var(--color-bg-active);
+  color: var(--color-text-strong);
+}
+
+.rowActionDanger:hover:not(:disabled) {
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+}
+
+.rowAction:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

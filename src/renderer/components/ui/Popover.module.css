@@ -1,0 +1,19 @@
+.root {
+  position: relative;
+  display: inline-flex;
+}
+
+/* 面板 portal 到 body、fixed 定位（避免被侧栏与折叠容器的 overflow 裁剪）：
+   left/top 由 Popover 在首帧前按触发器矩形写入，这里只给默认值与外观。 */
+.panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  min-width: 180px;
+  padding: var(--spacing-xs);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay);
+  z-index: var(--z-menu);
+}

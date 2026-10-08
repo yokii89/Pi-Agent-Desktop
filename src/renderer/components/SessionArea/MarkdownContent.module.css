@@ -1,0 +1,83 @@
+/* 会话区包装：注入会话流正文字号与默认正文色。
+   思考流 mutedMd（ReasoningBlock.module.css）覆盖 color/font-size ——
+   该覆盖沿用提取前 MarkdownContent.module.css 与 ReasoningBlock.module.css
+   的级联关系，文档流样式本体在共享 components/markdown/markdown.module.css。 */
+.session {
+  font-size: var(--session-stream-font-md);
+  color: var(--color-text);
+}
+
+/* 流式切分的容器：普通块级流，让各定型块（.md）之间的外边距与单文档渲染一致
+   （.md 无 padding/border，子元素外边距可穿透折叠）。流式与完成态同构，
+   message_end 时 React 原地 reconcile，无重挂载（docs/design/13 P1-4）。 */
+.streamFlow {
+  min-width: 0;
+}
+
+/* 定型块之间的接缝：完成态靠元素自身外边距，切分后被 .md 的 :first/:last-child 归零吃掉。
+   只补"后块首元素"，前块末元素保持归零 → 接缝间距由后块决定，与完成态同值
+   （docs/design/29 缺陷 D）。 */
+.streamFlow > .md + .md > :first-child {
+  margin-top: var(--spacing-sm);
+}
+
+/* 必须写成 `:first-child:is(...)`：单独 `> :is(h1,…)` 的特异度是 (0,3,1)，
+   压不过上面那条 (0,4,0)，标题接缝会静默退回 8px。探针实测两版差异 = 8px / 24px。
+   接缝值与完成态标题上距（--spacing-lg，docs/design/33）保持同源。 */
+.streamFlow > .md + .md > :first-child:is(h1, h2, h3, h4, h5, h6) {
+  margin-top: var(--spacing-lg);
+}
+
+/* 代码块完成态上距 = --spacing-md（docs/design/33）：切分后 fence/pre 作首元素
+   同样被 .md > :first-child 归零，钉回同值，流式与完成态同构。
+   注意 CSS Modules 跨文件哈希：MarkdownContent.module.css 里写 `.fence` 命中不了
+   共享 markdown.module.css 的围栏外壳，改用元素匹配——.md 下唯一的块级 div
+   就是 FenceShell 的围栏 div（react-markdown 不产出其它裸 div），裸 pre 是退化路径 */
+.streamFlow > .md + .md > :first-child:is(div, pre) {
+  margin-top: var(--spacing-md);
+}
+
+/* 抬高下距的元素（标题 / 围栏，mb = --spacing-md，docs/design/33）作前块末元素时
+   不归零：接缝间距回到与完成态一致的自然折叠 max(前块末 mb, 后块首补)。
+   否则「标题→段落」「围栏→段落」流式态 8px、完成态 16px，message_end 会跳 8px
+   （docs/design/29 缺陷 D 的同类回归）。后块首的专项补偿（标题 24 / 围栏 16）
+   依旧生效，两者取折叠较大值。 */
+.streamFlow > .md > :last-child:is(h1, h2, h3, h4, h5, h6, div, pre) {
+  margin-bottom: var(--spacing-md);
+}
+
+/* 消息收尾块除外：对齐 ZCode [&>*:last-child]:mb-0，不在消息底部多出留白 */
+.streamFlow > .md:last-child > :last-child:is(h1, h2, h3, h4, h5, h6, div, pre) {
+  margin-bottom: 0;
+}
+
+/* 生成光标（docs/design/13 P1-3）：挂在尾块最后一个块级元素末尾，
+   视觉上等价于"正在打字的行内光标"；尾块为空时独立成行呼吸。 */
+.caretHost > :last-child::after,
+.caretHost:empty::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--color-text-muted);
+  animation: caretBlink 1s steps(1) infinite;
+}
+
+@keyframes caretBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caretHost > :last-child::after,
+  .caretHost:empty::after {
+    animation: none;
+  }
+}

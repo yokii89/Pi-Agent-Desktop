@@ -1,0 +1,73 @@
+.splash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  text-align: center;
+}
+
+.headline {
+  color: var(--color-text-strong);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.subline {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}
+
+/* 可发现性提示：比副文案再退一档，弱化到「知道就好」 */
+.tip {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  opacity: 0.75;
+}
+
+/* 最近会话快捷入口（docs/design/13 P2-3）：轻量行式，不做成卡片墙 */
+.recents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--spacing-md);
+  width: min(100%, 420px);
+}
+
+.recentItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    color 0.12s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.12s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.recentItem:hover {
+  color: var(--color-text);
+  background: var(--color-bg-surface);
+}
+
+.recentItem:focus-visible {
+  outline: 1px solid var(--color-accent);
+}
+
+.recentTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recentTime {
+  flex-shrink: 0;
+  font-size: var(--font-size-sm);
+  opacity: 0.75;
+}

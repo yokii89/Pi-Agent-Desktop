@@ -1,0 +1,138 @@
+/* 提交栏：自动增高输入 + 两行动作（辅助按钮 / 主操作），
+   与浮窗整体等宽；禁用态统走 opacity。 */
+
+.bar {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  /* 容器查询锚点：宽度不足时按钮收成纯图标（停靠窄侧栏 / 被缩窄的浮窗共用） */
+  container: commit-bar / inline-size;
+}
+
+.input {
+  width: 100%;
+  min-height: 38px;
+  max-height: 120px;
+  resize: none;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-md);
+  line-height: 1.45;
+  overflow-y: auto;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-border-strong);
+}
+
+.input:disabled {
+  opacity: 0.6;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.ghostBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.ghostBtn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+.ghostBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.summary {
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.commitBtn,
+.pushBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 13px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.commitBtn {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.commitBtn:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.pushBtn {
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.pushBtn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+.commitBtn:disabled,
+.pushBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 窄容器（默认 300px 停靠侧栏，或被缩窄的浮窗）：按钮收成纯图标，
+   title/aria-label 保留可访问性——「提交」收成 GitCommit 主色图标。 */
+@container commit-bar (max-width: 439px) {
+  .btnText {
+    display: none;
+  }
+}

@@ -1,0 +1,74 @@
+/* 悬浮详情卡：经 portal 挂在 body 下，不参与侧栏布局，也不被侧栏的 overflow 裁剪 */
+.card {
+  position: fixed;
+  /* 真实坐标由组件在首帧绘制前写入；这里先把元素挪出视口，避免出现一次"错位闪帧" */
+  left: -10000px;
+  top: 0;
+  visibility: hidden;
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  padding: var(--spacing-sm) 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  /* 纯信息展示：不抢行的悬浮/点击，鼠标离开行即消失 */
+  pointer-events: none;
+  animation: hoverCardIn 0.14s ease-out;
+}
+
+@keyframes hoverCardIn {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 全文标题：行内是单行截断，这里最多 6 行，再长才省略 */
+.title {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+}
+
+/* 信息行：图标 16px + 文案；文案单行截断（空间名/时间都可能很长） */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}
+
+.rowIcon {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.rowText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+}

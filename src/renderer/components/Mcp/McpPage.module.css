@@ -1,0 +1,206 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-bg);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg) var(--spacing-xl) var(--spacing-md);
+  flex-shrink: 0;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  /* 中栏可被右侧栏挤得很窄（main 轨道 min-width:0）。basis 320 让「标题块+动作区」
+     放不下时动作区换到下一行、标题块独占整行；若保持 flex:1（basis 0），
+     收缩永远先压标题块，副标题会被挤成逐词换行。 */
+  flex: 1 1 320px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-text-strong);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* 路径单行尾部截断：word-break 断行会把文件名甩到下一行，更难读；
+   hover 有 title 全文，点击复制（docs/design/40 MCP优化方案 3） */
+.configFile {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.configFile:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  /* 极窄（动作区独占一行仍放不下）时允许收缩并让按钮换行；
+     不能 flex-shrink:0——那样动作区保持内容宽直接溢出容器，按钮被裁切 */
+  flex-wrap: wrap;
+}
+
+.reloadBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin: 0 var(--spacing-xl) var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  flex-wrap: wrap;
+}
+
+.reloadText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.reloadActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.degradeBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin: 0 var(--spacing-xl) var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.degradeText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.degradeTitle {
+  font-weight: 600;
+}
+
+.probing {
+  margin: 0 var(--spacing-xl) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.probeNote {
+  margin: 0 var(--spacing-xl) var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+/* 探测用的项目 cwd：多项目时解释「为什么别的项目里有、这里没有」 */
+.probeCwd {
+  margin: calc(var(--spacing-md) * -0.5) var(--spacing-xl) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.errorBanner {
+  margin: 0 var(--spacing-xl) var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.errorTitle {
+  margin: 0 0 var(--spacing-xs);
+  font-weight: 600;
+}
+
+.errorItem {
+  margin: 0;
+  word-break: break-all;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--spacing-xl) var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.loading {
+  padding: var(--spacing-lg);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}
+
+.empty {
+  padding: var(--spacing-xl);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.emptyTitle {
+  margin: 0 0 var(--spacing-xs);
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.empty p {
+  margin: 0;
+}
+
+.emptyAction {
+  margin-top: var(--spacing-md);
+}
