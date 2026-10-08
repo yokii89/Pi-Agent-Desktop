@@ -165,7 +165,6 @@ pnpm dist                # 产出 Windows NSIS 安装包与 SHA-256 校验和（
 | `pnpm dev:renderer` | 只起 Vite dev server（纯浏览器调试渲染层） |
 | `pnpm build` / `pnpm start` | 构建产物并以产物启动 |
 | `pnpm dist` / `pnpm release` | 打 NSIS 包 / bump+tag 触发 CI 发版 |
-| `pnpm sync:public` | 把 main 快照同步到发布仓库 [Pi-Agent-Desktop](https://github.com/yokii89/Pi-Agent-Desktop)（`-- --tag x.y.z` 同时推 tag 触发 CI 发版） |
 | `pnpm typecheck` / `pnpm lint` | tsc strict 检查 / Biome 格式化与 Lint |
 | `pnpm test:view` | view-sdk 与主进程协议逻辑测试 |
 | `pnpm test:sdk:coverage` | view-sdk 行/分支覆盖率 |

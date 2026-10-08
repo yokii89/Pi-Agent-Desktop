@@ -184,4 +184,4 @@ import { Play } from "@phosphor-icons/react";
 - 分支：`main` 为稳定分支，功能开发用 `feat/<主题>`、修复用 `fix/<主题>`。
 - 提交信息遵循 Conventional Commits：`feat:` / `fix:` / `chore:` / `docs:` / `refactor:`。
 - **唯一公开仓库是 `yokii89/Pi-Agent-Desktop`**（`yokii89/PiDesk` 已停用，不再推送）：更新源写死在 `electron-builder.yml` 的 `publish.repo` 与 `src/shared/update.ts` 的常量里，改这两处等于改线上客户端的升级通道。
-- 本地 `main` 与发布仓库的 `main` 是**两套独立历史**：后者是 `scripts/sync-public.mjs` 生成的快照式线性历史（根提交 `Initial public commit`，每个同步提交含相对上一快照的全部差异）。因此 `git push origin main` 必然被拒，**不要 `--force` 去覆盖公开历史**；发版一律 `pnpm release x.y.z` 后 `pnpm sync:public -- --tag x.y.z`。
+- 本地 `main` 就是发布仓库的 `main`：`git push origin main` 直接生效，提交逐条公开可见。发版是 `pnpm release x.y.z`（本地 bump + commit + tag，不自动推）之后按脚本提示 `git push origin main` 与 `git push origin v<版本>`，推 tag 触发 CI 构建并创建 Release。

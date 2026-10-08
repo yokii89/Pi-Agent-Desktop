@@ -2,9 +2,9 @@
  * PiDesk 本地发版脚本（docs/design/35）：bump package.json 版本 → commit → 打 tag。
  *
  * **不自动 push**，避免误推共享分支；脚本会打印下一步命令，由维护者确认后执行。
- * 发布走 `pnpm sync:public -- --tag x.y.z`：把 main 快照与该 tag 推到发布仓库
- * Pi-Agent-Desktop，由其 `.github/workflows/release.yml` 构建 NSIS 安装包并挂到
- * GitHub Release（含 latest.yml / blockmap，供 electron-updater 发现与差量更新）。
+ * 把 main 与 `v*` tag 推到发布仓库 Pi-Agent-Desktop 后，由其
+ * `.github/workflows/release.yml` 构建 NSIS 安装包并挂到 GitHub Release
+ * （含 latest.yml / blockmap，供 electron-updater 发现与差量更新）。
  *
  * 用法：node scripts/release.mjs 0.3.0
  *       pnpm release 0.3.0
@@ -72,11 +72,10 @@ function main() {
 
   console.log("");
   log("下一步（确认无误后手动执行）：");
-  console.log(`  pnpm sync:public -- --tag ${version}`);
+  console.log("  git push origin main");
+  console.log(`  git push origin ${tag}`);
   console.log("");
-  log(
-    "发布仓库 Pi-Agent-Desktop 的 CI 将构建安装包并创建 GitHub Release（含 latest.yml / blockmap）。",
-  );
+  log("推送 tag 后，发布仓库的 CI 将构建安装包并创建 GitHub Release。");
 }
 
 main();

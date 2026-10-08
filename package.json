@@ -24,7 +24,6 @@
     "start": "pnpm run build && electron .",
     "dist": "node scripts/package.mjs",
     "release": "node scripts/release.mjs",
-    "sync:public": "node scripts/sync-public.mjs",
     "test:sdk:coverage": "vitest run --config packages/view-sdk/vitest.config.ts --coverage && node scripts/sdk-coverage-snapshot.mjs",
     "check:sdk-cross": "node scripts/check-sdk-cross.mjs",
     "build:view-sdk": "tsc -p packages/view-sdk/tsconfig.build.json",
