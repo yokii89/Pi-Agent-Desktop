@@ -48,8 +48,14 @@ export function RevealOnRowHover({ children }: RevealOnRowHoverProps) {
       const next = root.querySelector(`.${styles.rowButtonOpen}`) !== null;
       locked.current = next;
       setLockedAttr(next);
-      // 菜单刚打开而鼠标已不在行上时，补一次显形
-      if (next) setShown(true);
+      if (next) {
+        // 菜单刚打开而鼠标已不在行上时，补一次显形
+        setShown(true);
+      } else if (!row.matches(":hover") && !row.matches(":focus-within")) {
+        // 解锁时指针已不在行上（菜单在别处关闭，如点了菜单项/点空白/Escape）：
+        // 补一次收起。缺这一步按钮会常驻成"幽灵"，盖住同槽位的状态指示（docs/design/46 F1）
+        setShown(false);
+      }
     };
 
     const setShown = (next: boolean): void => {
