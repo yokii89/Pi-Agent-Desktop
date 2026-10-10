@@ -49,7 +49,12 @@ import {
 } from "./piSession";
 import { readDefaultModel, setDefaultModel } from "./piSettings";
 import { getCachedPiShellProbe, setPiShellPath } from "./piShell";
-import { assertNoModeTransition, ensureSessionReady } from "./runtimeCoordinator";
+import {
+  assertNoModeTransition,
+  ensureSessionReady,
+  isRuntimeReady,
+  noteWarmPrompt,
+} from "./runtimeCoordinator";
 import { listAllSessions, listSessions, removeSession } from "./sessionHistory";
 import { readSessionTranscript } from "./sessionTranscriptRead";
 
@@ -248,7 +253,11 @@ export function registerSessionIpc(): void {
           throw new Error("输入不能为空");
         }
         // 只等待 pi 接受 prompt 请求；执行中的失败以事件形式推送
+        // 直通路径（实例已 ready，未经 ensureSessionReady）单独记命中与延迟（docs/design/44 A4）
+        const startedAtMs = Date.now();
+        const warm = isRuntimeReady(sessionId);
         await promptSession(sessionId, text, images.length > 0 ? images : undefined);
+        if (warm) noteWarmPrompt(startedAtMs);
         return null;
       }),
   );

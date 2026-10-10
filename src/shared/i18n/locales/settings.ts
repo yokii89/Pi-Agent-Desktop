@@ -379,14 +379,14 @@ export const settingsMessages = defineMessages({
       "How many pi session processes may stay alive (default 8). Starting over the limit fails; free slots via End process in the sidebar. Applies to sessions started after the change",
   },
   "settings.general.sessionPrefetch": {
-    "zh-CN": "会话预热（实验）",
-    "en-US": "Session prefetch (experimental)",
+    "zh-CN": "会话预热",
+    "en-US": "Session prefetch",
   },
   "settings.general.sessionPrefetch.description": {
     "zh-CN":
-      "在 active 会话稳定停留后，用空余额度预启动 pi，加快首次发送/模式激活。不会挤占显式启动；关闭后完全退回按需启动",
+      "打开或新建会话时，用空余额度提前启动 pi，让你发送时无需等待冷启动。显式启动永远优先；关闭后完全退回按需启动",
     "en-US":
-      "After the active session settles, prestart pi with spare slots to speed up first send / mode activation. Explicit starts always win; turn off to start strictly on demand",
+      "Prestart pi with spare slots when you open or create a chat, so sending doesn't wait for a cold start. Explicit starts always win; turn off to start strictly on demand",
   },
   "settings.general.welcomeRecents": {
     "zh-CN": "欢迎页历史记录",

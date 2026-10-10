@@ -37,8 +37,8 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   browserLoginImportConsent: false,
   // 并行 pi 会话上限（多会话架构决策 #7）；超限 start 失败，不自动杀最旧
   maxParallelSessions: 8,
-  // speculative 预热默认关闭（docs/design/16 Phase G）
-  sessionPrefetchEnabled: false,
+  // 会话预热默认开启（docs/design/44：打开/新建会话即触发，把冷启动移到发送之前）
+  sessionPrefetchEnabled: true,
   // 欢迎页最近会话入口默认关闭：新会话界面保持干净，回访入口由侧栏承担
   welcomeRecentsEnabled: false,
   // 系统提示音（docs/design/18）；深拷贝，避免与 DEFAULT_NOTIFICATION_SETTINGS 共享嵌套对象

@@ -1361,6 +1361,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             sessionId: existingId,
             sessionFile: file,
             cwd: cwd ?? existing?.cwd ?? null,
+            intent: "open",
           })
           .catch(() => {});
         setSwitchingToFile(null);
@@ -1417,6 +1418,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             sessionId: openId,
             sessionFile: file,
             cwd: cwd ?? existing?.cwd ?? null,
+            intent: "open",
           })
           .catch(() => {});
         setSwitchingToFile(null);
@@ -1451,6 +1453,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // 冷打开不再 spawn：modelLabel 刷新显式补上（现状挂在 startPromise 里，§3.1），
       // 冷目标走 getModelState 的 A5 回退展示 pi 配置默认模型
       void refreshModelState();
+      // docs/design/44 A1：首开冷会话即触发预热（零 spawn 展示历史，pi 在发送前就位）；
+      // 上面的"二次打开"分支与热分支各自已有同款通知
+      void prefetchService
+        .notifyActive({
+          sessionId: openId,
+          sessionFile: file,
+          cwd: cwd ?? null,
+          intent: "open",
+        })
+        .catch(() => {});
 
       const startedAt = allSessionsRef.current.find((s) => s.file === file)?.startedAt;
 

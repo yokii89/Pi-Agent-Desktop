@@ -281,6 +281,11 @@ export interface PrefetchNotifyRequest {
   sessionId?: SessionId;
   sessionFile?: string | null;
   cwd?: string | null;
+  /**
+   * 触发意图（docs/design/44 A1）：`open` = 用户明确打开/新建该会话，
+   * 用短 dwell 且不因其它会话 busy/starting 而跳过；缺省按 `idle`（弱信号）处理。
+   */
+  intent?: "open" | "idle";
 }
 
 export interface PrefetchMetrics {
@@ -290,6 +295,13 @@ export interface PrefetchMetrics {
   viewActionReadyMs: number[];
   p50ReadyMs: number | null;
   p95ReadyMs: number | null;
+  /** send → runtime ready 延迟样本（ms，最多保留 50 条）。 */
+  sendReadyMs: number[];
+  p50SendReadyMs: number | null;
+  p95SendReadyMs: number | null;
+  /** 显式启动时实例已 ready（命中）/ 未 ready（含在途预热）的次数。 */
+  prefetchHits: number;
+  prefetchMisses: number;
   /** 预热发起次数 / 因额度跳过次数 / 回收次数。 */
   prefetchAttempts: number;
   prefetchSkippedLimit: number;
@@ -313,3 +325,6 @@ export const WORKER_GRACE_EXIT_MS = 45_000;
 
 /** speculative 预热：active 会话稳定停留多久后尝试（ms）。 */
 export const PREFETCH_STABLE_MS = 2_500;
+
+/** speculative 预热：用户明确打开/新建会话后的触发延迟（ms，docs/design/44 A1）。 */
+export const PREFETCH_OPEN_DWELL_MS = 350;

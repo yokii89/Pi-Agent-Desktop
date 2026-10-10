@@ -4,9 +4,9 @@
  */
 
 import type { PrefetchMetrics, PrefetchNotifyRequest, SessionId } from "../../shared/contribution";
-import { PREFETCH_STABLE_MS } from "../../shared/contribution";
 import { getSettings } from "../settings/settings";
 import { hasSession, listLiveSessions } from "./piSession";
+import { normalizePrefetchIntent, prefetchDwellMs, requiresIdleSystem } from "./prefetchPolicy";
 import {
   ensureSessionReady,
   listRuntimeSnapshots,
@@ -50,7 +50,8 @@ async function tryPrefetch(hint: PrefetchNotifyRequest): Promise<void> {
     prefetchStats.skippedLimit += 1;
     return;
   }
-  if (!isSystemIdleForPrefetch()) return;
+  // 弱信号要求系统空闲；用户明确打开时豁免（docs/design/44 A1）
+  if (requiresIdleSystem(hint.intent) && !isSystemIdleForPrefetch()) return;
 
   prefetchStats.attempts += 1;
   try {
@@ -72,13 +73,14 @@ async function tryPrefetch(hint: PrefetchNotifyRequest): Promise<void> {
  * 仅当开关打开时排程稳定停留后的 prefetch。
  */
 export function notifyActiveSessionForPrefetch(req: PrefetchNotifyRequest): void {
-  lastHint = req;
+  const hint: PrefetchNotifyRequest = { ...req, intent: normalizePrefetchIntent(req.intent) };
+  lastHint = hint;
   clearStableTimer();
   if (!getSettings().sessionPrefetchEnabled) return;
   stableTimer = setTimeout(() => {
     stableTimer = null;
-    void tryPrefetch(req);
-  }, PREFETCH_STABLE_MS);
+    void tryPrefetch(hint);
+  }, prefetchDwellMs(hint.intent));
   stableTimer.unref?.();
 }
 
@@ -96,21 +98,27 @@ export function onPrefetchSettingChanged(enabled: boolean): void {
 export function getPrefetchMetrics(): PrefetchMetrics {
   const snapshots = listRuntimeSnapshots();
   const samples = [...prefetchStats.readySamples];
-  const sorted = [...samples].sort((a, b) => a - b);
-  const pct = (p: number): number | null => {
-    if (sorted.length === 0) return null;
+  const sendSamples = [...prefetchStats.sendSamples];
+  const percentile = (values: number[], p: number): number | null => {
+    if (values.length === 0) return null;
+    const sorted = [...values].sort((a, b) => a - b);
     const idx = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length));
     return sorted[idx] ?? null;
   };
   return {
     enabled: getSettings().sessionPrefetchEnabled === true,
     viewActionReadyMs: samples,
-    p50ReadyMs: pct(50),
-    p95ReadyMs: pct(95),
+    p50ReadyMs: percentile(samples, 50),
+    p95ReadyMs: percentile(samples, 95),
+    sendReadyMs: sendSamples,
+    p50SendReadyMs: percentile(sendSamples, 50),
+    p95SendReadyMs: percentile(sendSamples, 95),
     prefetchAttempts: prefetchStats.attempts,
     prefetchSkippedLimit: prefetchStats.skippedLimit,
     speculativeReclaimed: prefetchStats.reclaimed,
     speculativeAlive: snapshots.filter((r) => r.createdBy === "speculative-prefetch").length,
+    prefetchHits: prefetchStats.hits,
+    prefetchMisses: prefetchStats.misses,
   };
 }
 
@@ -121,6 +129,9 @@ export function __resetPrefetchForTests(): void {
   prefetchStats.skippedLimit = 0;
   prefetchStats.reclaimed = 0;
   prefetchStats.readySamples.length = 0;
+  prefetchStats.sendSamples.length = 0;
+  prefetchStats.hits = 0;
+  prefetchStats.misses = 0;
 }
 
 export type { SessionId };

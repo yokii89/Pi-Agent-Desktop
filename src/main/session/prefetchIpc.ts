@@ -20,6 +20,7 @@ export function registerPrefetchIpc(): void {
           sessionId: typeof req?.sessionId === "string" ? req.sessionId : undefined,
           sessionFile: typeof req?.sessionFile === "string" ? req.sessionFile : null,
           cwd: typeof req?.cwd === "string" ? req.cwd : null,
+          intent: req?.intent === "open" ? "open" : "idle",
         });
         return null;
       }),

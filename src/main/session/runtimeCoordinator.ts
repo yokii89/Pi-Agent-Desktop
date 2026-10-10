@@ -58,15 +58,47 @@ export const prefetchStats = {
   reclaimed: 0,
   /** view-action → ready 延迟样本（ms）。 */
   readySamples: [] as number[],
+  /** send → ready 延迟样本（ms，docs/design/44 A4）。 */
+  sendSamples: [] as number[],
+  /** 显式启动时实例已 ready（命中）/ 未 ready（含在途预热）的次数。 */
+  hits: 0,
+  misses: 0,
 };
 
 const MAX_READY_SAMPLES = 50;
 
-export function recordReadyLatency(ms: number): void {
-  prefetchStats.readySamples.push(ms);
-  if (prefetchStats.readySamples.length > MAX_READY_SAMPLES) {
-    prefetchStats.readySamples.splice(0, prefetchStats.readySamples.length - MAX_READY_SAMPLES);
+function pushSample(samples: number[], ms: number): void {
+  samples.push(ms);
+  if (samples.length > MAX_READY_SAMPLES) {
+    samples.splice(0, samples.length - MAX_READY_SAMPLES);
   }
+}
+
+export function recordReadyLatency(ms: number): void {
+  pushSample(prefetchStats.readySamples, ms);
+}
+
+/** 发送路径 ready 延迟：发送时未 ready 的真实等待（docs/design/44 A4）。 */
+export function recordSendLatency(ms: number): void {
+  pushSample(prefetchStats.sendSamples, ms);
+}
+
+function isReadyState(state: SessionRuntimeState): boolean {
+  return state === "ready" || state === "idle" || state === "busy";
+}
+
+/** 实例当前是否可用（ready/idle/busy）——渲染层直通 prompt 的命中判定用。 */
+export function isRuntimeReady(sessionId: SessionId): boolean {
+  return isReadyState(getRuntimeState(sessionId));
+}
+
+/**
+ * 渲染层直通 prompt 的命中记账：热实例路径不经 ensureSessionReady，
+ * 由 prompt IPC 入口判定后调用（docs/design/44 A4：send 延迟样本 + 命中计数）。
+ */
+export function noteWarmPrompt(startedAtMs: number): void {
+  prefetchStats.hits += 1;
+  recordSendLatency(Math.max(0, Date.now() - startedAtMs));
 }
 
 function lockKey(sessionId: SessionId, contributionKey: string): string {
@@ -424,14 +456,29 @@ export async function ensureSessionReady(
     }
   };
 
+  /** 显式启动的命中记账：预热是否在用户动作前把实例拉到 ready（docs/design/44 A4）。 */
+  const noteOutcome = (hit: boolean): void => {
+    if (!isExplicitUser) return;
+    if (hit) prefetchStats.hits += 1;
+    else prefetchStats.misses += 1;
+  };
+
+  const noteExplicitLatency = (): void => {
+    if (reason === "send") recordSendLatency(Date.now() - startedAtMs);
+    if (reason === "view-action") recordReadyLatency(Date.now() - startedAtMs);
+  };
+
   // 同 file 已有 ready 实例：直接复用，不二次 spawn
   if (req.sessionFile) {
     for (const rec of records.values()) {
       if (rec.sessionFile === req.sessionFile && hasSession(rec.sessionId)) {
+        const hit = isReadyState(rec.state);
         rec.lastActivityAt = Date.now();
         promote(rec);
         pushRuntimeChanged(toSnapshot(rec));
         await waitRuntimeReady(rec.sessionId);
+        noteOutcome(hit);
+        noteExplicitLatency();
         return { sessionId: rec.sessionId, reused: true };
       }
     }
@@ -440,9 +487,12 @@ export async function ensureSessionReady(
   // 显式使用必须先晋升，避免容量回收误杀正在复用的预热会话。
   const requested = req.sessionId ? records.get(req.sessionId) : undefined;
   if (requested && hasSession(requested.sessionId)) {
+    const hit = isReadyState(requested.state);
     promote(requested);
     pushRuntimeChanged(toSnapshot(requested));
     await waitRuntimeReady(requested.sessionId);
+    noteOutcome(hit);
+    noteExplicitLatency();
     return { sessionId: requested.sessionId, reused: true };
   }
   if (isExplicitUser) {
@@ -528,9 +578,8 @@ export async function ensureSessionReady(
     throw err;
   }
 
-  if (reason === "view-action") {
-    recordReadyLatency(Date.now() - startedAtMs);
-  }
+  noteOutcome(reused);
+  noteExplicitLatency();
 
   return { sessionId, reused };
 }
@@ -638,6 +687,9 @@ export function __resetRuntimeCoordinatorForTests(): void {
   prefetchStats.skippedLimit = 0;
   prefetchStats.reclaimed = 0;
   prefetchStats.readySamples.length = 0;
+  prefetchStats.sendSamples.length = 0;
+  prefetchStats.hits = 0;
+  prefetchStats.misses = 0;
 }
 
 export { RUNTIME_IPC };
