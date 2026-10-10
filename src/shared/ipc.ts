@@ -3,6 +3,7 @@
  * channel 命名遵循 AGENTS.md：`pidesk:<域>:<动作>`。
  */
 
+import type { SessionStartReason } from "./contribution";
 import type { FontMonoPreset, FontUiPreset } from "./fontPresets";
 import type { LocalePreference } from "./i18n";
 import type { NotificationSettings } from "./notification";
@@ -677,13 +678,7 @@ export interface SessionStartRequest {
    * 启动原因（docs/design/16 §8.1）；缺省 manual。
    * 供 runtime coordinator 日志、调度与 speculative 回收策略使用。
    */
-  reason?:
-    | "send"
-    | "view-action"
-    | "slash-command"
-    | "manual"
-    | "speculative-prefetch"
-    | "scheduled";
+  reason?: SessionStartReason;
 }
 
 /** 进程绑定型会话请求：必须带 sessionId（多实例路由）。 */

@@ -193,6 +193,16 @@ function newLocalSessionId(): SessionId {
   return `sess_ui_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`;
 }
 
+/** 待用新会话 id（docs/design/44 A2）：带 cwd 绑定，跨项目即作废。 */
+type PendingNewChatRef = { current: { cwd: string | null; id: SessionId } | null };
+
+/** 消费待用新会话 id：cwd 不匹配则丢弃（预热实例由主进程 hint 清理）。 */
+function takePendingNewChat(ref: PendingNewChatRef, cwd: string | null): SessionId | null {
+  const pending = ref.current;
+  ref.current = null;
+  return pending && pending.cwd === cwd ? pending.id : null;
+}
+
 /** 尚未落盘 JSONL 的会话在侧栏用的占位 file key。 */
 const PENDING_FILE_PREFIX = "pending:";
 
@@ -315,6 +325,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /** 高频动作只读 ref，避免 useCallback 依赖桶 state 导致闭包过期。 */
   const activeKeyRef = useRef<SessionId | null>(null);
   activeKeyRef.current = bucketsState.activeKey;
+  /** 待用新会话 id（docs/design/44 A2）：点击"新建会话"即对它预热，发送时消费。 */
+  const pendingNewChatRef = useRef<{ cwd: string | null; id: SessionId } | null>(null);
 
   const activeBucket = getActiveBucket(bucketsState);
   const phase = activeBucket?.phase ?? "empty";
@@ -836,7 +848,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
         return started;
       }
-      const newId = newLocalSessionId();
+      const newId =
+        takePendingNewChat(pendingNewChatRef, cwdRef.current ?? null) ?? newLocalSessionId();
       const started = await startBucket(newId, { cwd: cwdRef.current, makeActive: true, reason });
       return started;
     },
@@ -889,6 +902,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     bindActive(null);
     navigate("session");
     void refreshSessions();
+    // docs/design/44 A2：生成/复用待用 id 并立即预热（无 sessionFile = 待用新会话）；
+    // 不建桶、不切 active，UX 与现状一致，发送时消费该实例。
+    const cwd = cwdRef.current ?? null;
+    const existing = pendingNewChatRef.current;
+    const id = existing && existing.cwd === cwd ? existing.id : newLocalSessionId();
+    pendingNewChatRef.current = { cwd, id };
+    void prefetchService
+      .notifyActive({ sessionId: id, sessionFile: null, cwd, intent: "open" })
+      .catch(() => {});
   }, [bindActive, navigate, refreshSessions, setState]);
 
   const commitPinned = useCallback((next: string[]): void => {
@@ -1143,7 +1165,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       let targetId = activeKeyRef.current;
       if (isModeTransitioning(targetId)) return;
       if (!targetId) {
-        targetId = newLocalSessionId();
+        // docs/design/44 A2：优先消费"新建会话"预热的待用 id（命中则主进程直接复用实例）
+        targetId =
+          takePendingNewChat(pendingNewChatRef, cwdRef.current ?? null) ?? newLocalSessionId();
         setState((prev) =>
           patchBucket(prev, targetId as SessionId, {
             phase: "empty",
@@ -1312,6 +1336,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const openSessionFile = useCallback(
     async (file: string, cwd?: string): Promise<void> => {
+      // 用户转向历史会话：待用新会话 id 作废（预热实例由主进程随 hint 变化清理，A3）
+      pendingNewChatRef.current = null;
       // 乐观 pending 条目：只切 active，不 start/读盘（进程可能已在跑）
       const pendingId = sessionIdFromPendingFile(file);
       if (pendingId) {

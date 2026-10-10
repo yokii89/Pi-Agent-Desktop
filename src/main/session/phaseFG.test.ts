@@ -5,7 +5,11 @@
 import { describe, expect, it } from "vitest";
 import { parsePideskManifest } from "../extension/contributionSchema";
 import { buildWorkerArgsForTest } from "../extension/extensionWorkerArgs";
-import { canReclaimSpeculative } from "./speculativeReclaim";
+import {
+  canReclaimSpeculative,
+  canSupersedeSpeculative,
+  isSpeculativeCreatedBy,
+} from "./speculativeReclaim";
 
 describe("pi selective load worker args (spike)", () => {
   it("uses -ne + explicit -e paths, never full discovery", () => {
@@ -88,6 +92,85 @@ describe("speculative reclaim conditions (docs/design/16 §8.3)", () => {
         state: "idle",
         hasActivationTxn: true,
         childAlive: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("treats pending new-chat prefetch as speculative (docs/design/44 A2)", () => {
+    expect(isSpeculativeCreatedBy("new-chat-prefetch")).toBe(true);
+    expect(isSpeculativeCreatedBy("speculative-prefetch")).toBe(true);
+    expect(isSpeculativeCreatedBy("send")).toBe(false);
+    expect(isSpeculativeCreatedBy(null)).toBe(false);
+    expect(
+      canReclaimSpeculative({
+        createdBy: "new-chat-prefetch",
+        usedByUser: false,
+        state: "ready",
+        hasActivationTxn: false,
+        childAlive: true,
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("speculative supersede conditions (docs/design/44 A3)", () => {
+  it("supersedes unused in-flight instances", () => {
+    expect(
+      canSupersedeSpeculative({
+        createdBy: "speculative-prefetch",
+        usedByUser: false,
+        state: "starting",
+        hasActivationTxn: false,
+        childAlive: true,
+      }),
+    ).toBe(true);
+    expect(
+      canSupersedeSpeculative({
+        createdBy: "new-chat-prefetch",
+        usedByUser: false,
+        state: "starting",
+        hasActivationTxn: false,
+        childAlive: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("never supersedes promoted, activating or already-ready instances", () => {
+    expect(
+      canSupersedeSpeculative({
+        createdBy: "send",
+        usedByUser: true,
+        state: "starting",
+        hasActivationTxn: false,
+        childAlive: true,
+      }),
+    ).toBe(false);
+    expect(
+      canSupersedeSpeculative({
+        createdBy: "speculative-prefetch",
+        usedByUser: false,
+        state: "starting",
+        hasActivationTxn: true,
+        childAlive: true,
+      }),
+    ).toBe(false);
+    // starting 之外的态不走 supersede（idle/ready 由 canReclaimSpeculative 负责）
+    expect(
+      canSupersedeSpeculative({
+        createdBy: "speculative-prefetch",
+        usedByUser: false,
+        state: "idle",
+        hasActivationTxn: false,
+        childAlive: true,
+      }),
+    ).toBe(false);
+    expect(
+      canSupersedeSpeculative({
+        createdBy: "speculative-prefetch",
+        usedByUser: false,
+        state: "starting",
+        hasActivationTxn: false,
+        childAlive: false,
       }),
     ).toBe(false);
   });

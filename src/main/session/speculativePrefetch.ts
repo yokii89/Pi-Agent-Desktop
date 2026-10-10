@@ -12,8 +12,10 @@ import {
   listRuntimeSnapshots,
   prefetchStats,
   reclaimSpeculativeSessions,
+  reclaimStaleSpeculativeSessions,
   recordReadyLatency,
 } from "./runtimeCoordinator";
+import { isSpeculativeCreatedBy } from "./speculativeReclaim";
 
 let stableTimer: ReturnType<typeof setTimeout> | null = null;
 let lastHint: PrefetchNotifyRequest | null = null;
@@ -34,7 +36,7 @@ export function hasSpareQuotaForPrefetch(): boolean {
 
 /** 系统是否适合预热：无 busy agent（粗粒度「非高负载」代理）。 */
 export function isSystemIdleForPrefetch(): boolean {
-  return listRuntimeSnapshots().every((r) => r.state !== "busy" && r.state !== "starting");
+  return listRuntimeSnapshots(true).every((r) => r.state !== "busy" && r.state !== "starting");
 }
 
 async function tryPrefetch(hint: PrefetchNotifyRequest): Promise<void> {
@@ -59,7 +61,8 @@ async function tryPrefetch(hint: PrefetchNotifyRequest): Promise<void> {
       sessionId: hint.sessionId,
       sessionFile: hint.sessionFile ?? undefined,
       cwd: hint.cwd ?? undefined,
-      reason: "speculative-prefetch",
+      // 无 sessionFile = 待用新会话预热（docs/design/44 A2）：未晋升前对渲染层不可见
+      reason: hint.sessionFile ? "speculative-prefetch" : "new-chat-prefetch",
     });
     // 开关可能在 ready 等待期间关闭；新产生的 speculative 也必须回收。
     if (!getSettings().sessionPrefetchEnabled || lastHint !== hint) reclaimSpeculativeSessions();
@@ -76,6 +79,8 @@ export function notifyActiveSessionForPrefetch(req: PrefetchNotifyRequest): void
   const hint: PrefetchNotifyRequest = { ...req, intent: normalizePrefetchIntent(req.intent) };
   lastHint = hint;
   clearStableTimer();
+  // A3：hint 一变即定向清理不匹配的预热实例（含顶掉在途 starting），用户已离开的不再空转
+  reclaimStaleSpeculativeSessions({ sessionId: hint.sessionId, sessionFile: hint.sessionFile });
   if (!getSettings().sessionPrefetchEnabled) return;
   stableTimer = setTimeout(() => {
     stableTimer = null;
@@ -96,7 +101,7 @@ export function onPrefetchSettingChanged(enabled: boolean): void {
 }
 
 export function getPrefetchMetrics(): PrefetchMetrics {
-  const snapshots = listRuntimeSnapshots();
+  const snapshots = listRuntimeSnapshots(true);
   const samples = [...prefetchStats.readySamples];
   const sendSamples = [...prefetchStats.sendSamples];
   const percentile = (values: number[], p: number): number | null => {
@@ -116,7 +121,7 @@ export function getPrefetchMetrics(): PrefetchMetrics {
     prefetchAttempts: prefetchStats.attempts,
     prefetchSkippedLimit: prefetchStats.skippedLimit,
     speculativeReclaimed: prefetchStats.reclaimed,
-    speculativeAlive: snapshots.filter((r) => r.createdBy === "speculative-prefetch").length,
+    speculativeAlive: snapshots.filter((r) => isSpeculativeCreatedBy(r.createdBy)).length,
     prefetchHits: prefetchStats.hits,
     prefetchMisses: prefetchStats.misses,
   };

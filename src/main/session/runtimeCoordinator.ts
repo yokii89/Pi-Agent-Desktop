@@ -23,7 +23,11 @@ import {
   startSession,
   waitForSessionDisposal,
 } from "./piSession";
-import { canReclaimSpeculative } from "./speculativeReclaim";
+import {
+  canReclaimSpeculative,
+  canSupersedeSpeculative,
+  isSpeculativeCreatedBy,
+} from "./speculativeReclaim";
 
 export interface CoordinatorStartRequest extends SessionStartRequest {
   reason?: SessionStartReason;
@@ -105,8 +109,18 @@ function lockKey(sessionId: SessionId, contributionKey: string): string {
   return `${sessionId}::${contributionKey}`;
 }
 
-function pushRuntimeChanged(snapshot: SessionRuntimeSnapshot): void {
-  getMainWindow()?.webContents.send(RUNTIME_IPC.changed, snapshot);
+/**
+ * 未晋升的新会话预热实例对渲染层不可见（docs/design/44 A2）：
+ * 渲染层没有对应桶，推送只会经 ensureBucket 造出幽灵桶并回流"计划 sessionFile"；
+ * 晋升（promote 改写 createdBy）后恢复正常推送。
+ */
+function isHiddenFromRenderer(rec: RuntimeRecord): boolean {
+  return rec.createdBy === "new-chat-prefetch";
+}
+
+function pushRuntimeChanged(rec: RuntimeRecord): void {
+  if (isHiddenFromRenderer(rec)) return;
+  getMainWindow()?.webContents.send(RUNTIME_IPC.changed, toSnapshot(rec));
 }
 
 function isStale(fingerprint: string | null, cwd: string | null): boolean {
@@ -140,7 +154,7 @@ function patchRecord(id: SessionId, patch: Partial<RuntimeRecord>): void {
   const rec = records.get(id);
   if (!rec) return;
   Object.assign(rec, patch);
-  pushRuntimeChanged(toSnapshot(rec));
+  pushRuntimeChanged(rec);
 }
 
 function ensureRecord(
@@ -176,7 +190,7 @@ export function markRuntimeExit(sessionId: SessionId): void {
   rec.state = "cold";
   rec.readyPromise = null;
   rec.lastActivityAt = Date.now();
-  pushRuntimeChanged(toSnapshot(rec));
+  pushRuntimeChanged(rec);
   notifyActivityListeners(sessionId, "exit");
 }
 
@@ -251,7 +265,7 @@ export function markRuntimeActivity(
   if (rec.state === "cold" || rec.state === "stopping" || rec.state === "failed") return;
   rec.state = activity;
   rec.lastActivityAt = Date.now();
-  pushRuntimeChanged(toSnapshot(rec));
+  pushRuntimeChanged(rec);
   notifyActivityListeners(sessionId, activity, meta);
 }
 
@@ -260,11 +274,11 @@ export function markRuntimeUsedByUser(sessionId: SessionId): void {
   const rec = records.get(sessionId);
   if (!rec) return;
   rec.usedByUser = true;
-  if (rec.createdBy === "speculative-prefetch") {
+  if (isSpeculativeCreatedBy(rec.createdBy)) {
     rec.createdBy = "send";
   }
   rec.lastActivityAt = Date.now();
-  pushRuntimeChanged(toSnapshot(rec));
+  pushRuntimeChanged(rec);
 }
 
 /**
@@ -288,14 +302,14 @@ export function noteSessionSpawned(input: {
   rec.startedAt = Date.now();
   rec.reason = reason;
   rec.createdBy = reason;
-  rec.usedByUser = reason !== "speculative-prefetch";
+  rec.usedByUser = !isSpeculativeCreatedBy(reason);
   rec.extensionFingerprint = currentExtensionFingerprint(input.cwd);
   rec.state = "starting";
   rec.errorCode = undefined;
   rec.errorMessage = undefined;
   rec.readyPromise = null;
   rec.lastActivityAt = Date.now();
-  pushRuntimeChanged(toSnapshot(rec));
+  pushRuntimeChanged(rec);
 }
 
 /** 标记 RPC 已可用（start IPC 模型对齐后 / ready 探针成功）。 */
@@ -307,14 +321,14 @@ export function markRuntimeReady(sessionId: SessionId): void {
   rec.errorCode = undefined;
   rec.errorMessage = undefined;
   if (rec.state !== "busy") rec.state = "idle";
-  pushRuntimeChanged(toSnapshot(rec));
+  pushRuntimeChanged(rec);
 }
 
 /** 扩展变更后：fingerprint 过期的存活 runtime 标 stale（只提示不重启）。 */
 export function markExtensionStale(): void {
   for (const rec of records.values()) {
     if (rec.state !== "cold" && rec.state !== "failed") {
-      pushRuntimeChanged(toSnapshot(rec));
+      pushRuntimeChanged(rec);
     }
   }
 }
@@ -445,12 +459,12 @@ export async function ensureSessionReady(
 ): Promise<{ sessionId: SessionId; reused: boolean }> {
   const reason = req.reason ?? "manual";
   const startedAtMs = Date.now();
-  const isExplicitUser = reason !== "speculative-prefetch";
+  const isExplicitUser = !isSpeculativeCreatedBy(reason);
 
   const promote = (rec: RuntimeRecord): void => {
     if (isExplicitUser) {
       rec.usedByUser = true;
-      if (rec.createdBy === "speculative-prefetch") {
+      if (isSpeculativeCreatedBy(rec.createdBy)) {
         rec.createdBy = reason;
       }
     }
@@ -475,7 +489,7 @@ export async function ensureSessionReady(
         const hit = isReadyState(rec.state);
         rec.lastActivityAt = Date.now();
         promote(rec);
-        pushRuntimeChanged(toSnapshot(rec));
+        pushRuntimeChanged(rec);
         await waitRuntimeReady(rec.sessionId);
         noteOutcome(hit);
         noteExplicitLatency();
@@ -489,7 +503,7 @@ export async function ensureSessionReady(
   if (requested && hasSession(requested.sessionId)) {
     const hit = isReadyState(requested.state);
     promote(requested);
-    pushRuntimeChanged(toSnapshot(requested));
+    pushRuntimeChanged(requested);
     await waitRuntimeReady(requested.sessionId);
     noteOutcome(hit);
     noteExplicitLatency();
@@ -555,7 +569,7 @@ export async function ensureSessionReady(
   } else {
     rec.lastActivityAt = Date.now();
     promote(rec);
-    pushRuntimeChanged(toSnapshot(rec));
+    pushRuntimeChanged(rec);
   }
 
   try {
@@ -584,32 +598,33 @@ export async function ensureSessionReady(
   return { sessionId, reused };
 }
 
+/** 该会话是否有激活事务在途（回收判定用）。 */
+function hasActivationTxnFor(sessionId: SessionId): boolean {
+  for (const key of activationLocks.keys()) {
+    if (key.startsWith(`${sessionId}::`)) return true;
+  }
+  return false;
+}
+
 /**
  * 回收 speculative 实例（docs/design/16 §8.3）：
- * 仅 createdBy=speculative-prefetch、从未显式使用、非 busy、无激活事务。
+ * 仅预热创建（speculative-prefetch / new-chat-prefetch）、从未显式使用、非 busy、无激活事务。
  * user-owned / 已晋升实例永不自动回收。
  */
 export function reclaimSpeculativeSessions(): SessionId[] {
   const reclaimed: SessionId[] = [];
   for (const rec of [...records.values()]) {
-    let hasTxn = false;
-    for (const key of activationLocks.keys()) {
-      if (key.startsWith(`${rec.sessionId}::`)) {
-        hasTxn = true;
-        break;
-      }
-    }
     const childAlive = hasSession(rec.sessionId);
     if (
       !canReclaimSpeculative({
         createdBy: rec.createdBy,
         usedByUser: rec.usedByUser,
         state: rec.state,
-        hasActivationTxn: hasTxn,
+        hasActivationTxn: hasActivationTxnFor(rec.sessionId),
         childAlive,
       })
     ) {
-      if (rec.createdBy === "speculative-prefetch" && !childAlive && rec.state === "cold") {
+      if (isSpeculativeCreatedBy(rec.createdBy) && !childAlive && rec.state === "cold") {
         records.delete(rec.sessionId);
       }
       continue;
@@ -628,15 +643,61 @@ export function reclaimSpeculativeSessions(): SessionId[] {
   return reclaimed;
 }
 
-/** 主进程权威 runtime 快照。 */
-export function listRuntimeSnapshots(): SessionRuntimeSnapshot[] {
+/**
+ * 新 hint 到达时的定向清理（docs/design/44 A3）：回收/顶掉与当前 hint 不匹配的预热实例——
+ * idle/ready 走常规回收，starting 走 supersede（用户已离开，mid-boot 终止安全：
+ * 尚未落盘、无人等待，在途 waitRuntimeReady 会因 hasSession=false 退出）。
+ */
+export function reclaimStaleSpeculativeSessions(keep: {
+  sessionId?: string;
+  sessionFile?: string | null;
+}): SessionId[] {
+  const reclaimed: SessionId[] = [];
+  for (const rec of [...records.values()]) {
+    if (!isSpeculativeCreatedBy(rec.createdBy)) continue;
+    if (keep.sessionId && rec.sessionId === keep.sessionId) continue;
+    if (keep.sessionFile && rec.sessionFile === keep.sessionFile) continue;
+    const childAlive = hasSession(rec.sessionId);
+    const base = {
+      createdBy: rec.createdBy,
+      usedByUser: rec.usedByUser,
+      hasActivationTxn: hasActivationTxnFor(rec.sessionId),
+      childAlive,
+    };
+    const stale =
+      canReclaimSpeculative({ ...base, state: rec.state }) ||
+      canSupersedeSpeculative({ ...base, state: rec.state });
+    if (!stale) continue;
+    try {
+      disposeSession(rec.sessionId);
+    } catch {
+      // ignore
+    }
+    records.delete(rec.sessionId);
+    reclaimed.push(rec.sessionId);
+  }
+  if (reclaimed.length > 0) {
+    prefetchStats.reclaimed += reclaimed.length;
+  }
+  return reclaimed;
+}
+
+/**
+ * 主进程权威 runtime 快照。
+ * `includeHidden=false`（默认，渲染层 IPC 用）时跳过未晋升的新会话预热实例
+ * （docs/design/44 A2：渲染层无桶，推送会造幽灵桶）；主进程内部判定传 true。
+ */
+export function listRuntimeSnapshots(includeHidden = false): SessionRuntimeSnapshot[] {
   for (const rec of records.values()) {
     if (!hasSession(rec.sessionId) && rec.state !== "cold" && rec.state !== "failed") {
       rec.state = "cold";
       rec.readyPromise = null;
     }
   }
-  return [...records.values()].map(toSnapshot);
+  const visible = [...records.values()].filter(
+    (rec) => includeHidden || !isHiddenFromRenderer(rec),
+  );
+  return visible.map(toSnapshot);
 }
 
 /** 激活事务互斥：同 sessionId+contributionKey 合并重复点击。 */

@@ -117,6 +117,8 @@ export type SessionStartReason =
   | "slash-command"
   | "manual"
   | "speculative-prefetch"
+  /** 新会话预热（docs/design/44 A2）：无 sessionFile 的待用实例，未晋升前对渲染层不可见。 */
+  | "new-chat-prefetch"
   | "scheduled";
 
 /** 主进程 runtime 快照条目（Renderer reload 后对账用）。 */
