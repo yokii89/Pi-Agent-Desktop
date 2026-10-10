@@ -138,6 +138,13 @@ export const sessionService = {
     return unwrap(api.session.readTranscript(file));
   },
 
+  /** 导出会话记录为 Markdown 文件（系统保存对话框；取消返回 null）。 */
+  exportMarkdown(file: string, title?: string): Promise<{ path: string } | null> {
+    const api = pideskApi();
+    if (!api) return Promise.reject(new Error("preload 未就绪"));
+    return unwrap(api.session.exportMarkdown({ file, title }));
+  },
+
   /** 读取 pi 可用斜杠命令（目标会话未启动时返回空列表）。 */
   getCommands(sessionId?: SessionId): Promise<PiSlashCommand[]> {
     const api = pideskApi();

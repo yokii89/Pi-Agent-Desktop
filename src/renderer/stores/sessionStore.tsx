@@ -74,8 +74,10 @@ interface SessionMetaValue {
   unreadDoneFile: string | null;
   /** 运行中的会话 JSONL 集合（侧栏多旋转）。 */
   runningFiles: ReadonlySet<string>;
-  /** 置顶的会话文件（数组顺序即置顶顺序）。 */
+  /** 在工作区内置顶的会话文件（数组顺序即置顶顺序）；条目固定在其所属列表最前。 */
   pinnedFiles: string[];
+  /** 全局置顶的会话文件（数组顺序即置顶顺序）；从原分组提出，固定展示在侧栏「置顶」分区（docs/design/45）。 */
+  globalPinnedFiles: string[];
   /** 已归档的会话（JSONL 绝对路径 → 归档时间 Unix ms）；侧栏主列表不展示，管理入口在设置页（docs/design/32）。 */
   archivedFiles: Record<string, number>;
   /** 会话自定义标题（JSONL 绝对路径 → 用户重命名后的标题）。 */
@@ -120,6 +122,10 @@ interface SessionMetaValue {
   /** 新建任务：新建空桶并设为 active，**不杀**其它会话进程（Ctrl+N）。 */
   newSession: () => void;
   togglePin: (file: string) => void;
+  /** 全局置顶开关（docs/design/45）：置顶条目从原分组提出，进入侧栏顶部「置顶」分区。 */
+  toggleGlobalPin: (file: string) => void;
+  /** 手动标记会话未读（行菜单）；已浏览会话由既有的清除副作用消化。 */
+  markSessionUnread: (file: string) => void;
   /** 归档会话：JSONL 保留；有存活实例先结束，active 让位，置顶联动清除（docs/design/32）。 */
   archiveSession: (file: string) => void;
   /** 取消归档：会话回到侧栏主列表（设置页归档面板「恢复」用）。 */
@@ -308,6 +314,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [bucketsState, dispatchBuckets] = useReducer(bucketsReducer, undefined, createBucketsState);
   const [allSessions, setAllSessions] = useState<SessionSummary[]>([]);
   const [pinnedFiles, setPinnedFiles] = useState<string[]>([]);
+  const [globalPinnedFiles, setGlobalPinnedFiles] = useState<string[]>([]);
   const [archivedFiles, setArchivedFiles] = useState<Record<string, number>>({});
   const [sessionTitles, setSessionTitles] = useState<Record<string, string>>({});
   const [modelLabel, setModelLabel] = useState("pi");
@@ -824,6 +831,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void settingsService.get().then((settings) => {
       if (cancelled || !settings) return;
       setPinnedFiles(settings.pinnedSessions);
+      setGlobalPinnedFiles(settings.globalPinnedSessions);
       setArchivedFiles(settings.archivedSessions);
       setSessionTitles(settings.sessionTitles);
     });
@@ -927,6 +935,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [pinnedFiles, commitPinned],
   );
 
+  const commitGlobalPinned = useCallback((next: string[]): void => {
+    setGlobalPinnedFiles(next);
+    void settingsService.set({ globalPinnedSessions: next });
+  }, []);
+
+  /** 全局置顶（docs/design/45）：从原分组提出，固定展示在侧栏顶部「置顶」分区。 */
+  const toggleGlobalPin = useCallback(
+    (file: string): void => {
+      commitGlobalPinned(
+        globalPinnedFiles.includes(file)
+          ? globalPinnedFiles.filter((f) => f !== file)
+          : [...globalPinnedFiles, file],
+      );
+    },
+    [globalPinnedFiles, commitGlobalPinned],
+  );
+
+  /** 手动标记未读（侧栏行菜单）；当前正在浏览的会话由清除副作用立即消化。 */
+  const markSessionUnread = useCallback(
+    (file: string): void => {
+      setState((prev) => markUnread(prev, file));
+    },
+    [setState],
+  );
+
   const commitArchived = useCallback((next: Record<string, number>): void => {
     setArchivedFiles(next);
     void settingsService.set({ archivedSessions: next });
@@ -952,6 +985,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       sessionIdByFileRef.current.delete(file);
       if (pinnedFiles.includes(file)) commitPinned(pinnedFiles.filter((f) => f !== file));
+      if (globalPinnedFiles.includes(file)) {
+        commitGlobalPinned(globalPinnedFiles.filter((f) => f !== file));
+      }
       commitArchived({ ...archivedFiles, [file]: Date.now() });
       setState((prev) => {
         let next = dropFileIndex(prev, file);
@@ -975,7 +1011,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       archivedFiles,
       bindActive,
       commitArchived,
+      commitGlobalPinned,
       commitPinned,
+      globalPinnedFiles,
       pinnedFiles,
       refreshSessions,
       setState,
@@ -1097,6 +1135,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (pinnedFiles.includes(file)) commitPinned(pinnedFiles.filter((f) => f !== file));
+      if (globalPinnedFiles.includes(file)) {
+        commitGlobalPinned(globalPinnedFiles.filter((f) => f !== file));
+      }
       if (archivedFiles[file] !== undefined) {
         const nextArchived = { ...archivedFiles };
         delete nextArchived[file];
@@ -1135,8 +1176,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       archivedFiles,
       bindActive,
       commitArchived,
+      commitGlobalPinned,
       commitPinned,
       commitTitles,
+      globalPinnedFiles,
       pinnedFiles,
       refreshSessions,
       rematerializeSidebar,
@@ -1552,6 +1595,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       unreadDoneFile,
       runningFiles,
       pinnedFiles,
+      globalPinnedFiles,
       archivedFiles,
       sessionTitles,
       processAlive,
@@ -1574,6 +1618,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       getSlashCommands,
       newSession,
       togglePin,
+      toggleGlobalPin,
+      markSessionUnread,
       archiveSession,
       unarchiveSession,
       renameSession,
@@ -1602,6 +1648,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       unreadDoneFile,
       runningFiles,
       pinnedFiles,
+      globalPinnedFiles,
       archivedFiles,
       sessionTitles,
       processAlive,
@@ -1623,6 +1670,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       getSlashCommands,
       newSession,
       togglePin,
+      toggleGlobalPin,
+      markSessionUnread,
       archiveSession,
       unarchiveSession,
       renameSession,

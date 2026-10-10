@@ -18,6 +18,7 @@ function fakeSettings(): PideskSettings {
     locale: "zh-CN",
     navCollapsed: true,
     pinnedSessions: ["C:/s/a.jsonl"],
+    globalPinnedSessions: ["C:/s/c.jsonl"],
     archivedSessions: { "C:/s/b.jsonl": 1 },
     sessionTitles: { "C:/s/a.jsonl": "标题" },
     browserRecentUrls: [],

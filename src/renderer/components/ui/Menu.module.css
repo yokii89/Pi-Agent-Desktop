@@ -66,3 +66,11 @@
 .itemDanger .itemIcon {
   color: var(--color-danger);
 }
+
+/* 条目组之间的分隔线（如行菜单「归档 / 删除」与常规动作之间） */
+.separator {
+  height: 1px;
+  margin: 4px 2px;
+  border: none;
+  background: var(--color-border);
+}

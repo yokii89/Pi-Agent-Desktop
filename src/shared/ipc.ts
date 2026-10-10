@@ -112,8 +112,13 @@ export interface PideskSettings {
   locale: LocalePreference;
   /** 侧边栏默认折叠。 */
   navCollapsed: boolean;
-  /** 置顶的会话（JSONL 绝对路径，数组顺序即置顶顺序）；列表排序时置顶条目固定在各列表最前。 */
+  /** 「在工作区内置顶」的会话（JSONL 绝对路径，数组顺序即置顶顺序）；条目固定在其所属列表最前。 */
   pinnedSessions: string[];
+  /**
+   * 「全局置顶」的会话（JSONL 绝对路径，数组顺序即置顶顺序）；条目从原分组提出，
+   * 固定展示在侧栏最顶部的「置顶」分区（docs/design/45）。
+   */
+  globalPinnedSessions: string[];
   /**
    * 已归档的会话（JSONL 绝对路径 → 归档时间 Unix ms）；会话正文 JSONL 不动，仅 PiDesk 侧标记。
    * 归档与置顶互斥（归档动作会同时清 pinnedSessions）；侧栏主列表不展示归档条目，
@@ -293,6 +298,8 @@ export const SESSION_IPC = {
   setDefaultModel: "pidesk:session:setDefaultModel",
   /** 读取会话 JSONL 转为消息数组（磁盘优先展示，不依赖 pi 进程）。 */
   readTranscript: "pidesk:session:readTranscript",
+  /** 导出会话记录为 Markdown 文件（保存对话框；docs/design/45）。 */
+  exportMarkdown: "pidesk:session:exportMarkdown",
   /** 读取会话用量统计（RPC `get_session_stats`，上下文占用）。 */
   getStats: "pidesk:session:getStats",
 } as const;
@@ -304,6 +311,14 @@ export interface SessionTranscriptPayload {
   startedAt: number | null;
   /** 因软上限截断了更早的消息。 */
   truncated: boolean;
+}
+
+/** 导出会话记录（Markdown）请求；title 仅用于默认文件名（经净化）。 */
+export interface SessionExportRequest {
+  /** 会话 JSONL 绝对路径（须位于 pi sessions 目录内）。 */
+  file: string;
+  /** 会话展示标题；缺省时用默认名。 */
+  title?: string;
 }
 
 /** pi 斜杠命令（RPC get_commands）。 */

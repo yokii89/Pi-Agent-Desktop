@@ -805,4 +805,21 @@ export const sessionMessages = defineMessages({
   "session.piState.completed": { "zh-CN": "已完成", "en-US": "Completed" },
   "session.piState.failed": { "zh-CN": "失败", "en-US": "Failed" },
   "session.piState.interrupted": { "zh-CN": "已中断", "en-US": "Interrupted" },
+
+  "session.export.saveTitle": { "zh-CN": "导出会话记录", "en-US": "Export session record" },
+  "session.export.defaultName": { "zh-CN": "会话记录", "en-US": "Session record" },
+  "session.export.done": { "zh-CN": "记录已导出", "en-US": "Record exported" },
+  "session.export.metaFile": { "zh-CN": "会话文件", "en-US": "Session file" },
+  "session.export.metaStarted": { "zh-CN": "开始时间", "en-US": "Started" },
+  "session.export.metaExported": { "zh-CN": "导出时间", "en-US": "Exported" },
+  "session.export.roleUser": { "zh-CN": "用户", "en-US": "User" },
+  "session.export.roleAssistant": { "zh-CN": "助手", "en-US": "Assistant" },
+  "session.export.thinking": { "zh-CN": "思考过程", "en-US": "Reasoning" },
+  "session.export.toolCall": { "zh-CN": "工具调用", "en-US": "Tool call" },
+  "session.export.toolError": { "zh-CN": "工具失败", "en-US": "Tool failed" },
+  "session.export.image": { "zh-CN": "图片附件", "en-US": "Image attachment" },
+  "session.export.truncated": {
+    "zh-CN": "会话过长，导出仅包含最近的部分消息。",
+    "en-US": "The conversation is long; only recent messages are included.",
+  },
 });

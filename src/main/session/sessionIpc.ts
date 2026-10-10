@@ -8,6 +8,7 @@ import type {
   PiSessionStats,
   PiShellProbe,
   PiSlashCommand,
+  SessionExportRequest,
   SessionGetModelsRequest,
   SessionId,
   SessionPromptRequest,
@@ -22,6 +23,7 @@ import { AUTH_IPC, PI_IPC, SESSION_IPC } from "../../shared/ipc";
 import { envelope, envelopeAsync } from "../ipc/envelope";
 import { getSettings } from "../settings/settings";
 import { buildContextBreakdown } from "./contextBreakdown";
+import { exportSessionMarkdown } from "./exportSession";
 import { invalidateGatewayModelCache, listApiKeyProviders } from "./piAuth";
 import {
   activateCredential,
@@ -307,6 +309,12 @@ export function registerSessionIpc(): void {
     SESSION_IPC.readTranscript,
     (_event, req: { file: string }): Promise<IpcResult<SessionTranscriptPayload>> =>
       envelopeAsync(() => readSessionTranscript(req?.file)),
+  );
+
+  ipcMain.handle(
+    SESSION_IPC.exportMarkdown,
+    (_event, req: SessionExportRequest): Promise<IpcResult<{ path: string } | null>> =>
+      envelopeAsync(() => exportSessionMarkdown(req)),
   );
 
   ipcMain.handle(

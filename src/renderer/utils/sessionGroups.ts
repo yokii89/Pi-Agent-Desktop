@@ -7,10 +7,33 @@ export interface ProjectSessionGroup {
   sessions: SessionSummary[];
 }
 
-/** 会话归属树：能映射到项目的进项目，其余（无 cwd / 目录不属任何项目）进"任务"。 */
+/** 会话归属树：全局置顶提出单独成区，其余能映射到项目的进项目、剩下的进"任务"。 */
 export interface SessionTree {
+  /** 全局置顶的会话（按置顶顺序），从普通分组中提出，侧栏「置顶」分区展示（docs/design/45）。 */
+  globalPinned: SessionSummary[];
   tasks: SessionSummary[];
   projectGroups: ProjectSessionGroup[];
+}
+
+/**
+ * 找到会话工作目录归属的项目：多个项目嵌套时取路径最深（最具体）的一个；
+ * 无 cwd 或不属于任何项目返回 null。侧栏分组与悬浮卡"所属空间"共用同一口径。
+ */
+export function findOwningProject(
+  cwd: string | null,
+  projects: readonly PideskProject[],
+): PideskProject | null {
+  if (!cwd) return null;
+  let owner: PideskProject | null = null;
+  let ownerDepth = -1;
+  for (const project of projects) {
+    const depth = normalizeDirPath(project.dir).length;
+    if (depth > ownerDepth && isSameOrInsideDir(cwd, project.dir)) {
+      owner = project;
+      ownerDepth = depth;
+    }
+  }
+  return owner;
 }
 
 /**
@@ -29,25 +52,29 @@ function sortByPin(sessions: SessionSummary[], pinnedFiles: readonly string[]): 
 
 /**
  * 按"会话工作目录 → 项目"把历史会话分组：
- * - cwd 等于某项目目录或位于其内部 → 归入该项目；多个项目嵌套时归入路径最深（最具体）的一个；
+ * - 全局置顶会话从分组中提出，单独成区（"置顶"分区固定在侧栏最顶部，docs/design/45）；
+ * - 其余 cwd 等于某项目目录或位于其内部 → 归入该项目；多个项目嵌套时归入路径最深（最具体）的一个；
  * - 无 cwd 或映射不到任何项目 → 归入顶层"任务"。
- * 每条会话只出现在一个位置；组内默认保持入参的时间倒序，置顶会话提到该组最前。
+ * 每条会话只出现在一个位置；组内默认保持入参的时间倒序，工作区置顶会话提到该组最前。
  */
 export function buildSessionTree(
   sessions: SessionSummary[],
   projects: PideskProject[],
   pinnedFiles: readonly string[] = [],
+  globalPinnedFiles: readonly string[] = [],
 ): SessionTree {
-  // 嵌套目录的项目需先匹配更深的，避免会话被上层项目"截走"（按归一化后路径长度比较）
-  const byDepth = [...projects].sort(
-    (a, b) => normalizeDirPath(b.dir).length - normalizeDirPath(a.dir).length,
-  );
+  const globalRank = new Map(globalPinnedFiles.map((file, index) => [file, index]));
+  const globalPinned = sessions
+    .filter((session) => globalRank.has(session.file))
+    .sort((a, b) => (globalRank.get(a.file) ?? 0) - (globalRank.get(b.file) ?? 0));
+  const rest =
+    globalRank.size === 0 ? sessions : sessions.filter((session) => !globalRank.has(session.file));
+
   const grouped = new Map<string, SessionSummary[]>();
   const tasks: SessionSummary[] = [];
 
-  for (const session of sessions) {
-    const cwd = session.cwd;
-    const owner = cwd ? byDepth.find((p) => isSameOrInsideDir(cwd, p.dir)) : undefined;
+  for (const session of rest) {
+    const owner = findOwningProject(session.cwd, projects);
     if (owner) {
       const list = grouped.get(owner.id);
       if (list) {
@@ -61,6 +88,7 @@ export function buildSessionTree(
   }
 
   return {
+    globalPinned,
     tasks: sortByPin(tasks, pinnedFiles),
     projectGroups: projects.map((project) => ({
       project,
@@ -82,7 +110,11 @@ export function excludeArchivedSessions(
   return sessions.filter((session) => archivedFiles[session.file] === undefined);
 }
 
-/** 把会话树拍平成侧栏展示顺序（项目组在前、任务在后，组内保持既有排序）；上/下一个会话导航用。 */
+/** 把会话树拍平成侧栏展示顺序（置顶区在前、项目组次之、任务在后，组内保持既有排序）；上/下一个会话导航用。 */
 export function flattenSessionTree(tree: SessionTree): SessionSummary[] {
-  return [...tree.projectGroups.flatMap((group) => group.sessions), ...tree.tasks];
+  return [
+    ...tree.globalPinned,
+    ...tree.projectGroups.flatMap((group) => group.sessions),
+    ...tree.tasks,
+  ];
 }

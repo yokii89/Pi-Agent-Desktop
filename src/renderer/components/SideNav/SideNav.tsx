@@ -16,6 +16,7 @@ import { type PageId, useUiStore } from "../../stores/uiStore";
 import { buildSessionTree, excludeArchivedSessions } from "../../utils/sessionGroups";
 import { SidebarMount } from "../ExtensionView/SidebarMount";
 import { IconButton } from "../ui/IconButton";
+import { PinnedList } from "./PinnedList";
 import { ProjectList } from "./ProjectList";
 import styles from "./SideNav.module.css";
 import { TaskList } from "./TaskList";
@@ -25,16 +26,23 @@ export function SideNav() {
   const t = useT();
   const { navCollapsed, page, navigate, dispatch, settingsOpen, openSettings, shortcuts } =
     useUiStore();
-  const { newSession, allSessions, pinnedFiles, archivedFiles } = useSessionMeta();
+  const { newSession, allSessions, pinnedFiles, globalPinnedFiles, archivedFiles } =
+    useSessionMeta();
   const { projects } = useProjectStore();
   const { sidebars: visibleSidebars } = useExtensionViewStore();
 
-  // History → Project 归属：有工作目录且命中项目的进项目，其余进"任务"（无重复）；
-  // 置顶条目由 buildSessionTree 提到各自列表最前；已归档条目不进主列表（docs/design/32）
+  // History → Project 归属：全局置顶条目提出进「置顶」分区；有工作目录且命中项目的进项目，
+  // 其余进"任务"（无重复）；组内置顶由 buildSessionTree 提到各自列表最前；
+  // 已归档条目不进主列表（docs/design/32）
   const tree = useMemo(
     () =>
-      buildSessionTree(excludeArchivedSessions(allSessions, archivedFiles), projects, pinnedFiles),
-    [allSessions, archivedFiles, projects, pinnedFiles],
+      buildSessionTree(
+        excludeArchivedSessions(allSessions, archivedFiles),
+        projects,
+        pinnedFiles,
+        globalPinnedFiles,
+      ),
+    [allSessions, archivedFiles, projects, pinnedFiles, globalPinnedFiles],
   );
 
   if (navCollapsed) {
@@ -128,6 +136,12 @@ export function SideNav() {
       </button>
 
       <div className={styles.divider} />
+      {tree.globalPinned.length > 0 ? (
+        <>
+          <PinnedList sessions={tree.globalPinned} />
+          <div className={styles.divider} />
+        </>
+      ) : null}
       <ProjectList groups={tree.projectGroups} />
 
       <div className={styles.divider} />

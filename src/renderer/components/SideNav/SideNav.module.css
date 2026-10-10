@@ -202,12 +202,11 @@
   white-space: nowrap;
 }
 
-/* 历史会话条目（"任务"与项目子列表共用）：单行 = 标题 + 右槽（时间 / 操作按钮原位互换） */
+/* 历史会话条目（"任务"与项目子列表共用）：单行 = 标题 + 右缘状态槽（⋯ 悬浮时原位互换） */
 .historyItem {
-  /* 右侧动作槽宽度：⋯ 与置顶两个 24px 按钮 + 2px 间距 + 4px 右缘留白。
-     标题在该边界截断，时间与操作按钮同在槽内右对齐——悬浮时原位 crossfade，
-     而不是按钮盖在时间上（那会在交接的一瞬叠印，见旧版缺陷） */
-  --row-slot: 58px;
+  /* 右缘槽位宽：24px 状态/⋯ 盒 + 4px 右缘留白 + 2px 缓冲。
+     标题在该边界截断，悬浮时不会因 ⋯ 浮现而 reflow */
+  --row-slot: 30px;
   position: relative;
   display: flex;
   align-items: center;
@@ -266,7 +265,7 @@
   transition: transform 0.16s ease;
 }
 
-/* 条目左侧状态指示：AI 输出中（旋转）/ 完成未读（绿点） */
+/* 标题行内的小状态徽标（扩展待重载等，跟在标题文字后） */
 .historyStatus {
   display: inline-flex;
   flex-shrink: 0;
@@ -278,21 +277,69 @@
   color: var(--color-text);
 }
 
-.statusSpin {
-  animation: statusSpin 1.1s linear infinite;
-}
-
-@keyframes statusSpin {
-  to {
-    transform: rotate(1turn);
-  }
-}
-
+/* 完成未读蓝点（设计图 3）：AI 输出完成且用户不在该会话时的提示 */
 .doneDot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: var(--color-success);
+  background: var(--color-accent);
+}
+
+/* 运行中点阵（设计图 4）：3×3 方点，透明度按对角线相位呼吸；
+   相位差用 nth-child 写死（行列序号和 × 0.12s），减动效时静止为常量点阵 */
+.runningDots {
+  display: grid;
+  grid-template-columns: repeat(3, 3px);
+  grid-auto-rows: 3px;
+  gap: 2px;
+}
+
+.runningDot {
+  width: 3px;
+  height: 3px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.25;
+  animation: runningDotPulse 1.2s ease-in-out infinite;
+}
+
+.runningDot:nth-child(1) {
+  animation-delay: 0s;
+}
+.runningDot:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.runningDot:nth-child(3) {
+  animation-delay: 0.24s;
+}
+.runningDot:nth-child(4) {
+  animation-delay: 0.12s;
+}
+.runningDot:nth-child(5) {
+  animation-delay: 0.24s;
+}
+.runningDot:nth-child(6) {
+  animation-delay: 0.36s;
+}
+.runningDot:nth-child(7) {
+  animation-delay: 0.24s;
+}
+.runningDot:nth-child(8) {
+  animation-delay: 0.36s;
+}
+.runningDot:nth-child(9) {
+  animation-delay: 0.48s;
+}
+
+@keyframes runningDotPulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 .historyItemActive .historyTitle {
@@ -304,13 +351,39 @@
   transform: translateX(2px);
 }
 
+/* 右缘槽位（状态 / ⋯ 共用）：固定 24px 盒，两者同位叠加、互斥显隐。
+   状态槽在流内，⋯ 与其重叠铺设——不悬浮时 ⋯ 只占位不可点（pointer-events 由 .hoverReveal 控制）。 */
 .historyDots {
   position: absolute;
   top: 50%;
   right: 4px;
-  display: inline-flex;
-  gap: 2px;
+  width: 24px;
+  height: 24px;
   transform: translateY(-50%);
+}
+
+/* 状态槽：AI 输出中（点阵）/ 完成未读（蓝点）/ 置顶（图钉），与 ⋯ 交叉淡出。
+   pointer-events 关闭：右缘槽位本身不是点击目标，点击应穿透到整行按钮（打开会话）。 */
+.statusLayer {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.historyItemActive .statusLayer {
+  color: var(--color-text);
+}
+
+/* 悬浮 / 键盘聚焦 / 菜单常驻（data-locked）时状态位让给 ⋯ */
+.historyItem:hover .statusLayer,
+.historyItem:focus-within .statusLayer,
+.historyItem:has(.hoverReveal[data-locked]) .statusLayer {
+  opacity: 0;
 }
 
 /* 行内重命名输入框：原位替换标题按钮，右侧留出动作槽宽度避免被悬浮按钮压住 */
@@ -336,6 +409,14 @@
   display: inline-flex;
   opacity: var(--reveal, 0);
   pointer-events: none;
+}
+
+/* 历史行内 ⋯ 覆盖在状态槽同位（鼠标进入行即进入 ⋯ 显隐链路，状态自然让位，设计图 1/3/4） */
+.historyDots .hoverReveal {
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
 }
 
 .historyItem:hover .hoverReveal,
@@ -523,9 +604,9 @@
   bottom: 50%;
 }
 
-/* 无障碍：系统开启"减少动效"时关闭纯 CSS 动画 */
+/* 无障碍：系统开启"减少动效"时关闭纯 CSS 动画；点阵静止为常量指示 */
 @media (prefers-reduced-motion: reduce) {
-  .statusSpin {
+  .runningDot {
     animation: none;
   }
 }

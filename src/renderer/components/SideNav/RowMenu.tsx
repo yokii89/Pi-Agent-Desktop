@@ -1,7 +1,22 @@
-import { Archive, DotsThree, FolderOpen, Pen, Trash } from "@phosphor-icons/react";
+import {
+  Archive,
+  Copy,
+  DotsThree,
+  EnvelopeSimple,
+  Export,
+  FolderOpen,
+  Pen,
+  PushPin,
+  PushPinSimple,
+  PushPinSimpleSlash,
+  PushPinSlash,
+  Trash,
+} from "@phosphor-icons/react";
+import { useEffect } from "react";
 import { t as translate } from "../../../shared/i18n";
 import { useT } from "../../hooks/useT";
 import { fsService } from "../../services/fsService";
+import { sessionService } from "../../services/sessionService";
 import { isPendingFile } from "../../stores/sessionStore";
 import type { MenuItem } from "../ui/Menu";
 import { Menu } from "../ui/Menu";
@@ -13,6 +28,16 @@ interface RowMenuProps {
   label: string;
   /** 菜单条目；返回 null 的条件条目（如"没有工作目录就没有打开文件夹"）在此统一剔除。 */
   items: (MenuItem | null)[];
+  /** 菜单开合回调（HistoryItem 借此在菜单打开时收起悬浮详情卡，避免卡片压住菜单）。 */
+  onOpenChange?: (open: boolean) => void;
+}
+
+/** 把 Popover 的 open 状态转成回调（trigger 是渲染函数，hook 不能写在里面）。 */
+function OpenNotifier({ open, onChange }: { open: boolean; onChange: (open: boolean) => void }) {
+  useEffect(() => {
+    onChange(open);
+  }, [open, onChange]);
+  return null;
 }
 
 /**
@@ -21,7 +46,7 @@ interface RowMenuProps {
  *
  * 条件条目传 null 即可（本组件会过滤掉），调用处不必写展开语法。
  */
-export function RowMenu({ label, items }: RowMenuProps) {
+export function RowMenu({ label, items, onOpenChange }: RowMenuProps) {
   const t = useT();
   const visible = items.filter((item): item is MenuItem => item !== null);
   return (
@@ -30,16 +55,19 @@ export function RowMenu({ label, items }: RowMenuProps) {
         align="right"
         direction="bottom"
         trigger={({ open, onClick }) => (
-          <button
-            type="button"
-            className={[styles.rowButton, open ? styles.rowButtonOpen : ""].join(" ")}
-            title={t("sidenav.row.moreActions")}
-            aria-label={label}
-            aria-haspopup="menu"
-            onClick={onClick}
-          >
-            <DotsThree size={16} weight="regular" />
-          </button>
+          <>
+            {onOpenChange ? <OpenNotifier open={open} onChange={onOpenChange} /> : null}
+            <button
+              type="button"
+              className={[styles.rowButton, open ? styles.rowButtonOpen : ""].join(" ")}
+              title={t("sidenav.row.moreActions")}
+              aria-label={label}
+              aria-haspopup="menu"
+              onClick={onClick}
+            >
+              <DotsThree size={16} weight="regular" />
+            </button>
+          </>
         )}
         items={visible}
       />
@@ -100,8 +128,95 @@ export function renameItem(onSelect: () => void): MenuItem {
   };
 }
 
+/** 「复制任务 ID」条目：复制 pi 会话 id（JSONL 头部 id；未落盘的新会话为运行时 id）。 */
+export function copyTaskIdItem(taskId: string, showToast: (message: string) => void): MenuItem {
+  return {
+    key: "copy-id",
+    label: translate("sidenav.session.copyTaskId"),
+    icon: <Copy size={16} weight="regular" />,
+    onSelect: () => {
+      void navigator.clipboard
+        .writeText(taskId)
+        .then(() => showToast(translate("sidenav.session.idCopied")))
+        .catch(() => showToast(translate("session.copyFailed")));
+    },
+  };
+}
+
+/**
+ * 「导出记录」条目（docs/design/45）：会话 JSONL → Markdown 文件（系统保存对话框）。
+ * 未落盘的新会话没有可导出的文件，返回 null = 整行不展示。
+ */
+export function exportItem(
+  file: string,
+  title: string,
+  showToast: (message: string) => void,
+): MenuItem | null {
+  if (isPendingFile(file)) return null;
+  return {
+    key: "export",
+    label: translate("sidenav.session.export"),
+    icon: <Export size={16} weight="regular" />,
+    onSelect: () => {
+      void sessionService
+        .exportMarkdown(file, title)
+        .then((result) => {
+          if (result) showToast(translate("session.export.done"));
+        })
+        .catch((err: unknown) => {
+          showToast(err instanceof Error ? err.message : translate("sidenav.session.exportFailed"));
+        });
+    },
+  };
+}
+
+/** 「全局置顶」开关条目（docs/design/45）：条目从原分组提出，进入侧栏顶部「置顶」分区。 */
+export function pinGlobalItem(pinned: boolean, onSelect: () => void): MenuItem {
+  return {
+    key: "pin-global",
+    label: pinned
+      ? translate("sidenav.session.unpinGlobal")
+      : translate("sidenav.session.pinGlobal"),
+    icon: pinned ? (
+      <PushPinSlash size={16} weight="regular" />
+    ) : (
+      <PushPin size={16} weight="regular" />
+    ),
+    onSelect,
+  };
+}
+
+/** 「在工作区内置顶」开关条目：条目固定在其所属列表最前（不离开原分组）。 */
+export function pinWorkspaceItem(pinned: boolean, onSelect: () => void): MenuItem {
+  return {
+    key: "pin-workspace",
+    label: pinned
+      ? translate("sidenav.session.unpinWorkspace")
+      : translate("sidenav.session.pinWorkspace"),
+    icon: pinned ? (
+      <PushPinSimpleSlash size={16} weight="regular" />
+    ) : (
+      <PushPinSimple size={16} weight="regular" />
+    ),
+    onSelect,
+  };
+}
+
+/** 「标记为未读」条目：active 且正在浏览的会话会被清除副作用立刻消化，此时禁用并标注原因。 */
+export function markUnreadItem(options: { disabled: boolean; onSelect: () => void }): MenuItem {
+  return {
+    key: "mark-unread",
+    label: translate("sidenav.session.markUnread"),
+    icon: <EnvelopeSimple size={16} weight="regular" />,
+    disabled: options.disabled,
+    hint: options.disabled ? translate("sidenav.session.markUnreadCurrent") : undefined,
+    onSelect: options.onSelect,
+  };
+}
+
 /**
  * 「归档」条目（docs/design/32）：归档可逆（设置 → 已归档对话可恢复），无需确认。
+ * 设计图把它作为分隔线之下的收尾动作，用危险色提示"会从侧栏收起"（docs/design/45）。
  * pending 占位行还没落盘 JSONL，无档可归，返回 null = 整行不展示。
  */
 export function archiveItem(file: string, onSelect: () => void): MenuItem | null {
@@ -110,6 +225,8 @@ export function archiveItem(file: string, onSelect: () => void): MenuItem | null
     key: "archive",
     label: translate("sidenav.session.archive"),
     icon: <Archive size={16} weight="regular" />,
+    tone: "danger",
+    dividerBefore: true,
     onSelect,
   };
 }

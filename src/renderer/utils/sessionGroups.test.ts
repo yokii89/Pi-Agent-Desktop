@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { PideskProject, SessionSummary } from "../../shared/ipc";
-import { buildSessionTree, excludeArchivedSessions, flattenSessionTree } from "./sessionGroups";
+import {
+  buildSessionTree,
+  excludeArchivedSessions,
+  findOwningProject,
+  flattenSessionTree,
+} from "./sessionGroups";
 
 const project = (id: string, dir: string): PideskProject => ({ id, name: id, dir });
 const session = (file: string, cwd: string | null, updatedAt = 0): SessionSummary => ({
@@ -43,6 +48,47 @@ describe("buildSessionTree / flattenSessionTree", () => {
   it("无项目时全部归入任务段", () => {
     const flat = flattenSessionTree(buildSessionTree(SESSIONS, []));
     expect(flat.map((s) => s.file)).toEqual(["s-pi-1.jsonl", "s-ui.jsonl", "s-task.jsonl"]);
+  });
+
+  it("全局置顶会话从分组中提出，按置顶顺序排在拍平最前", () => {
+    const tree = buildSessionTree(SESSIONS, PROJECTS, [], ["s-task.jsonl", "s-ui.jsonl"]);
+    expect(tree.globalPinned.map((s) => s.file)).toEqual(["s-task.jsonl", "s-ui.jsonl"]);
+    expect(tree.tasks).toEqual([]);
+    expect(tree.projectGroups.flatMap((g) => g.sessions).map((s) => s.file)).toEqual([
+      "s-pi-1.jsonl",
+    ]);
+    expect(flattenSessionTree(tree).map((s) => s.file)).toEqual([
+      "s-task.jsonl",
+      "s-ui.jsonl",
+      "s-pi-1.jsonl",
+    ]);
+  });
+
+  it("全局置顶优先于工作区置顶：同一会话只出现在置顶区一次", () => {
+    const tree = buildSessionTree(SESSIONS, PROJECTS, ["s-pi-1.jsonl"], ["s-pi-1.jsonl"]);
+    expect(tree.globalPinned.map((s) => s.file)).toEqual(["s-pi-1.jsonl"]);
+    const flat = flattenSessionTree(tree);
+    expect(flat.filter((s) => s.file === "s-pi-1.jsonl")).toHaveLength(1);
+  });
+
+  it("全局置顶登记了已不存在的会话时不影响其余分组", () => {
+    const tree = buildSessionTree(SESSIONS, PROJECTS, [], ["missing.jsonl"]);
+    expect(tree.globalPinned).toEqual([]);
+    expect(flattenSessionTree(tree).map((s) => s.file)).toEqual([
+      "s-pi-1.jsonl",
+      "s-ui.jsonl",
+      "s-task.jsonl",
+    ]);
+  });
+});
+
+describe("findOwningProject", () => {
+  it("多个项目嵌套时取路径最深（最具体）的一个", () => {
+    const nested = [project("outer", "D:\\work"), project("inner", "D:\\work\\pi")];
+    expect(findOwningProject("D:\\work\\pi\\src", nested)?.id).toBe("inner");
+    expect(findOwningProject("D:\\work\\other", nested)?.id).toBe("outer");
+    expect(findOwningProject(null, nested)).toBeNull();
+    expect(findOwningProject("D:\\elsewhere", nested)).toBeNull();
   });
 });
 

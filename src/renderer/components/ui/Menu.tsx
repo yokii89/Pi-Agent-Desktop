@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import styles from "./Menu.module.css";
 import { Popover } from "./Popover";
 
@@ -12,6 +12,8 @@ export interface MenuItem {
   hint?: string;
   /** 危险操作（删除类）：文字与图标用危险色。 */
   tone?: "danger";
+  /** 在该条目之前渲染一条分隔线（把危险/收尾动作与常规动作分组）。 */
+  dividerBefore?: boolean;
   onSelect?: () => void;
 }
 
@@ -35,21 +37,23 @@ export function MenuList({
   return (
     <div className={styles.list} role="menu">
       {items.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          role="menuitem"
-          disabled={item.disabled}
-          className={[styles.item, item.tone === "danger" ? styles.itemDanger : ""].join(" ")}
-          onClick={() => {
-            item.onSelect?.();
-            afterSelect?.();
-          }}
-        >
-          {item.icon && <span className={styles.itemIcon}>{item.icon}</span>}
-          <span>{item.label}</span>
-          {item.hint && <span className={styles.hint}>{item.hint}</span>}
-        </button>
+        <Fragment key={item.key}>
+          {item.dividerBefore && <hr className={styles.separator} />}
+          <button
+            type="button"
+            role="menuitem"
+            disabled={item.disabled}
+            className={[styles.item, item.tone === "danger" ? styles.itemDanger : ""].join(" ")}
+            onClick={() => {
+              item.onSelect?.();
+              afterSelect?.();
+            }}
+          >
+            {item.icon && <span className={styles.itemIcon}>{item.icon}</span>}
+            <span>{item.label}</span>
+            {item.hint && <span className={styles.hint}>{item.hint}</span>}
+          </button>
+        </Fragment>
       ))}
     </div>
   );

@@ -101,6 +101,7 @@ import type {
   ProcPushMessage,
   ProcStopAllResult,
   ProcStopResult,
+  SessionExportRequest,
   SessionGetModelsRequest,
   SessionId,
   SessionPromptRequest,
@@ -222,6 +223,8 @@ export interface PideskGlobalApi {
     remove(file: string): Promise<IpcResult<null>>;
     /** 读取会话 JSONL 转为消息数组（磁盘优先展示，不依赖 pi 进程）。 */
     readTranscript(file: string): Promise<IpcResult<SessionTranscriptPayload>>;
+    /** 导出会话记录为 Markdown 文件（系统保存对话框；取消返回 null）。 */
+    exportMarkdown(req: SessionExportRequest): Promise<IpcResult<{ path: string } | null>>;
     getCommands(sessionId: SessionId): Promise<IpcResult<PiSlashCommand[]>>;
     setThinkingLevel(req: SessionSetThinkingLevelRequest): Promise<IpcResult<null>>;
     getModelState(sessionId: SessionId): Promise<IpcResult<PiModelState>>;

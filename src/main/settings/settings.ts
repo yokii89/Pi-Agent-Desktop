@@ -51,6 +51,9 @@ export function getSettings(): PideskSettings {
     pinnedSessions: Array.isArray(loaded.pinnedSessions)
       ? loaded.pinnedSessions.filter((file): file is string => typeof file === "string")
       : DEFAULT_SETTINGS.pinnedSessions,
+    globalPinnedSessions: Array.isArray(loaded.globalPinnedSessions)
+      ? loaded.globalPinnedSessions.filter((file): file is string => typeof file === "string")
+      : DEFAULT_SETTINGS.globalPinnedSessions,
     // 同理：非对象（手改坏了）时回退空表，避免渲染层读属性时崩
     sessionTitles:
       loaded.sessionTitles && typeof loaded.sessionTitles === "object"

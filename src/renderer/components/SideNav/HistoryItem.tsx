@@ -1,5 +1,5 @@
-import { CircleNotch, Prohibit, PushPin, PushPinSlash } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { Prohibit, PushPin } from "@phosphor-icons/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SessionSummary } from "../../../shared/ipc";
 import { useT } from "../../hooks/useT";
 import { procStore, refreshSessionProcesses } from "../../stores/procStore";
@@ -10,8 +10,19 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ExtensionReloadNotice } from "./ExtensionReloadNotice";
 import { HistoryHoverCard } from "./HistoryHoverCard";
 import type { HistoryItemStatus } from "./HistoryList";
-import { RevealOnRowHover } from "./RevealOnRowHover";
-import { archiveItem, deleteItem, openFolderItem, RowMenu, renameItem } from "./RowMenu";
+import {
+  archiveItem,
+  copyTaskIdItem,
+  deleteItem,
+  exportItem,
+  markUnreadItem,
+  openFolderItem,
+  pinGlobalItem,
+  pinWorkspaceItem,
+  RowMenu,
+  renameItem,
+} from "./RowMenu";
+import { RunningDots } from "./RunningDots";
 import styles from "./SideNav.module.css";
 import { TreeGuideLines } from "./TreeGuideLines";
 
@@ -43,12 +54,15 @@ interface HistoryItemProps {
 }
 
 /**
- * 侧栏历史会话条目（单行）：状态指示 + 标题 + 悬浮操作（更多 / 置顶）。
- * AI 输出中显示旋转指示，完成后（且用户不在该会话）变绿点提醒。
+ * 侧栏历史会话条目（单行）：标题 + 右缘状态槽 + 悬浮操作（仅 ⋯，docs/design/45）。
+ * 状态槽（与 ⋯ 互斥，悬浮/聚焦时让位）：
+ * - AI 输出中 → 3×3 点阵呼吸动画；打开会话进行中同款；
+ * - 完成未读 → 蓝点；
+ * - 置顶（全局或工作区）→ 图钉。
  *
  * 标题不再"悬浮滚动"，改为单行截断 + 悬浮（或键盘聚焦）后弹出详情卡展示全文与元信息，
  * 见 HistoryHoverCard。悬浮时整行轻微右移，作为"这条可点"的触觉提示。
- * 标题可用行内"更多"菜单重命名：标题原地变成输入框（Enter / 失焦提交，Escape 取消），
+ * ⋯ 菜单内重命名：标题原地变成输入框（Enter / 失焦提交，Escape 取消），
  * 与终端 Tab 的重命名交互保持一致。
  */
 export function HistoryItem({
@@ -70,15 +84,22 @@ export function HistoryItem({
     removeSession,
     renameSession,
     pinnedFiles,
+    globalPinnedFiles,
     sessionTitles,
+    unreadFiles,
     togglePin,
+    toggleGlobalPin,
+    markSessionUnread,
     endSessionProcess,
     archiveSession,
     getSessionIdForFile,
   } = useSessionMeta();
-  const { showToast } = useUiStore();
+  const { page, showToast } = useUiStore();
   const title = sessionTitle(session, sessionTitles[session.file]);
   const pinned = pinnedFiles.includes(session.file);
+  const globalPinned = globalPinnedFiles.includes(session.file);
+  const unread = unreadFiles.has(session.file);
+  const busy = status === "running" || opening;
   const [renaming, setRenaming] = useState(false);
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
   /** 打开结束确认时拉到的后台进程数（0 = 不出现「保留」双选）。 */
@@ -134,6 +155,11 @@ export function HistoryItem({
     renameSession(session.file, value);
   };
 
+  /** 收起悬浮详情卡（菜单开合、置顶重排、进入重命名等改变行状态的动线都先收起它）。 */
+  const closeHoverCard = useCallback((): void => {
+    setCardAnchor(null);
+  }, []);
+
   return (
     <div
       ref={rowRef}
@@ -162,33 +188,40 @@ export function HistoryItem({
         />
       ) : (
         <button type="button" className={styles.historyMain} disabled={disabled} onClick={onOpen}>
-          {(status === "running" || opening) && (
-            <span
-              className={styles.historyStatus}
-              title={opening ? t("sidenav.session.opening") : t("sidenav.session.aiResponding")}
-            >
-              <CircleNotch size={16} weight="regular" className={styles.statusSpin} />
-            </span>
-          )}
-          {status === "unread" && !opening && (
-            <span className={styles.historyStatus} title={t("sidenav.session.aiDone")}>
-              <span className={styles.doneDot} />
-            </span>
-          )}
-          {/* 置顶常驻标识：置顶只改变排序，这是不悬浮时唯一可见的痕迹；运行/未读状态优先占用状态槽 */}
-          {pinned && !status && !opening && (
-            <span className={styles.historyStatus} title={t("sidenav.session.pinned")}>
-              <PushPin size={16} weight="fill" />
-            </span>
-          )}
           <span className={styles.historyTitle}>{compactTitle ? truncateTitle(title) : title}</span>
           <ExtensionReloadNotice sessionFile={session.file} />
         </button>
       )}
       <div className={styles.historyDots}>
+        {/* 状态槽与 ⋯ 同位叠加：悬浮/聚焦/菜单常驻时状态让位（设计图 1/3/4，见 CSS） */}
+        {busy || unread || pinned || globalPinned ? (
+          <span
+            className={styles.statusLayer}
+            title={
+              busy
+                ? opening
+                  ? t("sidenav.session.opening")
+                  : t("sidenav.session.aiResponding")
+                : unread
+                  ? t("sidenav.session.aiDone")
+                  : t("sidenav.session.pinned")
+            }
+          >
+            {busy ? (
+              <RunningDots />
+            ) : unread ? (
+              <span className={styles.doneDot} />
+            ) : (
+              <PushPin size={16} weight="fill" />
+            )}
+          </span>
+        ) : null}
         <RowMenu
           label={t("sidenav.row.moreActionsFor", { name: title })}
+          // 菜单打开即收起详情卡：卡片会压住菜单（设计图 2 的菜单更高，重叠更明显）
+          onOpenChange={closeHoverCard}
           items={[
+            copyTaskIdItem(session.id, showToast),
             renameItem(() => {
               // 进入输入态前先收起详情卡，否则它会挡住正在编辑的行
               setCardAnchor(null);
@@ -196,6 +229,17 @@ export function HistoryItem({
             }),
             // 没有工作目录的会话（旧格式 JSONL）没有可打开的目录：整行不展示
             openFolderItem(session.cwd, showToast),
+            // 未落盘的新会话没有可导出的 JSONL：整行不展示
+            exportItem(session.file, title, showToast),
+            pinGlobalItem(globalPinned, () => {
+              // 全局置顶会立刻把条目挪进「置顶」分区：先收起卡片，避免它停在旧位置
+              setCardAnchor(null);
+              toggleGlobalPin(session.file);
+            }),
+            pinWorkspaceItem(pinned, () => {
+              setCardAnchor(null);
+              togglePin(session.file);
+            }),
             // 「结束进程」：仅该会话有存活 pi 实例时显示；结束 ≠ 删除，JSONL 保留
             processAlive
               ? {
@@ -217,37 +261,20 @@ export function HistoryItem({
                   },
                 }
               : null,
-            // 归档（pending 行返回 null）：收进设置 → 已归档对话，可随时恢复
+            // 已未读的条目不必再标；正在浏览的会话标记后会被清除副作用立刻消化，禁用并提示
+            unread
+              ? null
+              : markUnreadItem({
+                  disabled: active && page === "session",
+                  onSelect: () => markSessionUnread(session.file),
+                }),
+            // 归档（分隔线之下，危险色；pending 行返回 null）：收进设置 → 已归档对话，可随时恢复
             archiveItem(session.file, () => archiveSession(session.file)),
             deleteItem(t("sidenav.session.deleteTask"), () => {
               void removeSession(session.file);
             }),
           ]}
         />
-        <RevealOnRowHover>
-          <button
-            type="button"
-            className={styles.rowButton}
-            title={pinned ? t("sidenav.session.unpin") : t("sidenav.session.pin")}
-            aria-label={
-              pinned
-                ? t("sidenav.session.unpinLabel", { title })
-                : t("sidenav.session.pinLabel", { title })
-            }
-            aria-pressed={pinned}
-            onClick={() => {
-              // 置顶会立刻重排列表，这一行可能挪走：先收起卡片，避免它停在旧位置
-              setCardAnchor(null);
-              togglePin(session.file);
-            }}
-          >
-            {pinned ? (
-              <PushPinSlash size={16} weight="regular" />
-            ) : (
-              <PushPin size={16} weight="regular" />
-            )}
-          </button>
-        </RevealOnRowHover>
       </div>
       {cardAnchor && (
         <HistoryHoverCard

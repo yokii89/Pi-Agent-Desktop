@@ -117,6 +117,11 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         if (files) clean.pinnedSessions = files;
         break;
       }
+      case "globalPinnedSessions": {
+        const files = sanitizePinnedSessions(value);
+        if (files) clean.globalPinnedSessions = files;
+        break;
+      }
       case "sessionTitles": {
         const titles = sanitizeSessionTitles(value);
         if (titles) clean.sessionTitles = titles;

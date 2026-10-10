@@ -3,6 +3,7 @@ import type { SessionSummary } from "../../../shared/ipc";
 import { useT } from "../../hooks/useT";
 import { useProjectStore } from "../../stores/projectStore";
 import { useSessionMeta } from "../../stores/sessionStore";
+import { findOwningProject } from "../../utils/sessionGroups";
 import { HistoryItem } from "./HistoryItem";
 import styles from "./SideNav.module.css";
 import { TreeGuideLines } from "./TreeGuideLines";
@@ -56,10 +57,12 @@ export function HistoryList({
   const { projects } = useProjectStore();
 
   const visible = showAll ? sessions : sessions.slice(0, VISIBLE_LIMIT);
-  // 所属空间名给悬浮详情卡用；会话归属由 cwd → 项目映射算出，这里只把 id 翻成名字
-  const spaceName = projectId
-    ? (projects.find((project) => project.id === projectId)?.name ?? null)
-    : null;
+  // 所属空间名给悬浮详情卡用：项目子列表由归属 id 直取；顶层列表（任务 / 置顶）
+  // 按会话 cwd 现查（置顶分区的条目来自任意分组，必须逐条解析）
+  const spaceNameOf = (session: SessionSummary): string | null => {
+    if (projectId) return projects.find((project) => project.id === projectId)?.name ?? null;
+    return findOwningProject(session.cwd, projects)?.name ?? null;
+  };
 
   // 运行中优先于完成未读（多会话：按 file 独立判定，不依赖 active）
   const statusOf = (file: string): HistoryItemStatus => {
@@ -77,7 +80,7 @@ export function HistoryList({
             active={activeSessionFile === session.file}
             disabled={false}
             status={statusOf(session.file)}
-            spaceName={spaceName}
+            spaceName={spaceNameOf(session)}
             treeDepth={withTreeGuides ? 0 : undefined}
             /* 树线 └ 只画在真实末条上：收起态的"可见末条"下面还有"显示更多"行，
                分支未结束，须画贯穿线（├）让树线延续下去 */

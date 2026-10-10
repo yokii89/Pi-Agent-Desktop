@@ -39,8 +39,8 @@ function touchCache(key: string, entry: TranscriptCacheEntry): void {
   }
 }
 
-/** 校验路径必须是 sessions 根内的 .jsonl（与 removeSession 同级安全要求）。 */
-function assertSessionFile(file: string): string {
+/** 校验路径必须是 sessions 根内的 .jsonl（与 removeSession 同级安全要求）。导出记录共用同一校验。 */
+export function assertSessionFile(file: string): string {
   if (typeof file !== "string" || !file.toLowerCase().endsWith(".jsonl")) {
     throw new Error("非法的会话文件");
   }
