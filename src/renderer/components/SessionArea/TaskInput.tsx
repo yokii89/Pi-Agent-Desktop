@@ -1,7 +1,8 @@
 import { Folder } from "@phosphor-icons/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FsSearchHit, PiSlashCommand } from "../../../shared/ipc";
 import { FileIcon } from "../../fileIcons/FileIcon";
+import { useGlideOverlay } from "../../hooks/useGlideOverlay";
 import { useGlidePill } from "../../hooks/useGlidePill";
 import { useT } from "../../hooks/useT";
 import { fsService } from "../../services/fsService";
@@ -79,8 +80,17 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
   const [suggestIndex, setSuggestIndex] = useState(0);
   const slashFetchSeqRef = useRef(0);
   const suggestPanelRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * 同一个 token 的重复上报（光标移动、选区变化都会再报一次同样的文本）必须**原样吞掉**：
+   * 早先无条件 setSuggest(新对象) + setSuggestIndex(0) 会让 suggestIndex 被反复清零，
+   * 于是悬停刚把药丸移到第 4 行，下一次上报就把它拽回第 0 行——视觉上就是频闪。
+   */
+  const lastSuggestKey = useRef("");
   const setSuggestAndReset = useCallback(
     (next: { kind: Exclude<SuggestKind, null>; query: string } | null) => {
+      const key = next ? `${next.kind}|${next.query}` : "";
+      if (key === lastSuggestKey.current) return;
+      lastSuggestKey.current = key;
       setSuggest(next);
       setSuggestIndex(0);
     },
@@ -255,7 +265,48 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
     consumePendingQuote();
   }, [pendingQuote, consumePendingQuote]);
 
-  const closeSuggest = useCallback(() => setSuggestAndReset(null), [setSuggestAndReset]);
+  /**
+   * 建议列表的进出场（docs/design/51）。面板是父级条件渲染的，收起要演完动画再卸载，
+   * 所以这里**延迟置空** `suggest`：动画期间行内容原样保留，不动任何数据流；
+   * 用户在淡出过程中继续打字就中止收起、从当前值演回展开。
+   */
+  const suggestOverlay = useGlideOverlay(suggestPanelRef);
+  const suggestClosing = useRef(false);
+  const suggestShown = useRef(false);
+
+  useLayoutEffect(() => {
+    const panel = suggestPanelRef.current;
+    if (!panel || !suggest || suggestClosing.current || suggestShown.current) return;
+    suggestShown.current = true;
+    // 面板长在输入框上方，缩放要从贴近输入框的那一角推开
+    panel.style.transformOrigin = "bottom left";
+    suggestOverlay.prime();
+    suggestOverlay.enter();
+  }, [suggest, suggestOverlay]);
+
+  const abortSuggestClose = useCallback((): void => {
+    if (!suggestClosing.current) return;
+    suggestClosing.current = false;
+    suggestOverlay.enter();
+  }, [suggestOverlay]);
+
+  const closeSuggest = useCallback((): void => {
+    if (!suggest || suggestClosing.current) return;
+    suggestClosing.current = true;
+    suggestOverlay.exit(() => {
+      suggestClosing.current = false;
+      suggestShown.current = false;
+      setSuggestAndReset(null);
+    });
+  }, [suggest, setSuggestAndReset, suggestOverlay]);
+
+  /** 不演动画直接收：发送后整栏清空，留着过期条目淡出会闪一下。 */
+  const hideSuggestNow = useCallback((): void => {
+    suggestClosing.current = false;
+    suggestShown.current = false;
+    suggestOverlay.cancel();
+    setSuggestAndReset(null);
+  }, [setSuggestAndReset, suggestOverlay]);
 
   const applySuggestItem = useCallback(
     (item: { id: string; label: string }) => {
@@ -280,16 +331,19 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
       const fileMatch = text.match(/(^|\s)@([^\s@]*)$/);
       const slashMatch = text.match(/(^|\s)\/([^\s/]*)$/);
       if (fileMatch) {
+        abortSuggestClose();
         setSuggestAndReset({ kind: "file", query: fileMatch[2] ?? "" });
         return;
       }
       if (slashMatch) {
+        abortSuggestClose();
         setSuggestAndReset({ kind: "slash", query: slashMatch[2] ?? "" });
         return;
       }
-      setSuggestAndReset(null);
+      // 删掉 @ 或 / 让 token 消失：走动画收起，与点开条目一致
+      closeSuggest();
     },
-    [setSuggestAndReset],
+    [setSuggestAndReset, abortSuggestClose, closeSuggest],
   );
 
   const doSend = async (): Promise<void> => {
@@ -351,7 +405,7 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
     });
     composer.clear();
     setStaleConfirm(false);
-    setSuggestAndReset(null);
+    hideSuggestNow();
     clearFileMentions();
     clearImageAttachments();
     clearFileAttachments();
@@ -443,6 +497,8 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
   const onPlusAction = (action: "mention" | "slash"): void => {
     const composer = composerRef.current;
     if (!composer) return;
+    // 上一次收起可能还在淡出中
+    abortSuggestClose();
     if (action === "mention") {
       setInsertTrigger({ kind: "@", seq: Date.now() });
       setSuggestAndReset({ kind: "file", query: "" });
@@ -461,16 +517,25 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
     [onAttachFiles],
   );
 
-  // 建议列表的高亮由滑动的药丸承担（焦点必须留在输入框，所以不抢焦点）
+  // 建议列表的高亮由滑动的药丸承担（焦点必须留在输入框，所以不抢焦点）。
+  // 指向行 = 键盘光标 suggestIndex，**只有一个写入方**：悬停改了指向就经 onActiveChange
+  // 同步回 state，effect 不再反向把药丸拽回上一行——两边各写一次会互相取消补间，
+  // 实测过那种写法：悬停末行（offsetTop 582）药丸却卡在 32px 不动，视觉上就是频闪。
+  const pillIndex = useRef(-1);
   const suggestPill = useGlidePill(suggestPanelRef, {
     onPick: (index) => {
       const item = suggestItems[index];
       if (item) applySuggestItem(item);
     },
+    onActiveChange: (index) => {
+      if (index === null || index === pillIndex.current) return;
+      pillIndex.current = index;
+      setSuggestIndex(index);
+    },
   });
 
   const onEnterIntercept = useCallback((): boolean => {
-    if (!suggest || suggestItems.length === 0) return false;
+    if (!suggest || suggestItems.length === 0 || suggestClosing.current) return false;
     const item = suggestItems[suggestIndex];
     if (!item) return false;
     applySuggestItem(item);
@@ -479,7 +544,7 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
 
   const onSuggestKey = useCallback(
     (key: "ArrowUp" | "ArrowDown" | "Escape"): boolean => {
-      if (!suggest || suggestItems.length === 0) return false;
+      if (!suggest || suggestItems.length === 0 || suggestClosing.current) return false;
       if (key === "ArrowDown") {
         setSuggestIndex((i) => (i + 1) % suggestItems.length);
         return true;
@@ -503,7 +568,11 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
     if (!panel) return;
     const active = panel.querySelector<HTMLElement>('[role="option"][aria-selected="true"]');
     if (!active) return;
-    suggestPill.highlight(suggestIndex, true);
+    // 只有键盘/换查询改了光标才挪药丸；悬停改的指向已经由 onActiveChange 同步过了
+    if (suggestIndex !== pillIndex.current) {
+      pillIndex.current = suggestIndex;
+      suggestPill.highlight(suggestIndex, true);
+    }
     const panelRect = panel.getBoundingClientRect();
     const activeRect = active.getBoundingClientRect();
     if (activeRect.top < panelRect.top) {

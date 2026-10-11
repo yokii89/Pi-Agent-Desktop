@@ -45,6 +45,12 @@ export interface GlidePillApi {
 interface GlidePillOptions {
   /** 擦选（按住拖动换行后松开）落在某行时的激活回调。 */
   onPick?: (index: number) => void;
+  /**
+   * 指向行发生变化时的回调（悬停、聚焦、擦选都会改指向）。
+   * 外部若另存一份"当前行"（如输入框补全用 state 决定 Enter 送哪条），
+   * 必须从这里同步回来——否则外部那份 state 会反过来把药丸拽到别处，两边互相取消补间。
+   */
+  onActiveChange?: (index: number | null) => void;
   /** 指针离开列表后是否保留高亮（默认保留，对齐参考稿 rememberPosition）。 */
   rememberPosition?: boolean;
 }
@@ -59,7 +65,7 @@ interface GlidePillOptions {
  */
 export function useGlidePill(
   listRef: RefObject<HTMLElement | null>,
-  { onPick, rememberPosition = true }: GlidePillOptions = {},
+  { onPick, rememberPosition = true, onActiveChange }: GlidePillOptions = {},
 ): GlidePillApi {
   const pillRef = useRef<HTMLSpanElement>(null);
   const state = useRef({ y: 0, height: 0, opacity: 0, index: null as number | null });
@@ -72,8 +78,8 @@ export function useGlidePill(
     move: (e: PointerEvent) => void;
     up: (e: PointerEvent) => void;
   } | null>(null);
-  const options = useRef({ onPick, rememberPosition });
-  options.current = { onPick, rememberPosition };
+  const options = useRef({ onPick, rememberPosition, onActiveChange });
+  options.current = { onPick, rememberPosition, onActiveChange };
 
   const apply = (): void => {
     const pill = pillRef.current;
@@ -95,6 +101,7 @@ export function useGlidePill(
     fadeTween.current();
     const current = state.current;
     current.index = null;
+    options.current.onActiveChange?.(null);
     if (current.opacity <= 0) return;
     const from = current.opacity;
     fadeTween.current = glide({
@@ -121,6 +128,7 @@ export function useGlidePill(
     moveTween.current();
     fadeTween.current();
     current.index = index;
+    options.current.onActiveChange?.(index);
 
     if (jump) {
       current.y = targetY;
