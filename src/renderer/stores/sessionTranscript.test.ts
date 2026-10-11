@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { t } from "../../shared/i18n";
 import type { PiAgentEvent, PiChatMessage } from "../../shared/ipc";
 import { findRetrySurfaceId, type SessionEntry, sessionEntriesReducer } from "./sessionTranscript";
 
@@ -497,5 +498,52 @@ describe("run usage accumulation on message_end", () => {
     // 终态必须落真实 endedAt：null 会让 run 头用时随组件重挂载一直变大
     expect(last.endedAt).toBe(4_000);
     expect(last.usage?.totalTokens).toBe(160);
+  });
+});
+
+describe("noop compaction notice (docs/design/47/48 F2)", () => {
+  it("renders the skipped copy without token numbers when the extension marks a degenerate response", () => {
+    let entries: SessionEntry[] = [];
+    entries = sessionEntriesReducer(entries, {
+      type: "event",
+      event: { type: "compaction_start", reason: "overflow" },
+    });
+    entries = sessionEntriesReducer(entries, {
+      type: "event",
+      event: {
+        type: "compaction_end",
+        reason: "overflow",
+        result: {
+          tokensBefore: 73397,
+          estimatedTokensAfter: 73390,
+          details: { kind: "pidesk.noop-compaction" },
+        },
+      },
+    });
+    const notice = entries.at(-1);
+    if (notice?.kind !== "notice") throw new Error("expected notice entry");
+    expect(notice.text).toBe(t("session.compact.skipped"));
+    expect(notice.text).not.toContain("73.4k");
+    expect(notice.pending).toBe(false);
+  });
+
+  it("keeps the usual done notice with numbers for regular compactions", () => {
+    let entries: SessionEntry[] = [];
+    entries = sessionEntriesReducer(entries, {
+      type: "event",
+      event: { type: "compaction_start", reason: "overflow" },
+    });
+    entries = sessionEntriesReducer(entries, {
+      type: "event",
+      event: {
+        type: "compaction_end",
+        reason: "overflow",
+        result: { tokensBefore: 73397, estimatedTokensAfter: 30100 },
+      },
+    });
+    const notice = entries.at(-1);
+    if (notice?.kind !== "notice") throw new Error("expected notice entry");
+    expect(notice.text).toContain("73.4k");
+    expect(notice.text).not.toBe(t("session.compact.skipped"));
   });
 });

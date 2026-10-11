@@ -188,6 +188,10 @@ export const sessionMessages = defineMessages({
     "zh-CN": "（{before} → 约 {after}）",
     "en-US": " ({before} → ~{after})",
   },
+  "session.compact.skipped": {
+    "zh-CN": "已跳过压缩（网关响应异常，历史已保留）",
+    "en-US": "Compaction skipped (abnormal gateway response; history kept)",
+  },
   "session.access.mode": { "zh-CN": "访问模式", "en-US": "Access mode" },
   "session.access.activating": {
     "zh-CN": "正在切换：{title}",

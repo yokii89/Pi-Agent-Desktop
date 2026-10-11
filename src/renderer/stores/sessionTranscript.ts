@@ -591,6 +591,7 @@ function appendCompactionEnd(
     result?: {
       tokensBefore?: number;
       estimatedTokensAfter?: number;
+      details?: { kind?: string };
     };
   },
 ): SessionEntry[] {
@@ -615,6 +616,24 @@ function appendCompactionEnd(
         message: event.errorMessage.trim(),
         at: Date.now(),
       },
+    ];
+  }
+
+  // 扩展判定的空压缩（网关退化响应被跳过，docs/design/47/48 F2）：历史和压缩前
+  // 一致，before→after 两个数字没有信息量还会误导，换成专用文案。
+  if (event.result?.details?.kind === "pidesk.noop-compaction") {
+    const next = [...entries];
+    for (let i = next.length - 1; i >= 0; i -= 1) {
+      const entry = next[i];
+      if (entry.kind === "notice" && entry.pending === true) {
+        next[i] = { ...entry, pending: false, text: t("session.compact.skipped") };
+        return next;
+      }
+      if (entry.kind === "run" || entry.kind === "assistant") break;
+    }
+    return [
+      ...entries,
+      { kind: "notice", id: uid(), text: t("session.compact.skipped"), at: Date.now() },
     ];
   }
 

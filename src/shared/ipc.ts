@@ -862,6 +862,11 @@ export type PiAgentEvent =
         tokensBefore?: number;
         estimatedTokensAfter?: number;
         usage?: PiUsage;
+        /**
+         * 扩展压缩标记：`pidesk.noop-compaction` = 扩展（yoki-newapi）判定网关退化响应后
+         * 跳过的空压缩（docs/design/47 P0 / 48 F2）；渲染层据此换文案、不显示 before→after。
+         */
+        details?: { kind?: string };
       };
     };
 
