@@ -31,6 +31,9 @@
   --color-accent-hover: #6aa3ff;
   --color-accent-text: #0b1a2b;
   --color-accent-soft: rgba(74, 140, 255, 0.16);
+  /* 顶档特效色（思考等级「最高」的起辉 / 粒子 / 滑轨强调，docs/ui-design/prompt-bar-micro-interactions
+     的琥珀粒子档）：与 accent 脱钩，避免语义混用 */
+  --color-spark: #f2b46b;
   /* 代码底（行内 code / pre / fence 共用）：与 bg-surface 同档，
      深底上"浮起一档"，对齐 ZCode 代码卡对比度（docs/design/33） */
   --color-code-bg: #202024;
@@ -189,6 +192,8 @@
 
   /* 阴影 */
   --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.4);
+  /* 浮层内的小浮起元素（思考等级滑轨的 thumb）：比整壳阴影近一档 */
+  --shadow-overlay-item: 0 2px 6px rgba(0, 0, 0, 0.25);
 
   /* 磨砂玻璃（顶栏 + 左右侧栏）：配方见 styles/glass.module.css */
   --glass-bg: rgba(24, 24, 27, 0.5);
@@ -232,6 +237,8 @@
   --color-accent-hover: #1f5ecb;
   --color-accent-text: #ffffff;
   --color-accent-soft: rgba(47, 111, 224, 0.12);
+  /* 顶档特效色：浅底上取深琥珀保证可读 */
+  --color-spark: #b06c00;
   --color-code-bg: #e2e2e6;
 
   /* 状态色 */
@@ -292,4 +299,5 @@
 
   /* 阴影 */
   --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --shadow-overlay-item: 0 2px 6px rgba(0, 0, 0, 0.18);
 }

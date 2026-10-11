@@ -129,6 +129,12 @@ export const sessionMessages = defineMessages({
   "session.thinking.low": { "zh-CN": "低", "en-US": "Low" },
   "session.thinking.high": { "zh-CN": "高", "en-US": "High" },
   "session.thinking.max": { "zh-CN": "最高", "en-US": "Max" },
+  "session.thinking.faster": { "zh-CN": "更快", "en-US": "Faster" },
+  "session.thinking.smarter": { "zh-CN": "更准", "en-US": "Smarter" },
+  "session.thinking.help": {
+    "zh-CN": "思考等级越高，回答前思考得越久",
+    "en-US": "Higher levels think longer before answering",
+  },
   "session.image.hint": {
     "zh-CN": "模型目录未声明支持图片",
     "en-US": "This model's catalog does not declare image support",

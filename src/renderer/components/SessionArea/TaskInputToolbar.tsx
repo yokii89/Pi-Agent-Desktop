@@ -1,5 +1,4 @@
 import {
-  ArrowUp,
   AtIcon,
   Check,
   ClipboardText,
@@ -8,8 +7,8 @@ import {
   Plus,
   Shield,
   ShieldCheck,
+  Sparkle,
   Spinner,
-  Stop,
 } from "@phosphor-icons/react";
 import { useCallback, useRef, useState } from "react";
 import type { PiModelOption, ThinkingLevelId } from "../../../shared/ipc";
@@ -26,7 +25,9 @@ import { Menu, type MenuItem } from "../ui/Menu";
 import { OptionList, type OptionRow } from "../ui/OptionList";
 import { Popover } from "../ui/Popover";
 import { ContextUsageChip } from "./ContextUsageChip";
+import { SendButton } from "./SendButton";
 import styles from "./TaskInputToolbar.module.css";
+import { ThinkingLevelSlider } from "./ThinkingLevelSlider";
 
 interface ToolbarProps {
   running: boolean;
@@ -123,28 +124,7 @@ export function TaskInputToolbar({
       <ModelMenu label={modelLabel} />
       <ThinkingChip level={thinkingLevel} onChange={setThinkingLevel} alive={processAlive} />
 
-      {running ? (
-        <button
-          type="button"
-          className={styles.stopBtn}
-          title={t("session.input.stop")}
-          aria-label={t("session.input.stop")}
-          onClick={onStop}
-        >
-          <Stop size={16} weight="fill" />
-        </button>
-      ) : (
-        <button
-          type="button"
-          className={[styles.sendBtn, canSend ? "" : styles.sendDisabled].join(" ")}
-          title={t("session.input.send")}
-          aria-label={t("session.input.send")}
-          disabled={!canSend}
-          onClick={onSend}
-        >
-          <ArrowUp size={18} weight="bold" />
-        </button>
-      )}
+      <SendButton running={running} canSend={canSend} onSend={onSend} onStop={onStop} />
     </div>
   );
 }
@@ -342,6 +322,7 @@ function ThinkingChip({
 }) {
   const t = useT();
   const levels: ThinkingLevelId[] = ["low", "high", "max"];
+  const maxed = level === levels[levels.length - 1];
 
   const apply = (next: ThinkingLevelId): void => {
     onChange(next);
@@ -355,36 +336,17 @@ function ThinkingChip({
       trigger={({ onClick }) => (
         <button
           type="button"
-          className={styles.thinkingChip}
+          className={[styles.thinkingChip, maxed ? styles.thinkingChipMax : ""].join(" ")}
           title={t("session.input.thinkingLevel")}
           onClick={onClick}
         >
+          <Sparkle size={14} weight="regular" />
           {t(THINKING_LABEL_KEY[level])}
           <GlideChevron size={12} />
         </button>
       )}
     >
-      <OptionList
-        rows={levels.map<OptionRow>((item) => ({
-          key: item,
-          className: styles.thinkingRow,
-          selected: item === level,
-          text: t(THINKING_LABEL_KEY[item]),
-          node: (
-            <>
-              <span>{t(THINKING_LABEL_KEY[item])}</span>
-              {item === level && <Check size={14} weight="regular" className={styles.check} />}
-            </>
-          ),
-        }))}
-        role="listbox"
-        ariaLabel={t("session.input.thinkingLevel")}
-        className={styles.thinkingPanel}
-        onSelect={(index) => {
-          const item = levels[index];
-          if (item) apply(item);
-        }}
-      />
+      <ThinkingLevelSlider levels={levels} value={level} onChange={apply} />
     </Popover>
   );
 }

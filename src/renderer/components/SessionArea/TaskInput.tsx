@@ -33,6 +33,7 @@ import { ImageAttachStrip } from "./ImageAttachStrip";
 import styles from "./TaskInput.module.css";
 import { TaskInputContextBar } from "./TaskInputContextBar";
 import { TaskInputToolbar } from "./TaskInputToolbar";
+import { ThinkingMaxAura } from "./ThinkingMaxAura";
 
 type SuggestKind = "file" | "slash" | null;
 
@@ -48,6 +49,7 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
   const browser = useBrowserStore();
   const { currentProject } = useProjectStore();
   const {
+    thinkingLevel,
     fileMentions,
     addFileMention,
     removeFileMention,
@@ -680,7 +682,11 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
 
       <div
         className={[styles.inputBox, variant === "session" ? styles.inputSession : ""].join(" ")}
+        data-max={thinkingLevel === "max" ? "" : undefined}
       >
+        {/* 思考等级顶档特效：左下角起辉走 .inputBox[data-max]::before，粒子在这里 */}
+        {thinkingLevel === "max" && <ThinkingMaxAura />}
+
         {variant === "empty" && <TaskInputContextBar />}
 
         {staleConfirm && (

@@ -1,0 +1,48 @@
+/* 发送/停止一体键（SendButton）：外观沿用原发送键（elevated 底 + 描边），
+   running 转危险色；图标本身是 7 顶点形变的 SVG（SendButton.tsx 逐帧写 d 与 transform）。
+   按压回弹走 --send-press（定帧时间轴写入），scale 由这里的 calc 静态消费，
+   所以按钮的可见性不依赖 JS。 */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  transform: scale(calc(1 - 0.04 * var(--send-press, 0)));
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--color-bg-active);
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.running {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.running:hover:not(:disabled) {
+  background: var(--color-danger-soft);
+  filter: brightness(1.08);
+}
+
+.glyph {
+  display: block;
+  width: 18px;
+  height: 18px;
+  transform-origin: 50% 50%;
+}

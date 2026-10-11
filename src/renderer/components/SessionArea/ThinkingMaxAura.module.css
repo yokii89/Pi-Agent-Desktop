@@ -1,0 +1,11 @@
+/* 顶档粒子画布（ThinkingMaxAura）：铺满输入卡、垫在内容之下（卡片自身背景之上），
+   圆角随卡片；粒子色为 --color-spark 琥珀（组件从计算样式读取喂给 canvas）。 */
+.canvas {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+}

@@ -58,6 +58,22 @@ export const GLIDE_MOTION = {
 } as const;
 
 /**
+ * 发送键形变（箭头 ↔ 停止方块，复刻 docs/ui-design/prompt-bar-micro-interactions.html 的形变）：
+ * 7 个顶点在两个形状间插值，中途叠加 sin(πt) 的挤压与倾斜，于是"发送"与"停止"互相变成对方。
+ * 缓动刻意用两端慢中间快的形变曲线，与浮层 easeOut（快速到位）不同——形变要"看到过程"。
+ */
+export const SEND_MOTION = {
+  /** 形变时长。 */
+  morph: 0.24,
+  /** 中途挤压幅度：scale(sx, 1/sx)，sx = 1 - squash·sin(πt)。 */
+  squash: 0.12,
+  /** 中途倾斜峰值（deg），方向随形变方向翻转。 */
+  tilt: 8,
+  /** 形变缓动控制点（设计稿 EASE_IN_OUT），供 makeCubicBezier 消费。 */
+  ease: [0.77, 0, 0.175, 1],
+} as const;
+
+/**
  * 冷启动进度条（PiColdStartBar，docs/会话进程懒加载方案 §4.2）：
  * 分段轨道爬行到 90% 封顶，进程就绪后补到 100% 再淡出卸载。
  */

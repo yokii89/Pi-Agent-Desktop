@@ -59,11 +59,15 @@
   color: var(--color-text);
 }
 
-/* 思考档位只承担「低/高/最高」，收成窄芯片（约为原宽度一半） */
+/* 思考档位芯片：Sparkle + 档位名 + 箭头；顶档转强调色（滑轨浮层见 ThinkingLevelSlider） */
 .thinkingChip {
   gap: 4px;
   padding: 0 6px;
   font-size: var(--font-size-sm);
+}
+
+.thinkingChipMax {
+  color: var(--color-spark);
 }
 
 .modelLabel {
@@ -83,43 +87,6 @@
   align-items: center;
   color: var(--color-text-muted);
   margin-right: 2px;
-}
-
-.sendBtn,
-.stopBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
-  flex-shrink: 0;
-}
-
-.sendBtn {
-  background: var(--color-bg-elevated);
-  color: var(--color-text);
-  border: 1px solid var(--color-border-strong);
-}
-
-.sendBtn:hover:not(:disabled) {
-  background: var(--color-bg-active);
-}
-
-.sendDisabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.stopBtn {
-  color: var(--color-danger);
-  border: 1px solid var(--color-danger);
-  background: var(--color-danger-soft);
-}
-
-.stopBtn:hover {
-  background: var(--color-danger-soft);
-  filter: brightness(1.08);
 }
 
 .spin {
@@ -189,18 +156,4 @@
   padding: 6px 10px 4px;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
-}
-
-.thinkingPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 64px;
-}
-
-.thinkingRow {
-  --row-padding: 6px 8px;
-  --row-font-size: var(--font-size-sm);
-  justify-content: space-between;
-  color: var(--color-text);
 }

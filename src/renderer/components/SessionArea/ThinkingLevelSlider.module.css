@@ -1,0 +1,102 @@
+/**
+ * 思考等级滑轨浮层（复刻 docs/ui-design/prompt-bar-micro-interactions.html 的强度滑轨）。
+ * 开合动效归 Popover 的定帧时间轴；thumb / 进度条的位移由 ThinkingLevelSlider
+ * 逐帧写 `--effort-x` / `--effort-fill`（docs/design/51），这里只描述静息几何与颜色。
+ * 14/28/4/-3 等 是滑轨部件的几何常量（thumb、档位点的物理尺寸），不是主题间距。
+ */
+.panel {
+  width: 248px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-sm) 0;
+  font-size: var(--font-size-md);
+}
+
+.title {
+  color: var(--color-text-muted);
+}
+
+.level {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.help {
+  display: inline-flex;
+  margin-left: auto;
+  color: var(--color-text-muted);
+  cursor: help;
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  margin: var(--spacing-sm) var(--spacing-sm) 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.track {
+  position: relative;
+  height: 22px;
+  margin: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-hover);
+  cursor: pointer;
+  outline: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.track:focus-visible {
+  box-shadow: 0 0 0 1px var(--color-border-strong);
+}
+
+.fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--effort-fill, 0px);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-text) 18%, transparent);
+  transition: background-color 300ms ease;
+}
+
+.dot {
+  position: absolute;
+  top: 50%;
+  display: block;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-text) 30%, transparent);
+}
+
+.thumb {
+  position: absolute;
+  top: -3px;
+  left: var(--effort-x, 0px);
+  width: 14px;
+  height: 28px;
+  margin-left: -7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-text-strong);
+  box-shadow: var(--shadow-overlay-item);
+  transition: background-color 300ms ease;
+}
+
+/* 顶档：进度条与 thumb 转琥珀顶档色（设计稿的 spark 档） */
+.panel[data-max] .fill {
+  background: color-mix(in srgb, var(--color-spark) 35%, transparent);
+}
+
+.panel[data-max] .thumb {
+  background: var(--color-spark);
+}

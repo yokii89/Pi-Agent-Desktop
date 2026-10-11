@@ -20,6 +20,29 @@
   z-index: 1;
 }
 
+/* 思考等级顶档起辉（设计稿 field::before）：左下角琥珀辉光 500ms 淡入淡出；
+   z-index:-1 垫在内容之下、卡片背景之上（inputBox 自成堆叠上下文）。粒子特效
+   见 ThinkingMaxAura，同层。 */
+.inputBox::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    140% 120% at 0% 100%,
+    color-mix(in srgb, var(--color-spark) 26%, transparent),
+    transparent 62%
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms ease;
+}
+
+.inputBox[data-max]::before {
+  opacity: 1;
+}
+
 .inputSession {
   /* 会话态无 ContextBar，表面即整卡 */
 }
