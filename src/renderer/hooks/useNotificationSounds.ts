@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import type { SessionPushMessage } from "../../shared/ipc";
 import type { NotificationScenarioId } from "../../shared/notification";
 import { extensionViewService } from "../services/extensionViewService";
 import { notificationService } from "../services/notificationService";
@@ -7,9 +6,8 @@ import { pideskApi } from "../services/pideskApi";
 import { sessionService } from "../services/sessionService";
 import { settingsService } from "../services/settingsService";
 import { useSessionMeta } from "../stores/sessionStore";
+import { createSessionSoundTriggers } from "../utils/sessionSoundTriggers";
 import { sessionTitle } from "../utils/sessionTitle";
-
-type PiEvent = Extract<SessionPushMessage, { type: "event" }>["payload"];
 
 function play(
   scenario: NotificationScenarioId,
@@ -22,92 +20,12 @@ function play(
 
 /**
  * 订阅会话事件流，把 agent 终态映射为提示音场景（docs/design/18）。
- * 独立于 sessionStore：不改会话桶状态，只旁路听事件。
- *
- * 失败音去重：auto_retry_end(success=false) 与随后的 agent_end(error)
- * 会连着到达，同一 run 只响一次 failed。
+ * 状态机（运行门禁 / 失败去重）在 utils/sessionSoundTriggers，这里只旁路接线。
  */
 function bindSessionTriggers(): () => void {
-  const stopReasons = new Map<string, string | undefined>();
-  const running = new Set<string>();
-  /** 本 run 已播过 failed 的会话，避免重试耗尽 + agent_end 双响。 */
-  const failedPlayed = new Set<string>();
-
-  const handleEvent = (sessionId: string, event: PiEvent): void => {
-    if (event.type === "agent_start") {
-      running.add(sessionId);
-      failedPlayed.delete(sessionId);
-      return;
-    }
-    if (event.type === "message_end") {
-      const msg = event.message;
-      if (msg?.role === "assistant" && msg.stopReason) {
-        stopReasons.set(sessionId, msg.stopReason);
-      }
-      return;
-    }
-    if (event.type === "auto_retry_end") {
-      if (event.success === false && !failedPlayed.has(sessionId)) {
-        failedPlayed.add(sessionId);
-        play("failed", sessionId, event.finalError ?? "auto retry failed");
-      }
-      return;
-    }
-    if (event.type === "agent_end") {
-      // willRetry：自动重试/压缩续跑尚未收口，不播终态音
-      if (event.willRetry === true) return;
-      const reason = stopReasons.get(sessionId);
-      stopReasons.delete(sessionId);
-      running.delete(sessionId);
-      if (reason === "error") {
-        if (!failedPlayed.has(sessionId)) play("failed", sessionId, "agent error");
-        failedPlayed.delete(sessionId);
-      } else if (reason === "aborted") {
-        failedPlayed.delete(sessionId);
-        play("interrupted", sessionId);
-      } else if (reason === "length") {
-        failedPlayed.delete(sessionId);
-        play("needsAttention", sessionId, "output truncated");
-      } else {
-        failedPlayed.delete(sessionId);
-        play("completed", sessionId);
-      }
-      return;
-    }
-    if (event.type === "agent_settled") {
-      // settled 为收口确认，终态以 agent_end 为准，避免双响
-      running.delete(sessionId);
-      stopReasons.delete(sessionId);
-    }
-  };
-
-  return sessionService.subscribe((message: SessionPushMessage) => {
-    const sessionId = message.sessionId;
-    if (message.type === "event") {
-      handleEvent(sessionId, message.payload);
-      return;
-    }
-    if (message.type === "eventBatch") {
-      for (const event of message.payload) handleEvent(sessionId, event);
-      return;
-    }
-    if (message.type === "error") {
-      if (!failedPlayed.has(sessionId)) {
-        failedPlayed.add(sessionId);
-        play("failed", sessionId, message.payload);
-      }
-      return;
-    }
-    if (message.type === "exit") {
-      // 运行中进程消失 → 需要关注；idle 后手动结束不打扰
-      if (running.has(sessionId) && !failedPlayed.has(sessionId)) {
-        play("needsAttention", sessionId, `process exit code=${message.payload}`);
-      }
-      running.delete(sessionId);
-      stopReasons.delete(sessionId);
-      failedPlayed.delete(sessionId);
-    }
-  });
+  return sessionService.subscribe(
+    createSessionSoundTriggers((scenario, sessionId, reason) => play(scenario, sessionId, reason)),
+  );
 }
 
 /**
