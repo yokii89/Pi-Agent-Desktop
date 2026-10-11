@@ -196,6 +196,7 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
             />
           ))}
           <IconButton
+            className={styles.iconBtnCompact}
             title={
               tabs.length >= MAX_TERMINAL_TABS
                 ? t("terminal.maxTabs", { count: MAX_TERMINAL_TABS })
@@ -209,6 +210,7 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
         </div>
         <div className={styles.actions}>
           <IconButton
+            className={styles.iconBtnCompact}
             title={activeTab ? t("terminal.killCurrent") : t("terminal.noneRunning")}
             disabled={!activeTab}
             onClick={() => activeTab && closeTab(activeTab.id)}
@@ -216,6 +218,7 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
             <Stop size={16} weight="regular" />
           </IconButton>
           <IconButton
+            className={styles.iconBtnCompact}
             title={t("titleBar.hideTerminal", { shortcut: shortcuts.toggleTerminal })}
             onClick={() => dispatch({ type: "toggleTerminalPanel" })}
           >

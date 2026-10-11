@@ -144,12 +144,17 @@
   /** 会话流末尾正文与输入栏上沿的呼吸间距（在输入栏高度与停靠偏移之外额外留出）。 */
   --session-input-gap: 128px;
   /**
-   * 会话文档流底部留白 = 输入栏高度 + 停靠偏移(--spacing-lg) + 呼吸间距。
+   * 输入栏/欢迎页输入区的停靠偏移。终端面板展开时 SessionArea 切到 0px——
+   * 输入区直接坐在面板边框上，不留空隙；面板收起时回落到 --spacing-lg 作窗口底距。
+   */
+  --session-input-offset: var(--spacing-lg);
+  /**
+   * 会话文档流底部留白 = 输入栏高度 + 停靠偏移(--session-input-offset) + 呼吸间距。
    * 贴底时最后一段停在输入栏上沿之上，且保留可上滑的滚动余量。
    */
   --session-input-clearance: calc(
     var(--session-input-height) +
-    var(--spacing-lg) +
+    var(--session-input-offset) +
     var(--session-input-gap)
   );
   /**

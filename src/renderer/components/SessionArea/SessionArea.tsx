@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { useInputClearance } from "../../hooks/useInputClearance";
 import { useSessionMeta } from "../../stores/sessionStore";
+import { useUiStore } from "../../stores/uiStore";
 import { WidgetMountAbove, WidgetMountBelow } from "../ExtensionView/ExtensionViewHost";
 import { BackgroundProcsCard } from "./BackgroundProcs/BackgroundProcsCard";
 import styles from "./SessionArea.module.css";
@@ -13,16 +14,22 @@ import { WelcomeSplash } from "./WelcomeSplash";
  * running/idle 显示自研会话视图，输入框底部停靠。
  * 会话标题/目录/分支在 TitleBar 中间槽的 SessionHeader（docs/用户对话栏/7.1）。
  * 扩展 View 的 widget 槽挂在输入框上/下（docs/design/08 §5.3）。
+ * 终端面板展开时输入区贴住面板边框（.inputFlush），收起时留一档窗口底距。
  */
 export function SessionArea() {
   const { phase } = useSessionMeta();
+  const { terminalPanelVisible } = useUiStore();
   const isEmpty = phase === "empty";
   const runningRef = useRef<HTMLDivElement>(null);
   const inputStackRef = useRef<HTMLDivElement>(null);
   useInputClearance(runningRef, inputStackRef, !isEmpty);
 
   return (
-    <section className={styles.area}>
+    <section
+      className={[styles.area, terminalPanelVisible ? styles.inputFlush : ""]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {isEmpty ? (
         <div className={styles.splash}>
           <WelcomeSplash />

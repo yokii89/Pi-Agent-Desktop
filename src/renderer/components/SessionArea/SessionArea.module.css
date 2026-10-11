@@ -4,6 +4,16 @@
   height: 100%;
   min-height: 0;
   background: var(--color-bg);
+  /*
+   * 输入区停靠偏移：默认（终端面板收起/未开）留一档窗口底距；
+   * 面板展开时（.inputFlush）切 0——输入区直接坐在面板 border-top 上，
+   * 不再留出「对话流与终端之间的间隔」（SessionArea.tsx 按面板可见性挂类）。
+   */
+  --session-input-offset: var(--spacing-lg);
+}
+
+.inputFlush {
+  --session-input-offset: 0px;
 }
 
 .splash {
@@ -13,7 +23,8 @@
   align-items: center;
   justify-content: center;
   gap: var(--spacing-xl);
-  padding: var(--spacing-xl);
+  /* 底部跟随停靠偏移：面板展开时 0，欢迎页输入区同样贴住面板；收起时留窗口底距 */
+  padding: var(--spacing-xl) var(--spacing-xl) var(--session-input-offset);
 }
 
 .running {
@@ -29,19 +40,19 @@
    */
   --session-input-clearance: calc(
     var(--session-input-height) +
-    var(--spacing-lg) +
+    var(--session-input-offset) +
     var(--session-input-gap)
   );
 }
 
-/* 会话进行中，输入框悬浮停靠在底部。
+/* 会话进行中，输入框悬浮停靠在底部（终端面板展开时贴住面板边框，见 .inputFlush）。
    右内缩一个滚动条槽宽：文档流内容区被 .scroll 的 scrollbar-gutter 让掉了这 8px，
    不补的话输入栏比会话列整体偏右 4px，同宽的卡片边界对不齐。 */
 .dockedInput {
   position: absolute;
   left: 0;
   right: var(--scrollbar-size);
-  bottom: var(--spacing-lg);
+  bottom: var(--session-input-offset);
   display: flex;
   justify-content: center;
   padding: 0 var(--spacing-xl);

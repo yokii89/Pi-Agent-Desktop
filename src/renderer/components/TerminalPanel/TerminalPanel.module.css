@@ -13,12 +13,15 @@
   display: none;
 }
 
-/* 拖拽把手：面板顶部边界，向上拖增高、向下拖变矮 */
+/* 拖拽把手：面板顶部边界，向上拖增高、向下拖变矮。
+   底色与工具栏同面：把手位于 border-top 与工具栏之间，透明会让 --terminal-bg
+   透出来，在浅色主题下读作「对话流和工具栏之间又空了一条」。
+   高度算进「终端栏」的视觉条里（把手 + 工具栏一体），压缩后 3px 仍是可命中的拖拽热区。 */
 .resizeHandle {
   flex: none;
-  height: 5px;
+  height: 3px;
   cursor: row-resize;
-  background: transparent;
+  background: var(--color-bg-surface);
   transition: background-color 0.12s ease;
 }
 
@@ -27,15 +30,25 @@
   background: var(--color-accent-soft);
 }
 
+/* 工具条超紧凑档：内容行统一 16px（与图标同高），上下不留 padding，
+   加上 1px 底边框整条 17px，连同 3px 把手组成 20px 的「终端栏」视觉条。
+   min-height 只作兜底；行内元素若超过 16px 会撑破条高，新增内容注意别超。 */
 .toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-sm);
-  min-height: 30px;
-  padding: 2px var(--spacing-sm);
+  min-height: 17px;
+  padding: 0 var(--spacing-sm);
   background: var(--color-bg-surface);
   border-bottom: 1px solid var(--color-border);
+}
+
+/* 工具条内的图标按钮收窄为 16px 方块（父级前缀提权，确保压过 IconButton 默认的 28px） */
+.tabs .iconBtnCompact,
+.actions .iconBtnCompact {
+  width: 16px;
+  height: 16px;
 }
 
 .tabs {
@@ -44,11 +57,18 @@
   gap: var(--spacing-xs);
   min-width: 0;
   overflow-x: auto;
+  /* 16px 高的行容不下横向滚动条，藏掉（滚轮/拖拽仍可滚动） */
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .label {
   display: inline-flex;
   align-items: center;
+  height: 16px;
   gap: var(--spacing-xs);
   padding-right: var(--spacing-xs);
   color: var(--color-text-muted);
@@ -66,8 +86,9 @@
 .tab {
   display: inline-flex;
   align-items: center;
+  height: 16px;
   gap: 2px;
-  padding: 3px 6px 3px var(--spacing-sm);
+  padding: 0 6px 0 var(--spacing-sm);
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
   flex-shrink: 0;
@@ -91,8 +112,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
 }
@@ -102,10 +123,12 @@
   color: var(--color-text-strong);
 }
 
-/* 内联重命名输入框：替换 Tab 标题时展示 */
+/* 内联重命名输入框：替换 Tab 标题时展示。高度锁 14px（+边框 = 16px），
+   与压缩后的 Tab 行同高，进入重命名时工具条不跳动。 */
 .renameInput {
   width: 96px;
-  padding: 1px 4px;
+  height: 14px;
+  padding: 0 4px;
   border: 1px solid var(--color-accent);
   border-radius: var(--radius-sm);
   background: var(--color-bg-elevated);
