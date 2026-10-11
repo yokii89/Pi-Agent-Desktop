@@ -78,14 +78,10 @@
      margin/padding 任一方不对称都会让「New task ↔ Extensions」比后续行距宽 */
   padding: 7px var(--spacing-sm);
   border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
   color: var(--color-text-strong);
   font-size: var(--font-size-md);
-  transition: background-color 0.12s ease;
-}
-
-.newTask:hover {
-  background: var(--color-bg-hover);
+  /* 不设常驻底色：bg-surface 的不透明填充在整列平铺的行里被读成"一直处于激活态"
+     （docs/design/54 §七）。悬停与选中反馈都由选中药丸接管，这里只留文字强调 */
 }
 
 .navItem {

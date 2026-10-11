@@ -111,7 +111,7 @@ export function SideNav() {
         <span className={styles.beta}>{t("common.beta")}</span>
       </div>
 
-      <button type="button" className={styles.newTask} onClick={newSession}>
+      <button type="button" className={styles.newTask} data-side-hover="" onClick={newSession}>
         <PlusCircle size={20} weight="regular" />
         {t("sidenav.newTask")}
       </button>
