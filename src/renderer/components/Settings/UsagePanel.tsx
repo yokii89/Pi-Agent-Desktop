@@ -14,8 +14,8 @@ import { UsageHeatLegend, UsageHeatmap } from "./UsageHeatmap";
 import styles from "./UsagePanel.module.css";
 
 /**
- * 设置页「用量统计」面板：汇总卡片 + 近期趋势（纯 CSS 堆叠柱）+「全部」档
- * 年度热力图（当日 output 色阶，可按项目筛选）+ 按项目 / 按模型明细。
+ * 设置页「用量统计」面板：汇总卡片 + 近期趋势（纯 CSS 堆叠柱；今日档按小时
+ * 分桶）+「全部」档年度热力图（当日 output 色阶，可按项目筛选）+ 按项目 / 按模型明细。
  * 数据经 usageService.query 扫描 pi 会话 JSONL 聚合而来，只读不落库。
  */
 
@@ -48,7 +48,17 @@ function rangeSince(range: UsageRange, now: number): number | null {
   return null;
 }
 
+/** hour 桶键形如 `YYYY-MM-DDTHH`（见 usageBucketKey），day/month 按连字符拆分。 */
 function parseBucketKey(key: string): Date {
+  const hourMatch = /^(\d{4})-(\d{2})-(\d{2})T(\d{2})$/.exec(key);
+  if (hourMatch) {
+    return new Date(
+      Number(hourMatch[1]),
+      Number(hourMatch[2]) - 1,
+      Number(hourMatch[3]),
+      Number(hourMatch[4]),
+    );
+  }
   const [y, m, d] = key.split("-").map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
@@ -58,7 +68,9 @@ function nextBucketKey(key: string, granularity: UsageGranularity): string {
   const next =
     granularity === "month"
       ? new Date(d.getFullYear(), d.getMonth() + 1, 1)
-      : new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+      : granularity === "hour"
+        ? new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1)
+        : new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
   return usageBucketKey(next.getTime(), granularity);
 }
 
@@ -96,10 +108,28 @@ function buildChartSlices(report: UsageReport): UsageDaySlice[] {
   return out;
 }
 
-/** 横轴端点标签：day 显示 MM-DD，month 显示 YYYY-MM。 */
+/** 横轴端点标签：hour 显示 HH:00，day 显示 MM-DD，month 显示 YYYY-MM。 */
 function axisLabel(key: string | undefined, granularity: UsageGranularity): string {
   if (!key) return "";
+  if (granularity === "hour") return `${key.slice(11)}:00`;
   return granularity === "day" ? key.slice(5) : key;
+}
+
+/** tooltip 的桶标签：hour 桶显示 HH:00（当日内无歧义），其余直接展示桶键。 */
+function sliceLabel(key: string, granularity: UsageGranularity): string {
+  return granularity === "hour" ? `${key.slice(11)}:00` : key;
+}
+
+/**
+ * 悬浮提示的横向对齐：贴边的柱子向内锚定，避免浮层溢出图表被滚动容器裁剪。
+ * 左 1/4 锚左缘向右展开，右 1/4 锚右缘向左展开，居中柱子居中展开。
+ */
+function tipAlignAttr(index: number, count: number): "start" | "center" | "end" {
+  if (count <= 1) return "center";
+  const frac = index / (count - 1);
+  if (frac < 0.25) return "start";
+  if (frac > 0.75) return "end";
+  return "center";
 }
 
 function modelLabel(provider: string, modelId: string, unknownText: string): string {
@@ -133,7 +163,11 @@ export function UsagePanel() {
     let cancelled = false;
     setPending(true);
     void (async () => {
-      const result = await usageService.query({ since: rangeSince(range, Date.now()) });
+      const result = await usageService.query({
+        since: rangeSince(range, Date.now()),
+        // 今日档按小时分桶：day 粒度下当日只有一个桶，趋势图会整条占满
+        granularity: range === "today" ? "hour" : null,
+      });
       if (cancelled) return;
       setReport(result);
       setFailed(result === null);
@@ -295,22 +329,50 @@ export function UsagePanel() {
               )}
               <div className={styles.chart}>
                 <div className={styles.bars}>
-                  {chartSlices.map((slice) => {
+                  {chartSlices.map((slice, index) => {
                     const total = slice.totalTokens;
+                    // 补零的零用量桶不挂浮层与读屏标注，避免满屏「0」噪声
+                    if (total <= 0) {
+                      return <div key={slice.key} className={styles.barSlot} />;
+                    }
                     const inputH = ((total - slice.output) / maxTotal) * 100;
                     const outputH = (slice.output / maxTotal) * 100;
+                    // 悬浮快览走自绘 CSS tooltip：无边框窗口（Windows）原生 title 不显示
+                    const label = sliceLabel(slice.key, granularity);
+                    const input = formatTokens(slice.input + slice.cacheRead + slice.cacheWrite);
+                    const output = formatTokens(slice.output);
+                    const cache = formatTokens(slice.cacheRead + slice.cacheWrite);
                     const title = t("settings.usage.trendTooltip", {
-                      label: slice.key,
-                      input: formatTokens(slice.input + slice.cacheRead + slice.cacheWrite),
-                      output: formatTokens(slice.output),
-                      cache: formatTokens(slice.cacheRead + slice.cacheWrite),
+                      label,
+                      input,
+                      output,
+                      cache,
                     });
                     return (
-                      <div key={slice.key} className={styles.barSlot} title={title}>
-                        {total > 0 && inputH > 0 && (
+                      <div key={slice.key} className={styles.barSlot} role="img" aria-label={title}>
+                        <span
+                          role="tooltip"
+                          className={styles.slotTip}
+                          data-tip-align={tipAlignAttr(index, chartSlices.length)}
+                        >
+                          <span className={styles.tipLabel}>{label}</span>
+                          <span className={styles.tipRow}>
+                            <i className={`${styles.tipDot} ${styles.tipDotInput}`} />
+                            {t("settings.usage.input")} {input}
+                          </span>
+                          <span className={styles.tipRow}>
+                            <i className={`${styles.tipDot} ${styles.tipDotOutput}`} />
+                            {t("settings.usage.output")} {output}
+                          </span>
+                          <span className={styles.tipRow}>
+                            <i className={`${styles.tipDot} ${styles.tipDotCache}`} />
+                            {t("settings.usage.cache")} {cache}
+                          </span>
+                        </span>
+                        {inputH > 0 && (
                           <span className={styles.segInput} style={{ height: `${inputH}%` }} />
                         )}
-                        {total > 0 && outputH > 0 && (
+                        {outputH > 0 && (
                           <span className={styles.segOutput} style={{ height: `${outputH}%` }} />
                         )}
                       </div>

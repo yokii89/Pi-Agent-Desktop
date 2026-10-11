@@ -121,6 +121,12 @@ describe("usageBucketKey / pickUsageGranularity", () => {
     expect(usageBucketKey(ts, "month")).toBe("2026-09");
   });
 
+  it("hour 粒度键为本地时区 YYYY-MM-DDTHH（分钟不进键）", () => {
+    const ts = new Date(2026, 8, 26, 9, 30).getTime();
+    expect(usageBucketKey(ts, "hour")).toBe("2026-09-26T09");
+    expect(usageBucketKey(new Date(2026, 8, 26, 0, 5).getTime(), "hour")).toBe("2026-09-26T00");
+  });
+
   it("跨度 ≤90 天按天，超过按月", () => {
     const start = new Date(2026, 0, 1).getTime();
     expect(pickUsageGranularity(start, start + 90 * 86_400_000)).toBe<UsageGranularity>("day");

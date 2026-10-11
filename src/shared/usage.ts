@@ -25,7 +25,8 @@ export interface UsageQuery {
    * 过滤发生在文件级：整个会话文件（即整段会话）归属一个项目。
    */
   project?: string | null;
-  /** 桶粒度覆盖；null/缺省按跨度自动（≤90 天按天，否则按月）。年度热力图固定传 "day"。 */
+  /** 桶粒度覆盖；null/缺省按跨度自动（≤90 天按天，否则按月）。「今日」档传 "hour"，
+   * 年度热力图固定传 "day"。 */
   granularity?: UsageGranularity | null;
 }
 
@@ -134,8 +135,11 @@ export interface UsageReport {
 // 纯函数（主进程聚合与渲染层 run 累加共用，便于 vitest 覆盖）
 // ---------------------------------------------------------------------------
 
-/** 时间桶粒度：跨度短按天，超过阈值按月，避免「全部」档柱状条过密。 */
-export type UsageGranularity = "day" | "month";
+/**
+ * 时间桶粒度：跨度短按天，超过阈值按月，避免「全部」档柱状条过密。
+ * hour 只经显式覆盖使用（「今日」档按小时分桶），不参与跨度自动选择。
+ */
+export type UsageGranularity = "hour" | "day" | "month";
 
 /** 按天展示的最大跨度（天）；超过后聚合粒度降为月。 */
 export const USAGE_MONTHLY_AFTER_DAYS = 90;
@@ -145,12 +149,16 @@ export function pickUsageGranularity(sinceMs: number, untilMs: number): UsageGra
   return untilMs - sinceMs > USAGE_MONTHLY_AFTER_DAYS * 86_400_000 ? "month" : "day";
 }
 
-/** 时间戳 → 桶键（本地时区；day=`YYYY-MM-DD`，month=`YYYY-MM`）。 */
+/** 时间戳 → 桶键（本地时区；hour=`YYYY-MM-DDTHH`，day=`YYYY-MM-DD`，month=`YYYY-MM`）。 */
 export function usageBucketKey(ms: number, granularity: UsageGranularity): string {
   const d = new Date(ms);
   const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
   if (granularity === "month") return `${d.getFullYear()}-${mm}`;
-  return `${d.getFullYear()}-${mm}-${String(d.getDate()).padStart(2, "0")}`;
+  if (granularity === "hour") {
+    return `${d.getFullYear()}-${mm}-${dd}T${String(d.getHours()).padStart(2, "0")}`;
+  }
+  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
 function isFiniteNumber(value: unknown): value is number {

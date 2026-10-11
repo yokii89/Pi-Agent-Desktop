@@ -127,7 +127,9 @@ export async function queryUsageReport(raw: unknown): Promise<UsageReport> {
   const project =
     typeof query.project === "string" && query.project.length > 0 ? query.project : null;
   const granularity: UsageGranularity | null =
-    query.granularity === "day" || query.granularity === "month" ? query.granularity : null;
+    query.granularity === "hour" || query.granularity === "day" || query.granularity === "month"
+      ? query.granularity
+      : null;
 
   const files = await collectSessionFiles(Number.POSITIVE_INFINITY);
   const candidates = since === null ? files : files.filter((f) => f.mtime >= since);

@@ -51,6 +51,10 @@
   .bodyPending {
     transition: none;
   }
+
+  .slotTip {
+    transition: none;
+  }
 }
 
 /* 汇总卡片行 */
@@ -136,9 +140,84 @@
 .barSlot {
   flex: 1 1 0;
   min-width: 2px;
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+}
+
+/* 悬浮快览：原生 title 在无边框窗口（Windows）不显示，走 CSS tooltip（约定同 ContextUsageChip）。
+   贴边柱子经 data-tip-align 向内锚定，避免浮层溢出内容区被滚动容器裁剪。 */
+.slotTip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.slotTip[data-tip-align="start"] {
+  left: 0;
+  transform: none;
+}
+
+.slotTip[data-tip-align="end"] {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.barSlot:hover .slotTip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.tipLabel {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tipRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tipDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.tipDotInput {
+  background: var(--tool-flow-soft);
+}
+
+.tipDotOutput {
+  background: var(--tool-flow-strong);
+}
+
+.tipDotCache {
+  background: var(--color-text-muted);
 }
 
 .segInput,

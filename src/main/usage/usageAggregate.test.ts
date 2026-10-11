@@ -238,6 +238,33 @@ describe("aggregateUsage", () => {
     expect(report.byDay.map((slice) => slice.key)).toEqual(["2025-01-15", "2026-09-10"]);
   });
 
+  it("granularity: hour 按小时分桶（今日档），同小时合并、跨小时分桶", () => {
+    const files: FileUsage[] = [
+      file({
+        entries: [
+          entry({
+            ts: new Date(2026, 8, 30, 9, 10).getTime(),
+            usage: { input: 10, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 10 },
+          }),
+          entry({
+            ts: new Date(2026, 8, 30, 9, 50).getTime(),
+            usage: { input: 5, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 5 },
+          }),
+          entry({
+            ts: new Date(2026, 8, 30, 10, 0).getTime(),
+            usage: { input: 20, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 20 },
+          }),
+        ],
+      }),
+    ];
+    const report = aggregateUsage(files, null, now, { granularity: "hour" });
+    expect(report.granularity).toBe("hour");
+    expect(report.byDay.map((slice) => slice.key)).toEqual(["2026-09-30T09", "2026-09-30T10"]);
+    expect(report.byDay[0].totalTokens).toBe(15);
+    expect(report.byDay[0].sessions).toBe(1);
+    expect(report.byDay[1].totalTokens).toBe(20);
+  });
+
   it("cost 独立求和，缺失 cost 不影响 token 汇总", () => {
     const files: FileUsage[] = [
       file({
