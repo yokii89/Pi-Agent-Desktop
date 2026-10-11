@@ -2,6 +2,8 @@
   /* 磨砂玻璃：半透明底 + 背景模糊 + 颗粒（配方与令牌见 styles/glass.module.css） */
   composes: glass from "../../styles/glass.module.css";
   grid-area: nav;
+  /* 选中药丸（.selectionPill）的定位父级：绝对定位子元素随滚动内容一起移动 */
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -96,18 +98,29 @@
   color: var(--color-text);
   font-size: var(--font-size-md);
   text-align: left;
-  transition:
-    background-color 0.12s ease,
-    color 0.12s ease;
+  /* 悬停底色由选中药丸接管（docs/design/54），这里只保留选中文字强调的过渡 */
+  transition: color 0.12s ease;
 }
 
-.navItem:hover {
-  background: var(--color-bg-hover);
-}
-
+/* 选中底色由选中药丸统一承担（docs/design/54），行上只保留文字强调 */
 .navItemActive {
-  background: var(--color-bg-active);
   color: var(--color-text-strong);
+}
+
+/* 选中药丸（docs/design/54）：选项 / 项目 / 历史记录共用的一块高亮底。
+   悬浮时沿下拉曲线跟随指针，离开侧栏后滑回选中行；选中目标变化时滑到新行。
+   半透明底盖在行上方（z-index 压过行底色与文字，让位于行内 z-index:1 的
+   ⋯ 按钮与活动强调条）；pointer-events 关闭，不拦任何交互。
+   因此行上不得再写 :hover 底色——「指向哪一行」只有药丸一个写入方。 */
+.selectionPill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-active);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .divider {
@@ -211,20 +224,12 @@
   display: flex;
   align-items: center;
   border-radius: var(--radius-md);
-  /* 只用颜色过渡；位移由 GSAP 负责，避免两条动画链路打架 */
-  transition: background-color 0.12s ease;
 }
 
-.historyItem:hover {
-  background: var(--color-bg-hover);
-}
+/* 悬停底色由选中药丸接管（docs/design/54）；这里只保留 ⋯/状态互换与标题位移 */
 
-.historyItemActive,
-.historyItemActive:hover {
-  background: var(--color-bg-active);
-}
-
-/* 活动行左缘的强调条：灰底之外多一道可扫视的锚点；树线行上由它接管该行的线段 */
+/* 选中会话行：底色由选中药丸承担（docs/design/54），这里保留强调条与文字层级。
+   强调条是灰底之外多一道可扫视的锚点；树线行上由它接管该行的线段 */
 .historyItemActive::before {
   content: "";
   position: absolute;
@@ -461,7 +466,7 @@
 }
 
 /* 项目行：主体（图标 + 名称）+ 右缘信息区（时间 / 悬浮操作 / 展开箭头）；
-   整行为历史会话的展开/收起开关 */
+   整行为历史会话的展开/收起开关。悬停底色由选中药丸接管（docs/design/54） */
 .projectRow {
   position: relative;
   display: flex;
@@ -469,11 +474,6 @@
   /* 行右缘固定留给展开箭头：各项目行的箭头横向对齐，不再跟着名称长度漂移 */
   padding-right: 4px;
   border-radius: var(--radius-md);
-  transition: background-color 0.12s ease;
-}
-
-.projectRow:hover {
-  background: var(--color-bg-hover);
 }
 
 /* 项目行不再有"选中底色"：整行点击 = 展开/收起，底色变化会和展开态打架

@@ -165,6 +165,9 @@ export function HistoryItem({
       ref={rowRef}
       className={[styles.historyItem, active ? styles.historyItemActive : ""].join(" ")}
       data-side-row=""
+      // 选中药丸（docs/design/54）的落点标记：activeSessionFile 命中本行时高亮滑到这里
+      data-side-active={active ? "session" : undefined}
+      data-side-hover=""
     >
       {treeDepth !== undefined && <TreeGuideLines depth={treeDepth} last={treeLast} />}
       {renaming ? (

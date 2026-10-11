@@ -73,6 +73,7 @@ export function ProjectList({ groups }: ProjectListProps) {
                   <div
                     className={[styles.projectRow, active ? styles.projectRowActive : ""].join(" ")}
                     data-side-row=""
+                    data-side-hover=""
                   >
                     {/* 整行可点的展开/收起开关：透明按钮拉伸铺满行，
                         操作按钮（更多/新建）浮在其上层，点击不会落到开关上 */}
