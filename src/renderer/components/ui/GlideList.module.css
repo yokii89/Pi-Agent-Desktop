@@ -1,0 +1,55 @@
+/* 高亮药丸的轨道与本体（docs/design/51）。
+   轨道是药丸的定位父级，所以列表内部滚动时药丸跟着内容走；
+   药丸绝对定位、不参与布局，面板尺寸不会因为它的高度变化而抖动。 */
+.track {
+  position: relative;
+}
+
+.pill {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 0;
+  border-radius: var(--radius-overlay-item);
+  background: var(--color-bg-active);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 行：药丸负责"指向哪一行"，这里不再写悬停底色，避免出现两层高亮。
+   尺寸/排版一律走 --row-* 变量：站点类名和本类同权重，直接覆盖 padding 之类
+   会随 CSS 打包顺序定胜负，变量则永远是声明方说话。 */
+.row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: var(--row-align, center);
+  gap: var(--row-gap, var(--spacing-sm));
+  width: 100%;
+  padding: var(--row-padding, 6px var(--spacing-sm));
+  border: 0;
+  border-radius: var(--radius-overlay-item);
+  background: transparent;
+  color: inherit;
+  font-size: var(--row-font-size, var(--font-size-md));
+  text-align: left;
+  white-space: var(--row-space, nowrap);
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.row:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 条目组之间的分隔线（如行菜单「归档 / 删除」与常规动作之间）；不占行序 */
+.separator {
+  height: 1px;
+  margin: 4px 2px;
+  border: none;
+  background: var(--color-border);
+}

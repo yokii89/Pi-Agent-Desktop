@@ -50,6 +50,15 @@
   border-color: var(--color-danger);
 }
 
+/* 自绘下拉触发器：皮肤交回 ui/Select 的 .field，这里只补宽度。
+   高度与相邻 .input 同为 36px，用 --field-min-height 表达——直接写 height 会和
+   composes 来的 .field 同权重相争，谁赢取决于 CSS 打包顺序（站点模块排在 ui/ 之前）。 */
+.selectField {
+  composes: field from "../ui/Select.module.css";
+  --field-min-height: 36px;
+  width: 100%;
+}
+
 .textarea {
   width: 100%;
   padding: var(--spacing-xs) var(--spacing-sm);

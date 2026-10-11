@@ -1,50 +1,25 @@
 /* 「更多」菜单浮层：portal + fixed，不占文档流，不把页面区挤矮。
-   打开期间主进程已抑制 WebContentsView，浮层不会被原生视图盖住。 */
+   打开期间主进程已抑制 WebContentsView，浮层不会被原生视图盖住。
+   外壳外观走共享配方（overlayShell），层级即 --z-menu。 */
 
 .panel {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: var(--z-menu);
+  composes: shell from "../../../ui/overlayShell.module.css";
+  width: 220px;
+  max-width: calc(100vw - 16px);
 }
 
+/* 轨道 + 行 + 药丸全部复用 ui/GlideList（docs/design/51）：
+   这个菜单与其它下拉必须同一套高亮语言，不能再留一份 :hover 底色。 */
 .menu {
+  composes: track from "../../../ui/GlideList.module.css";
   display: flex;
   flex-direction: column;
   gap: 2px;
-  width: 220px;
-  max-width: calc(100vw - 16px);
-  padding: var(--spacing-xs);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-elevated);
-  box-shadow: var(--shadow-overlay);
 }
 
 .action {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  width: 100%;
-  padding: 6px var(--spacing-sm);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
+  composes: row from "../../../ui/GlideList.module.css";
   color: var(--color-text);
-  font-size: var(--font-size-md);
-  text-align: left;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.action:hover:not(:disabled) {
-  background: var(--color-bg-hover);
-}
-
-.action:disabled {
-  color: var(--color-text-muted);
-  opacity: 0.6;
-  cursor: default;
 }
 
 .actionIcon {

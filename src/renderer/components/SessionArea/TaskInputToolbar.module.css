@@ -33,7 +33,7 @@
   gap: 6px;
   height: 32px;
   padding: 0 10px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-overlay-item);
   font-size: var(--font-size-md);
   flex-shrink: 0;
   white-space: nowrap;
@@ -132,40 +132,28 @@
   }
 }
 
+/* 外壳与内边距来自 ui/overlayShell，高亮来自 ui/GlideList 的药丸，
+   这里只留这个面板自己的宽度与行排版（--row-* 见 GlideList.module.css）。 */
 .modePanel {
+  width: 260px;
+}
+
+.modeList {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  width: 260px;
-  padding: 4px;
 }
 
 .modeRow {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  padding: 10px;
-  border-radius: var(--radius-sm);
-  text-align: left;
+  --row-align: flex-start;
+  --row-gap: 10px;
+  --row-padding: 10px;
+  --row-space: normal;
   color: var(--color-text);
-}
-
-.modeRow:hover {
-  background: var(--color-bg-hover);
 }
 
 .modeRow:disabled {
   opacity: 0.4;
-  cursor: default;
-}
-
-.modeRow:disabled:hover {
-  background: transparent;
-}
-
-.modeActive {
-  background: var(--color-bg-hover);
 }
 
 .modeIcon {
@@ -208,21 +196,11 @@
   flex-direction: column;
   gap: 2px;
   min-width: 64px;
-  padding: 4px;
 }
 
 .thinkingRow {
-  display: flex;
-  align-items: center;
+  --row-padding: 6px 8px;
+  --row-font-size: var(--font-size-sm);
   justify-content: space-between;
-  width: 100%;
-  padding: 6px 8px;
-  border-radius: var(--radius-sm);
   color: var(--color-text);
-  font-size: var(--font-size-sm);
-  text-align: left;
-}
-
-.thinkingRow:hover {
-  background: var(--color-bg-hover);
 }

@@ -10,9 +10,16 @@ import { projectService } from "../../services/projectService";
 import { settingsService } from "../../services/settingsService";
 import { useUiStore } from "../../stores/uiStore";
 import { Button } from "../ui/Button";
+import { Select } from "../ui/Select";
 import { Toggle } from "../ui/Toggle";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import styles from "./Settings.module.css";
+
+/** 并发会话上限候选值：与主进程 settings schema 的取值口径一致。 */
+const MAX_PARALLEL_OPTIONS = [1, 2, 4, 6, 8, 12, 16, 24, 32].map((n) => ({
+  value: String(n),
+  label: String(n),
+}));
 
 /**
  * 常规：应用级通用偏好。
@@ -122,18 +129,13 @@ export function GeneralPanel() {
           label={t("settings.general.language")}
           description={t("settings.general.language.description")}
           control={
-            <select
+            <Select
               className={styles.selectLike}
               value={localePreference}
-              aria-label={t("settings.general.language")}
-              onChange={(e) => changeLocale(e.target.value)}
-            >
-              {localeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              ariaLabel={t("settings.general.language")}
+              options={localeOptions}
+              onChange={changeLocale}
+            />
           }
         />
         <SettingRow
@@ -166,19 +168,14 @@ export function GeneralPanel() {
           label={t("settings.general.maxParallelSessions")}
           description={t("settings.general.maxParallelSessions.description")}
           control={
-            <select
+            <Select
               className={styles.selectLike}
               value={String(maxParallelSessions)}
               disabled={!ready}
-              aria-label={t("settings.general.maxParallelSessions")}
-              onChange={(e) => void changeMaxParallel(e.target.value)}
-            >
-              {[1, 2, 4, 6, 8, 12, 16, 24, 32].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
+              ariaLabel={t("settings.general.maxParallelSessions")}
+              options={MAX_PARALLEL_OPTIONS}
+              onChange={(next) => void changeMaxParallel(next)}
+            />
           }
         />
         <SettingRow

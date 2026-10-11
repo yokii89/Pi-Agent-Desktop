@@ -1,3 +1,5 @@
+/* 行的容器、圆角、悬停高亮都由 ui/GlideList 负责（docs/design/51），
+   这里只管列表本身的滚动与限高，以及条目内部的排版。 */
 .list {
   list-style: none;
   display: flex;
@@ -16,36 +18,11 @@
 
 .list::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--color-text-muted) 40%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-overlay-item);
 }
 
 .list::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--color-text-muted) 65%, transparent);
-}
-
-.item {
-  /* 图标与文案紧贴左对齐：条目是"图标 + 文字（+ 可选尾巴提示）"，
-     用 space-between 会把文字顶到最右，图标和文字之间空出一大截。 */
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--spacing-sm);
-  width: 100%;
-  padding: 6px var(--spacing-sm);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-md);
-  text-align: left;
-  white-space: nowrap;
-}
-
-.item:hover:not(:disabled) {
-  background: var(--color-bg-hover);
-}
-
-.item:disabled {
-  color: var(--color-text-muted);
-  opacity: 0.6;
-  cursor: default;
 }
 
 .hint {
@@ -61,16 +38,8 @@
   color: var(--color-text-muted);
 }
 
-/* 危险操作（删除任务等）：文字与图标同用危险色，悬停仍沿用条目底色 */
+/* 危险操作（删除任务等）：文字与图标同用危险色，高亮仍由药丸统一表现 */
 .itemDanger,
 .itemDanger .itemIcon {
   color: var(--color-danger);
-}
-
-/* 条目组之间的分隔线（如行菜单「归档 / 删除」与常规动作之间） */
-.separator {
-  height: 1px;
-  margin: 4px 2px;
-  border: none;
-  background: var(--color-border);
 }

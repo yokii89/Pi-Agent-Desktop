@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../../../../../hooks/useT";
+import { Select, type SelectOption } from "../../../../ui/Select";
 import styles from "./styleEdit.module.css";
 
 /**
@@ -15,6 +16,8 @@ export interface LengthInputProps {
   compact?: boolean;
   /** 无单位数字提交时补上的默认单位（如 px）；flex-grow 等传 ""。 */
   defaultUnit?: string;
+  /** 读屏用途：单位下拉嵌在数值框右端，自身没有伴随的文字标签。 */
+  ariaLabel?: string;
   onChange: (value: string) => void;
   onLive?: (value: string) => void;
 }
@@ -53,6 +56,7 @@ export function LengthInput({
   disabled,
   compact,
   defaultUnit = "",
+  ariaLabel,
   onChange,
   onLive,
 }: LengthInputProps) {
@@ -66,6 +70,18 @@ export function LengthInput({
   }, [value]);
 
   const parsed = parseLength(draft, defaultUnit);
+  const unit = parsed.unit || (parsed.num === "auto" ? "auto" : "");
+  // 表外单位（如 1.5pt）也要显示得出来，否则触发器只剩占位，读不出当前值
+  const unitOptions = useMemo(() => {
+    const list: SelectOption[] = UNITS.map((item) => ({
+      value: item,
+      label: item === "" ? "—" : item,
+    }));
+    if (unit && !list.some((item) => item.value === unit)) {
+      list.unshift({ value: unit, label: unit });
+    }
+    return list;
+  }, [unit]);
 
   const commit = (next: string): void => {
     if (!next.trim()) {
@@ -169,21 +185,16 @@ export function LengthInput({
           setDragging(false);
         }}
       />
-      <select
+      <Select
         className={styles.lengthUnit}
-        value={parsed.unit || (parsed.num === "auto" ? "auto" : "")}
+        rootClassName={styles.lengthUnitRoot}
+        panelClassName={styles.lengthUnitPanel}
+        value={unit}
+        options={unitOptions}
         disabled={disabled}
-        onChange={(event) => {
-          const unit = event.target.value;
-          commit(unit === "auto" ? "auto" : joinLength(parsed.num, unit));
-        }}
-      >
-        {UNITS.map((unit) => (
-          <option key={unit || "none"} value={unit}>
-            {unit === "" ? "—" : unit}
-          </option>
-        ))}
-      </select>
+        ariaLabel={ariaLabel}
+        onChange={(next) => commit(next === "auto" ? "auto" : joinLength(parsed.num, next))}
+      />
     </div>
   );
 }

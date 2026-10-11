@@ -16,6 +16,7 @@ import { useT } from "../../hooks/useT";
 import { notificationService } from "../../services/notificationService";
 import { settingsService } from "../../services/settingsService";
 import { Button } from "../ui/Button";
+import { Select } from "../ui/Select";
 import { Toggle } from "../ui/Toggle";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import styles from "./Settings.module.css";
@@ -168,21 +169,17 @@ export function NotificationsPanel() {
               : t("notification.panel.focusPolicy")
           }
           control={
-            <select
+            <Select
               className={styles.selectLike}
               value={settings.focusPolicy}
               disabled={!ready}
-              aria-label={t("notification.panel.focusPolicy")}
-              onChange={(event) =>
-                void patchRoot({ focusPolicy: event.target.value as NotificationFocusPolicy })
-              }
-            >
-              {FOCUS_POLICY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {t(option.labelKey)}
-                </option>
-              ))}
-            </select>
+              ariaLabel={t("notification.panel.focusPolicy")}
+              options={FOCUS_POLICY_OPTIONS.map((option) => ({
+                value: option.value,
+                label: t(option.labelKey),
+              }))}
+              onChange={(next) => void patchRoot({ focusPolicy: next as NotificationFocusPolicy })}
+            />
           }
         />
         <SettingRow
@@ -233,23 +230,19 @@ export function NotificationsPanel() {
                     onChange={(next) => void patchScenario(id, { enabled: next })}
                     aria-label={t("notification.panel.scenarioEnable", { name })}
                   />
-                  <select
+                  <Select
                     className={styles.selectLike}
                     value={cfg.sound}
                     disabled={!ready}
-                    aria-label={t("notification.panel.scenarioSound", { name })}
-                    onChange={(event) =>
-                      void patchScenario(id, {
-                        sound: event.target.value as NotificationSoundId,
-                      })
+                    ariaLabel={t("notification.panel.scenarioSound", { name })}
+                    options={NOTIFICATION_SOUNDS.map((sound) => ({
+                      value: sound,
+                      label: soundLabel(sound),
+                    }))}
+                    onChange={(next) =>
+                      void patchScenario(id, { sound: next as NotificationSoundId })
                     }
-                  >
-                    {NOTIFICATION_SOUNDS.map((sound) => (
-                      <option key={sound} value={sound}>
-                        {soundLabel(sound)}
-                      </option>
-                    ))}
-                  </select>
+                  />
                   <Button onClick={() => notificationService.preview(cfg.sound)} disabled={!ready}>
                     <SpeakerHigh size={16} weight="regular" />
                     {t("notification.panel.preview")}

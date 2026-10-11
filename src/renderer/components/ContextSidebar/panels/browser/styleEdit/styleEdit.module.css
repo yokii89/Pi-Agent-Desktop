@@ -10,7 +10,7 @@
   margin: 0 0 var(--spacing-sm);
   padding: 2px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--color-bg-surface);
 }
 
@@ -18,7 +18,7 @@
   flex: 1;
   height: 28px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-muted);
   font-size: 12px;
@@ -82,7 +82,7 @@
   gap: 5px;
   padding: 3px 8px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-accent-soft);
   color: var(--color-accent);
   font-size: 11px;
@@ -305,7 +305,7 @@
   height: 18px;
   margin: 2px 0 0;
   border: 1px solid var(--color-border-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: transparent;
   cursor: pointer;
@@ -363,7 +363,7 @@
   flex-shrink: 0;
   padding: 0 4px;
   border: 1px solid var(--color-warning);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--color-warning);
   font-family: var(--font-family-mono);
   font-size: 9px;
@@ -441,6 +441,12 @@
   border-radius: var(--radius-sm);
   background: var(--color-bg-elevated);
   overflow: hidden;
+  /* 值一律等宽小字：写在容器上让所有值控件继承。
+     ui/Select 的触发器基座是 `font: inherit` / `color: inherit`，
+     控件类名再各自声明同等权重的字体会与基座比注入顺序，继承没有这场竞争。 */
+  color: var(--color-text);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
 }
 
 .field:focus-within {
@@ -452,13 +458,11 @@
   opacity: 0.65;
 }
 
-/* 值控件铺满 .field（flex 下 width:100% 不够稳） */
-.field > * {
-  flex: 1;
-  min-width: 0;
-}
-
+/* 值控件铺满 .field 由各控件自己声明（flex: 1 + min-width: 0，见 .textInput / .lengthRoot /
+   .colorRoot / .enumSelectRoot）。以前是一条 `.field > *` 隔空指挥，但它同样会指挥到自绘下拉
+   外面那层 Popover 的 root（inline-flex）——那层的尺寸现在挂在 rootClassName 上说话。 */
 .textInput {
+  flex: 1;
   width: 100%;
   min-width: 0;
   height: 100%;
@@ -478,6 +482,7 @@
 
 .lengthRoot {
   display: flex;
+  flex: 1;
   align-items: center;
   width: 100%;
   height: 100%;
@@ -503,23 +508,36 @@
   color: var(--color-accent);
 }
 
-.lengthUnit {
+/* 单位 chip 是嵌在数值框右端的自绘下拉：分隔线、底色、字号直接挂在 Popover 的 root 上
+   （rootClassName），不再为它多套一层 span。root 自带 inline-flex，
+   作为 flex item 会被块化成 flex，排版与原来那层槽一致。 */
+/* 单位芯片只有 ~45px 宽：面板不该被 180px 默认下限撑到触发器的四倍宽 */
+.lengthUnitPanel {
+  --panel-min-width: 0;
+}
+
+.lengthUnitRoot {
   flex: 0 0 auto;
-  height: 100%;
-  max-width: 52px;
-  padding: 0 4px;
-  border: none;
+  align-self: stretch;
+  min-width: 0;
   border-left: 1px solid var(--color-border);
   background: var(--color-bg-surface);
+  /* 单位比数值小一档、用灰色：写在 root 上由触发器基座继承（见 .field 的说明） */
   color: var(--color-text-muted);
   font-family: var(--font-family-mono);
   font-size: 11px;
-  outline: none;
-  cursor: pointer;
+}
+
+/* 触发器本体：分隔线与底色归上面的 root，这里只留内距 */
+.lengthUnit {
+  flex: 1;
+  min-width: 0;
+  padding: 0 4px;
 }
 
 .colorRoot {
   display: flex;
+  flex: 1;
   align-items: center;
   width: 100%;
   height: 100%;
@@ -554,23 +572,26 @@
   height: calc(100% - 6px);
   padding: 0;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: transparent;
   cursor: pointer;
 }
 
+/* 枚举下拉的触发器：透明行内的观感由 ui/Select 的 .trigger 基座给（无边框/无底色/可点），
+   字体颜色继承 .field，这里只补铺满 .field 所需的尺寸与内距。 */
 .enumSelect {
-  width: 100%;
+  flex: 1;
   min-width: 0;
-  height: 100%;
   padding: 0 6px;
-  border: none;
-  background: transparent;
-  color: var(--color-text);
-  font-family: var(--font-family-mono);
-  font-size: 12px;
-  outline: none;
-  cursor: pointer;
+}
+
+/* .field 与触发器之间还夹着一层 Popover 的 root（inline-flex）：
+   不把它拉满，控件就只有文字那么高，28px 的命中区没了。尺寸挂在 root 自己的类上，
+   不再靠 `.field > *` 隔空指挥（见上面的说明）。 */
+.enumSelectRoot {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
 }
 
 /* ── 添加属性（幽灵声明行） ───────────────────────── */
@@ -650,45 +671,45 @@
   cursor: default;
 }
 
-.suggestList {
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  z-index: 5;
-  margin: 2px 0 0;
-  padding: 4px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-elevated);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  list-style: none;
-  max-height: 180px;
-  overflow-y: auto;
-}
-
-.suggestItem {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  width: 100%;
-  padding: 6px 8px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
+/* 属性名建议浮层：外壳外观（底色/描边/圆角/投影/浮层档 z-index）全部走
+   overlayShell 的公共配方，坐标由组件在首帧绘制前按声明行的矩形写入（fixed + portal），
+   所以它既不被侧栏的 overflow 裁剪，也不必再自己声明一套 box-shadow 与圆角。
+   字体写在面板上，由 ui/GlideList 的行（font: inherit）继承。 */
+.suggestPanel {
+  composes: shell from "../../../../ui/overlayShell.module.css";
   color: var(--color-text);
   font-family: var(--font-family-mono);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
+  font-size: var(--font-size-sm);
 }
 
-.suggestItem:hover:not(:disabled) {
-  background: var(--color-bg-hover);
+/* 限高与内滚归条目容器（行的排版见 ui/GlideList） */
+.suggestList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
-.suggestItem:disabled {
-  opacity: 0.4;
-  cursor: default;
+.suggestList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.suggestList::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-text-muted) 40%, transparent);
+  border-radius: var(--radius-overlay-item);
+}
+
+.suggestList::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-text-muted) 65%, transparent);
+}
+
+/* 条目比下拉面板再紧一档：带上面板类名抬高权重，压过 .row 的公共配方而不是靠注入顺序 */
+.suggestPanel .suggestItem {
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
 }
 
 .suggestName {

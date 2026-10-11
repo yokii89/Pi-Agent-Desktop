@@ -1,10 +1,12 @@
-import { CaretDown, Check, GitBranch, Plus } from "@phosphor-icons/react";
+import { Check, GitBranch, Plus } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GitBranchesResult } from "../../../shared/ipc";
 import { useT } from "../../hooks/useT";
 import { gitService } from "../../services/gitService";
 import { useReviewStore } from "../../stores/reviewStore";
 import { useUiStore } from "../../stores/uiStore";
+import { GlideChevron } from "../ui/GlideChevron";
+import { OptionList, type OptionRow } from "../ui/OptionList";
 import { Popover } from "../ui/Popover";
 import styles from "./GitBranchChip.module.css";
 
@@ -70,6 +72,64 @@ export function GitBranchChip({ cwd, direction = "top", variant = "default" }: G
     }
   };
 
+  // rows 与 actions 同序（分隔线不占行序），OptionList 的行序就是这里的下标
+  const rows: OptionRow[] = [];
+  const actions: Array<() => void> = [];
+  for (const branch of filteredBranches) {
+    rows.push({
+      key: branch.name,
+      className: styles.row,
+      disabled: busy || branch.current,
+      selected: branch.current,
+      text: branch.name,
+      node: (
+        <>
+          <GitBranch size={16} weight="regular" />
+          <span className={styles.col}>
+            <span className={styles.rowLabel}>{branch.name}</span>
+            {branch.current && (branchData?.dirtyCount ?? 0) > 0 && (
+              <span className={styles.hint}>
+                {t("session.git.dirty", { count: branchData?.dirtyCount ?? 0 })}
+              </span>
+            )}
+          </span>
+          {branch.current && <Check size={16} weight="regular" className={styles.check} />}
+        </>
+      ),
+    });
+    actions.push(() => {
+      void checkout(branch.name, false);
+    });
+  }
+  rows.push({ key: "group-divider", node: null, separator: true });
+  if (!creating) {
+    rows.push({
+      key: "create-branch",
+      className: styles.row,
+      node: (
+        <>
+          <Plus size={16} weight="regular" />
+          <span>{t("session.git.createCheckout")}</span>
+        </>
+      ),
+    });
+    actions.push(() => setCreating(true));
+  }
+  rows.push({
+    key: "open-graph",
+    className: styles.row,
+    node: (
+      <>
+        <GitBranch size={16} weight="regular" />
+        <span>{t("session.git.graph")}</span>
+      </>
+    ),
+  });
+  actions.push(() => {
+    setReviewView("graph");
+    openReview();
+  });
+
   return (
     <Popover
       direction={direction}
@@ -82,7 +142,7 @@ export function GitBranchChip({ cwd, direction = "top", variant = "default" }: G
         >
           <GitBranch size={14} weight="regular" />
           <span className={styles.chipLabel}>{branchData?.current ?? t("session.git.branch")}</span>
-          <CaretDown size={12} weight="regular" />
+          <GlideChevron size={12} />
         </button>
       )}
     >
@@ -96,33 +156,15 @@ export function GitBranchChip({ cwd, direction = "top", variant = "default" }: G
           />
         </div>
         <p className={styles.sectionLabel}>{t("session.git.branches")}</p>
-        <div className={styles.list}>
-          {filteredBranches.map((branch) => (
-            <button
-              key={branch.name}
-              type="button"
-              className={[styles.row, branch.current ? styles.rowActive : ""].join(" ")}
-              disabled={busy || branch.current}
-              onClick={() => void checkout(branch.name, false)}
-            >
-              <GitBranch size={16} weight="regular" />
-              <span className={styles.col}>
-                <span className={styles.rowLabel}>{branch.name}</span>
-                {branch.current && (branchData?.dirtyCount ?? 0) > 0 && (
-                  <span className={styles.hint}>
-                    {t("session.git.dirty", { count: branchData?.dirtyCount ?? 0 })}
-                  </span>
-                )}
-              </span>
-              {branch.current && <Check size={16} weight="regular" className={styles.check} />}
-            </button>
-          ))}
-          {filteredBranches.length === 0 && (
-            <p className={styles.empty}>{t("session.git.empty")}</p>
-          )}
-        </div>
-        <div className={styles.divider} />
-        {creating ? (
+        <OptionList
+          rows={rows}
+          role="listbox"
+          ariaLabel={t("session.git.branch")}
+          className={styles.list}
+          onSelect={(index) => actions[index]?.()}
+        />
+        {filteredBranches.length === 0 && <p className={styles.empty}>{t("session.git.empty")}</p>}
+        {creating && (
           <div className={styles.createRow}>
             <input
               ref={createInputRef}
@@ -146,23 +188,7 @@ export function GitBranchChip({ cwd, direction = "top", variant = "default" }: G
               {t("session.git.create")}
             </button>
           </div>
-        ) : (
-          <button type="button" className={styles.row} onClick={() => setCreating(true)}>
-            <Plus size={16} weight="regular" />
-            <span>{t("session.git.createCheckout")}</span>
-          </button>
         )}
-        <button
-          type="button"
-          className={styles.row}
-          onClick={() => {
-            setReviewView("graph");
-            openReview();
-          }}
-        >
-          <GitBranch size={16} weight="regular" />
-          <span>{t("session.git.graph")}</span>
-        </button>
       </div>
     </Popover>
   );

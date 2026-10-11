@@ -18,6 +18,7 @@ import { useProjectStore } from "../../stores/projectStore";
 import { type Theme, useUiStore } from "../../stores/uiStore";
 import { useUpdateStatus } from "../../stores/updateStore";
 import { Button } from "../ui/Button";
+import { GlideChevron } from "../ui/GlideChevron";
 import { Menu, type MenuItem } from "../ui/Menu";
 import { Toggle } from "../ui/Toggle";
 import { SettingRow, SettingsSection } from "./SettingRow";
@@ -343,6 +344,7 @@ export function EnvironmentPanel() {
                   {shellValidating
                     ? t("settings.config.validating")
                     : t("settings.environment.select")}
+                  <GlideChevron size={14} />
                 </Button>
               )}
               items={shellMenuItems}

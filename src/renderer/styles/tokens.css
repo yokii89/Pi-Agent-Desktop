@@ -102,6 +102,12 @@
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  /* 浮层专用一档（docs/design/51）：下拉外壳与条目行此前散着 8/12/6px 三种写法，
+     统一成「壳 12 / 行 8」，同时给条目留出比表单控件 --radius-md 更松的可点面积 */
+  --radius-overlay: 12px;
+  --radius-overlay-item: 8px;
+  /* 胶囊档：徽章/药丸形，替代散落各处的 999px 字面量 */
+  --radius-pill: 999px;
 
   /* 字号（三档 + 欢迎语大标题）——固定 chrome 用绝对 px；
      缩放敏感的文档流尺寸见下方 --md-* em 令牌（docs/design/29 §3.1） */

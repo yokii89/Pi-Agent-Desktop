@@ -1,7 +1,9 @@
-import { CaretDown, Check, Circle, Cloud, Folder, Plus } from "@phosphor-icons/react";
+import { Check, Circle, Cloud, Folder, Plus } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { useT } from "../../hooks/useT";
 import { useProjectStore } from "../../stores/projectStore";
+import { GlideChevron } from "../ui/GlideChevron";
+import { OptionList, type OptionRow } from "../ui/OptionList";
 import { Popover } from "../ui/Popover";
 import { GitBranchChip } from "./GitBranchChip";
 import styles from "./TaskInputContextBar.module.css";
@@ -24,6 +26,65 @@ export function TaskInputContextBar() {
     );
   }, [projects, workspaceQuery]);
 
+  // rows 与 actions 同序（分隔线不占行序），OptionList 的行序就是这里的下标
+  const rows: OptionRow[] = [];
+  const actions: Array<() => void> = [];
+  for (const project of filteredProjects) {
+    const isCurrent = project.id === currentProject?.id;
+    rows.push({
+      key: project.id,
+      className: styles.row,
+      selected: isCurrent,
+      text: project.name,
+      node: (
+        <>
+          <Folder size={16} weight="regular" />
+          <span className={styles.rowLabel}>{project.name}</span>
+          {isCurrent && <Check size={16} weight="regular" className={styles.check} />}
+        </>
+      ),
+    });
+    actions.push(() => selectProject(project.id));
+  }
+  rows.push({ key: "group-divider", node: null, separator: true });
+  rows.push({
+    key: "add-project",
+    className: styles.row,
+    node: (
+      <>
+        <Plus size={16} weight="regular" />
+        <span>{t("session.workspace.openFolder")}</span>
+      </>
+    ),
+  });
+  actions.push(() => {
+    void addProjectByPicker();
+  });
+  rows.push({
+    key: "remote-project",
+    className: styles.row,
+    disabled: true,
+    title: t("common.comingSoon"),
+    node: (
+      <>
+        <Cloud size={16} weight="regular" className={styles.mutedIcon} />
+        <span className={styles.mutedText}>{t("session.workspace.remote")}</span>
+      </>
+    ),
+  });
+  actions.push(() => undefined);
+  rows.push({
+    key: "no-project",
+    className: styles.row,
+    node: (
+      <>
+        <Circle size={16} weight="regular" className={styles.mutedIcon} />
+        <span>{t("session.workspace.none")}</span>
+      </>
+    ),
+  });
+  actions.push(() => selectProject(null));
+
   return (
     <div className={styles.bar}>
       <Popover
@@ -35,7 +96,7 @@ export function TaskInputContextBar() {
             <span className={styles.chipLabel}>
               {currentProject?.name ?? t("session.workspace.select")}
             </span>
-            <CaretDown size={14} weight="regular" />
+            <GlideChevron size={14} />
           </button>
         )}
       >
@@ -48,44 +109,16 @@ export function TaskInputContextBar() {
               onChange={(e) => setWorkspaceQuery(e.target.value)}
             />
           </div>
-          <div className={styles.list}>
-            {filteredProjects.map((project) => (
-              <button
-                key={project.id}
-                type="button"
-                className={styles.row}
-                onClick={() => selectProject(project.id)}
-              >
-                <Folder size={16} weight="regular" />
-                <span className={styles.rowLabel}>{project.name}</span>
-                {project.id === currentProject?.id && (
-                  <Check size={16} weight="regular" className={styles.check} />
-                )}
-              </button>
-            ))}
-            {filteredProjects.length === 0 && (
-              <p className={styles.empty}>{t("session.workspace.empty")}</p>
-            )}
-          </div>
-          <div className={styles.divider} />
-          <button
-            type="button"
-            className={styles.row}
-            onClick={() => {
-              void addProjectByPicker();
-            }}
-          >
-            <Plus size={16} weight="regular" />
-            <span>{t("session.workspace.openFolder")}</span>
-          </button>
-          <button type="button" className={styles.row} disabled title={t("common.comingSoon")}>
-            <Cloud size={16} weight="regular" className={styles.mutedIcon} />
-            <span className={styles.mutedText}>{t("session.workspace.remote")}</span>
-          </button>
-          <button type="button" className={styles.row} onClick={() => selectProject(null)}>
-            <Circle size={16} weight="regular" className={styles.mutedIcon} />
-            <span>{t("session.workspace.none")}</span>
-          </button>
+          <OptionList
+            rows={rows}
+            role="listbox"
+            ariaLabel={t("session.workspace.select")}
+            className={styles.list}
+            onSelect={(index) => actions[index]?.()}
+          />
+          {filteredProjects.length === 0 && (
+            <p className={styles.empty}>{t("session.workspace.empty")}</p>
+          )}
         </div>
       </Popover>
 

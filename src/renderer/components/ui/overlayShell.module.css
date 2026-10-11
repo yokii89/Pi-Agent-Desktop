@@ -1,0 +1,20 @@
+/**
+ * 浮层外壳配方（下拉面板 / 菜单 / 右键菜单共用），用法与 glass.module.css 一致：
+ * 组件用 `composes: shell from "./overlayShell.module.css"` 复用，不要各自重写一套。
+ *
+ * 圆角走 --radius-overlay（壳）一档，条目再套 --radius-overlay-item（见 docs/design/51）。
+ * left/top 由 Popover / ContextMenu 在首帧前按锚点矩形写入，这里只给默认值与外观；
+ * 开合动效不在此处（CSS transition 表达不了 30fps 封顶），由 utils/glideMotion 逐帧写内联样式，
+ * 所以 CSS 描述的是**静息（展开）态**。
+ */
+.shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  padding: var(--spacing-xs);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-overlay);
+  box-shadow: var(--shadow-overlay);
+  z-index: var(--z-menu);
+}

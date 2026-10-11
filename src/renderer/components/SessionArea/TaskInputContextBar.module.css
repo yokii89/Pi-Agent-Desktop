@@ -11,7 +11,7 @@
   gap: 6px;
   max-width: 220px;
   padding: 6px var(--spacing-sm);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-overlay-item);
   color: var(--color-text);
   font-size: var(--font-size-md);
 }
@@ -65,28 +65,10 @@
   min-height: 0;
 }
 
+/* 行的容器/圆角/高亮都由 ui/GlideList 负责，这里只声明本面板的行尺寸 */
 .row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  width: 100%;
-  padding: 8px;
-  border-radius: var(--radius-sm);
+  --row-padding: 8px;
   color: var(--color-text);
-  font-size: var(--font-size-md);
-  text-align: left;
-}
-
-.row:hover:not(:disabled) {
-  background: var(--color-bg-hover);
-}
-
-.row:disabled {
-  cursor: default;
-}
-
-.rowActive {
-  background: var(--color-bg-hover);
 }
 
 .rowLabel {
@@ -104,12 +86,6 @@
   padding: 8px;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
-}
-
-.divider {
-  height: 1px;
-  margin: 4px 0;
-  background: var(--color-border);
 }
 
 .mutedIcon,

@@ -1,6 +1,7 @@
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import styles from "./Menu.module.css";
-import { Popover } from "./Popover";
+import { OptionList, type OptionRow } from "./OptionList";
+import { Popover, type PopoverTriggerProps } from "./Popover";
 
 export interface MenuItem {
   key: string;
@@ -14,18 +15,25 @@ export interface MenuItem {
   tone?: "danger";
   /** 在该条目之前渲染一条分隔线（把危险/收尾动作与常规动作分组）。 */
   dividerBefore?: boolean;
+  /** 当前值所在条目：打开时高亮药丸瞬移到这里（选取器菜单用，动作菜单不用）。 */
+  selected?: boolean;
   onSelect?: () => void;
 }
 
 interface MenuProps {
   /** 触发器渲染函数。 */
-  trigger: (props: { open: boolean; onClick: () => void }) => React.ReactNode;
+  trigger: (props: PopoverTriggerProps) => React.ReactNode;
   items: MenuItem[];
   align?: "left" | "right";
   direction?: "top" | "bottom";
+  /** 根节点类名，见 Popover。 */
+  rootClassName?: string;
 }
 
-/** 菜单条目列表：Menu（锚定弹出）与 ContextMenu（右键定位）共用。 */
+/**
+ * 菜单条目列表：Menu（锚定弹出）与 ContextMenu（右键定位）共用。
+ * 行容器、悬停高亮与擦选由 ui/OptionList 负责，这里只做条目模型 → 行的映射。
+ */
 export function MenuList({
   items,
   afterSelect,
@@ -34,35 +42,51 @@ export function MenuList({
   /** 选中任意（未禁用）条目后的收尾动作：弹出式菜单传 close，右键菜单传 onClose。 */
   afterSelect?: () => void;
 }) {
+  const rows: OptionRow[] = [];
+  for (const item of items) {
+    if (item.dividerBefore) {
+      rows.push({ key: `${item.key}:divider`, node: null, separator: true });
+    }
+    rows.push({
+      key: item.key,
+      disabled: item.disabled,
+      selected: item.selected,
+      text: item.label,
+      className: item.tone === "danger" ? styles.itemDanger : undefined,
+      node: (
+        <>
+          {item.icon && <span className={styles.itemIcon}>{item.icon}</span>}
+          <span>{item.label}</span>
+          {item.hint && <span className={styles.hint}>{item.hint}</span>}
+        </>
+      ),
+    });
+  }
+
+  // 每个条目恰好占一个可点行（分隔线不占行序），所以 OptionList 的行序就是 items 下标
   return (
-    <div className={styles.list} role="menu">
-      {items.map((item) => (
-        <Fragment key={item.key}>
-          {item.dividerBefore && <hr className={styles.separator} />}
-          <button
-            type="button"
-            role="menuitem"
-            disabled={item.disabled}
-            className={[styles.item, item.tone === "danger" ? styles.itemDanger : ""].join(" ")}
-            onClick={() => {
-              item.onSelect?.();
-              afterSelect?.();
-            }}
-          >
-            {item.icon && <span className={styles.itemIcon}>{item.icon}</span>}
-            <span>{item.label}</span>
-            {item.hint && <span className={styles.hint}>{item.hint}</span>}
-          </button>
-        </Fragment>
-      ))}
-    </div>
+    <OptionList
+      rows={rows}
+      role="menu"
+      className={styles.list}
+      onSelect={(index) => {
+        items[index]?.onSelect?.();
+        afterSelect?.();
+      }}
+    />
   );
 }
 
 /** 基于 Popover 的菜单列表；选中条目后自动收起（条目自身若会卸载所在行则无需处理）。 */
-export function Menu({ trigger, items, align = "left", direction = "bottom" }: MenuProps) {
+export function Menu({
+  trigger,
+  items,
+  align = "left",
+  direction = "bottom",
+  rootClassName,
+}: MenuProps) {
   return (
-    <Popover trigger={trigger} align={align} direction={direction}>
+    <Popover trigger={trigger} align={align} direction={direction} rootClassName={rootClassName}>
       {(close) => <MenuList items={items} afterSelect={close} />}
     </Popover>
   );

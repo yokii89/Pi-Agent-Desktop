@@ -64,7 +64,7 @@
   max-height: 280px;
   overflow: auto;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-overlay);
   background: var(--color-bg-elevated);
   box-shadow: var(--shadow-overlay);
   z-index: var(--z-menu);
@@ -76,13 +76,16 @@
   font-size: var(--font-size-sm);
 }
 
+/* 高亮是 ui/GlideList 的药丸（TaskInput 里焦点留在输入框，所以只借药丸不借 OptionList） */
 .suggestRow {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
   width: 100%;
   padding: 8px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-overlay-item);
   color: var(--color-text);
   font-size: var(--font-size-md);
   text-align: left;
@@ -94,10 +97,6 @@
   height: 16px;
   flex-shrink: 0;
   color: var(--color-text-muted);
-}
-
-.suggestActive {
-  background: var(--color-bg-hover);
 }
 
 /* 文件名主文案 */

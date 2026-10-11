@@ -2,6 +2,7 @@ import { CalendarDots, Desktop, Folder } from "@phosphor-icons/react";
 import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { SessionSummary } from "../../../shared/ipc";
+import { useGlideOverlay } from "../../hooks/useGlideOverlay";
 import { useT } from "../../hooks/useT";
 import { formatAbsoluteTime } from "../../utils/time";
 import styles from "./HistoryHoverCard.module.css";
@@ -28,6 +29,9 @@ interface HistoryHoverCardProps {
  * - **portal 到 body**：侧栏 `.nav` 是 `overflow: auto` 容器，卡片留在里面会被裁掉；
  * - **position: fixed + 首帧前定位**：先用 useLayoutEffect 量出真实尺寸再写坐标
  *   （同步于首次绘制），所以既不会闪一下错位，也不用给卡片写死高度；
+ * - **入场走 30fps 浮层补间**（docs/design/51）：与 Popover/右键菜单同一条曲线；
+ *   卡片由父级在鼠标离开时立即卸载，没有出场动画（原先的 CSS keyframe 也没有）；
+ *   补间内部尊重 prefers-reduced-motion，命中时直接落终态；
  * - **pointer-events: none**：卡片是纯信息展示，不抢行的悬浮与点击，
  *   鼠标一旦离开行就消失，不需要额外的"指针是否在卡片上"判断；
  * - **aria-hidden**：行内标题在 DOM 里本就是完整文本（只是被 CSS 截断），
@@ -36,18 +40,25 @@ interface HistoryHoverCardProps {
 export function HistoryHoverCard({ session, title, spaceName, anchor }: HistoryHoverCardProps) {
   const t = useT();
   const cardRef = useRef<HTMLDivElement>(null);
+  const overlay = useGlideOverlay(cardRef);
 
   useLayoutEffect(() => {
     const card = cardRef.current;
     if (!card) return;
-    const { width, height } = card.getBoundingClientRect();
+    // 用布局盒尺寸而非 getBoundingClientRect：入场补间期间盒子带着 scale，会量小一档
+    const width = card.offsetWidth;
+    const height = card.offsetHeight;
     // 优先贴在行右侧；右侧放不下就翻到左侧；两侧都放不下（窗口极窄）时贴视口右缘
-    const left =
-      anchor.right + CARD_GAP + width + VIEWPORT_MARGIN <= window.innerWidth
-        ? anchor.right + CARD_GAP
-        : anchor.left - CARD_GAP - width >= VIEWPORT_MARGIN
-          ? anchor.left - CARD_GAP - width
-          : Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN);
+    let flippedLeft = false;
+    let left: number;
+    if (anchor.right + CARD_GAP + width + VIEWPORT_MARGIN <= window.innerWidth) {
+      left = anchor.right + CARD_GAP;
+    } else if (anchor.left - CARD_GAP - width >= VIEWPORT_MARGIN) {
+      left = anchor.left - CARD_GAP - width;
+      flippedLeft = true;
+    } else {
+      left = Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN);
+    }
     const centerY = anchor.top + anchor.height / 2;
     const top = Math.min(
       Math.max(VIEWPORT_MARGIN, centerY - height / 2),
@@ -55,8 +66,13 @@ export function HistoryHoverCard({ session, title, spaceName, anchor }: HistoryH
     );
     card.style.left = `${left}px`;
     card.style.top = `${top}px`;
+    // 缩放要从朝向那一行的那侧长出（卡片始终挂在行的左/右边）
+    card.style.transformOrigin = `${flippedLeft ? "right" : "left"} center`;
+    overlay.prime();
+    overlay.enter();
+    // 坐标写好才放行可见性：避免定位前那帧被看见
     card.style.visibility = "visible";
-  }, [anchor]);
+  }, [anchor, overlay]);
 
   return createPortal(
     <div ref={cardRef} className={styles.card} aria-hidden="true">

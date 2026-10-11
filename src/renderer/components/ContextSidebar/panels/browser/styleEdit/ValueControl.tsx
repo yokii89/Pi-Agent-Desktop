@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import { useT } from "../../../../../hooks/useT";
+import { Select } from "../../../../ui/Select";
 import { ColorInput } from "./ColorInput";
 import { LengthInput } from "./LengthInput";
 import { resolvePropertyMeta } from "./propertyCatalog";
@@ -23,35 +25,37 @@ export function EnumSelect({
   value,
   options,
   disabled,
+  ariaLabel,
   onChange,
 }: {
   value: string;
   options: readonly string[];
   disabled?: boolean;
+  /** 读屏用途：行上方的属性名就是它的标签，但没有 form label 关联。 */
+  ariaLabel?: string;
   onChange: (value: string) => void;
 }) {
   const t = useT();
-  const known = options.includes(value);
+  // 当前值不在枚举表里（页面自带的手写值）时，像原生 select 那样把它留成一项，不能吞掉
+  const items = useMemo(() => {
+    const list = options.map((option) => ({ value: option, label: option }));
+    if (value && !list.some((item) => item.value === value)) {
+      list.unshift({ value, label: value });
+    }
+    return list;
+  }, [options, value]);
+
   return (
-    <select
+    <Select
       className={styles.enumSelect}
-      value={known ? value : ""}
+      rootClassName={styles.enumSelectRoot}
+      value={value}
+      options={items}
       disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
-    >
-      {!known && value ? (
-        <option value={value}>{value}</option>
-      ) : (
-        <option value="" disabled>
-          {t("browser.styles.enumPlaceholder")}
-        </option>
-      )}
-      {options.map((option) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
-    </select>
+      ariaLabel={ariaLabel}
+      placeholder={t("browser.styles.enumPlaceholder")}
+      onChange={onChange}
+    />
   );
 }
 
@@ -89,7 +93,13 @@ export function ValueControl({
   }
   if (meta.kind === "enum" && meta.options && !compact) {
     return (
-      <EnumSelect value={value} options={meta.options} disabled={disabled} onChange={onChange} />
+      <EnumSelect
+        value={value}
+        options={meta.options}
+        disabled={disabled}
+        ariaLabel={name}
+        onChange={onChange}
+      />
     );
   }
   if (meta.kind === "length" && !compact) {
@@ -99,6 +109,7 @@ export function ValueControl({
         disabled={disabled}
         compact={compact}
         defaultUnit={meta.defaultUnit ?? ""}
+        ariaLabel={name}
         onChange={onChange}
         onLive={onLive}
       />

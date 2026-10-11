@@ -179,6 +179,34 @@ import { Play } from "@phosphor-icons/react";
   `:hover` / `:focus-within` 兜底，否则动画中断时键盘用户会聚焦到透明元素上。
   GSAP 只改自定义属性（如 `--reveal`），真实 `opacity` 交给 CSS 决定。
 
+### 下拉浮层例外：30fps 独立时间轴（docs/design/51）
+
+下拉/浮层的开合、高亮药丸滑行、箭头翻转、按压回弹**不走 GSAP 也不走 CSS transition**，
+统一走 `src/renderer/utils/glideMotion.ts` 的 30fps 时间轴（复刻 `docs/ui-design/glide-select-bezier.html`）：
+
+- **为什么必须自己写**：CSS 只有时长没有帧率，封顶不了 30fps；`gsap.ticker.fps(30)` 是
+  **全局**时间轴，一降档会连带侧栏折叠、行菜单悬浮揭示等已验收动效一起变钝。
+  所以浮层单独一条按固定步长推进的时间轴，实测 60Hz 喂帧派发 30 帧/秒
+  （`src/renderer/utils/glideMotion.test.ts` 断言这一点）。
+- **时长/缓动登记在** `motionTokens.ts` 的 `GLIDE_MOTION`（曲线 `cubic-bezier(0.23, 1, 0.32, 1)`），
+  组件内不得再写第二套浮层时序。
+- 面板进出用 `hooks/useGlideOverlay.ts`（`prime → enter → exit(done)`：收起要演完动画再卸载）；
+  列表高亮用 `hooks/useGlidePill.ts`（单处 `translateY` 补间 + 按住擦选）。
+- **界面入口固定为**：`ui/Select`（**禁止原生 `<select>`**：系统绘制弹层，加不了动效也改不了圆角）、
+  `ui/OptionList`（选项行 + 药丸）、`ui/Popover` / `ui/Menu` / `ui/ContextMenu`、`ui/GlideChevron`。
+  外壳配方 `ui/overlayShell.module.css`，行与药丸 `ui/GlideList.module.css`。
+- **圆角只用浮层档**：壳 `--radius-overlay`（12px）、行与触发器 `--radius-overlay-item`（8px），
+  不再出现 6px / 12px 字面量。
+- **站点覆盖 `.field` / `.row` 的尺寸只能走变量**：`--field-min-height` / `--field-padding` /
+  `--field-font-size`、`--row-padding` / `--row-gap` / `--row-align` / `--row-font-size` / `--row-space`。
+  直接写 `padding` 之类会和公共类同权重打架，谁赢取决于 CSS 打包顺序（站点模块总是排在 `ui/` 之前）。
+- 浮层的 `transform-origin` 必须贴着锚点那一角写，否则面板看起来是"原地呼吸"而不是从触发器推开。
+- **触发器箭头一律用 `ui/GlideChevron`**（跟随根节点的 `--gs-chev` 翻转，静息 0deg 不依赖 JS）：
+  尺寸随行字号——`sm` 文本用 12、`md` 用 14；纯图标「⋯」菜单不加箭头。**禁止再写裸 `CaretDown`
+  当下拉箭头**，那等于把"这个控件会展开"的反馈漏掉。
+- **对话框里的下拉必须能正常用键盘**：`ui/Modal` 的 Tab 焦点陷阱认 `data-overlay-panel` 标记，
+  自绘浮层（不走 Popover 的那些）也要挂这个属性，否则焦点被抢回 Modal、列表再也 Tab 不动。
+
 ## Git 约定
 
 - 分支：`main` 为稳定分支，功能开发用 `feat/<主题>`、修复用 `fix/<主题>`。

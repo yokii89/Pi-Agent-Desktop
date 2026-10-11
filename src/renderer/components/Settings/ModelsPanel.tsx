@@ -1,4 +1,3 @@
-import { CaretDown } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   PiApiKeyProviderOption,
@@ -17,7 +16,9 @@ import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
 import { buildModelOverrideRows, type ModelOverrideRow } from "../../utils/modelOverrides";
 import { Button } from "../ui/Button";
+import { GlideChevron } from "../ui/GlideChevron";
 import { Menu, type MenuItem } from "../ui/Menu";
+import { Select } from "../ui/Select";
 import { AiProviderLogo } from "./AiProviderLogo";
 import { ModelOverridesSection } from "./ModelOverridesSection";
 import { SettingRow, SettingsSection } from "./SettingRow";
@@ -346,7 +347,7 @@ export function ModelsPanel() {
                       {t("settings.models.refreshing")}
                     </span>
                   ) : (
-                    <CaretDown size={14} weight="regular" />
+                    <GlideChevron size={14} />
                   )}
                 </button>
               )}
@@ -445,18 +446,16 @@ export function ModelsPanel() {
                 onChange={(e) => setFormName(e.target.value)}
               />
               {formOpen === "create" ? (
-                <select
+                <Select
                   className={styles.authSelect}
                   value={formProvider}
-                  onChange={(e) => handleProviderChange(e.target.value)}
-                  aria-label={t("settings.models.credential.providerLabel")}
-                >
-                  {apiKeyProviders.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  ariaLabel={t("settings.models.credential.providerLabel")}
+                  options={apiKeyProviders.map((option) => ({
+                    value: option.id,
+                    label: option.label,
+                  }))}
+                  onChange={handleProviderChange}
+                />
               ) : (
                 <span className={styles.authFixedProvider}>
                   <AiProviderLogo providerId={formProvider} size={16} />
@@ -485,15 +484,16 @@ export function ModelsPanel() {
                     autoComplete="off"
                     onChange={(e) => setFormBaseUrl(e.target.value)}
                   />
-                  <select
+                  <Select
                     className={styles.authSelect}
                     value={formApiType}
-                    onChange={(e) => setFormApiType(e.target.value)}
-                    aria-label={t("settings.models.credential.apiTypeLabel")}
-                  >
-                    <option value="openai-completions">openai-completions</option>
-                    <option value="openai-responses">openai-responses</option>
-                  </select>
+                    ariaLabel={t("settings.models.credential.apiTypeLabel")}
+                    options={[
+                      { value: "openai-completions", label: "openai-completions" },
+                      { value: "openai-responses", label: "openai-responses" },
+                    ]}
+                    onChange={setFormApiType}
+                  />
                 </>
               )}
               <input

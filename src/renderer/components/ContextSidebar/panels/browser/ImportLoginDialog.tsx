@@ -8,6 +8,7 @@ import { useUiStore } from "../../../../stores/uiStore";
 import { prepareOverlayFreeze, releaseOverlayFreeze } from "../../../../utils/overlayFreeze";
 import { Button } from "../../../ui/Button";
 import { Modal } from "../../../ui/Modal";
+import { Select } from "../../../ui/Select";
 import styles from "./ImportLoginDialog.module.css";
 
 const SUPPRESS_REASON = "loginImport";
@@ -244,6 +245,12 @@ export function ImportLoginDialog({ open, onClose }: ImportLoginDialogProps) {
     }
   };
 
+  const profileOptions = sources.map((source) => ({
+    value: source.id,
+    label: `${source.browserLabel} · ${source.profileLabel}`,
+    hint: source.isDefaultBrowser ? t("browser.loginImport.defaultBrowser") : undefined,
+  }));
+
   return (
     <Modal
       open={open}
@@ -340,27 +347,22 @@ export function ImportLoginDialog({ open, onClose }: ImportLoginDialogProps) {
       {step === "auto" && (
         <div className={styles.body}>
           <h2 className={styles.title}>{t("browser.loginImport.autoTitle")}</h2>
-          <label className={styles.field}>
+          <div className={styles.field}>
             <span className={styles.fieldLabel}>{t("browser.loginImport.profile")}</span>
-            <select
+            <Select
               className={styles.select}
+              ariaLabel={t("browser.loginImport.profile")}
               value={sourceId ?? ""}
               disabled={busy || sources.length === 0}
-              onChange={(event) => {
-                setSourceId(event.target.value);
+              options={profileOptions}
+              onChange={(next) => {
+                setSourceId(next);
                 setPreviewNames(null);
                 setError(null);
                 setWarnings([]);
               }}
-            >
-              {sources.map((source) => (
-                <option key={source.id} value={source.id}>
-                  {source.browserLabel} · {source.profileLabel}
-                  {source.isDefaultBrowser ? t("browser.loginImport.defaultBrowser") : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>{t("browser.loginImport.targetHost")}</span>
             <input
@@ -436,25 +438,20 @@ export function ImportLoginDialog({ open, onClose }: ImportLoginDialogProps) {
         <div className={styles.body}>
           <h2 className={styles.title}>{t("browser.loginImport.fullTitle")}</h2>
           <p className={styles.hint}>{t("browser.loginImport.fullHint")}</p>
-          <label className={styles.field}>
+          <div className={styles.field}>
             <span className={styles.fieldLabel}>{t("browser.loginImport.profile")}</span>
-            <select
+            <Select
               className={styles.select}
+              ariaLabel={t("browser.loginImport.profile")}
               value={sourceId ?? ""}
               disabled={busy || sources.length === 0}
-              onChange={(event) => {
-                setSourceId(event.target.value);
+              options={profileOptions}
+              onChange={(next) => {
+                setSourceId(next);
                 setError(null);
               }}
-            >
-              {sources.map((source) => (
-                <option key={source.id} value={source.id}>
-                  {source.browserLabel} · {source.profileLabel}
-                  {source.isDefaultBrowser ? t("browser.loginImport.defaultBrowser") : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>
               <input

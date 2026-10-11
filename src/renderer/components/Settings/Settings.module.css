@@ -129,7 +129,7 @@
 .navItemBadge {
   flex-shrink: 0;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-accent-soft);
   color: var(--color-accent);
   font-size: var(--font-size-sm);
@@ -425,21 +425,21 @@
 .updateProgressTrack {
   width: 100%;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-bg-surface);
   overflow: hidden;
 }
 
 .updateProgressBar {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-accent);
   transition: width 0.2s ease;
 }
 
 .comingSoon {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   color: var(--color-text-muted);
@@ -447,17 +447,12 @@
   white-space: nowrap;
 }
 
+/* 设置页下拉：字段皮肤走 ui/Select 的公共配方，这里只留宽度。
+   原先的 opacity: 0.7 + cursor: default 是原生 select 的偷懒写法，
+   看起来像禁用态；换成自绘下拉后控件真的可点，这两行必须去掉。 */
 .selectLike {
+  composes: field from "../ui/Select.module.css";
   min-width: 120px;
-  padding: 6px var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-md);
-  text-align: left;
-  opacity: 0.7;
-  cursor: default;
 }
 
 /* ---------- 占位页 ---------- */
@@ -709,7 +704,7 @@
 .authActiveBadge,
 .authExpiredBadge {
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: var(--font-size-sm);
   white-space: nowrap;
 }
@@ -971,7 +966,7 @@
   align-items: center;
   height: 18px;
   padding: 0 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-warning-soft);
   color: var(--color-warning);
   font-size: 11px;
@@ -994,7 +989,7 @@
   padding: 0 22px 0 6px;
   margin-left: -6px;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-overlay-item);
   background: none;
   color: var(--color-text-muted);
   font-size: 13px;
@@ -1083,11 +1078,11 @@
 }
 
 /* popover 内容（外观由 ui/Popover 的面板给出） */
+/* 外壳内边距来自 ui/overlayShell（Popover 面板自带 4px），这里只留内容排版 */
 .ovPop {
   display: flex;
   flex-direction: column;
   min-width: 216px;
-  padding: var(--spacing-xs);
 }
 
 .ovPopTitle {

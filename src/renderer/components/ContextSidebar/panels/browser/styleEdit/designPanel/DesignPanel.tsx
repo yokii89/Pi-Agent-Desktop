@@ -504,6 +504,7 @@ export function DesignPanel({ disabled }: DesignPanelProps) {
             value={fontValue}
             options={FONT_OPTIONS.map((f) => f.replace(/^["']|["']$/g, ""))}
             disabled={!canEdit}
+            ariaLabel={t("browser.design.font")}
             onChange={(v) => setOne(FIELD_FONT.prop, v.includes(" ") ? `"${v}"` : v)}
           />
         </DesignField>
@@ -514,6 +515,7 @@ export function DesignPanel({ disabled }: DesignPanelProps) {
             options={FIELD_WEIGHT.options ?? []}
             placeholder="400"
             disabled={!canEdit}
+            ariaLabel={FIELD_WEIGHT.prop}
             onChange={(v) => setOne(FIELD_WEIGHT.prop, v)}
           />
           <UnitField
@@ -683,6 +685,7 @@ export function DesignPanel({ disabled }: DesignPanelProps) {
             options={FIELD_BORDER_STYLE.options ?? []}
             placeholder="solid"
             disabled={!canEdit}
+            ariaLabel={FIELD_BORDER_STYLE.prop}
             onChange={(v) => setOne(FIELD_BORDER_STYLE.prop, v)}
           />
         </FieldPair>

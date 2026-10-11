@@ -48,6 +48,9 @@ export function Modal({ open, onClose, panelClassName, ariaLabel, children }: Mo
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
       const active = document.activeElement;
+      // 浮层（下拉/菜单）portal 在 body 上、不在本面板子树里；焦点落在其中是合法状态，
+      // 抢回来会让方向键与擦选在对话框内无法使用（docs/design/51）
+      if (active instanceof Element && active.closest("[data-overlay-panel]")) return;
       if (!panel.contains(active)) {
         event.preventDefault();
         first.focus();

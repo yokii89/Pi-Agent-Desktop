@@ -1,0 +1,71 @@
+/* 触发器基座：只负责"成为一个能点的行内盒子"。
+   故意不写 border/background/color/font——这些留给调用方的类名，
+   两边都声明就会因 CSS 打包顺序而互相覆盖（同一个元素上两个类同权重）。
+   自带皮肤的类（如 .authSelect、.enumSelect）必须自己给 border + background，
+   否则就落回 `.field`。 */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 标准字段皮肤：站点 CSS 用 `composes: field from "../../ui/Select.module.css"` 复用，
+   不要各自再写一遍边框/底色/圆角。尺寸走 --field-* 变量：站点类与 .field 同权重，
+   直接写 padding 谁赢取决于打包顺序，变量则永远由声明方说话。 */
+.field {
+  composes: trigger;
+  min-height: var(--field-min-height, 32px);
+  padding: var(--field-padding, 6px var(--spacing-sm));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-overlay-item);
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+  font-size: var(--field-font-size, var(--font-size-md));
+}
+
+.field:hover {
+  border-color: var(--color-border-strong);
+}
+
+.field:focus-visible {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
+}
+
+.trigger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.label[data-empty] {
+  opacity: 0.6;
+}
+
+/* 行尾辅助说明（"推荐""需硬件"）：列宽不参与伸展，名字超长先截断 */
+.hint {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.check {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-accent);
+}

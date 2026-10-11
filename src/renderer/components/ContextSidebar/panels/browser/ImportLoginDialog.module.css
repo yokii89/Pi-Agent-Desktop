@@ -146,19 +146,9 @@
 }
 
 .select {
+  composes: field from "../../../ui/Select.module.css";
+  /* Popover 的根是 inline-flex：靠 .field 的交叉轴 stretch 撑满，触发器再填满它 */
   width: 100%;
-  box-sizing: border-box;
-  padding: 8px var(--spacing-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-size: var(--font-size-md);
-}
-
-.select:focus {
-  outline: none;
-  border-color: var(--color-accent);
 }
 
 .previewBox {
@@ -181,7 +171,7 @@
 
 .nameChip {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-accent-soft);
   color: var(--color-accent);
   font-size: var(--font-size-sm);

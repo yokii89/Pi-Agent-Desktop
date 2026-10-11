@@ -3,6 +3,8 @@ import type { ViewNode } from "../../../shared/view";
 import { useT } from "../../hooks/useT";
 import { MarkdownContent } from "../SessionArea/MarkdownContent";
 import { Button } from "../ui/Button";
+import { OptionList, type OptionRow } from "../ui/OptionList";
+import { Select } from "../ui/Select";
 import {
   formatCell,
   resolveAlign,
@@ -141,21 +143,19 @@ export function ViewNodeRenderer({ node, bridge }: ViewNodeRendererProps) {
               {node.label}
             </label>
           ) : null}
-          <select
+          <Select
             id={fieldId}
             className={styles.select}
+            ariaLabel={node.label}
             value={value}
-            onChange={(e) => bridge.onChange(node.id, e.target.value)}
-          >
-            <option value="" disabled>
-              {t("ui.view.selectPlaceholder")}
-            </option>
-            {node.options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.description ? `${option.label} — ${option.description}` : option.label}
-              </option>
-            ))}
-          </select>
+            placeholder={t("ui.view.selectPlaceholder")}
+            options={node.options.map((option) => ({
+              value: option.value,
+              label: option.label,
+              hint: option.description,
+            }))}
+            onChange={(next) => bridge.onChange(node.id, next)}
+          />
         </div>
       );
     }
@@ -182,45 +182,56 @@ export function ViewNodeRenderer({ node, bridge }: ViewNodeRendererProps) {
             : [],
       );
       const multi = node.multiple === true;
-      return (
-        <div className={styles.list} role="listbox" aria-multiselectable={multi}>
-          {node.items.map((item) => {
-            const active = selected.has(item.value);
-            return (
-              <button
-                key={item.value}
-                type="button"
-                role="option"
-                aria-selected={active}
-                className={[styles.listItem, active ? styles.listItemActive : ""].join(" ")}
-                onClick={() => {
-                  if (multi) {
-                    const next = new Set(selected);
-                    if (next.has(item.value)) next.delete(item.value);
-                    else next.add(item.value);
-                    bridge.onChange(node.id, [...next]);
-                  } else {
-                    bridge.onChange(node.id, item.value);
-                  }
-                }}
-              >
-                {multi ? (
-                  <span
-                    className={[styles.listCheck, active ? styles.listCheckOn : ""].join(" ")}
-                    aria-hidden
-                  >
-                    {active ? "✓" : ""}
-                  </span>
-                ) : null}
-                <span className={styles.listText}>
-                  <span className={styles.listLabel}>{item.label}</span>
-                  {item.description ? (
-                    <span className={styles.listDesc}>{item.description}</span>
-                  ) : null}
+      // 每个条目恰好占一个可点行，OptionList 的行序就是 items 下标
+      const rows = node.items.map<OptionRow>((item) => {
+        const active = selected.has(item.value);
+        return {
+          key: item.value,
+          text: item.label,
+          selected: active,
+          className: [styles.listItem, active ? styles.listItemActive : ""].join(" "),
+          node: (
+            <>
+              {multi ? (
+                <span
+                  className={[styles.listCheck, active ? styles.listCheckOn : ""].join(" ")}
+                  aria-hidden
+                >
+                  {active ? "✓" : ""}
                 </span>
-              </button>
-            );
-          })}
+              ) : null}
+              <span className={styles.listText}>
+                <span className={styles.listLabel}>{item.label}</span>
+                {item.description ? (
+                  <span className={styles.listDesc}>{item.description}</span>
+                ) : null}
+              </span>
+            </>
+          ),
+        };
+      });
+      return (
+        <div className={styles.list}>
+          <OptionList
+            rows={rows}
+            role="listbox"
+            className={styles.listRows}
+            // 弹出式列表收起即卸载，药丸留着无所谓；这是常驻面板，指针移出后必须熄灭，
+            // 否则一次悬停的高亮会被读成「已选中」，和左侧强调条打架。
+            rememberPosition={false}
+            onSelect={(index) => {
+              const item = node.items[index];
+              if (!item) return;
+              if (multi) {
+                const next = new Set(selected);
+                if (next.has(item.value)) next.delete(item.value);
+                else next.add(item.value);
+                bridge.onChange(node.id, [...next]);
+              } else {
+                bridge.onChange(node.id, item.value);
+              }
+            }}
+          />
         </div>
       );
     }

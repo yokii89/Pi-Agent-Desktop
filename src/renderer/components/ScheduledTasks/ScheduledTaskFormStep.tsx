@@ -12,6 +12,7 @@ import { useT } from "../../hooks/useT";
 import { projectService } from "../../services/projectService";
 import { useProjectStore } from "../../stores/projectStore";
 import { Button } from "../ui/Button";
+import { Select } from "../ui/Select";
 import styles from "./ScheduledTasksPage.module.css";
 import { ALL_WEEKDAYS, type FormState, type ModeId, type TargetId } from "./scheduledTaskForm";
 
@@ -43,6 +44,24 @@ export function ScheduledTaskFormStep({
     if (project) onPatch({ cwd: project.dir });
   };
 
+  // 浏览/手选的目录可以不在项目列表里：补一条当前值进去，否则触发器显示不出它
+  const cwdOptions = [
+    { value: "", label: "—" },
+    ...projects.map((project) => ({ value: project.dir, label: project.name })),
+    ...(form.cwd && !projects.some((project) => project.dir === form.cwd)
+      ? [{ value: form.cwd, label: form.cwd }]
+      : []),
+  ];
+
+  // 空值行留着：绑定过的会话要能改回「不绑定」
+  const sessionOptions = [
+    { value: "", label: t("scheduled.dialog.target.pick") },
+    ...boundSessions.map((session) => ({
+      value: session.file,
+      label: (session.firstUserMessage ?? session.file).slice(0, 60),
+    })),
+  ];
+
   return (
     <div className={styles.formBody}>
       <section className={styles.formSection}>
@@ -66,26 +85,19 @@ export function ScheduledTaskFormStep({
         </div>
 
         <div className={styles.field}>
-          <span className={styles.fieldLabel} id="scheduled-task-cwd-label">
+          <label className={styles.fieldLabel} htmlFor="scheduled-task-cwd">
             {t("scheduled.dialog.cwd")}
-          </span>
+          </label>
           <div className={styles.rowInline}>
-            <select
-              className={`${styles.selectInput} ${styles.grow}`}
+            <Select
+              rootClassName={styles.grow}
+              id="scheduled-task-cwd"
+              className={styles.selectInput}
+              ariaLabel={t("scheduled.dialog.cwd")}
               value={form.cwd}
-              aria-labelledby="scheduled-task-cwd-label"
-              onChange={(event) => onPatch({ cwd: event.target.value })}
-            >
-              <option value="">—</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.dir}>
-                  {project.name}
-                </option>
-              ))}
-              {form.cwd && !projects.some((project) => project.dir === form.cwd) ? (
-                <option value={form.cwd}>{form.cwd}</option>
-              ) : null}
-            </select>
+              options={cwdOptions}
+              onChange={(cwd) => onPatch({ cwd })}
+            />
             <Button onClick={() => void browseCwd()}>
               <FolderOpen size={16} weight="regular" />
               {t("scheduled.dialog.cwd.browse")}
@@ -240,19 +252,13 @@ export function ScheduledTaskFormStep({
           </span>
         ) : (
           <div className={styles.field}>
-            <select
+            <Select
               className={styles.selectInput}
-              aria-label={t("scheduled.dialog.target.pick")}
+              ariaLabel={t("scheduled.dialog.target.pick")}
               value={form.sessionFile}
-              onChange={(event) => onPatch({ sessionFile: event.target.value })}
-            >
-              <option value="">{t("scheduled.dialog.target.pick")}</option>
-              {boundSessions.map((session) => (
-                <option key={session.file} value={session.file}>
-                  {(session.firstUserMessage ?? session.file).slice(0, 60)}
-                </option>
-              ))}
-            </select>
+              options={sessionOptions}
+              onChange={(sessionFile) => onPatch({ sessionFile })}
+            />
             <span className={styles.fieldDescription}>
               {t("scheduled.dialog.target.bound.description")}
             </span>

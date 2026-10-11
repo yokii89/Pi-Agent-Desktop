@@ -1,4 +1,4 @@
-import { ArrowCounterClockwise, CaretDown } from "@phosphor-icons/react";
+import { ArrowCounterClockwise } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import type { TranslateFn } from "../../../shared/i18n";
 import type { PiModelOverridePatch } from "../../../shared/ipc";
@@ -11,6 +11,7 @@ import {
   type OverrideFilterMode,
   WINDOW_PRESETS,
 } from "../../utils/modelOverrides";
+import { GlideChevron } from "../ui/GlideChevron";
 import { Popover } from "../ui/Popover";
 import styles from "./Settings.module.css";
 
@@ -176,7 +177,7 @@ function OverrideRow({
               onClick={onClick}
             >
               {formatModelWindow(row.effectiveWindow)}
-              <CaretDown size={16} weight="regular" className={styles.ovValCaret} />
+              <GlideChevron size={16} className={styles.ovValCaret} />
             </button>
           )}
         >
@@ -219,7 +220,7 @@ function OverrideRow({
               {row.effectiveInput?.includes("image")
                 ? t("settings.models.overrides.inputImages")
                 : t("settings.models.overrides.inputText")}
-              <CaretDown size={16} weight="regular" className={styles.ovValCaret} />
+              <GlideChevron size={16} className={styles.ovValCaret} />
             </button>
           )}
         >

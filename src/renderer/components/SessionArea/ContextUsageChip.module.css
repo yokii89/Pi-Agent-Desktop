@@ -92,7 +92,8 @@
   --ring-color: var(--color-danger);
 }
 
-/* —— Popover 面板：总量 + 堆叠条 + 图例（只给百分比）—— */
+/* —— Popover 面板内容：外壳（position/背景/边框/圆角/阴影/层级）由 ui/Popover 的
+   共享 overlayShell 提供，这里只写内容排版与尺寸差异 —— */
 .panel {
   display: flex;
   flex-direction: column;
@@ -123,7 +124,7 @@
   display: flex;
   width: 100%;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--color-border);
 }

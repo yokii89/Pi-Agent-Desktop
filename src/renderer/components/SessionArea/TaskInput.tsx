@@ -2,6 +2,7 @@ import { Folder } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FsSearchHit, PiSlashCommand } from "../../../shared/ipc";
 import { FileIcon } from "../../fileIcons/FileIcon";
+import { useGlidePill } from "../../hooks/useGlidePill";
 import { useT } from "../../hooks/useT";
 import { fsService } from "../../services/fsService";
 import { useBrowserStore } from "../../stores/browserStore";
@@ -24,6 +25,7 @@ import {
   imageCapabilityToast,
 } from "../../utils/imageCapability";
 import { Button } from "../ui/Button";
+import glideStyles from "../ui/GlideList.module.css";
 import { Composer, type ComposerHandle } from "./Composer";
 import { FileAttachStrip } from "./FileAttachStrip";
 import { ImageAttachStrip } from "./ImageAttachStrip";
@@ -459,6 +461,14 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
     [onAttachFiles],
   );
 
+  // 建议列表的高亮由滑动的药丸承担（焦点必须留在输入框，所以不抢焦点）
+  const suggestPill = useGlidePill(suggestPanelRef, {
+    onPick: (index) => {
+      const item = suggestItems[index];
+      if (item) applySuggestItem(item);
+    },
+  });
+
   const onEnterIntercept = useCallback((): boolean => {
     if (!suggest || suggestItems.length === 0) return false;
     const item = suggestItems[suggestIndex];
@@ -493,6 +503,7 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
     if (!panel) return;
     const active = panel.querySelector<HTMLElement>('[role="option"][aria-selected="true"]');
     if (!active) return;
+    suggestPill.highlight(suggestIndex, true);
     const panelRect = panel.getBoundingClientRect();
     const activeRect = active.getBoundingClientRect();
     if (activeRect.top < panelRect.top) {
@@ -500,12 +511,18 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
     } else if (activeRect.bottom > panelRect.bottom) {
       panel.scrollTop += activeRect.bottom - panelRect.bottom;
     }
-  }, [suggest, suggestIndex, suggestItems.length, slashGroups]);
+  }, [suggest, suggestIndex, suggestItems.length, slashGroups, suggestPill]);
 
   return (
     <div className={styles.wrap}>
       {suggest && (
-        <div ref={suggestPanelRef} className={styles.suggestPanel} role="listbox">
+        <div
+          ref={suggestPanelRef}
+          className={styles.suggestPanel}
+          role="listbox"
+          {...suggestPill.listProps}
+        >
+          <span ref={suggestPill.pillRef} className={glideStyles.pill} aria-hidden="true" />
           {suggest.kind === "file" && suggestItems.length > 0 && (
             <p className={styles.suggestTitle}>{t("session.input.filesTitle")}</p>
           )}
@@ -528,13 +545,14 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
                       type="button"
                       role="option"
                       aria-selected={index === suggestIndex}
-                      className={[
-                        styles.suggestRow,
-                        index === suggestIndex ? styles.suggestActive : "",
-                      ].join(" ")}
+                      className={styles.suggestRow}
+                      data-glide-index={index}
                       onMouseEnter={() => setSuggestIndex(index)}
                       onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => applySuggestItem(item)}
+                      onClick={(event) => {
+                        if (suggestPill.consumeClick(event.detail)) return;
+                        applySuggestItem(item);
+                      }}
                     >
                       <span className={styles.suggestName}>{item.label}</span>
                       {item.hint && <span className={styles.suggestPath}>{item.hint}</span>}
@@ -551,13 +569,14 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
                 type="button"
                 role="option"
                 aria-selected={index === suggestIndex}
-                className={[
-                  styles.suggestRow,
-                  index === suggestIndex ? styles.suggestActive : "",
-                ].join(" ")}
+                className={styles.suggestRow}
+                data-glide-index={index}
                 onMouseEnter={() => setSuggestIndex(index)}
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => applySuggestItem(item)}
+                onClick={(event) => {
+                  if (suggestPill.consumeClick(event.detail)) return;
+                  applySuggestItem(item);
+                }}
               >
                 {item.kind === "dir" ? (
                   <Folder size={16} weight="regular" className={styles.suggestIcon} />

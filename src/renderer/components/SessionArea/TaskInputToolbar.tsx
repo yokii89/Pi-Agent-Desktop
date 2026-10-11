@@ -1,7 +1,6 @@
 import {
   ArrowUp,
   AtIcon,
-  CaretDown,
   Check,
   ClipboardText,
   ListMagnifyingGlass,
@@ -22,7 +21,9 @@ import { THINKING_LABEL_KEY, useComposerStore } from "../../stores/composerStore
 import { useExtensionViewStore } from "../../stores/extensionViewStore";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
+import { GlideChevron } from "../ui/GlideChevron";
 import { Menu, type MenuItem } from "../ui/Menu";
+import { OptionList, type OptionRow } from "../ui/OptionList";
 import { Popover } from "../ui/Popover";
 import { ContextUsageChip } from "./ContextUsageChip";
 import styles from "./TaskInputToolbar.module.css";
@@ -295,33 +296,36 @@ function AccessModeChip({ running }: { running: boolean }) {
           ) : (
             <ShieldCheck size={16} weight="regular" />
           )}
-          <CaretDown size={14} weight="regular" />
+          <GlideChevron size={14} />
         </button>
       )}
     >
       <div className={styles.modePanel}>
-        {accessModeError ? (
-          <div className={styles.modeDesc} style={{ padding: "4px 8px" }}>
-            {accessModeError}
-          </div>
-        ) : null}
-        {rows.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            className={[styles.modeRow, item.active ? styles.modeActive : ""].join(" ")}
-            disabled={running || modeTransitioning}
-            title={running ? t("session.access.waitUntilIdle") : undefined}
-            onClick={item.onSelect}
-          >
-            <span className={styles.modeIcon}>{item.icon}</span>
-            <span className={styles.modeText}>
-              <span className={styles.modeTitle}>{item.title}</span>
-              <span className={styles.modeDesc}>{item.desc}</span>
-            </span>
-            {item.active && <Check size={16} weight="regular" className={styles.check} />}
-          </button>
-        ))}
+        {accessModeError ? <div className={styles.modeNote}>{accessModeError}</div> : null}
+        <OptionList
+          rows={rows.map<OptionRow>((item) => ({
+            key: item.key,
+            className: styles.modeRow,
+            disabled: running || modeTransitioning,
+            title: running ? t("session.access.waitUntilIdle") : undefined,
+            selected: item.active,
+            text: item.title,
+            node: (
+              <>
+                <span className={styles.modeIcon}>{item.icon}</span>
+                <span className={styles.modeText}>
+                  <span className={styles.modeTitle}>{item.title}</span>
+                  <span className={styles.modeDesc}>{item.desc}</span>
+                </span>
+                {item.active && <Check size={16} weight="regular" className={styles.check} />}
+              </>
+            ),
+          }))}
+          role="listbox"
+          ariaLabel={accessModeChip.title}
+          className={styles.modeList}
+          onSelect={(index) => rows[index]?.onSelect?.()}
+        />
       </div>
     </Popover>
   );
@@ -356,23 +360,31 @@ function ThinkingChip({
           onClick={onClick}
         >
           {t(THINKING_LABEL_KEY[level])}
-          <CaretDown size={12} weight="regular" />
+          <GlideChevron size={12} />
         </button>
       )}
     >
-      <div className={styles.thinkingPanel}>
-        {levels.map((item) => (
-          <button
-            key={item}
-            type="button"
-            className={[styles.thinkingRow, item === level ? styles.modeActive : ""].join(" ")}
-            onClick={() => apply(item)}
-          >
-            <span>{t(THINKING_LABEL_KEY[item])}</span>
-            {item === level && <Check size={14} weight="regular" className={styles.check} />}
-          </button>
-        ))}
-      </div>
+      <OptionList
+        rows={levels.map<OptionRow>((item) => ({
+          key: item,
+          className: styles.thinkingRow,
+          selected: item === level,
+          text: t(THINKING_LABEL_KEY[item]),
+          node: (
+            <>
+              <span>{t(THINKING_LABEL_KEY[item])}</span>
+              {item === level && <Check size={14} weight="regular" className={styles.check} />}
+            </>
+          ),
+        }))}
+        role="listbox"
+        ariaLabel={t("session.input.thinkingLevel")}
+        className={styles.thinkingPanel}
+        onSelect={(index) => {
+          const item = levels[index];
+          if (item) apply(item);
+        }}
+      />
     </Popover>
   );
 }
@@ -442,6 +454,7 @@ function ModelMenu({ label }: { label: string }) {
             return {
               key,
               label: model.label,
+              selected: isSameModel(label, model),
               hint: isSameModel(label, model) ? t("session.model.current") : undefined,
               onSelect: () => void applyModel(model),
             };
@@ -464,7 +477,7 @@ function ModelMenu({ label }: { label: string }) {
           <span className={styles.modelLabel}>
             {displayModelLabel(label) || t("session.model.select")}
           </span>
-          <CaretDown size={14} weight="regular" />
+          <GlideChevron size={14} />
         </button>
       )}
       items={items}

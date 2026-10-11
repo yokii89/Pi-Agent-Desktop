@@ -1,36 +1,19 @@
-/* 悬浮详情卡：经 portal 挂在 body 下，不参与侧栏布局，也不被侧栏的 overflow 裁剪 */
+/* 悬浮详情卡：经 portal 挂在 body 下，不参与侧栏布局，也不被侧栏的 overflow 裁剪。
+   外壳外观走共享配方（overlayShell，圆角即 --radius-overlay）；入场由 30fps 补间
+   （utils/glideMotion）逐帧写内联样式，CSS 只描述静息态，命中 reduced-motion 时补间
+   直接落终态，与原 `animation: none` 的降级行为一致。 */
 .card {
-  position: fixed;
-  /* 真实坐标由组件在首帧绘制前写入；这里先把元素挪出视口，避免出现一次"错位闪帧" */
-  left: -10000px;
-  top: 0;
+  composes: shell from "../ui/overlayShell.module.css";
+  /* 真实坐标由组件在首帧绘制前写入，写完才置 visible，避免出现一次"错位闪帧" */
   visibility: hidden;
-  z-index: var(--z-menu);
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 320px;
   max-width: calc(100vw - 16px);
   padding: var(--spacing-sm) 12px;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-overlay);
   /* 纯信息展示：不抢行的悬浮/点击，鼠标离开行即消失 */
   pointer-events: none;
-  animation: hoverCardIn 0.14s ease-out;
-}
-
-@keyframes hoverCardIn {
-  from {
-    opacity: 0;
-    transform: translateX(-4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 
 /* 全文标题：行内是单行截断，这里最多 6 行，再长才省略 */
@@ -65,10 +48,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .card {
-    animation: none;
-  }
 }

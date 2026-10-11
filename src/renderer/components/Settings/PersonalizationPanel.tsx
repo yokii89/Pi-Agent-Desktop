@@ -3,8 +3,7 @@ import { FONT_MONO_PRESETS, FONT_UI_PRESETS } from "../../../shared/fontPresets"
 import { RAIL_STYLES } from "../../../shared/railStyles";
 import { useT } from "../../hooks/useT";
 import { useUiStore } from "../../stores/uiStore";
-import { Button } from "../ui/Button";
-import { Menu, type MenuItem } from "../ui/Menu";
+import { Select } from "../ui/Select";
 import { RailStyleSwatch } from "./RailStyleSwatch";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import styles from "./Settings.module.css";
@@ -33,20 +32,6 @@ export function PersonalizationPanel() {
     dispatch,
   } = useUiStore();
 
-  const uiFontItems: MenuItem[] = FONT_UI_PRESETS.map((preset: FontUiPreset) => ({
-    key: preset,
-    label: t(`settings.personalization.fontUi.preset.${preset}`),
-    hint: fontUiPreset === preset ? t("settings.personalization.font.selected") : undefined,
-    onSelect: () => dispatch({ type: "setFontUiPreset", preset }),
-  }));
-
-  const monoFontItems: MenuItem[] = FONT_MONO_PRESETS.map((preset: FontMonoPreset) => ({
-    key: preset,
-    label: t(`settings.personalization.fontMono.preset.${preset}`),
-    hint: fontMonoPreset === preset ? t("settings.personalization.font.selected") : undefined,
-    onSelect: () => dispatch({ type: "setFontMonoPreset", preset }),
-  }));
-
   return (
     <div className={styles.panel}>
       <h2 className={styles.panelTitle}>{t("settings.section.personalization")}</h2>
@@ -57,14 +42,18 @@ export function PersonalizationPanel() {
           label={t("settings.personalization.fontUi")}
           description={t("settings.personalization.fontUi.description")}
           control={
-            <Menu
-              align="right"
-              trigger={({ onClick }) => (
-                <Button onClick={onClick} disabled={!hydrated}>
-                  {t(`settings.personalization.fontUi.preset.${fontUiPreset}`)}
-                </Button>
-              )}
-              items={uiFontItems}
+            <Select
+              className={styles.selectLike}
+              value={fontUiPreset}
+              disabled={!hydrated}
+              ariaLabel={t("settings.personalization.fontUi")}
+              options={FONT_UI_PRESETS.map((preset) => ({
+                value: preset,
+                label: t(`settings.personalization.fontUi.preset.${preset}`),
+              }))}
+              onChange={(next) =>
+                dispatch({ type: "setFontUiPreset", preset: next as FontUiPreset })
+              }
             />
           }
         />
@@ -72,14 +61,18 @@ export function PersonalizationPanel() {
           label={t("settings.personalization.fontMono")}
           description={t("settings.personalization.fontMono.description")}
           control={
-            <Menu
-              align="right"
-              trigger={({ onClick }) => (
-                <Button onClick={onClick} disabled={!hydrated}>
-                  {t(`settings.personalization.fontMono.preset.${fontMonoPreset}`)}
-                </Button>
-              )}
-              items={monoFontItems}
+            <Select
+              className={styles.selectLike}
+              value={fontMonoPreset}
+              disabled={!hydrated}
+              ariaLabel={t("settings.personalization.fontMono")}
+              options={FONT_MONO_PRESETS.map((preset) => ({
+                value: preset,
+                label: t(`settings.personalization.fontMono.preset.${preset}`),
+              }))}
+              onChange={(next) =>
+                dispatch({ type: "setFontMonoPreset", preset: next as FontMonoPreset })
+              }
             />
           }
         />

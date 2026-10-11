@@ -6,6 +6,7 @@ import { useT } from "../../hooks/useT";
 import { usageService } from "../../services/usageService";
 import { formatCost, formatTokens } from "../../utils/formatTokens";
 import { IconButton } from "../ui/IconButton";
+import { Select } from "../ui/Select";
 import { SettingsSection } from "./SettingRow";
 import settingsStyles from "./Settings.module.css";
 import { UsageHeatLegend, UsageHeatmap } from "./UsageHeatmap";
@@ -268,21 +269,19 @@ export function UsagePanel() {
           {range === "all" ? (
             <SettingsSection>
               <div className={styles.heatmapToolbar}>
-                <select
+                <Select
                   className={settingsStyles.selectLike}
                   value={heatProject ?? PROJECT_ALL}
-                  aria-label={t("settings.usage.heatmap.projectLabel")}
-                  onChange={(event) =>
-                    setHeatProject(event.target.value === PROJECT_ALL ? null : event.target.value)
-                  }
-                >
-                  <option value={PROJECT_ALL}>{t("settings.usage.heatmap.projectAll")}</option>
-                  {report.byProject.map((project) => (
-                    <option key={project.key} value={project.key}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
+                  ariaLabel={t("settings.usage.heatmap.projectLabel")}
+                  options={[
+                    { value: PROJECT_ALL, label: t("settings.usage.heatmap.projectAll") },
+                    ...report.byProject.map((project) => ({
+                      value: project.key,
+                      label: project.name,
+                    })),
+                  ]}
+                  onChange={(next) => setHeatProject(next === PROJECT_ALL ? null : next)}
+                />
                 <UsageHeatLegend />
               </div>
               {heatReport === null && heatPending && (

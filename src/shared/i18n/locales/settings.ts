@@ -527,10 +527,6 @@ export const settingsMessages = defineMessages({
     "zh-CN": "Lucida Console",
     "en-US": "Lucida Console",
   },
-  "settings.personalization.font.selected": {
-    "zh-CN": "当前",
-    "en-US": "Current",
-  },
   "settings.personalization.monoPreview": {
     "zh-CN": "等宽预览",
     "en-US": "Monospace preview",

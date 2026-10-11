@@ -100,28 +100,28 @@
 .mLine {
   width: 12px;
   height: 2px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transform: scaleX(var(--seg-scale, 1));
 }
 
 .mBar {
   width: 12px;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transform: scaleX(var(--seg-scale, 1));
 }
 
 .mPill {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transform: scaleX(var(--seg-scale, 1));
 }
 
 .mTick {
   width: 2px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transform-origin: center;
   transform: scaleY(calc(1 + (var(--seg-scale, 1) - 1) * 0.55));
 }

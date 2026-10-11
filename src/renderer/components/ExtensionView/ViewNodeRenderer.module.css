@@ -120,8 +120,7 @@
 }
 
 .input,
-.textarea,
-.select {
+.textarea {
   width: 100%;
   padding: 6px var(--spacing-sm);
   border: 1px solid var(--color-border);
@@ -134,14 +133,20 @@
 }
 
 .input:focus,
-.textarea:focus,
-.select:focus {
+.textarea:focus {
   border-color: var(--color-border-strong);
 }
 
 .textarea {
   resize: vertical;
   min-height: 72px;
+}
+
+/* 下拉用 ui/Select 的标准字段皮肤（圆角与相邻输入框同为 8px），这里只补宽度：
+   Popover 的根是 inline-flex，靠 .field 的交叉轴 stretch 撑满，触发器再填满它。 */
+.select {
+  composes: field from "../ui/Select.module.css";
+  width: 100%;
 }
 
 .checkboxRow {
@@ -153,52 +158,40 @@
   cursor: pointer;
 }
 
+/* 列表壳：圆角走浮层那一档（壳 12 / 行 8），内边距给药丸留出与行间距一致的呼吸位。
+   这是常驻内嵌列表，不能 composes overlayShell 的 shell——那套配方带 position: fixed。 */
 .list {
-  display: flex;
-  flex-direction: column;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
+  border-radius: var(--radius-overlay);
+  padding: var(--spacing-xs);
   max-height: 280px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--color-bg-elevated);
 }
 
-.listItem {
+/* OptionList 的容器：同时是药丸的定位父级，列表内滚动时高亮跟着内容走 */
+.listRows {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* GlideList 的 .row 面向"单行下拉条目"：扩展的行带说明文案，要顶端对齐并允许换行。
+   color 这类没有 --row-* 口径的属性，站点类和基类同为单类选择器、胜负只看打包顺序，
+   所以统一靠 .list 祖先抬一档，保证不随 CSS Modules 的注入顺序翻车。 */
+.list .listItem {
   align-items: flex-start;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: none;
-  border-bottom: 1px solid var(--color-border);
-  border-left: 2px solid transparent;
-  background: transparent;
+  padding: var(--spacing-sm);
   color: var(--color-text);
-  font-size: var(--font-size-md);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease;
+  white-space: normal;
 }
 
-.listItem:last-child {
-  border-bottom: none;
-}
-
-.listItem:hover {
-  background: var(--color-bg-hover);
-}
-
-.listItem:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -2px;
-}
-
-.listItemActive {
-  background: var(--color-accent-soft);
-  border-left-color: var(--color-accent);
+/* 已选态：底色交给药丸（它只表示"指针在哪"），选中靠左侧强调条 + 强调文字表达。
+   内阴影不占布局，切换选中不会抖行高。 */
+.list .listItemActive {
+  box-shadow: inset 2px 0 0 var(--color-accent);
   color: var(--color-text-strong);
 }
 
@@ -252,7 +245,7 @@
 
 .progressTrack {
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-bg-surface);
   overflow: hidden;
 }
@@ -260,7 +253,7 @@
 .progressFill {
   height: 100%;
   background: var(--color-accent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transition: width 0.15s ease;
 }
 
@@ -302,7 +295,7 @@
   max-width: 180px;
   padding: 4px var(--spacing-sm);
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-bg-elevated);
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
@@ -333,7 +326,7 @@
   flex-shrink: 0;
   width: 14px;
   height: 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 10px;
   line-height: 14px;
   text-align: center;

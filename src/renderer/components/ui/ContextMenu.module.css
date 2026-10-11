@@ -1,10 +1,6 @@
+/* 外壳配方与 Popover 同一份（overlayShell.module.css）：右键菜单和下拉必须看起来是同一个东西。
+   left/top 由 ContextMenu 在首帧前按光标坐标写入；动效走 utils/glideMotion。 */
 .panel {
-  position: fixed;
+  composes: shell from "./overlayShell.module.css";
   min-width: 160px;
-  padding: var(--spacing-xs);
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-overlay);
-  z-index: var(--z-menu);
 }

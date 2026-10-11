@@ -1,19 +1,13 @@
+/* 按压回弹：--gs-press 由 Popover 在 30fps 时间轴上补间（docs/design/51）。
+   静息值是 0，缩放系数落回 1，不依赖 JS 也能正常显示。 */
 .root {
   position: relative;
   display: inline-flex;
+  transform: scale(calc(1 - 0.03 * var(--gs-press, 0)));
 }
 
-/* 面板 portal 到 body、fixed 定位（避免被侧栏与折叠容器的 overflow 裁剪）：
-   left/top 由 Popover 在首帧前按触发器矩形写入，这里只给默认值与外观。 */
 .panel {
-  position: fixed;
-  top: 0;
-  left: 0;
-  min-width: 180px;
-  padding: var(--spacing-xs);
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-overlay);
-  z-index: var(--z-menu);
+  composes: shell from "./overlayShell.module.css";
+  /* 默认下限 180px；嵌入式窄控件（如样式编辑器的单位芯片）用 --panel-min-width 收回去 */
+  min-width: var(--panel-min-width, 180px);
 }

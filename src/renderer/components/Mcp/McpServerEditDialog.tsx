@@ -9,6 +9,7 @@ import { useT } from "../../hooks/useT";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Modal } from "../ui/Modal";
+import { Select } from "../ui/Select";
 import { Toggle } from "../ui/Toggle";
 import styles from "./McpServerEditDialog.module.css";
 
@@ -489,19 +490,15 @@ export function McpServerEditDialog({
             <label className={styles.label} htmlFor="mcp-exposure">
               {t("mcp.edit.exposure")}
             </label>
-            <select
+            <Select
               id="mcp-exposure"
-              className={styles.input}
+              className={styles.selectField}
+              ariaLabel={t("mcp.edit.exposure")}
               value={exposure}
               disabled={busy}
-              onChange={(event) => setExposure(event.target.value as McpExposure)}
-            >
-              {EXPOSURES.map((value) => (
-                <option key={value} value={value}>
-                  {t(`mcp.exposure.${value}`)}
-                </option>
-              ))}
-            </select>
+              options={EXPOSURES.map((value) => ({ value, label: t(`mcp.exposure.${value}`) }))}
+              onChange={(value) => setExposure(value as McpExposure)}
+            />
             <p className={styles.hint}>{t(`mcp.exposure.${exposure}.hint`)}</p>
           </div>
 

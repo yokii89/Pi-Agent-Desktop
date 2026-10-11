@@ -7,6 +7,7 @@ import { type Gsap, loadGsap, prefersReducedMotion } from "../../utils/animation
 import { NAV_MOTION } from "../../utils/motionTokens";
 import { IconButton } from "../ui/IconButton";
 import { Menu } from "../ui/Menu";
+import { Select } from "../ui/Select";
 import { Toggle } from "../ui/Toggle";
 import styles from "./McpServerCard.module.css";
 
@@ -14,6 +15,9 @@ export type McpCardAction = "login" | "logout" | "reconnect";
 
 /** 快速连点时终止上一轮高度补间，只需要 kill 能力。 */
 type ActiveTween = ReturnType<Gsap["to"]> | null;
+
+/** 暴露级别候选值（与编辑对话框共用同一组语义）。 */
+const EXPOSURES: readonly McpExposure[] = ["codemode", "deferred", "direct", "hidden"];
 
 /**
  * 工具 chips：默认单行截断，行尾「展开全部 N 个」点击全量展开，再次点击收起。
@@ -318,32 +322,28 @@ export function McpServerCard({
 
       {!invalid ? (
         <div className={styles.meta}>
-          <span className={styles.exposureLabel}>
+          {/* 用 div 而非 span：自绘下拉会渲染 Popover 外壳（div），套在 span 里是无效嵌套 */}
+          <div className={styles.exposureLabel}>
             <span>{t("mcp.card.exposureLabel")}</span>
             {frozen ? (
               <span className={styles.exposureValue}>
                 {t(`mcp.exposure.${config.exposure ?? "codemode"}`)}
               </span>
             ) : (
-              <select
+              <Select
                 className={styles.exposureSelect}
+                ariaLabel={t("mcp.card.exposureLabel")}
                 value={config.exposure ?? "codemode"}
                 disabled={busy}
-                aria-label={t("mcp.card.exposureLabel")}
-                onChange={(event) => onSetExposure?.(event.target.value as McpExposure)}
-              >
-                {(["codemode", "deferred", "direct", "hidden"] as const).map((exposure) => (
-                  <option
-                    key={exposure}
-                    value={exposure}
-                    title={t(`mcp.exposure.${exposure}.hint`)}
-                  >
-                    {t(`mcp.exposure.${exposure}`)}
-                  </option>
-                ))}
-              </select>
+                options={EXPOSURES.map((value) => ({
+                  value,
+                  label: t(`mcp.exposure.${value}`),
+                  title: t(`mcp.exposure.${value}.hint`),
+                }))}
+                onChange={(value) => onSetExposure?.(value as McpExposure)}
+              />
             )}
-          </span>
+          </div>
           {toolsParts.length > 0 ? (
             <span className={styles.tools}>{toolsParts.join(" · ")}</span>
           ) : null}
