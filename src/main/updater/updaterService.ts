@@ -2,7 +2,7 @@ import { app } from "electron";
 import { autoUpdater } from "electron-updater";
 import {
   isVersionNewer,
-  UPDATE_GITHUB_LATEST_API,
+  UPDATE_GITHUB_LATEST_URL,
   UPDATE_IPC,
   type UpdateStatus,
 } from "../../shared/update";
@@ -96,12 +96,13 @@ export function initUpdater(): void {
   });
 }
 
-/** 开发 / 未打包：走 GitHub Releases API 比版本，只能提示，不能安装。 */
-async function checkViaGitHubApi(): Promise<UpdateStatus> {
+/** 开发 / 未打包：走 github.com 发布页 JSON 比版本，只能提示，不能安装。 */
+async function checkViaGitHubReleasePage(): Promise<UpdateStatus> {
   pushStatus({ state: "checking" });
-  const res = await fetch(UPDATE_GITHUB_LATEST_API, {
+  const res = await fetch(UPDATE_GITHUB_LATEST_URL, {
     headers: {
-      Accept: "application/vnd.github+json",
+      // github.com 仅在显式 Accept JSON 时于 302 后返回 JSON，否则是发布页 HTML
+      Accept: "application/json",
       "User-Agent": "PiDesk-Updater",
     },
   });
@@ -112,13 +113,9 @@ async function checkViaGitHubApi(): Promise<UpdateStatus> {
     return next;
   }
   if (!res.ok) {
-    throw new Error(`GitHub API ${res.status}`);
+    throw new Error(`GitHub releases ${res.status}`);
   }
-  const data = (await res.json()) as {
-    tag_name?: string;
-    published_at?: string;
-    body?: string;
-  };
+  const data = (await res.json()) as { tag_name?: string };
   const remote = (data.tag_name ?? "").replace(/^v/i, "");
   const current = app.getVersion();
   if (!remote || !isVersionNewer(remote, current)) {
@@ -129,8 +126,8 @@ async function checkViaGitHubApi(): Promise<UpdateStatus> {
   const next: UpdateStatus = {
     state: "available",
     version: remote,
-    releaseDate: data.published_at ?? null,
-    releaseNotes: data.body ?? null,
+    releaseDate: null,
+    releaseNotes: null,
     canInstall: false,
   };
   pushStatus(next);
@@ -158,7 +155,7 @@ async function runCheck(options?: { silent?: boolean }): Promise<UpdateStatus> {
   silentCheck = options?.silent === true;
   try {
     if (!app.isPackaged) {
-      return await checkViaGitHubApi();
+      return await checkViaGitHubReleasePage();
     }
     return await checkViaElectronUpdater();
   } catch (err) {

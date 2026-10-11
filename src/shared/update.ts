@@ -39,9 +39,14 @@ export const UPDATE_IPC = {
 /** 发布页 URL（开发模式降级「打开下载页」、错误兜底）。 */
 export const UPDATE_RELEASES_URL = "https://github.com/yokii89/Pi-Agent-Desktop/releases";
 
-/** GitHub Releases API（开发模式检查用；仓库需可匿名读 Releases）。 */
-export const UPDATE_GITHUB_LATEST_API =
-  "https://api.github.com/repos/yokii89/Pi-Agent-Desktop/releases/latest";
+/**
+ * 开发模式检查端点（未打包；仓库需可匿名读 Releases）。
+ * github.com 发布页在 `Accept: application/json` 下返回 `{ id, tag_name, ... }`，
+ * 与 electron-updater 打包路径同源、不受 api.github.com 匿名 60 次/时/IP 限制；
+ * 代价：不含发布时间与说明。
+ */
+export const UPDATE_GITHUB_LATEST_URL =
+  "https://github.com/yokii89/Pi-Agent-Desktop/releases/latest";
 
 /**
  * 解析 `v1.2.3` / `1.2.3-beta.1` 为数值段。
