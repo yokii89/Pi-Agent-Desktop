@@ -53,6 +53,12 @@ interface GlidePillOptions {
   onActiveChange?: (index: number | null) => void;
   /** 指针离开列表后是否保留高亮（默认保留，对齐参考稿 rememberPosition）。 */
   rememberPosition?: boolean;
+  /**
+   * 横排胶囊模式：选项宽度不一、还会换行（如模型能力弹层里的预设档），
+   * 药丸按整段矩形补间（translate(x, y) + width/height）、盖在选项上方做半透明高亮；
+   * 默认的纵向行列表则是撑满轨道、贴在行下面。
+   */
+  horizontal?: boolean;
 }
 
 /**
@@ -65,10 +71,17 @@ interface GlidePillOptions {
  */
 export function useGlidePill(
   listRef: RefObject<HTMLElement | null>,
-  { onPick, rememberPosition = true, onActiveChange }: GlidePillOptions = {},
+  { onPick, rememberPosition = true, onActiveChange, horizontal }: GlidePillOptions = {},
 ): GlidePillApi {
   const pillRef = useRef<HTMLSpanElement>(null);
-  const state = useRef({ y: 0, height: 0, opacity: 0, index: null as number | null });
+  const state = useRef({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    opacity: 0,
+    index: null as number | null,
+  });
   const moveTween = useRef<GlideCancel>(() => {});
   const fadeTween = useRef<GlideCancel>(() => {});
   const scrub = useRef<ScrubSession | null>(null);
@@ -78,14 +91,20 @@ export function useGlidePill(
     move: (e: PointerEvent) => void;
     up: (e: PointerEvent) => void;
   } | null>(null);
-  const options = useRef({ onPick, rememberPosition, onActiveChange });
-  options.current = { onPick, rememberPosition, onActiveChange };
+  const options = useRef({ onPick, rememberPosition, onActiveChange, horizontal });
+  options.current = { onPick, rememberPosition, onActiveChange, horizontal };
 
   const apply = (): void => {
     const pill = pillRef.current;
     if (!pill) return;
-    const { y, height, opacity } = state.current;
-    pill.style.transform = `translateY(${y.toFixed(2)}px)`;
+    const { x, y, width, height, opacity } = state.current;
+    if (options.current.horizontal) {
+      // 横排胶囊：显式 width 覆盖 .pill 的 left/right 拉伸，整段矩形一起补间
+      pill.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)`;
+      pill.style.width = `${width.toFixed(2)}px`;
+    } else {
+      pill.style.transform = `translateY(${y.toFixed(2)}px)`;
+    }
     pill.style.height = `${height.toFixed(2)}px`;
     pill.style.opacity = String(opacity);
   };
@@ -120,7 +139,9 @@ export function useGlidePill(
     }
     const current = state.current;
     const index = Number(row.dataset.glideIndex);
+    const targetX = row.offsetLeft;
     const targetY = row.offsetTop;
+    const targetWidth = row.offsetWidth;
     const targetHeight = row.offsetHeight;
     // 首次出现（或外部要求瞬移）直接落位：从上一段目标滑过来会被看成选错了行
     const jump = instant || current.index === null || current.opacity < 1;
@@ -131,16 +152,22 @@ export function useGlidePill(
     options.current.onActiveChange?.(index);
 
     if (jump) {
+      current.x = targetX;
       current.y = targetY;
+      current.width = targetWidth;
       current.height = targetHeight;
       apply();
     } else {
+      const fromX = current.x;
       const fromY = current.y;
+      const fromWidth = current.width;
       const fromHeight = current.height;
       moveTween.current = glide({
         duration: GLIDE_MOTION.glide,
         onUpdate: (p) => {
+          current.x = mix(fromX, targetX, p);
           current.y = mix(fromY, targetY, p);
+          current.width = mix(fromWidth, targetWidth, p);
           current.height = mix(fromHeight, targetHeight, p);
           apply();
         },
@@ -218,8 +245,11 @@ export function useGlidePill(
     if (event.button !== 0 || scrub.current) return;
     const row = rowAt(event.clientX, event.clientY);
     picked.current = false;
+    // 空白处（分隔线、面板 padding、滚动条）不发起擦选：按住滚动条拖动再松在行上
+    // 会被当成擦选激活——命令面板里等于误触发一条命令
+    if (!row) return;
     moveTo(row, true);
-    scrub.current = { fromIndex: row ? Number(row.dataset.glideIndex) : -1, moved: false };
+    scrub.current = { fromIndex: Number(row.dataset.glideIndex), moved: false };
     detachScrub();
     attached.current = { move: onScrubMove, up: onScrubUp };
     window.addEventListener("pointermove", attached.current.move);

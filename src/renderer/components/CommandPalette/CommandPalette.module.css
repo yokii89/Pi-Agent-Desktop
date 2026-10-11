@@ -63,6 +63,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* 药丸的定位父级（GlideList .track 同款）：列表内滚时药丸跟着内容走 */
+  position: relative;
   padding: var(--spacing-xs) var(--spacing-xs) var(--spacing-sm);
 }
 
@@ -210,19 +212,13 @@
   color: var(--color-text-muted);
 }
 
+/* 行壳（定位层级 / 内边距 / 圆角 / 命中区域）由 GlideList 的 .row 承担（docs/design/51），
+   站点只用 --row-* 变量说话，与「站点覆盖 .field/.row 只走变量」同一条规矩 */
 .row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: 7px var(--spacing-sm);
-  border-radius: var(--radius-md);
-  cursor: pointer;
+  --row-padding: 7px var(--spacing-sm);
 }
 
-.rowActive {
-  background: var(--color-bg-active);
-}
-
+/* 高亮底色由药丸承担，行不再自带背景；激活态只保留图标提亮 */
 .rowIcon {
   flex-shrink: 0;
   color: var(--color-text-muted);

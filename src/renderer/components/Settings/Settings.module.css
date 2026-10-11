@@ -971,12 +971,15 @@
   background: var(--color-accent-soft);
 }
 
-/* 箭头常驻占位（避免悬停时行内跳动），透明度交给悬停/聚焦 */
+/* 箭头常驻占位（避免悬停时行内跳动），透明度交给悬停/聚焦。
+   垂直居中只能用 top/bottom + margin:auto——GlideChevron 的内联 transform（--gs-chev 翻转）
+   会覆盖这里的 translateY。 */
 .ovValCaret {
   position: absolute;
   right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0;
+  bottom: 0;
+  margin: auto 0;
   color: var(--color-text-muted);
   opacity: 0;
   transition: opacity 0.12s ease;
@@ -1045,7 +1048,9 @@
   color: var(--color-text-muted);
 }
 
+/* 药丸的定位父级（docs/design/51）：高亮药丸盖在胶囊上方做半透明滑行，指针反馈由它承担 */
 .ovPills {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -1061,10 +1066,6 @@
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
-}
-
-.ovPill:hover {
-  border-color: var(--color-border-strong);
 }
 
 .ovPillOn {
@@ -1099,7 +1100,9 @@
 }
 
 .ovPopHr {
-  width: calc(100% + var(--spacing-lg));
+  /* 通栏到面板边框：外壳内边距是 --spacing-xs（两侧共 8px），负 margin 同步只写 --spacing-xs，
+     宽度加 --spacing-sm（=2×xs）刚好抵消——多加会戳出面板右缘。 */
+  width: calc(100% + var(--spacing-sm));
   margin: 11px calc(var(--spacing-xs) * -1) 9px;
   border: none;
   border-top: 1px solid var(--color-border);

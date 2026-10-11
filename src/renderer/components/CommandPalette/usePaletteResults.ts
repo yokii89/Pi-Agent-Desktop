@@ -143,7 +143,7 @@ export function usePaletteResults(open: boolean): PaletteResults {
     useSessionMeta();
   const actionCtx = useActionContext();
 
-  const [rawQuery, setRawQuery] = useState("");
+  const [rawQuery, setRawQueryState] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [expandedSections, setExpandedSections] = useState<ReadonlySet<PaletteSectionId>>(
     () => new Set(),
@@ -160,25 +160,36 @@ export function usePaletteResults(open: boolean): PaletteResults {
   /** 搜索历史按工作目录隔离；无工作目录时落 default 键。 */
   const workspaceKey = sessionWorkingDir ?? "";
 
-  // 打开时复位输入 / 选中 / 展开态；读入本工作区的搜索历史
+  // 打开即同步复位（React 渲染期调整模式）：高亮药丸要求「打开 / 换查询的同一个 commit 里
+  // 选中项已经是首项」，复位留给 effect 会慢一拍，药丸先落去上一轮的行再被拽回来——
+  // 派生光标慢一拍会被动画放大成可见抖动（docs/design/51 §七）。
+  const [lastOpenKey, setLastOpenKey] = useState<string | null>(null);
+  const openKey = open ? workspaceKey : null;
+  if (openKey !== lastOpenKey) {
+    setLastOpenKey(openKey);
+    if (open) {
+      setRawQueryState("");
+      setActiveIndex(0);
+      setExpandedSections(new Set());
+      setFileItems([]);
+      setFilesLoading(false);
+      setFilesError(false);
+      setChangeItems([]);
+    }
+  }
+
+  // 输入变化：复位（选中回首项、收起「显示更多」）与输入同一批复位，原因同上
+  const setRawQuery = useCallback((value: string): void => {
+    setRawQueryState(value);
+    setActiveIndex(0);
+    setExpandedSections(new Set());
+  }, []);
+
+  // 打开时读入本工作区的搜索历史；其余复位已在上面渲染期同步完成
   useEffect(() => {
     if (!open) return;
-    setRawQuery("");
-    setActiveIndex(0);
-    setExpandedSections(new Set());
-    setFileItems([]);
-    setFilesLoading(false);
-    setFilesError(false);
-    setChangeItems([]);
     setHistoryEntries(readPaletteSearchHistory(workspaceKey));
   }, [open, workspaceKey]);
-
-  // 输入或作用域变化时回到首项、收起「显示更多」
-  // biome-ignore lint/correctness/useExhaustiveDependencies: rawQuery/scope 是重置信号，不在闭包内读取
-  useEffect(() => {
-    setActiveIndex(0);
-    setExpandedSections(new Set());
-  }, [rawQuery, scope]);
 
   const commandItems = useMemo<PaletteItem[]>(() => {
     if (!open) return [];
@@ -400,7 +411,7 @@ export function usePaletteResults(open: boolean): PaletteResults {
       const { query: currentQuery } = resolveQueryScope(rawQuery);
       setRawQuery(`${scopeToPrefix(next)}${currentQuery}`);
     },
-    [rawQuery],
+    [rawQuery, setRawQuery],
   );
 
   const clearHistory = useCallback((): void => {

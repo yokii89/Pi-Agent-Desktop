@@ -1,7 +1,8 @@
 import { ArrowCounterClockwise } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { TranslateFn } from "../../../shared/i18n";
 import type { PiModelOverridePatch } from "../../../shared/ipc";
+import { useGlidePill } from "../../hooks/useGlidePill";
 import { useT } from "../../hooks/useT";
 import type { ModelOverrideRow } from "../../utils/modelOverrides";
 import {
@@ -12,6 +13,7 @@ import {
   WINDOW_PRESETS,
 } from "../../utils/modelOverrides";
 import { GlideChevron } from "../ui/GlideChevron";
+import glideStyles from "../ui/GlideList.module.css";
 import { Popover } from "../ui/Popover";
 import { Segmented } from "../ui/Segmented";
 import styles from "./Settings.module.css";
@@ -255,6 +257,21 @@ function OverrideRow({
   );
 }
 
+/**
+ * 弹层胶囊组的「高亮药丸」（docs/design/51）：同一套 cubic-bezier 曲线 + 定帧时间轴（封顶
+ * 60fps），横排胶囊走 horizontal 模式——药丸按整段矩形补间、盖在选项上做半透明高亮。
+ * 打开时瞬移到当前值所在档位，悬停 / Tab 在选项之间滑行；选中态的 accent 底仍由
+ * .ovPillOn 承担，药丸只负责「正指向哪一个」。
+ */
+function useChipPill(selectedIndex: number, onPick: (index: number) => void) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const pill = useGlidePill(listRef, { horizontal: true, onPick });
+  useLayoutEffect(() => {
+    pill.jumpTo(selectedIndex >= 0 ? selectedIndex : null);
+  }, [selectedIndex, pill]);
+  return { listRef, pill };
+}
+
 /** popover 脚注：只说「沿用默认 X」或给一个「用默认值」的动作，不出现配置文件键名。 */
 function PopoverFoot({
   overridden,
@@ -304,6 +321,14 @@ function WindowEditor({
   const custom = row.overrideWindow !== undefined && !presets.includes(row.overrideWindow);
   const [draft, setDraft] = useState(custom ? String(row.overrideWindow) : "");
   const [error, setError] = useState<string | null>(null);
+  // 自定义值没有对应胶囊：药丸藏起，悬停时再出现
+  const selectedPreset =
+    row.overrideWindow !== undefined ? presets.indexOf(row.overrideWindow) : -1;
+  const { listRef, pill } = useChipPill(selectedPreset, (index) => {
+    if (index >= 0 && index < WINDOW_PRESETS.length) {
+      void onSubmit({ contextWindow: WINDOW_PRESETS[index] });
+    }
+  });
 
   const commit = (): void => {
     const trimmed = draft.trim();
@@ -319,16 +344,22 @@ function WindowEditor({
   return (
     <div className={styles.ovPop}>
       <p className={styles.ovPopTitle}>{t("settings.models.overrides.windowField")}</p>
-      <div className={styles.ovPills}>
-        {WINDOW_PRESETS.map((preset) => (
+      <div ref={listRef} className={styles.ovPills} {...pill.listProps}>
+        <span ref={pill.pillRef} className={glideStyles.pill} aria-hidden="true" />
+        {WINDOW_PRESETS.map((preset, index) => (
           <button
             key={preset}
             type="button"
+            data-glide-index={index}
             className={[styles.ovPill, row.overrideWindow === preset ? styles.ovPillOn : ""].join(
               " ",
             )}
             disabled={saving}
-            onClick={() => void onSubmit({ contextWindow: preset })}
+            onClick={(event) => {
+              // 擦选松手已由药丸代为实现，同一次点击在这里跳过
+              if (pill.consumeClick(event.detail)) return;
+              void onSubmit({ contextWindow: preset });
+            }}
           >
             {formatModelWindow(preset)}
           </button>
@@ -376,26 +407,41 @@ function InputEditor({
   onSubmit: (patch: PiModelOverridePatch) => Promise<void>;
 }) {
   const images = row.overrideInput?.includes("image") ?? false;
+  // 未覆盖时两个胶囊都不算选中：药丸藏起，悬停时再出现
+  const selectedInput = images ? 0 : row.overrideInput !== undefined ? 1 : -1;
+  const { listRef, pill } = useChipPill(selectedInput, (index) => {
+    void onSubmit(index === 0 ? { input: ["text", "image"] } : { input: ["text"] });
+  });
   return (
     <div className={styles.ovPop}>
       <p className={styles.ovPopTitle}>{t("settings.models.overrides.inputField")}</p>
-      <div className={styles.ovPills}>
+      <div ref={listRef} className={styles.ovPills} {...pill.listProps}>
+        <span ref={pill.pillRef} className={glideStyles.pill} aria-hidden="true" />
         <button
           type="button"
+          data-glide-index={0}
           className={[styles.ovPill, images ? styles.ovPillOn : ""].join(" ")}
           disabled={saving}
-          onClick={() => void onSubmit({ input: ["text", "image"] })}
+          onClick={(event) => {
+            // 擦选松手已由药丸代为实现，同一次点击在这里跳过
+            if (pill.consumeClick(event.detail)) return;
+            void onSubmit({ input: ["text", "image"] });
+          }}
         >
           {t("settings.models.overrides.inputImages")}
         </button>
         <button
           type="button"
+          data-glide-index={1}
           className={[
             styles.ovPill,
             row.overrideInput !== undefined && !images ? styles.ovPillOn : "",
           ].join(" ")}
           disabled={saving}
-          onClick={() => void onSubmit({ input: ["text"] })}
+          onClick={(event) => {
+            if (pill.consumeClick(event.detail)) return;
+            void onSubmit({ input: ["text"] });
+          }}
         >
           {t("settings.models.overrides.inputText")}
         </button>

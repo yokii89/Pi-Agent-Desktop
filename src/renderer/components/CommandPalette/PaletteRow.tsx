@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import glideStyles from "../ui/GlideList.module.css";
 import styles from "./CommandPalette.module.css";
 import type { PaletteItem } from "./types";
 
@@ -46,12 +47,12 @@ interface PaletteRowProps {
   index: number;
   active: boolean;
   optionId: string;
-  onHover: (index: number) => void;
-  onSelect: (item: PaletteItem) => void;
+  /** detail 透传给药丸的 consumeClick：擦选已代为实现的那次 click 要跳过（docs/design/51）。 */
+  onSelect: (item: PaletteItem, detail: number) => void;
 }
 
 /** 命令面板单条结果：图标 + 标题 + 副标题（带命中高亮）+ 右侧 meta/快捷键胶囊。 */
-export function PaletteRow({ item, index, active, optionId, onHover, onSelect }: PaletteRowProps) {
+export function PaletteRow({ item, index, active, optionId, onSelect }: PaletteRowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const IconComp = item.icon;
 
@@ -68,10 +69,10 @@ export function PaletteRow({ item, index, active, optionId, onHover, onSelect }:
       id={optionId}
       role="option"
       aria-selected={active}
-      className={[styles.row, active ? styles.rowActive : ""].join(" ")}
+      data-glide-index={index}
+      className={[glideStyles.row, styles.row, active ? styles.rowActive : ""].join(" ")}
       title={item.subtitle}
-      onMouseMove={() => onHover(index)}
-      onClick={() => onSelect(item)}
+      onClick={(event) => onSelect(item, event.detail)}
     >
       <IconComp size={16} weight="regular" className={styles.rowIcon} />
       <span className={styles.rowText}>

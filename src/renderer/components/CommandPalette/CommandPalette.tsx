@@ -7,14 +7,16 @@ import {
   MagnifyingGlass,
   Trash,
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useGlidePill } from "../../hooks/useGlidePill";
 import { useT } from "../../hooks/useT";
 import { useUiStore } from "../../stores/uiStore";
+import glideStyles from "../ui/GlideList.module.css";
 import { Modal } from "../ui/Modal";
 import { Segmented } from "../ui/Segmented";
 import styles from "./CommandPalette.module.css";
 import { PaletteRow } from "./PaletteRow";
-import type { PaletteScope } from "./types";
+import type { PaletteItem, PaletteScope } from "./types";
 import { scopeToPrefix, usePaletteResults } from "./usePaletteResults";
 
 const SCOPE_TABS: { scope: PaletteScope; labelKey: string; icon: typeof ListBullets }[] = [
@@ -66,6 +68,53 @@ export function CommandPalette() {
     inputRef.current?.focus();
     setHistoryExpanded(false);
   }, [commandPaletteOpen]);
+
+  // 高亮药丸（docs/design/51 同一套定帧时间轴 + easeOut 贝塞尔）：↑↓ 与悬停时在选项之间
+  // 滑行，按住拖动（擦选）松手直接激活落点行。指向行只有一个写入方：悬停经 onActiveChange
+  // 回写 activeIndex，下面的 effect 只在 activeIndex 真被键盘改动时才 highlight——
+  // 两边各写一次会互相取消补间（doc 51 §七 频闪教训）。
+  const listRef = useRef<HTMLDivElement>(null);
+  const pillIndex = useRef(-1);
+  const pill = useGlidePill(listRef, {
+    onPick: (index) => {
+      const item = flatItems[index];
+      if (item) runItem(item);
+    },
+    onActiveChange: (index) => {
+      if (index === null || index === pillIndex.current) return;
+      pillIndex.current = index;
+      setActiveIndex(index);
+    },
+  });
+
+  // 打开与结果换血（打字 / 切作用域 / 展开更多 / 结果清单更新）后药丸**瞬移**落位：
+  // 旧几何位置在新列表里已是别的条目，滑过去会被读成「选错了行」。
+  // 换查询/作用域回首项；其余换血把当前选中项原地落位（展开「显示更多」时该行的
+  // offsetTop 会移动）。复位在 usePaletteResults 里与输入同 commit 生效，这里读到的一定是新值。
+  const pillEpochRef = useRef<PaletteItem[] | null>(null);
+  const pillNavKeyRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const navKey = `${rawQuery}\u0000${scope}`;
+    const navChanged = pillNavKeyRef.current !== null && pillNavKeyRef.current !== navKey;
+    pillNavKeyRef.current = navKey;
+    const epoch = commandPaletteOpen ? flatItems : null;
+    const prevEpoch = pillEpochRef.current;
+    pillEpochRef.current = epoch;
+    if (epoch === null || epoch === prevEpoch || flatItems.length === 0) return;
+    const target =
+      prevEpoch === null || navChanged ? 0 : Math.min(activeIndex, flatItems.length - 1);
+    pillIndex.current = target;
+    pill.jumpTo(target);
+  }, [commandPaletteOpen, flatItems, rawQuery, scope, activeIndex, pill]);
+
+  // 键盘导航（↑↓）：药丸在选项之间滑行（GLIDE_MOTION.glide + easeOut，定帧时间轴封顶 60fps）。
+  // 越过列表长度的索引等 hook 夹紧后再说，别把药丸指去不存在的行。
+  useEffect(() => {
+    if (!commandPaletteOpen || activeIndex >= flatItems.length) return;
+    if (activeIndex === pillIndex.current) return;
+    pillIndex.current = activeIndex;
+    pill.highlight(activeIndex);
+  }, [commandPaletteOpen, flatItems, activeIndex, pill]);
 
   if (!commandPaletteOpen) return null;
 
@@ -143,13 +192,16 @@ export function CommandPalette() {
       </div>
 
       <div
+        ref={listRef}
         id="palette-listbox"
         className={styles.list}
         role="listbox"
         aria-label={t("palette.title")}
         aria-activedescendant={hasResults ? `palette-opt-${activeIndex}` : undefined}
         tabIndex={-1}
+        {...pill.listProps}
       >
+        <span ref={pill.pillRef} className={glideStyles.pill} aria-hidden="true" />
         {!hasResults && !showEmpty && !filesLoading && !showFilesError && (
           <p className={styles.placeholderHint}>{t("palette.placeholder.all")}</p>
         )}
@@ -175,8 +227,11 @@ export function CommandPalette() {
                     index={globalIndex}
                     active={globalIndex === activeIndex}
                     optionId={`palette-opt-${globalIndex}`}
-                    onHover={setActiveIndex}
-                    onSelect={runItem}
+                    onSelect={(picked, detail) => {
+                      // 擦选松手已由药丸代为实现，同一次点击在这里跳过
+                      if (pill.consumeClick(detail)) return;
+                      runItem(picked);
+                    }}
                   />
                 );
               })}
