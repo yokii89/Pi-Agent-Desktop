@@ -10,6 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import { useT } from "../../../../hooks/useT";
 import type { BrowserPanelTab } from "../../../../stores/uiStore";
+import { Segmented } from "../../../ui/Segmented";
 import styles from "./BrowserInspector.module.css";
 
 /**
@@ -57,24 +58,25 @@ export function BrowserPaneTabs({
 }: BrowserPaneTabsProps) {
   const t = useT();
   return (
-    <div className={styles.paneTabs} role="tablist" aria-label={t("browser.inspector.label")}>
-      {BROWSER_PANE_TABS.map((tab) => {
-        const Icon = tab.icon;
-        const selected = tab.id === active;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            className={[styles.paneTab, selected ? styles.paneTabActive : ""].join(" ")}
-            onClick={() => onSelect(tab.id)}
-          >
-            <Icon size={14} weight={selected ? "fill" : "regular"} />
-            {t(tab.labelKey)}
-          </button>
-        );
-      })}
+    <div className={styles.paneTabs}>
+      <Segmented
+        ariaLabel={t("browser.inspector.label")}
+        className={styles.paneSeg}
+        semantics="tab"
+        equal={false}
+        scrollable
+        size="sm"
+        value={active}
+        items={BROWSER_PANE_TABS.map((tab) => {
+          const Icon = tab.icon;
+          return {
+            value: tab.id,
+            label: t(tab.labelKey),
+            icon: <Icon size={14} weight={tab.id === active ? "fill" : "regular"} />,
+          };
+        })}
+        onChange={onSelect}
+      />
       {floatHost ? null : (
         <>
           <div className={styles.paneSpacer} />

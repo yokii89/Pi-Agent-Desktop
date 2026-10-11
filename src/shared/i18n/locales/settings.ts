@@ -246,6 +246,7 @@ export const settingsMessages = defineMessages({
     "en-US": "Delete",
   },
 
+  "settings.usage.rangeLabel": { "zh-CN": "统计区间", "en-US": "Stats range" },
   "settings.usage.range.today": { "zh-CN": "今日", "en-US": "Today" },
   "settings.usage.range.7d": { "zh-CN": "近 7 天", "en-US": "Last 7 days" },
   "settings.usage.range.30d": { "zh-CN": "近 30 天", "en-US": "Last 30 days" },
@@ -1052,6 +1053,10 @@ export const settingsMessages = defineMessages({
   "settings.models.overrides.searchPlaceholder": {
     "zh-CN": "搜索模型",
     "en-US": "Search models",
+  },
+  "settings.models.overrides.filterLabel": {
+    "zh-CN": "覆盖项筛选",
+    "en-US": "Override filter",
   },
   "settings.models.overrides.filterAll": {
     "zh-CN": "全部",

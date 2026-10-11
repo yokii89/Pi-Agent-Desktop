@@ -77,38 +77,14 @@
   flex-shrink: 1;
 }
 
-/* 视图切换（变更 / 图谱） */
+/* 视图切换（变更 / 图谱）：ui/Segmented 的落点皮肤，紧凑档沿用原来的壳底色 */
 .tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-elevated);
+  --seg-h: 26px;
+  --seg-inset: 2px;
+  --seg-pad: 8px;
+  --seg-track: var(--color-bg-elevated);
+
   flex-shrink: 0;
-}
-
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: calc(var(--radius-md) - 2px);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  transition:
-    background-color 0.12s ease,
-    color 0.12s ease;
-}
-
-.tab:hover {
-  color: var(--color-text);
-}
-
-.tabActive {
-  background: var(--color-bg-active);
-  color: var(--color-text-strong);
 }
 
 .spacer {

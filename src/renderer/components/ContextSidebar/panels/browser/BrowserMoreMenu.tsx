@@ -18,6 +18,7 @@ import { useGlidePill } from "../../../../hooks/useGlidePill";
 import { useT } from "../../../../hooks/useT";
 import { browserService } from "../../../../services/browserService";
 import { useBrowserStore, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from "../../../../stores/browserStore";
+import { GLIDE_MOTION } from "../../../../utils/motionTokens";
 import {
   handoffOverlaySuppress,
   prepareOverlayFreeze,
@@ -25,6 +26,7 @@ import {
 } from "../../../../utils/overlayFreeze";
 import glideStyles from "../../../ui/GlideList.module.css";
 import { IconButton } from "../../../ui/IconButton";
+import { Segmented } from "../../../ui/Segmented";
 import styles from "./BrowserMoreMenu.module.css";
 import { ImportLoginDialog } from "./ImportLoginDialog";
 
@@ -43,6 +45,12 @@ const VIEWPORT_PRESETS = [
   { key: "tablet", label: "Tablet", width: 768, icon: DeviceTablet },
   { key: "desktop", label: "Desktop", width: null, icon: Monitor },
 ] as const;
+
+type ViewportPresetKey = (typeof VIEWPORT_PRESETS)[number]["key"];
+
+/** 当前宽度落在哪个预设上；自定义宽度谁都不落（滑块收拢）。 */
+const presetForWidth = (width: number | null): ViewportPresetKey | null =>
+  VIEWPORT_PRESETS.find((preset) => preset.width === width)?.key ?? null;
 
 /**
  * 「更多」菜单：触发按钮 + 真正的浮层（portal + fixed）。
@@ -255,6 +263,17 @@ function MenuBody({ onClose, onImportLogin }: { onClose: () => void; onImportLog
   /** 可点行的动作，下标与 data-glide-index 对齐（缩放/视口是控件行，不占行序）。 */
   const picks = useRef<(() => void)[]>([]);
   const pill = useGlidePill(listRef, { onPick: (index) => picks.current[index]?.() });
+  /**
+   * 入场期间面板根节点带着 `scale(0.95)` 的内联变换，而分段器的滑块是按屏幕像素量槽位的：
+   * 在那一拍里量到的槽位是被缩放过的一份，变换又不会改变盒子尺寸（ResizeObserver 不触发），
+   * 动画演完也留着那份过期值。所以入场演完重挂一次，让它按 1:1 重新对位。
+   */
+  const [measured, setMeasured] = useState(false);
+  useEffect(() => {
+    // 两帧余量：定帧时间轴的收尾可能比标称时长晚一点
+    const timer = window.setTimeout(() => setMeasured(true), GLIDE_MOTION.pop * 1000 + 32);
+    return () => window.clearTimeout(timer);
+  }, []);
   picks.current = [
     () => {
       void store.forceReload();
@@ -353,29 +372,32 @@ function MenuBody({ onClose, onImportLogin }: { onClose: () => void; onImportLog
         </button>
       </div>
 
-      {/* 各按钮自带 title 语义，不叠加 role=group（Biome a11y：无对应原生元素） */}
+      {/* 行本身不标 role=group（Biome a11y：无对应原生元素）：预设条自带 radiogroup 语义与组名 */}
       <div className={styles.viewportRow}>
         <span className={styles.viewportLabel}>{t("browser.viewport.width")}</span>
-        {VIEWPORT_PRESETS.map((preset) => {
-          const active = store.viewportWidth === preset.width;
-          const Icon = preset.icon;
-          return (
-            <button
-              key={preset.key}
-              type="button"
-              className={[styles.viewportButton, active ? styles.viewportActive : ""].join(" ")}
-              title={
-                preset.width
-                  ? t("browser.viewport.preset", { width: preset.width })
-                  : t("browser.viewport.followPanel")
-              }
-              aria-pressed={active}
-              onClick={() => store.setViewport(preset.width)}
-            >
-              <Icon size={14} weight="regular" />
-            </button>
-          );
-        })}
+        <Segmented
+          key={measured ? "measured" : "entering"}
+          ariaLabel={t("browser.viewport.presetsLabel")}
+          className={styles.viewportSeg}
+          semantics="radio"
+          size="sm"
+          value={presetForWidth(store.viewportWidth)}
+          items={VIEWPORT_PRESETS.map((preset) => {
+            const Icon = preset.icon;
+            return {
+              value: preset.key,
+              label: null,
+              icon: <Icon size={14} weight="regular" />,
+              title: preset.width
+                ? t("browser.viewport.preset", { width: preset.width })
+                : t("browser.viewport.followPanel"),
+            };
+          })}
+          onChange={(key) => {
+            const preset = VIEWPORT_PRESETS.find((item) => item.key === key);
+            if (preset) store.setViewport(preset.width);
+          }}
+        />
         <input
           key={store.viewportWidth ?? "follow"}
           className={styles.viewportInput}

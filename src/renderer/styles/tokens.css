@@ -195,6 +195,10 @@
   /* 浮层内的小浮起元素（思考等级滑轨的 thumb）：比整壳阴影近一档 */
   --shadow-overlay-item: 0 2px 6px rgba(0, 0, 0, 0.25);
 
+  /** CSS 侧的缓动曲线：与 utils/motionTokens 的 GLIDE_MOTION.easeOut 同一条。
+      补间本身由 JS 定帧时间轴驱动，这里的曲线只服务 :active / 换墨色这类纯 CSS 微反馈。 */
+  --motion-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
   /* 磨砂玻璃（顶栏 + 左右侧栏）：配方见 styles/glass.module.css */
   --glass-bg: rgba(24, 24, 27, 0.5);
   /** 吸顶/覆盖类玻璃层：要盖住下层滚动内容，所以比 --glass-bg 实 */

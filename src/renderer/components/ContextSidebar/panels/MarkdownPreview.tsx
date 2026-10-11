@@ -1,8 +1,14 @@
 import { useT } from "../../../hooks/useT";
 import { MarkdownDoc } from "../../markdown/MarkdownDoc";
 import { CodeHighlight } from "../../ui/CodeHighlight";
+import { Segmented } from "../../ui/Segmented";
 import panelStyles from "./FilePanel.module.css";
 import styles from "./MarkdownPreview.module.css";
+
+const MODE_ITEMS: readonly { value: MarkdownViewMode; labelKey: string }[] = [
+  { value: "preview", labelKey: "panels.files.mdPreview" },
+  { value: "source", labelKey: "panels.files.mdSource" },
+];
 
 export type MarkdownViewMode = "preview" | "source";
 
@@ -31,24 +37,13 @@ export function MarkdownPreview({
   const t = useT();
   return (
     <div className={styles.wrap}>
-      <div className={styles.modeBar}>
-        <button
-          type="button"
-          aria-pressed={mode === "preview"}
-          className={mode === "preview" ? styles.modeBtnActive : styles.modeBtn}
-          onClick={() => onModeChange("preview")}
-        >
-          {t("panels.files.mdPreview")}
-        </button>
-        <button
-          type="button"
-          aria-pressed={mode === "source"}
-          className={mode === "source" ? styles.modeBtnActive : styles.modeBtn}
-          onClick={() => onModeChange("source")}
-        >
-          {t("panels.files.mdSource")}
-        </button>
-      </div>
+      <Segmented
+        className={styles.modeSeg}
+        size="sm"
+        value={mode}
+        items={MODE_ITEMS.map((item) => ({ value: item.value, label: t(item.labelKey) }))}
+        onChange={(next) => onModeChange(next)}
+      />
       {truncated && <p className={panelStyles.truncatedNote}>{t("panels.files.truncatedNote")}</p>}
       <div className={styles.body}>
         {mode === "preview" ? (

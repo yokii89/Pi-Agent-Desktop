@@ -377,43 +377,10 @@
   color: var(--color-text-muted);
 }
 
-.segmented {
-  display: inline-flex;
+/* 触发计划 / 运行方式两段的落点：表单分列是 flex column（align-items: stretch），
+   不写这句整条轨道会被拉成一列宽。 */
+.formSeg {
   align-self: flex-start;
-  padding: 3px;
-  gap: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-}
-
-.segment {
-  height: 28px;
-  padding: 0 var(--spacing-md);
-  border: none;
-  border-radius: calc(var(--radius-md) - 3px);
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  transition:
-    background-color 0.12s ease,
-    color 0.12s ease;
-}
-
-.segment:hover {
-  color: var(--color-text);
-  background: var(--color-bg-hover);
-}
-
-.segmentActive {
-  background: var(--color-accent);
-  color: var(--color-accent-text);
-}
-
-.segmentActive:hover {
-  background: var(--color-accent-hover);
-  color: var(--color-accent-text);
 }
 
 .weekdayRow {

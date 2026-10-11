@@ -1,0 +1,192 @@
+/* 横向分段控件（docs/design/52，复刻 docs/ui-design/rubber-segment-rubber-band.html）。
+   滑块不是一块移动的元素：它是铺满轨道的一份**文案副本**，只靠 clip-path 裁出左右两条边，
+   两条边由 utils/glideMotion 的定帧时间轴（封顶 60fps）补间。
+   所以这里没有任何关于"位置"的 transition——只剩换墨色与按压缩放这两条纯 CSS 微反馈。 */
+
+/* 皮肤与尺寸档一律走 --seg-* 变量：站点类名与本类同权重，直写 padding 之类
+   会随 CSS 打包顺序定胜负（与 --field-* / --row-* 同一条规则）。
+   默认值写在 :where() 里所以权重为 0——站点只要声明同名变量就能覆盖，不需要 `.x.x` 提权。 */
+:where(.root) {
+  --seg-h: 34px;
+  --seg-inset: 3px;
+  --seg-pad: var(--spacing-md);
+  --seg-min: 44px;
+  --seg-gap: 6px;
+  --seg-font: var(--font-size-md);
+  --seg-max: none;
+  --seg-radius: var(--radius-md);
+  --seg-track: var(--color-bg-surface);
+  --seg-border: var(--color-border);
+  --seg-border-width: 1px;
+  --seg-thumb: var(--color-bg-active);
+  --seg-ink: var(--color-text-muted);
+  --seg-ink-hover: var(--color-text);
+  --seg-ink-active: var(--color-text-strong);
+}
+
+.root {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+  padding: var(--seg-inset);
+  border: var(--seg-border-width) solid var(--seg-border);
+  border-radius: var(--seg-radius);
+  background: var(--seg-track);
+  font-family: inherit;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(.sm) {
+  --seg-h: 28px;
+  --seg-pad: 10px;
+  --seg-min: 36px;
+  --seg-font: var(--font-size-sm);
+}
+
+:where(.md) {
+  --seg-h: 34px;
+  --seg-pad: var(--spacing-md);
+  --seg-min: 44px;
+  --seg-font: var(--font-size-md);
+}
+
+:where(.lg) {
+  --seg-h: 40px;
+  --seg-pad: 18px;
+  --seg-min: 48px;
+  --seg-font: var(--font-size-md);
+}
+
+.viewport {
+  min-width: 0;
+}
+
+/* 撑满父容器档（原来靠 .modeTab{flex:1} 那类站点样式实现的"两个等宽段占满一列"）：
+   做成档位而不是让站点覆盖 display/width，否则又回到"同权重靠打包顺序定胜负"。 */
+.stretch {
+  display: flex;
+  width: 100%;
+}
+
+.stretch .viewport {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 只有会长满的长条（页签、扩展标签）才开横向滚动。
+   overflow-x 会连带把 overflow-y 也变成 auto，所以这一档的焦点环改画在里面，否则上半截被裁掉。 */
+.scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 轨道与滑块共用一套列定义：两者列宽必须逐列相同，副本才会严丝合缝地压在真标签上。
+   width: max-content + min-width: 100% 让轨道既能横向溢出滚动，又能在撑满时等分。 */
+.track,
+.thumb {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  justify-content: start;
+}
+
+.track {
+  position: relative;
+  width: max-content;
+  min-width: 100%;
+}
+
+.thumb {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--seg-thumb);
+  color: var(--seg-ink-active);
+  pointer-events: none;
+}
+
+/* 不等分档：两条网格一起改，列宽才会逐列相同（轨道用 offsetLeft/offsetWidth 量槽位） */
+.auto .track,
+.auto .thumb {
+  grid-auto-columns: auto;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--seg-gap);
+  height: calc(var(--seg-h) - var(--seg-inset) * 2);
+  min-width: var(--seg-min);
+  /* 长标签截断档：配合站点自己的 .xxxLabel{overflow:hidden;text-overflow:ellipsis} 用 */
+  max-width: var(--seg-max);
+  margin: 0;
+  padding: 0 var(--seg-pad);
+  border: 0;
+  border-radius: calc(var(--seg-radius) - var(--seg-inset) - 1px);
+  background: none;
+  color: var(--seg-ink);
+  font: inherit;
+  font-size: var(--seg-font);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+  transition:
+    color 160ms ease,
+    transform 160ms var(--motion-ease-out);
+}
+
+/* 选中项的墨色由滑块那层副本负责表达，本体被盖住；这条只是给"裁剪没跟上"兜底。 */
+.itemOn {
+  color: var(--seg-ink-active);
+}
+
+.thumb .item {
+  cursor: default;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .item:hover:not(:disabled) {
+    color: var(--seg-ink-hover);
+  }
+}
+
+.item:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.scroll .item:focus-visible {
+  outline-offset: -2px;
+}
+
+/* 整条禁用：与参考稿一致用 aria-disabled，保留焦点与读屏可达，只断掉指针。 */
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    transition: color 160ms ease;
+  }
+}

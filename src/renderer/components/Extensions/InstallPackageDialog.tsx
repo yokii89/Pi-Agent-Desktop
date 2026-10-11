@@ -4,12 +4,15 @@ import type { ExtensionPushMessage } from "../../../shared/ipc";
 import { useT } from "../../hooks/useT";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
+import { Segmented, type SegmentedItem } from "../ui/Segmented";
 import styles from "./ExtensionsPage.module.css";
 
 export interface InstallPackageRequest {
   source: string;
   local: boolean;
 }
+
+type InstallScope = "global" | "project";
 
 interface InstallPackageDialogProps {
   open: boolean;
@@ -53,6 +56,16 @@ export function InstallPackageDialog({
 
   const canSubmit = source.trim().length > 0 && !installing;
 
+  const scopeItems: readonly SegmentedItem<InstallScope>[] = [
+    { value: "global", label: t("extensions.scope.user"), disabled: installing },
+    {
+      value: "project",
+      label: t("extensions.scope.project"),
+      disabled: installing || !hasProject,
+      title: hasProject ? undefined : t("extensions.installDialog.needProject"),
+    },
+  ];
+
   return (
     <Modal
       open={open}
@@ -81,25 +94,13 @@ export function InstallPackageDialog({
         </div>
         <div>
           <span className={styles.fieldLabel}>{t("extensions.installDialog.installTo")}</span>
-          <div className={styles.scopeRow}>
-            <button
-              type="button"
-              className={[styles.scopeOption, local ? "" : styles.scopeOptionActive].join(" ")}
-              disabled={installing}
-              onClick={() => setLocal(false)}
-            >
-              {t("extensions.scope.user")}
-            </button>
-            <button
-              type="button"
-              className={[styles.scopeOption, local ? styles.scopeOptionActive : ""].join(" ")}
-              disabled={installing || !hasProject}
-              title={hasProject ? undefined : t("extensions.installDialog.needProject")}
-              onClick={() => setLocal(true)}
-            >
-              {t("extensions.scope.project")}
-            </button>
-          </div>
+          <Segmented
+            stretch
+            ariaLabel={t("extensions.installDialog.installTo")}
+            value={local ? "project" : "global"}
+            items={scopeItems}
+            onChange={(next) => setLocal(next === "project")}
+          />
         </div>
         <p className={styles.warning}>{t("extensions.installDialog.warning")}</p>
         {error ? <p className={styles.errorBanner}>{error}</p> : null}

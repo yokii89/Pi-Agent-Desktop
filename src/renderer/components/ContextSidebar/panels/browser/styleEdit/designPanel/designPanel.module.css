@@ -412,50 +412,27 @@
   min-width: 0;
 }
 
-.segment {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  border: none;
-  min-width: 0;
+/* 纯图标档：28×28 定宽格子。bare 不铺轨道也不描边（旧 fieldset 同样是裸的），
+   bordered 只是换一层壳——段高加 2×2px 内缩，格子仍是 28px。
+   类名写两遍是为了在与原语 .root/.sm 的 --seg-* 同名声明之争里稳定胜出。 */
+.segmentSeg {
+  --seg-h: 28px;
+  --seg-inset: 0px;
+  --seg-pad: 0px;
+  --seg-min: 28px;
+  --seg-gap: 0px;
+  --seg-radius: calc(var(--radius-sm) + 1px);
+  --seg-track: transparent;
+  --seg-border: transparent;
+  --seg-ink-active: var(--color-text);
 }
 
-.segmentBordered {
-  padding: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-}
-
-.segmentBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-
-.segmentBtn:hover:not(:disabled) {
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-}
-
-.segmentBtnOn {
-  background: var(--color-bg-active);
-  color: var(--color-text);
-}
-
-.segmentBtn:disabled {
-  opacity: 0.4;
-  cursor: default;
+.segmentSegBordered {
+  --seg-h: 32px;
+  --seg-inset: 2px;
+  --seg-radius: var(--radius-md);
+  --seg-track: var(--color-bg-surface);
+  --seg-border: var(--color-border);
 }
 
 .segmentAside {

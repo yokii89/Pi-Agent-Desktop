@@ -5,6 +5,7 @@ import { useT } from "../../../../hooks/useT";
 import { useBrowserStore } from "../../../../stores/browserStore";
 import { useInspectorStore } from "../../../../stores/inspectorStore";
 import { useStyleEditStore } from "../../../../stores/styleEditStore";
+import { Segmented } from "../../../ui/Segmented";
 import styles from "./BrowserInspector.module.css";
 import { AdjustPanel } from "./styleEdit/AdjustPanel";
 import { DesignPanel } from "./styleEdit/designPanel/DesignPanel";
@@ -288,30 +289,19 @@ export function StylesTab({ compact }: { compact: boolean }) {
         onDismissNav={edit.dismissNavCleared}
       />
 
-      <div
-        className={editStyles.modeSwitch}
-        role="tablist"
-        aria-label={t("browser.design.modeLabel")}
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "design"}
-          className={[editStyles.modeTab, mode === "design" ? editStyles.modeTabOn : ""].join(" ")}
-          onClick={() => setMode("design")}
-        >
-          {t("browser.design.mode.design")}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "css"}
-          className={[editStyles.modeTab, mode === "css" ? editStyles.modeTabOn : ""].join(" ")}
-          onClick={() => setMode("css")}
-        >
-          {t("browser.design.mode.css")}
-        </button>
-      </div>
+      <Segmented
+        ariaLabel={t("browser.design.modeLabel")}
+        className={editStyles.designSeg}
+        semantics="tab"
+        stretch
+        size="sm"
+        value={mode}
+        items={[
+          { value: "design", label: t("browser.design.mode.design") },
+          { value: "css", label: t("browser.design.mode.css") },
+        ]}
+        onChange={(next) => setMode(next)}
+      />
 
       {mode === "design" ? (
         <DesignPanel disabled={Boolean(stale) || edit.currentNodeId === null} />

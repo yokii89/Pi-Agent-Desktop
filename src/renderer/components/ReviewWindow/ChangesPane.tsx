@@ -14,6 +14,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { ROLLBACK_BLOCK_REASON_TEXT } from "../../utils/rollbackLastRound";
 import { type CacheEntry, FileDiffInline } from "../Review/FileDiffInline";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { Segmented } from "../ui/Segmented";
 import { ChangeList } from "./ChangeList";
 import styles from "./ChangesPane.module.css";
 import { CommitBar } from "./CommitBar";
@@ -309,27 +310,26 @@ function ChangesPaneImpl() {
       )}
       <div className={styles.content}>
         <div className={styles.listCol}>
-          <div
-            className={styles.filterRow}
-            role="tablist"
-            aria-label={t("panels.review.filterLabel")}
-          >
-            {filters.map((filter) => (
-              <button
-                key={filter.mode}
-                type="button"
-                role="tab"
-                aria-selected={filterMode === filter.mode}
-                className={[
-                  styles.filterChip,
-                  filterMode === filter.mode ? styles.filterChipActive : "",
-                ].join(" ")}
-                onClick={() => setFilterMode(filter.mode)}
-              >
-                {t(filter.labelKey)}
-                <span className={styles.filterCount}>{filter.count}</span>
-              </button>
-            ))}
+          <div className={styles.filterRow}>
+            <Segmented
+              className={styles.filterSeg}
+              size="sm"
+              semantics="tab"
+              equal={false}
+              scrollable
+              ariaLabel={t("panels.review.filterLabel")}
+              value={filterMode}
+              items={filters.map((filter) => ({
+                value: filter.mode,
+                label: (
+                  <>
+                    {t(filter.labelKey)}
+                    <span className={styles.filterCount}>{filter.count}</span>
+                  </>
+                ),
+              }))}
+              onChange={(mode) => setFilterMode(mode)}
+            />
           </div>
           {visibleChanges.length > 0 ? (
             <ChangeList

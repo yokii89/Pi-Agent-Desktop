@@ -210,6 +210,24 @@ import { Play } from "@phosphor-icons/react";
 - **对话框里的下拉必须能正常用键盘**：`ui/Modal` 的 Tab 焦点陷阱认 `data-overlay-panel` 标记，
   自绘浮层（不走 Popover 的那些）也要挂这个属性，否则焦点被抢回 Modal、列表再也 Tab 不动。
 
+### 横向分段控件：唯一入口 `ui/Segmented`（docs/design/52）
+
+横向互斥的 Tag / 分段选择（主题、Shell、字号、右侧边栏 tab、页签条…）**一律用 `ui/Segmented`**，
+禁止再手写 `.segmented` / `.tab` / `.scopeTab` 那一类"各自一块底色"的分段条——它表达不了"选中项在移动"。
+
+- **动效是裁剪，不是位移**：滑块是铺满轨道的一份文案副本，只由 `clip-path: inset(0 右 0 左 round 圆角)`
+  裁出左右两条边，两条边各自补间（张开 → 交接 → 前缘弹簧弹入 → 后缘过冲松弛）。
+  因此**不要给它加 `transition`**，位置一律由 JS 写内联 `clip-path`。
+- **帧率与浮层同一个真值**：走 `utils/glideMotion` 的定帧时间轴（`GLIDE_MOTION.fps`，60fps），
+  时序登记在 `SEGMENT_MOTION`；弹簧用同文件新增的 `glideSpring()`（阻尼振子闭式解），
+  不要退回逐帧数值积分或 CSS 近似。
+- **槽位必须用 `offsetLeft/offsetWidth`（布局坐标）量**，不能用 `getBoundingClientRect`：
+  浮层入场时祖先挂着 `scale(0.95)`，rect 会把槽位量小一档。
+- 语义按站点原有表达传 `semantics`（`toggle` / `tab` / `radio`），不要为了统一形态改掉读屏公告；
+  尺寸皮肤差异**只走 `--seg-*` 变量**（默认值声明在 `:where()` 里，站点单类名即可覆盖，不要写双类名提权）。
+- **可关闭的文档页签不属于它**：项内带关闭 × / 重命名输入框的（终端页签、浏览器页签）留作待统一，
+  要转得先给原语加"项内可放交互控件"的形态，别在站点绕。
+
 ## Git 约定
 
 - 分支：`main` 为稳定分支，功能开发用 `feat/<主题>`、修复用 `fix/<主题>`。

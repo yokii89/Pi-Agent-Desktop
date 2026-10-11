@@ -6,6 +6,7 @@ import { useT } from "../../hooks/useT";
 import { usageService } from "../../services/usageService";
 import { formatCost, formatTokens } from "../../utils/formatTokens";
 import { IconButton } from "../ui/IconButton";
+import { Segmented } from "../ui/Segmented";
 import { Select } from "../ui/Select";
 import { SettingsSection } from "./SettingRow";
 import settingsStyles from "./Settings.module.css";
@@ -198,21 +199,12 @@ export function UsagePanel() {
       <h2 className={settingsStyles.panelTitle}>{t("settings.section.usage")}</h2>
 
       <div className={styles.toolbar}>
-        <div className={settingsStyles.segmented}>
-          {RANGES.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className={[
-                settingsStyles.segment,
-                range === value ? settingsStyles.segmentActive : "",
-              ].join(" ")}
-              onClick={() => setRange(value)}
-            >
-              {t(RANGE_KEYS[value])}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          ariaLabel={t("settings.usage.rangeLabel")}
+          value={range}
+          items={RANGES.map((value) => ({ value, label: t(RANGE_KEYS[value]) }))}
+          onChange={(next) => setRange(next)}
+        />
         <IconButton
           title={t("settings.usage.refresh")}
           onClick={() => {

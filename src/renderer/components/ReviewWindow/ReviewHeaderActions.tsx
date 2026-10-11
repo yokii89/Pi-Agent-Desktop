@@ -3,6 +3,7 @@ import { useT } from "../../hooks/useT";
 import { useReviewStore } from "../../stores/reviewStore";
 import { useUiStore } from "../../stores/uiStore";
 import { IconButton } from "../ui/IconButton";
+import { Segmented } from "../ui/Segmented";
 import styles from "./ReviewWindow.module.css";
 
 /**
@@ -23,26 +24,19 @@ export function ReviewHeaderActions() {
 
   return (
     <>
-      <div className={styles.tabs} role="tablist" aria-label={t("panels.review.viewLabel")}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={reviewView === "changes"}
-          className={[styles.tab, reviewView === "changes" ? styles.tabActive : ""].join(" ")}
-          onClick={() => setReviewView("changes")}
-        >
-          {t("panels.review.viewChanges")}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={reviewView === "graph"}
-          className={[styles.tab, reviewView === "graph" ? styles.tabActive : ""].join(" ")}
-          onClick={() => setReviewView("graph")}
-        >
-          {t("panels.review.viewGraph")}
-        </button>
-      </div>
+      <Segmented
+        className={styles.tabs}
+        size="sm"
+        semantics="tab"
+        equal={false}
+        ariaLabel={t("panels.review.viewLabel")}
+        value={reviewView}
+        items={[
+          { value: "changes", label: t("panels.review.viewChanges") },
+          { value: "graph", label: t("panels.review.viewGraph") },
+        ]}
+        onChange={(view) => setReviewView(view)}
+      />
       <div className={styles.spacer} />
       {reviewView === "changes" && phase === "ready" && (
         <span className={styles.summaryChip}>

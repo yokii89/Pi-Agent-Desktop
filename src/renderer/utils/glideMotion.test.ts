@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { glide, makeCubicBezier, mix } from "./glideMotion";
-import { GLIDE_MOTION } from "./motionTokens";
+import { glide, glideSpring, makeCubicBezier, mix, springAt } from "./glideMotion";
+import { GLIDE_MOTION, SEGMENT_MOTION } from "./motionTokens";
 
 /**
  * 定帧时间轴（封顶 60fps）与贝塞尔曲线的纯逻辑验证（vitest 只跑无 DOM 的部分，见 AGENTS.md「测试」）。
@@ -110,6 +110,90 @@ describe("glide 60fps 调度", () => {
     glide({ duration: 0, onUpdate: (p) => (final = p), onComplete: () => completed++ });
     expect(final).toBe(1);
     expect(completed).toBe(1);
+  });
+});
+
+describe("springAt 阻尼振子闭式解", () => {
+  const T = SEGMENT_MOTION.land;
+
+  it("t=0 精确在起点（from = to + y0）", () => {
+    expect(springAt(10, 0, 100, T, 0, 0)[0]).toBeCloseTo(110, 9);
+  });
+
+  it("临界阻尼单调逼近、全程不过冲", () => {
+    let previous = 110;
+    for (let t = 0; t <= T * 1.5; t += 0.002) {
+      const [value] = springAt(10, 0, 100, T, 0, t);
+      expect(value).toBeLessThanOrEqual(previous + 1e-9);
+      expect(value).toBeGreaterThanOrEqual(100 - 1e-9);
+      previous = value;
+    }
+  });
+
+  it("整定时长末值已收到初偏移的 1% 以内", () => {
+    const y0 = -80;
+    const [value] = springAt(y0, 0, 100, T, 0, T);
+    expect(Math.abs(value - 100)).toBeLessThan(Math.abs(y0) * 0.01);
+  });
+
+  it("初速度接管：t=0 的解析速度就是交进来的速度", () => {
+    // 半途换向时靠这条保证速度没有台阶
+    expect(springAt(-40, 900, 100, T, 0, 0)[1]).toBeCloseTo(900, 6);
+  });
+
+  it("bounce>0 才会外弹", () => {
+    let peak = -Infinity;
+    for (let t = 0; t <= T * 2; t += 0.002) {
+      peak = Math.max(peak, springAt(-80, 0, 100, T, 0.4, t)[0]);
+    }
+    expect(peak).toBeGreaterThan(100);
+  });
+});
+
+describe("glideSpring 定帧调度", () => {
+  /** land(0.3) × 1.12 = 336ms，60fps 下约 20 帧。 */
+  const FRAMES = Math.ceil((SEGMENT_MOTION.land * 1.12 * 1000) / (1000 / 60));
+
+  it("60Hz 取帧逐帧推进，收尾精确落位", () => {
+    const clock = installFakeClock();
+    const seen: number[] = [];
+    let done = 0;
+    glideSpring({
+      from: 0,
+      to: 100,
+      duration: SEGMENT_MOTION.land,
+      onUpdate: (value) => seen.push(value),
+      onComplete: () => done++,
+    });
+
+    for (let i = 0; i < FRAMES + 20; i++) clock.tick(1000 / 60);
+
+    expect(seen.length).toBeLessThanOrEqual(FRAMES + 2);
+    expect(done).toBe(1);
+    // 最后一步不是"差一点点"，而是精确等于目标，滑块不会停在裁不干净的边界上
+    expect(seen[seen.length - 1]).toBe(100);
+  });
+
+  it("144Hz 取帧不会超发（封顶 60fps）", () => {
+    const clock = installFakeClock();
+    let updates = 0;
+    glideSpring({
+      from: 0,
+      to: 100,
+      duration: SEGMENT_MOTION.land,
+      onUpdate: () => updates++,
+    });
+
+    for (let i = 0; i < 90; i++) clock.tick(1000 / 144);
+
+    expect(updates).toBeLessThanOrEqual(FRAMES + 2);
+  });
+
+  it("时长为 0 直接落终态", () => {
+    installFakeClock();
+    let final = -1;
+    glideSpring({ from: 0, to: 42, duration: 0, onUpdate: (value) => (final = value) });
+    expect(final).toBe(42);
   });
 });
 

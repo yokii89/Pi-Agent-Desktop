@@ -3,6 +3,7 @@ import { FONT_MONO_PRESETS, FONT_UI_PRESETS } from "../../../shared/fontPresets"
 import { RAIL_STYLES } from "../../../shared/railStyles";
 import { useT } from "../../hooks/useT";
 import { useUiStore } from "../../stores/uiStore";
+import { Segmented } from "../ui/Segmented";
 import { Select } from "../ui/Select";
 import { RailStyleSwatch } from "./RailStyleSwatch";
 import { SettingRow, SettingsSection } from "./SettingRow";
@@ -80,25 +81,16 @@ export function PersonalizationPanel() {
           label={t("settings.personalization.streamFont")}
           description={t("settings.personalization.streamFont.description")}
           control={
-            <div className={styles.segmented}>
-              {FONT_SIZE_OPTIONS.map((option) => (
-                <button
-                  key={option.px}
-                  type="button"
-                  aria-pressed={sessionStreamFontPx === option.px}
-                  className={[
-                    styles.segment,
-                    sessionStreamFontPx === option.px ? styles.segmentActive : "",
-                  ]
-                    .join(" ")
-                    .trim()}
-                  disabled={!hydrated}
-                  onClick={() => dispatch({ type: "setSessionStreamFont", px: option.px })}
-                >
-                  {t(option.labelKey)}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              ariaLabel={t("settings.personalization.streamFont")}
+              value={String(sessionStreamFontPx)}
+              items={FONT_SIZE_OPTIONS.map((option) => ({
+                value: String(option.px),
+                label: t(option.labelKey),
+                disabled: !hydrated,
+              }))}
+              onChange={(next) => dispatch({ type: "setSessionStreamFont", px: Number(next) })}
+            />
           }
         />
         <SettingRow

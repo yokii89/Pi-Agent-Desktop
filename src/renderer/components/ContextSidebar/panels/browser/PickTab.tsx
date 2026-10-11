@@ -11,6 +11,7 @@ import type { BrowserPickMode } from "../../../../../shared/ipc";
 import { useT } from "../../../../hooks/useT";
 import { useBrowserStore } from "../../../../stores/browserStore";
 import { useInspectorStore } from "../../../../stores/inspectorStore";
+import { Segmented } from "../../../ui/Segmented";
 import styles from "./BrowserInspector.module.css";
 
 /**
@@ -56,24 +57,23 @@ export function PickTab() {
         </p>
       ) : (
         <>
-          <div className={styles.modeSwitch}>
-            {MODES.map((mode) => {
+          <Segmented
+            ariaLabel={t("browser.pick.modeLabel")}
+            className={styles.pickSeg}
+            semantics="toggle"
+            stretch
+            size="sm"
+            value={browser.pickMode}
+            items={MODES.map((mode) => {
               const Icon = mode.icon;
-              const selected = mode.id === browser.pickMode;
-              return (
-                <button
-                  key={mode.id}
-                  type="button"
-                  aria-pressed={selected}
-                  className={[styles.modeButton, selected ? styles.modeButtonActive : ""].join(" ")}
-                  onClick={() => browser.setPickMode(mode.id)}
-                >
-                  <Icon size={14} weight={selected ? "fill" : "regular"} />
-                  {t(mode.labelKey)}
-                </button>
-              );
+              return {
+                value: mode.id,
+                label: t(mode.labelKey),
+                icon: <Icon size={14} weight={mode.id === browser.pickMode ? "fill" : "regular"} />,
+              };
             })}
-          </div>
+            onChange={(mode) => browser.setPickMode(mode)}
+          />
           <p className={styles.modeHint}>
             {t(activeMode.hintKey)}
             {t("browser.pick.modeFooter")}

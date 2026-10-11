@@ -12,9 +12,13 @@ import { useT } from "../../hooks/useT";
 import { projectService } from "../../services/projectService";
 import { useProjectStore } from "../../stores/projectStore";
 import { Button } from "../ui/Button";
+import { Segmented } from "../ui/Segmented";
 import { Select } from "../ui/Select";
 import styles from "./ScheduledTasksPage.module.css";
 import { ALL_WEEKDAYS, type FormState, type ModeId, type TargetId } from "./scheduledTaskForm";
+
+const MODES: readonly ModeId[] = ["interval", "daily", "once"];
+const TARGETS: readonly TargetId[] = ["new", "bound"];
 
 interface ScheduledTaskFormStepProps {
   form: FormState;
@@ -117,28 +121,17 @@ export function ScheduledTaskFormStep({
           {t("scheduled.dialog.schedule")}
         </h3>
 
-        <div
-          className={styles.segmented}
-          role="tablist"
-          aria-label={t("scheduled.dialog.schedule")}
-        >
-          {(["interval", "daily", "once"] as ModeId[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              role="tab"
-              aria-selected={form.mode === mode}
-              className={[styles.segment, form.mode === mode ? styles.segmentActive : ""].join(" ")}
-              onClick={() => onPatch({ mode })}
-            >
-              {mode === "interval"
-                ? t("scheduled.dialog.schedule.interval")
-                : mode === "daily"
-                  ? t("scheduled.dialog.schedule.daily")
-                  : t("scheduled.dialog.schedule.once")}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          className={styles.formSeg}
+          semantics="tab"
+          ariaLabel={t("scheduled.dialog.schedule")}
+          value={form.mode}
+          items={MODES.map((mode) => ({
+            value: mode,
+            label: t(`scheduled.dialog.schedule.${mode}`),
+          }))}
+          onChange={(mode) => onPatch({ mode })}
+        />
 
         {form.mode === "interval" ? (
           <div className={styles.field}>
@@ -226,25 +219,17 @@ export function ScheduledTaskFormStep({
           {t("scheduled.dialog.target")}
         </h3>
 
-        <div className={styles.segmented}>
-          {(["new", "bound"] as TargetId[]).map((target) => (
-            <button
-              key={target}
-              type="button"
-              aria-pressed={form.target === target}
-              className={[styles.segment, form.target === target ? styles.segmentActive : ""].join(
-                " ",
-              )}
-              onClick={() =>
-                onPatch(target === "new" ? { target: "new", sessionFile: "" } : { target: "bound" })
-              }
-            >
-              {target === "new"
-                ? t("scheduled.dialog.target.new")
-                : t("scheduled.dialog.target.bound")}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          className={styles.formSeg}
+          value={form.target}
+          items={TARGETS.map((target) => ({
+            value: target,
+            label: t(`scheduled.dialog.target.${target}`),
+          }))}
+          onChange={(target) =>
+            onPatch(target === "new" ? { target: "new", sessionFile: "" } : { target: "bound" })
+          }
+        />
 
         {form.target === "new" ? (
           <span className={styles.fieldDescription}>

@@ -14,6 +14,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { PanelMount } from "../ExtensionView/PanelMount";
 import { ReviewPanel } from "../ReviewWindow/ReviewPanel";
 import { IconButton } from "../ui/IconButton";
+import { Segmented, type SegmentedItem } from "../ui/Segmented";
 import styles from "./ContextSidebar.module.css";
 import { BrowserPanel } from "./panels/BrowserPanel";
 import { FilePanel } from "./panels/FilePanel";
@@ -101,7 +102,7 @@ export function ContextSidebar() {
   const { visiblePanels: panels, catalogPanelRows, activateViewOpen } = useExtensionViewStore();
   const { ensureSession } = useSessionMeta();
   const rootRef = useRef<HTMLElement>(null);
-  const tabScrollerRef = useRef<HTMLDivElement>(null);
+  const tabBarRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<ResizeSession | null>(null);
   // 拖拽中的宽度直接写网格根元素的 CSS 变量（不经 React 渲染），松手时一次性提交 store，
   // 避免拖拽帧反复重渲染全局（与终端面板高度拖拽同一策略）
@@ -129,18 +130,21 @@ export function ContextSidebar() {
   ].join("|");
 
   // 单行 tab 永不换行：带文案放得下就展示文案，放不下收成纯图标。
-  // 用 scrollWidth 实测而不是固定阈值——扩展 Tab 多寡决定所需宽度，280px 之类写死值会漏。
+  // 用轨道视口的 scrollWidth 实测而不是固定阈值——扩展 Tab 多寡决定所需宽度，280px 之类写死值会漏。
   // biome-ignore lint/correctness/useExhaustiveDependencies: tabListKey 是「清单变化的触发信号」，宽度从 DOM 实测
   useLayoutEffect(() => {
-    const el = tabScrollerRef.current;
-    if (!el) return;
+    // 只在本行里找：侧栏 body 里嵌着浏览器检查器等别的分段轨道，从 aside 查会拿到错的实例
+    const row = tabBarRef.current;
+    const strip = row?.querySelector<HTMLElement>("[data-seg-root]");
+    const viewport = row?.querySelector<HTMLElement>("[data-seg-viewport]");
+    if (!row || !strip || !viewport) return;
     const measure = (): void => {
-      // 强制展开完整形态（文案 + 标准 padding）量「带标签」自然宽，
-      // 避免在 iconOnly 态量出偏小的宽度而在临界点来回改判
-      el.classList.add(styles.measuring);
-      const fullWidth = el.scrollWidth;
-      const available = el.clientWidth;
-      el.classList.remove(styles.measuring);
+      // 临时挂上 .measuring 强制展开完整形态（文案 + 标准 padding），量完立刻撤掉；
+      // 这一步不能经 React 渲染，否则展开态会被当成真的换行失败而反复改判
+      strip.classList.add(styles.measuring);
+      const fullWidth = viewport.scrollWidth;
+      const available = viewport.clientWidth;
+      strip.classList.remove(styles.measuring);
       setIconOnly((prev) => {
         // 进入纯图标：文案放不下；退出：留出滞回量才重新展开，避免临界宽度闪烁
         const next = prev ? fullWidth + ICON_ONLY_EXIT_MARGIN > available : fullWidth > available;
@@ -149,7 +153,7 @@ export function ContextSidebar() {
     };
     measure();
     const observer = new ResizeObserver(measure);
-    observer.observe(el);
+    observer.observe(viewport);
     return () => observer.disconnect();
   }, [tabListKey]);
 
@@ -264,6 +268,48 @@ export function ContextSidebar() {
     };
   }, [rightSidebarWidth, navCollapsed, dispatch]);
 
+  const tabItems: SegmentedItem<RightSidebarTab>[] = [
+    ...systemTabs.map((tab) => {
+      const Icon = tab.icon;
+      const label = t(tab.labelKey);
+      return {
+        value: tab.id,
+        title: label,
+        ariaLabel: label,
+        icon: <Icon size={16} weight="regular" />,
+        label: <span className={styles.tabLabel}>{label}</span>,
+      };
+    }),
+    ...panels.map((panel) => {
+      const label = panel.title || t("panels.context.extensionFallback");
+      return {
+        value: panelTabKey(panel.panelId ?? `ext-${panel.id}`),
+        title: label,
+        ariaLabel: label,
+        icon: <PuzzlePiece size={16} weight="regular" />,
+        label: <span className={styles.tabLabel}>{label}</span>,
+      };
+    }),
+    // Catalog-only panel（docs/design/19 §10.1）：未连接占位，点击 view:open 激活
+    ...catalogPanelRows.map((row) => {
+      const activating = row.state === "activating";
+      return {
+        value: `cat:${row.id}` as RightSidebarTab,
+        title: row.description ? `${row.title} — ${row.description}` : row.title,
+        ariaLabel: row.title,
+        disabled: activating,
+        icon: <PuzzlePiece size={16} weight="regular" />,
+        label: (
+          <span
+            className={activating ? `${styles.tabLabel} ${styles.tabPending}` : styles.tabLabel}
+          >
+            {activating ? t("panels.context.connecting") : row.title}
+          </span>
+        ),
+      };
+    }),
+  ];
+
   return (
     <aside ref={rootRef} className={styles.sidebar} aria-label={t("panels.context.sidebarLabel")}>
       <div
@@ -272,107 +318,49 @@ export function ContextSidebar() {
         onPointerDown={onResizeStart}
         onPointerMove={onResizeMove}
       />
-      <div className={styles.tabBar}>
-        {/* 可滚动单行 tab 区：放不下先收文案成纯图标，仍放不下则横向滚动；
-            关闭按钮留在滚动区外，始终可见 */}
-        <div
-          ref={tabScrollerRef}
-          className={[styles.tabScroller, iconOnly ? styles.iconOnly : ""].join(" ")}
-          role="tablist"
-          aria-label={t("panels.context.tabList")}
+      <div
+        ref={tabBarRef}
+        className={[styles.tabBar, iconOnly ? styles.tabBarIcon : ""].filter(Boolean).join(" ")}
+      >
+        {/* 审查入口：toggleReview 随形态行事——停靠态 = 切换 review 面板 tab，
+            浮窗态 = 开/关浮窗。高亮 = 审查在当前形态下可见。
+            它是 toggle 而不是轨道里的一项：浮窗态下审查高亮时轨道仍停在「文件」，
+            两处同时成立的关系没法用一条互斥的橡皮筋表达，所以留在轨道外。 */}
+        <button
+          type="button"
+          title={t("panels.context.review")}
+          aria-label={t("panels.context.review")}
+          aria-pressed={reviewActive}
+          className={[styles.reviewToggle, reviewActive ? styles.reviewToggleOn : ""]
+            .filter(Boolean)
+            .join(" ")}
+          onClick={toggleReview}
         >
-          {/* 审查入口：toggleReview 随形态行事——停靠态 = 切换 review 面板 tab，
-              浮窗态 = 开/关浮窗。高亮 = 审查在当前形态下可见。
-              tablist 里的非 role=tab 按钮，语义用 aria-pressed 表达。 */}
-          <button
-            type="button"
-            title={t("panels.context.review")}
-            aria-label={t("panels.context.review")}
-            aria-pressed={reviewActive}
-            className={[styles.tab, reviewActive ? styles.tabActive : ""].join(" ")}
-            onClick={toggleReview}
-          >
-            <GitPullRequest size={16} weight="regular" />
-            <span className={styles.tabLabel}>{t("panels.context.review")}</span>
-          </button>
-          {systemTabs.map((tab) => {
-            const active = tab.id === rightSidebarTab;
-            const Icon = tab.icon;
-            const label = t(tab.labelKey);
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                title={label}
-                aria-label={label}
-                className={[styles.tab, active ? styles.tabActive : ""].join(" ")}
-                onClick={() => dispatch({ type: "setRightSidebar", open: true, tab: tab.id })}
-              >
-                <Icon size={16} weight="regular" />
-                <span className={styles.tabLabel}>{label}</span>
-              </button>
-            );
-          })}
-          {panels.map((panel) => {
-            const tabId = panelTabKey(panel.panelId ?? `ext-${panel.id}`);
-            const active = tabId === rightSidebarTab;
-            const label = panel.title || t("panels.context.extensionFallback");
-            return (
-              <button
-                key={panel.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                title={label}
-                aria-label={label}
-                className={[styles.tab, active ? styles.tabActive : ""].join(" ")}
-                onClick={() => dispatch({ type: "setRightSidebar", open: true, tab: tabId })}
-              >
-                <PuzzlePiece size={16} weight="regular" />
-                <span className={styles.tabLabel}>{label}</span>
-              </button>
-            );
-          })}
-          {/* Catalog-only panel（docs/design/19 §10.1）：未连接占位，点击 view:open 激活 */}
-          {catalogPanelRows.map((row) => {
-            const tabId = `cat:${row.id}` as RightSidebarTab;
-            const active = tabId === rightSidebarTab;
-            const activating = row.state === "activating";
-            return (
-              <button
-                key={row.key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                title={row.description ? `${row.title} — ${row.description}` : row.title}
-                aria-label={row.title}
-                disabled={activating}
-                className={[
-                  styles.tab,
-                  active ? styles.tabActive : "",
-                  activating ? styles.tabPending : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => {
-                  dispatch({ type: "setRightSidebar", open: true, tab: tabId });
-                  if (row.state === "activating") return;
-                  void activateViewOpen({
-                    contributionKey: row.contributionKey,
-                    prepareSession: () => ensureSession("view-action"),
-                  });
-                }}
-              >
-                <PuzzlePiece size={16} weight="regular" />
-                <span className={styles.tabLabel}>
-                  {activating ? t("panels.context.connecting") : row.title}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+          <GitPullRequest size={16} weight="regular" />
+          <span className={styles.tabLabel}>{t("panels.context.review")}</span>
+        </button>
+        {/* 单行 tab 轨道：永不换行；放不下先由上面的实测收成纯图标，仍放不下则横向滚动；
+            关闭按钮留在滚动区外，始终可见 */}
+        <Segmented
+          className={[styles.tabStrip, iconOnly ? styles.tabStripIcon : ""]
+            .filter(Boolean)
+            .join(" ")}
+          ariaLabel={t("panels.context.tabList")}
+          semantics="tab"
+          equal={false}
+          scrollable
+          value={rightSidebarTab}
+          items={tabItems}
+          onChange={(tab) => {
+            dispatch({ type: "setRightSidebar", open: true, tab });
+            const row = catalogPanelRows.find((r) => `cat:${r.id}` === tab);
+            if (!row || row.state === "activating") return;
+            void activateViewOpen({
+              contributionKey: row.contributionKey,
+              prepareSession: () => ensureSession("view-action"),
+            });
+          }}
+        />
         <IconButton
           title={t("panels.context.collapseSidebar")}
           onClick={() => dispatch({ type: "toggleRightSidebar" })}

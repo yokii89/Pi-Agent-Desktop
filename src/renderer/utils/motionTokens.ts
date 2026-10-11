@@ -21,8 +21,6 @@ export const NAV_MOTION = {
   press: 0.12,
   /** 引用块落点高亮的淡出时长（docs/design/12 P1-2）。 */
   quoteFlash: 0.8,
-  /** 分区标签切换时的横向补间。 */
-  labelSlider: 0.24,
   /** 标准缓出（GSAP 幂次曲线）：用于"出现/展开"。 */
   easeOut: "power3.out",
   /** 标准缓入：用于"消失/收起"，让收尾更干脆。 */
@@ -55,6 +53,30 @@ export const GLIDE_MOTION = {
   chevron: 0.2,
   /** 选中值换字（淡入 + 去模糊）。 */
   swap: 0.16,
+} as const;
+
+/**
+ * 横向分段控件的橡皮筋动效令牌（docs/design/52，复刻 `docs/ui-design/rubber-segment-rubber-band.html`）。
+ * 曲线复用 GLIDE_MOTION.easeOut、时间轴复用 glideMotion（同为封顶 60fps），
+ * 这里只管"两条边各自怎么走"的时序——滑块不是移动的元素，而是被 clip-path 裁出来的文案副本。
+ */
+export const SEGMENT_MOTION = {
+  /** 张开：两条边先撑到能同时罩住起点槽与终点槽。 */
+  dilate: 0.19,
+  /** 交接时刻：张开演到这里就让前缘带着速度弹进目标槽，后缘还在原地。 */
+  handoff: 0.15,
+  /** 前缘弹入时长（临界阻尼，到位不外弹）。 */
+  land: 0.3,
+  /** 后缘冲过目标边之后的松弛时长。 */
+  settle: 0.16,
+  /** 落位弹簧的回弹系数（ζ = 1 - bounce）；0 为临界阻尼。 */
+  bounce: 0,
+  /** 后缘过冲像素：多冲这么多再松弛回去，就是橡皮筋"扯一下"的那下。 */
+  squash: 3,
+  /** 张开幅度（100 = 恰好罩住起点槽与终点槽的并集，0 = 没有橡皮筋）。 */
+  stretch: 100,
+  /** 半途被打断时允许接管的最大边速度（px/s），防止连续点击把滑块甩出轨道。 */
+  maxVelocity: 2000,
 } as const;
 
 /**

@@ -281,45 +281,18 @@
   min-width: 0;
 }
 
+/* 页签条：ui/Segmented 的落点皮肤。每枚 chip 自己那圈 1px 描边画不出来——滑块是被 clip-path
+   裁开的副本，描边会被同一刀切掉，所以落点沿用原来的 accent-soft 底，轨道壳由原语给。
+   --seg-max 是每项宽度上限，配合 .tabLabel 的省略号；不换行（一条裁剪只能是一个矩形），超出横向滚动。 */
 .tabBar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--spacing-xs);
-}
+  --seg-pad: var(--spacing-sm);
+  --seg-max: 180px;
+  --seg-radius: var(--radius-pill);
+  --seg-thumb: var(--color-accent-soft);
 
-.tabChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 180px;
-  padding: 4px var(--spacing-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-elevated);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
-}
-
-.tabChip:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-}
-
-.tabChip:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
-}
-
-.tabChipActive {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-text-strong);
+  /* 贴合内容宽度：轨道随页签增减而变宽，原语的 ResizeObserver 才会重测滑块槽位
+     （被父级拉满时宽度不动，新增的页签就没有槽位可裁）。长过容器仍由 max-width 兜住并滚动。 */
+  align-self: flex-start;
 }
 
 .tabDot {

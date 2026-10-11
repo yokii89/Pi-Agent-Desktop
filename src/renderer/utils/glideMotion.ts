@@ -2,14 +2,16 @@ import { prefersReducedMotion } from "./animation";
 import { GLIDE_MOTION } from "./motionTokens";
 
 /**
- * 下拉/浮层的定帧补间驱动，封顶 60fps（docs/design/51，复刻 `docs/ui-design/glide-select-bezier.html`）。
+ * 浮层与分段控件共用的定帧补间驱动，封顶 60fps
+ * （docs/design/51 复刻 `docs/ui-design/glide-select-bezier.html`，
+ *  docs/design/52 复刻 `docs/ui-design/rubber-segment-rubber-band.html`）。
  *
  * 为什么不是 CSS transition：CSS 只有"时长"没有"帧率"，封顶不了——120/144Hz 屏上
  * 同一段动效会跑成 120–144 次重绘，观感更碎、功耗更高。锁 60 之后，
  * 60Hz 屏上逐帧推进（等于不封顶），高刷屏上稳定压在 60。
  * 为什么不是 GSAP：`gsap.ticker.fps()` 是**全局**时间轴，一动就连带
  * 侧栏折叠、行菜单悬浮揭示等已验收的动效一起改档（docs/design/45/46）。
- * 浮层这一条独立时间轴按固定步长推进，只服务下拉，互不影响；
+ * 这条独立时间轴按固定步长推进，与 GSAP 互不影响；
  * 换帧率只改 GLIDE_MOTION.fps 一处，时长（pop/glide/…）不受影响。
  */
 
@@ -61,6 +63,95 @@ export const glideEase = makeCubicBezier(...GLIDE_MOTION.easeOut);
 /** 线性插值，配合 eased progress 用。 */
 export const mix = (from: number, to: number, progress: number): number =>
   from + (to - from) * progress;
+
+const linear = (t: number): number => t;
+
+/**
+ * 阻尼弹簧的整定映射，对齐上游 motion 库的 `{ type: "spring", duration, bounce }`：
+ * 阻尼比 ζ = 1 - bounce，固有频率 ω 取「duration 秒内衰减到 0.1%」。
+ * bounce 为 0 时 ζ = 1，落在临界阻尼分支（到位但不外弹）。
+ */
+export function springParams(duration: number, bounce: number): { zeta: number; omega: number } {
+  const zeta = Math.min(1, Math.max(0.05, 1 - bounce));
+  return { zeta, omega: -Math.log(0.001) / (zeta * duration) };
+}
+
+/**
+ * 阻尼振子闭式解：给定相对目标的初始偏移 y0 与初速度 v0，返回 t 秒时的 [位置, 速度]。
+ * 解析式而不是逐帧积分，所以补间被高刷屏/掉帧怎么取帧都一样，落点不漂。
+ */
+export function springAt(
+  y0: number,
+  v0: number,
+  to: number,
+  duration: number,
+  bounce: number,
+  t: number,
+): [number, number] {
+  const { zeta, omega } = springParams(duration, bounce);
+  const s = zeta * omega;
+
+  if (zeta >= 1 - 1e-6) {
+    const a = y0;
+    const b = v0 + s * a;
+    const e = Math.exp(-s * t);
+    return [to + (a + b * t) * e, (b - s * (a + b * t)) * e];
+  }
+
+  const d = omega * Math.sqrt(1 - zeta * zeta);
+  const a = y0;
+  const b = (v0 + s * a) / d;
+  const e = Math.exp(-s * t);
+  const cos = Math.cos(d * t);
+  const sin = Math.sin(d * t);
+  return [to + e * (a * cos + b * sin), e * ((-s * a + d * b) * cos + (-s * b - d * a) * sin)];
+}
+
+/** 弹簧跑完名义整定时长后再多演一成，才认为振子已经停住（对齐参考稿的 dur × 1.12）。 */
+const SPRING_SETTLE_SPAN = 1.12;
+
+/**
+ * 在同一条定帧时间轴（封顶 60fps）上跑一段阻尼弹簧。
+ *
+ * `onUpdate` 收到解析速度（值/秒），被打断时把它原样交给下一段补间，
+ * 否则半途换向会出现肉眼可见的速度台阶。`velocity` 是接管到的初速度。
+ */
+export function glideSpring(options: {
+  from: number;
+  to: number;
+  duration: number;
+  bounce?: number;
+  velocity?: number;
+  onUpdate: (value: number, velocity: number) => void;
+  onComplete?: () => void;
+}): GlideCancel {
+  const { from, to, duration } = options;
+  const bounce = options.bounce ?? 0;
+  const velocity = options.velocity ?? 0;
+  const span = duration * SPRING_SETTLE_SPAN;
+
+  return glide({
+    duration: span,
+    ease: linear,
+    onUpdate: (progress) => {
+      // progress 已经是真实时间占比（ease 为线性），换算成秒喂给闭式解
+      if (progress >= 1) {
+        options.onUpdate(to, 0);
+        return;
+      }
+      const [value, valueVelocity] = springAt(
+        from - to,
+        velocity,
+        to,
+        duration,
+        bounce,
+        progress * span,
+      );
+      options.onUpdate(value, valueVelocity);
+    },
+    onComplete: options.onComplete,
+  });
+}
 
 interface GlideEntry {
   elapsed: number;

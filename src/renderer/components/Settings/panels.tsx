@@ -20,6 +20,7 @@ import { useUpdateStatus } from "../../stores/updateStore";
 import { Button } from "../ui/Button";
 import { GlideChevron } from "../ui/GlideChevron";
 import { Menu, type MenuItem } from "../ui/Menu";
+import { Segmented } from "../ui/Segmented";
 import { Toggle } from "../ui/Toggle";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import styles from "./Settings.module.css";
@@ -103,22 +104,18 @@ export function AppearancePanel() {
           label={t("settings.appearance.theme")}
           description={t("settings.appearance.theme.description")}
           control={
-            <div className={styles.segmented}>
-              {(["dark", "light"] as Theme[]).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={[styles.segment, theme === value ? styles.segmentActive : ""].join(
-                    " ",
-                  )}
-                  onClick={() => dispatch({ type: "setTheme", theme: value })}
-                >
-                  {value === "dark"
+            <Segmented
+              ariaLabel={t("settings.appearance.theme")}
+              value={theme}
+              items={(["dark", "light"] as Theme[]).map((value) => ({
+                value,
+                label:
+                  value === "dark"
                     ? t("settings.appearance.theme.dark")
-                    : t("settings.appearance.theme.light")}
-                </button>
-              ))}
-            </div>
+                    : t("settings.appearance.theme.light"),
+              }))}
+              onChange={(next) => dispatch({ type: "setTheme", theme: next })}
+            />
           }
         />
       </SettingsSection>
@@ -317,21 +314,15 @@ export function EnvironmentPanel() {
           label={t("settings.environment.terminalShell")}
           description={t("settings.environment.terminalShell.description")}
           control={
-            <div className={styles.segmented}>
-              {(["powershell", "cmd", "gitbash"] as TerminalShellKind[]).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={[
-                    styles.segment,
-                    terminalShell === value ? styles.segmentActive : "",
-                  ].join(" ")}
-                  onClick={() => changeShell(value)}
-                >
-                  {value === "powershell" ? "PowerShell" : value === "cmd" ? "CMD" : "Git Bash"}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              ariaLabel={t("settings.environment.terminalShell")}
+              value={terminalShell}
+              items={(["powershell", "cmd", "gitbash"] as TerminalShellKind[]).map((value) => ({
+                value,
+                label: value === "powershell" ? "PowerShell" : value === "cmd" ? "CMD" : "Git Bash",
+              }))}
+              onChange={(next) => changeShell(next)}
+            />
           }
         />
         <SettingRow

@@ -529,29 +529,6 @@
   padding-bottom: var(--spacing-md);
 }
 
-.segmented {
-  display: inline-flex;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.segment {
-  padding: 6px var(--spacing-md);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-md);
-  background: var(--color-bg-surface);
-}
-
-.segment + .segment {
-  border-left: 1px solid var(--color-border);
-}
-
-.segmentActive {
-  background: var(--color-bg-active);
-  color: var(--color-text-strong);
-}
-
 .valueText {
   color: var(--color-text-muted);
 }
@@ -865,42 +842,19 @@
   min-width: 0;
 }
 
-.ovSeg {
-  display: inline-flex;
-  gap: 2px;
+/* 工具条里的筛选条不参与压缩（原来是 .ovSeg 的 flex-shrink: 0） */
+.ovSegStrip {
   flex-shrink: 0;
-  padding: 2px;
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
 }
 
-.ovSegBtn {
-  display: inline-flex;
-  align-items: center;
-  height: 26px;
-  padding: 0 10px;
-  border: none;
-  border-radius: 6px;
-  background: none;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  font-family: inherit;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.ovSegBtnOn {
-  background: var(--color-bg-elevated);
-  color: var(--color-text-strong);
-}
-
+/* 筛选条上的计数：滑块那层副本用强调色，未选一侧保持弱化（data-seg-thumb 是原语给的钩子） */
 .ovSegNum {
   margin-left: 4px;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-.ovSegBtnOn .ovSegNum {
+[data-seg-thumb] .ovSegNum {
   color: var(--color-accent);
 }
 

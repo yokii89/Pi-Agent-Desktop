@@ -41,6 +41,7 @@ export const browserMessages = defineMessages({
     "en-US":
       "Press Enter to add it to chat (no screenshot by default), or open Styles / Box model / Structure.",
   },
+  "browser.pick.modeLabel": { "zh-CN": "拾取模式", "en-US": "Pick mode" },
   "browser.pick.mode.select": { "zh-CN": "圈选", "en-US": "Select" },
   "browser.pick.mode.selectHint": {
     "zh-CN": "点击页面元素即选中；此时页面鼠标事件被高亮层接管，滚不动页面。",
@@ -576,6 +577,10 @@ export const browserMessages = defineMessages({
     "en-US": " ({warning})",
   },
   "browser.viewport.width": { "zh-CN": "视口宽度", "en-US": "Viewport width" },
+  "browser.viewport.presetsLabel": {
+    "zh-CN": "视口宽度预设",
+    "en-US": "Viewport width presets",
+  },
   "browser.viewport.follow": { "zh-CN": "跟随面板", "en-US": "Follow panel" },
   "browser.viewport.followPanel": {
     "zh-CN": "跟随面板宽度",

@@ -43,38 +43,19 @@
 .scopeTabs {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-md);
   border-bottom: 1px solid var(--color-border);
-  overflow-x: auto;
   flex-shrink: 0;
 }
 
-.scopeTab {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: var(--radius-full, 999px);
-  border: 1px solid transparent;
-  background: transparent;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  white-space: nowrap;
-  transition:
-    background-color 0.12s ease,
-    color 0.12s ease;
-}
-
-.scopeTab:hover {
-  color: var(--color-text);
-  background: var(--color-bg-hover);
-}
-
-.scopeTabActive,
-.scopeTabActive:hover {
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
+/* 药丸贴搜索条的既有皮肤：没有轨道壳，选中态靠强调色底 + 强调色墨 */
+.scopeSeg {
+  --seg-radius: var(--radius-pill);
+  --seg-track: transparent;
+  --seg-border: transparent;
+  --seg-thumb: var(--color-accent-soft);
+  --seg-ink-active: var(--color-accent);
+  --seg-gap: 5px;
 }
 
 /* —— 结果列表 —— */

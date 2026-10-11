@@ -76,39 +76,29 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-/* 分段筛选：全部 / 未暂存 / 已暂存 / 上一轮 */
+/* 分段筛选：全部 / 未暂存 / 已暂存 / 上一轮（轨道与滑块见 ui/Segmented，这里只留那条分隔线） */
 .filterRow {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
   padding: var(--spacing-xs) var(--spacing-xs) calc(var(--spacing-xs) - 1px);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
-.filterChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  transition:
-    background-color 0.12s ease,
-    color 0.12s ease;
-}
+/* 原来的 chip 就是裸贴在行底上，没有壳，所以轨道不铺底也不描边；落点沿用旧的 accent-soft 底。
+   --seg-inset 归零后裁剪圆角 = --seg-radius - 1px 边框，逐像素等于旧的 --radius-sm。
+   窄幅停靠时不换行（一条裁剪只能是一个矩形），超出走横向滚动。 */
+.filterSeg {
+  --seg-h: 24px;
+  --seg-inset: 0px;
+  --seg-pad: 8px;
+  --seg-gap: 5px;
+  --seg-radius: calc(var(--radius-sm) + 1px);
+  --seg-track: transparent;
+  --seg-border: transparent;
+  --seg-thumb: var(--color-accent-soft);
 
-.filterChip:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-}
-
-.filterChipActive,
-.filterChipActive:hover {
-  background: var(--color-accent-soft);
-  color: var(--color-text-strong);
+  min-width: 0;
 }
 
 .filterCount {
@@ -117,7 +107,8 @@
   color: var(--color-text-muted);
 }
 
-.filterChipActive .filterCount {
+/* 落点那层的计数换强调色：滑块是副本，选中墨色由 [data-seg-thumb] 这一层带过去 */
+[data-seg-thumb] .filterCount {
   color: var(--color-accent);
 }
 

@@ -84,33 +84,6 @@
   line-height: 1.5;
 }
 
-.transportRow {
-  display: flex;
-  gap: var(--spacing-sm);
-}
-
-.transportOption {
-  flex: 1;
-  height: 34px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-md);
-  cursor: pointer;
-}
-
-.transportOptionActive {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-text-strong);
-}
-
-.transportOption:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 /* 折叠低频字段区（OAuth / 高级选项共用，docs/design/40 优化 11） */
 .collapsible {
   border: 1px solid var(--color-border);

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Segmented } from "../../../../../ui/Segmented";
 import styles from "./designPanel.module.css";
 
 /**
@@ -10,6 +11,7 @@ export interface SegmentOption<T extends string> {
   value: T;
   title: string;
   icon: ReactNode;
+  disabled?: boolean;
 }
 
 export interface SegmentButtonsProps<T extends string> {
@@ -34,27 +36,22 @@ export function SegmentButtons<T extends string>({
 }: SegmentButtonsProps<T>) {
   return (
     <div className={styles.segmentRow}>
-      <fieldset
-        className={[styles.segment, bare ? "" : styles.segmentBordered].join(" ")}
-        aria-label={ariaLabel}
-      >
-        {options.map((option) => {
-          const selected = option.value === value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              className={[styles.segmentBtn, selected ? styles.segmentBtnOn : ""].join(" ")}
-              title={option.title}
-              aria-pressed={selected}
-              disabled={disabled}
-              onClick={() => onChange(option.value)}
-            >
-              {option.icon}
-            </button>
-          );
-        })}
-      </fieldset>
+      <Segmented
+        ariaLabel={ariaLabel}
+        className={[styles.segmentSeg, bare ? "" : styles.segmentSegBordered].join(" ")}
+        semantics="radio"
+        size="sm"
+        disabled={disabled}
+        value={value}
+        items={options.map((option) => ({
+          value: option.value,
+          label: null,
+          icon: option.icon,
+          title: option.title,
+          disabled: option.disabled,
+        }))}
+        onChange={(next) => onChange(next)}
+      />
       {aside ? <div className={styles.segmentAside}>{aside}</div> : null}
     </div>
   );

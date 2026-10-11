@@ -4,39 +4,19 @@
 
 /* ── 设计 | CSS 模式切换（设计图分段胶囊） ───────── */
 
-.modeSwitch {
-  display: flex;
-  gap: 3px;
+/* 段高 28px + 上下 2px 内缩 = 与旧 .modeSwitch 同样的 34px 外壳。
+   旧选中态那圈 0 1px 2px 的投影画不出来：滑块是一条被 clip-path 裁开的副本，
+   投影会被同一次裁剪切掉，所以维持 --color-bg-active 的底 + 正文墨色表达落点。
+   类名写两遍是为了在与原语 .root/.sm 的 --seg-* 同名声明之争里稳定胜出。 */
+.designSeg {
+  --seg-h: 32px;
+  --seg-inset: 2px;
+  --seg-min: 0px;
+  --seg-pad: var(--spacing-sm);
+  --seg-font: var(--font-size-sm);
+  --seg-ink-active: var(--color-text);
+
   margin: 0 0 var(--spacing-sm);
-  padding: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-}
-
-.modeTab {
-  flex: 1;
-  height: 28px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background-color 0.12s ease,
-    color 0.12s ease;
-}
-
-.modeTab:hover {
-  color: var(--color-text);
-}
-
-.modeTabOn {
-  background: var(--color-bg-active);
-  color: var(--color-text);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 /* ── 目标栏 ───────────────────────────────────────── */

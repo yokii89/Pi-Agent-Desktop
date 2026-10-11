@@ -9,6 +9,7 @@ import { useT } from "../../hooks/useT";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Modal } from "../ui/Modal";
+import { Segmented } from "../ui/Segmented";
 import { Select } from "../ui/Select";
 import { Toggle } from "../ui/Toggle";
 import styles from "./McpServerEditDialog.module.css";
@@ -39,6 +40,8 @@ interface McpServerEditDialogProps {
 const NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 const EXPOSURES: readonly McpExposure[] = ["codemode", "deferred", "direct", "hidden"];
+
+const TRANSPORTS: readonly ("stdio" | "http")[] = ["stdio", "http"];
 
 /** 非空行列表（args 用）。 */
 function parseLines(text: string): string[] {
@@ -272,30 +275,17 @@ export function McpServerEditDialog({
 
           <div className={styles.field}>
             <span className={styles.label}>{t("mcp.edit.transport")}</span>
-            <div className={styles.transportRow}>
-              <button
-                type="button"
-                className={[
-                  styles.transportOption,
-                  transport === "stdio" ? styles.transportOptionActive : "",
-                ].join(" ")}
-                disabled={busy}
-                onClick={() => requestTransport("stdio")}
-              >
-                {t("mcp.edit.transport.stdio")}
-              </button>
-              <button
-                type="button"
-                className={[
-                  styles.transportOption,
-                  transport === "http" ? styles.transportOptionActive : "",
-                ].join(" ")}
-                disabled={busy}
-                onClick={() => requestTransport("http")}
-              >
-                {t("mcp.edit.transport.http")}
-              </button>
-            </div>
+            <Segmented
+              stretch
+              ariaLabel={t("mcp.edit.transport")}
+              value={transport}
+              items={TRANSPORTS.map((value) => ({
+                value,
+                label: t(`mcp.edit.transport.${value}`),
+                disabled: busy,
+              }))}
+              onChange={(next) => requestTransport(next)}
+            />
           </div>
 
           {transport === "stdio" ? (

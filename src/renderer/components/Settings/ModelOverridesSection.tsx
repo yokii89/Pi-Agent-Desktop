@@ -13,6 +13,7 @@ import {
 } from "../../utils/modelOverrides";
 import { GlideChevron } from "../ui/GlideChevron";
 import { Popover } from "../ui/Popover";
+import { Segmented } from "../ui/Segmented";
 import styles from "./Settings.module.css";
 
 /** 覆盖列表默认展示行数（其余折叠）。 */
@@ -68,23 +69,25 @@ export function ModelOverridesSection({
       <p className={styles.ovHint}>{t("settings.models.overrides.sectionHint")}</p>
 
       <div className={styles.ovToolbar}>
-        <div className={styles.ovSeg}>
-          {modes.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={[styles.ovSegBtn, mode === item.key ? styles.ovSegBtnOn : ""].join(" ")}
-              aria-pressed={mode === item.key}
-              onClick={() => {
-                setMode(item.key);
-                setExpanded(false);
-              }}
-            >
-              {item.label}
-              <span className={styles.ovSegNum}>{counts[item.key]}</span>
-            </button>
-          ))}
-        </div>
+        <Segmented
+          ariaLabel={t("settings.models.overrides.filterLabel")}
+          className={styles.ovSegStrip}
+          size="sm"
+          value={mode}
+          items={modes.map((item) => ({
+            value: item.key,
+            label: (
+              <>
+                {item.label}
+                <span className={styles.ovSegNum}>{counts[item.key]}</span>
+              </>
+            ),
+          }))}
+          onChange={(next) => {
+            setMode(next);
+            setExpanded(false);
+          }}
+        />
         <input
           className={[styles.authInput, styles.ovSearch].join(" ")}
           type="text"

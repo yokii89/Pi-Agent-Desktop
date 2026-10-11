@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { useT } from "../../hooks/useT";
 import { useUiStore } from "../../stores/uiStore";
 import { Modal } from "../ui/Modal";
+import { Segmented } from "../ui/Segmented";
 import styles from "./CommandPalette.module.css";
 import { PaletteRow } from "./PaletteRow";
 import type { PaletteScope } from "./types";
@@ -116,28 +117,29 @@ export function CommandPalette() {
         />
       </div>
 
-      <div className={styles.scopeTabs} role="tablist" aria-label={t("palette.scope.tabs")}>
-        {SCOPE_TABS.map((tab) => {
-          const Icon = tab.icon;
-          const active = scope === tab.scope;
-          return (
-            <button
-              key={tab.scope}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              tabIndex={-1}
-              className={[styles.scopeTab, active ? styles.scopeTabActive : ""].join(" ")}
-              onClick={() => {
-                selectScope(tab.scope);
-                inputRef.current?.focus();
-              }}
-            >
-              <Icon size={12} weight="regular" />
-              {t(tab.labelKey)}
-            </button>
-          );
-        })}
+      <div className={styles.scopeTabs}>
+        <Segmented
+          className={styles.scopeSeg}
+          semantics="tab"
+          focusMode="none"
+          scrollable
+          equal={false}
+          size="sm"
+          ariaLabel={t("palette.scope.tabs")}
+          value={scope}
+          items={SCOPE_TABS.map((tab) => {
+            const Icon = tab.icon;
+            return {
+              value: tab.scope,
+              label: t(tab.labelKey),
+              icon: <Icon size={12} weight="regular" />,
+            };
+          })}
+          onChange={(next) => {
+            selectScope(next);
+            inputRef.current?.focus();
+          }}
+        />
       </div>
 
       <div

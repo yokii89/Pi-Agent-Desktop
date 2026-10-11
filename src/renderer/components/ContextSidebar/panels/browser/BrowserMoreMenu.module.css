@@ -99,28 +99,21 @@
   font-size: var(--font-size-sm);
 }
 
-.viewportButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-
-.viewportButton:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-}
-
-.viewportActive {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+/* 预设条：24×24 纯图标格子，不铺轨道也不描边（菜单底色就是原来的行底）。
+   旧的选中描边画不出来——滑块是被 clip-path 裁开的副本，边框会被同一次裁剪切掉，
+   落点靠 accent-soft 底 + accent 墨色表达。
+   类名写两遍是为了在与原语 .root/.sm 的 --seg-* 同名声明之争里稳定胜出。 */
+.viewportSeg {
+  --seg-h: 24px;
+  --seg-inset: 0px;
+  --seg-pad: 0px;
+  --seg-min: 24px;
+  --seg-gap: 0px;
+  --seg-radius: calc(var(--radius-sm) + 1px);
+  --seg-track: transparent;
+  --seg-border: transparent;
+  --seg-thumb: var(--color-accent-soft);
+  --seg-ink-active: var(--color-accent);
 }
 
 .viewportInput {

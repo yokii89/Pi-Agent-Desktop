@@ -31,41 +31,32 @@
   background: var(--color-accent-soft);
 }
 
-/* 二级 tab 条 */
+/* 二级 tab 条：外壳只管行布局。橡皮筋滑块的裁剪区是一个矩形，
+   所以刷新/停靠/收起三个动作按钮必须是分段器的兄弟，不能和页签同处一条轨道。 */
 .paneTabs {
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 4px 6px;
   border-bottom: 1px solid var(--color-border);
-  overflow-x: auto;
 }
 
-.paneTab {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  padding: 3px var(--spacing-sm);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    background-color 0.12s ease,
-    color 0.12s ease;
-}
+/* 站点类与原语的 .root/.sm 声明同一批 --seg-* 变量，同权重时谁赢看打包顺序
+   （站点模块排在 ui/ 之前），所以把类名写两遍抬权重。
+   轨道不铺底色也不描边（壳由 .paneTabs 承担，与旧版观感一致），滑块沿用原来的强调色。 */
+.paneSeg {
+  --seg-h: 24px;
+  --seg-inset: 0px;
+  --seg-pad: var(--spacing-sm);
+  --seg-min: 0px;
+  --seg-gap: var(--spacing-xs);
+  --seg-radius: calc(var(--radius-sm) + 1px);
+  --seg-track: transparent;
+  --seg-border: transparent;
+  --seg-thumb: var(--color-accent-soft);
+  --seg-ink-active: var(--color-accent);
 
-.paneTab:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-}
-
-.paneTabActive {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  min-width: 0;
 }
 
 .paneSpacer {
@@ -204,38 +195,16 @@
   font-size: var(--font-size-sm);
 }
 
-/* 模式开关（圈选 / 浏览） */
-.modeSwitch {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.modeButton {
-  display: inline-flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-xs);
-  padding: 4px var(--spacing-xs);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-}
-
-.modeButton:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-}
-
-.modeButtonActive {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+/* 模式开关（圈选 / 浏览）：两段等分撑满一行，滑块沿用原来的强调色。
+   类名写两遍是为了在与原语 .root/.sm 的 --seg-* 同名声明之争里稳定胜出。 */
+.pickSeg {
+  --seg-h: 26px;
+  --seg-inset: 2px;
+  --seg-pad: var(--spacing-xs);
+  --seg-min: 0px;
+  --seg-gap: var(--spacing-xs);
+  --seg-thumb: var(--color-accent-soft);
+  --seg-ink-active: var(--color-accent);
 }
 
 .modeHint {

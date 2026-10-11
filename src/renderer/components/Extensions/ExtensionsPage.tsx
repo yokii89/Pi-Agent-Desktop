@@ -15,6 +15,7 @@ import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { Segmented, type SegmentedItem } from "../ui/Segmented";
 import { ContributionDiagnostics } from "./ContributionDiagnostics";
 import styles from "./ExtensionsPage.module.css";
 import {
@@ -26,6 +27,11 @@ import { LocalResourcesSection } from "./LocalResourcesSection";
 import { PackageList } from "./PackageList";
 
 type ScopeTab = "user" | "project";
+
+const SCOPE_TABS: readonly { tab: ScopeTab; labelKey: string }[] = [
+  { tab: "user", labelKey: "extensions.scope.user" },
+  { tab: "project", labelKey: "extensions.scope.project" },
+];
 
 /**
  * 扩展页：pi packages 列表 / 安装 / 卸载 / 启停（docs/design/07）。
@@ -90,6 +96,10 @@ export function ExtensionsPage() {
     if (!snapshot) return [];
     return scope === "project" ? snapshot.project : snapshot.user;
   }, [snapshot, scope]);
+
+  const scopeItems: readonly SegmentedItem<ScopeTab>[] = SCOPE_TABS.filter(
+    (item) => item.tab === "user" || projectDir !== null,
+  ).map(({ tab, labelKey }) => ({ value: tab, label: t(labelKey) }));
 
   const openPath = useCallback(
     (path: string) => {
@@ -241,29 +251,14 @@ export function ExtensionsPage() {
 
       {listError ? <div className={styles.errorBanner}>{listError}</div> : null}
 
-      <div className={styles.scopeTabs} role="tablist" aria-label={t("extensions.scopeLabel")}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={scope === "user"}
-          className={[styles.scopeTab, scope === "user" ? styles.scopeTabActive : ""].join(" ")}
-          onClick={() => setScope("user")}
-        >
-          {t("extensions.scope.user")}
-        </button>
-        {projectDir ? (
-          <button
-            type="button"
-            role="tab"
-            aria-selected={scope === "project"}
-            className={[styles.scopeTab, scope === "project" ? styles.scopeTabActive : ""].join(
-              " ",
-            )}
-            onClick={() => setScope("project")}
-          >
-            {t("extensions.scope.project")}
-          </button>
-        ) : null}
+      <div className={styles.scopeTabs}>
+        <Segmented
+          semantics="tab"
+          ariaLabel={t("extensions.scopeLabel")}
+          value={scope}
+          items={scopeItems}
+          onChange={(next) => setScope(next)}
+        />
       </div>
 
       <div className={styles.body}>

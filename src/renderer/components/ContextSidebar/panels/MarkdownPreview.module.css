@@ -5,34 +5,16 @@
   height: 100%;
 }
 
-/* 预览 / 源码两态切换：紧凑分段按钮，常显（不依赖 hover）。
-   不加横向 padding：panelBody 已有，与代码预览 previewContent 对齐 */
-.modeBar {
-  display: flex;
-  gap: var(--spacing-xs);
-  padding: 0 0 var(--spacing-xs);
-}
+/* 预览 / 源码两态切换：紧凑分段条，常显（不依赖 hover）。
+   侧栏窄幅，轨道不铺底色、只留原来那圈描边；--seg-radius 保持默认 --radius-md，
+   裁出来的滑块圆角逐像素等于旧按钮的 --radius-sm。
+   不加横向 padding / margin：panelBody 已有，与代码预览 previewContent 对齐 */
+.modeSeg {
+  --seg-track: transparent;
+  --seg-pad: var(--spacing-sm);
+  --seg-ink-active: var(--color-text);
 
-.modeBtn {
-  padding: 2px var(--spacing-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-}
-
-.modeBtn:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-}
-
-.modeBtnActive,
-.modeBtnActive:hover {
-  background: var(--color-bg-active);
-  border-color: var(--color-border-strong);
-  color: var(--color-text);
+  margin-bottom: var(--spacing-xs);
 }
 
 .body {
