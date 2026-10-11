@@ -89,6 +89,9 @@ import type {
   PideskSettings,
   PiInfo,
   PiModelOption,
+  PiModelOverrideSetRequest,
+  PiModelOverrideSetResult,
+  PiModelOverridesSnapshot,
   PiModelState,
   PiPackageInstallRequest,
   PiPackageRemoveRequest,
@@ -211,6 +214,12 @@ export interface PideskGlobalApi {
     getPiSupport(): Promise<IpcResult<McpPiSupport>>;
     /** MCP 市场搜索：空 query 走内置精选清单，非空走官方注册表（docs/design/41）。 */
     marketSearch(req: McpMarketSearchRequest): Promise<IpcResult<McpMarketSearchResult>>;
+  };
+  modelOverrides: {
+    /** 读取 models.json 覆盖快照（~/.pi/agent/models.json，docs/design/49）。 */
+    get(): Promise<IpcResult<PiModelOverridesSnapshot>>;
+    /** 写入一条覆盖补丁（字段 null = 删除回到默认）并重载存活会话。 */
+    set(req: PiModelOverrideSetRequest): Promise<IpcResult<PiModelOverrideSetResult>>;
   };
   session: {
     start(req: SessionStartRequest): Promise<IpcResult<SessionId>>;

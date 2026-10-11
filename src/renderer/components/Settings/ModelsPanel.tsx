@@ -5,16 +5,21 @@ import type {
   PiAuthProviderStatus,
   PiAuthSnapshot,
   PiModelOption,
+  PiModelOverridePatch,
+  PiModelOverridesSnapshot,
 } from "../../../shared/ipc";
 import { useT } from "../../hooks/useT";
 import { authService } from "../../services/authService";
 import { fsService } from "../../services/fsService";
+import { modelOverridesService } from "../../services/modelOverridesService";
 import { sessionService } from "../../services/sessionService";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
+import { buildModelOverrideRows, type ModelOverrideRow } from "../../utils/modelOverrides";
 import { Button } from "../ui/Button";
 import { Menu, type MenuItem } from "../ui/Menu";
 import { AiProviderLogo } from "./AiProviderLogo";
+import { ModelOverridesSection } from "./ModelOverridesSection";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import styles from "./Settings.module.css";
 
@@ -42,6 +47,10 @@ export function ModelsPanel() {
   const [formApiType, setFormApiType] = useState("openai-completions");
   const [formPreferredModel, setFormPreferredModel] = useState("");
   const [formSaving, setFormSaving] = useState(false);
+
+  // 模型能力（docs/design/49 起，docs/design/50 改版）
+  const [overrides, setOverrides] = useState<PiModelOverridesSnapshot>({});
+  const [savingOverrideKey, setSavingOverrideKey] = useState<string | null>(null);
 
   const activeProviderId = auth?.activeProvider ?? null;
 
@@ -94,6 +103,16 @@ export function ModelsPanel() {
       setLoadingModels(false);
     }
   }, [auth]);
+
+  // 模型能力覆盖：挂载即载入模型清单与覆盖快照（仅一次；凭据变更由既有流程各自刷新）
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 只随挂载跑一次，不跟 refreshModelsForActive 的 auth 依赖重跑
+  useEffect(() => {
+    void refreshModelsForActive();
+    void modelOverridesService
+      .get()
+      .then(setOverrides)
+      .catch(() => {});
+  }, []);
 
   const applyModel = async (model: PiModelOption): Promise<void> => {
     setApplying(true);
@@ -231,6 +250,49 @@ export function ModelsPanel() {
       showToast(err instanceof Error ? err.message : t("settings.models.credential.saveFailed"));
     } finally {
       setFormSaving(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------
+  // 模型能力（docs/design/50）：即改即存 + 主进程写盘后自动重载存活会话
+  // ---------------------------------------------------------------------
+
+  const overrideRows = useMemo(
+    () => buildModelOverrideRows(models, overrides, selectedKey),
+    [models, overrides, selectedKey],
+  );
+
+  const saveOverride = async (
+    row: ModelOverrideRow,
+    patch: PiModelOverridePatch,
+  ): Promise<void> => {
+    const key = `${row.provider}/${row.modelId}`;
+    setSavingOverrideKey(key);
+    try {
+      const result = await modelOverridesService.set({
+        provider: row.provider,
+        modelId: row.modelId,
+        patch,
+      });
+      const snapshot = await modelOverridesService.get();
+      setOverrides(snapshot);
+      if (result.reloaded > 0) showToast(t("settings.models.overrides.savedLive"));
+      else if (result.failed > 0) showToast(t("settings.models.overrides.savedBusy"));
+      else showToast(t("settings.models.overrides.savedIdle"));
+      // 生效值来自 pi（主进程已重载存活会话）；存活路径极快，后台静默刷新
+      void sessionService.getModels().then((list) => {
+        if (list.length > 0) {
+          setModels(activeProviderId ? list.filter((m) => m.provider === activeProviderId) : list);
+        }
+      });
+    } catch (error) {
+      showToast(
+        error instanceof Error && error.message
+          ? error.message
+          : t("settings.models.overrides.saveFailed"),
+      );
+    } finally {
+      setSavingOverrideKey(null);
     }
   };
 
@@ -463,6 +525,13 @@ export function ModelsPanel() {
           </p>
         )}
       </SettingsSection>
+
+      <ModelOverridesSection
+        rows={overrideRows}
+        loading={loadingModels}
+        savingKey={savingOverrideKey}
+        onSave={saveOverride}
+      />
     </div>
   );
 }

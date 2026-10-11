@@ -92,6 +92,9 @@ import type {
   PideskSettings,
   PiInfo,
   PiModelOption,
+  PiModelOverrideSetRequest,
+  PiModelOverrideSetResult,
+  PiModelOverridesSnapshot,
   PiModelState,
   PiPackageInstallRequest,
   PiPackageRemoveRequest,
@@ -130,6 +133,7 @@ import {
   GIT_IPC,
   INSPECTOR_FLOAT_IPC,
   MCP_IPC,
+  MODEL_OVERRIDES_IPC,
   PI_IPC,
   PROC_IPC,
   PROJECT_IPC,
@@ -307,6 +311,15 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** MCP 市场搜索：空 query 走内置精选清单，非空走官方注册表（docs/design/41）。 */
     marketSearch: (req: McpMarketSearchRequest): Promise<IpcResult<McpMarketSearchResult>> =>
       ipcRenderer.invoke(MCP_IPC.marketSearch, req),
+  },
+
+  modelOverrides: {
+    /** 读取 models.json 覆盖快照（~/.pi/agent/models.json，docs/design/49）。 */
+    get: (): Promise<IpcResult<PiModelOverridesSnapshot>> =>
+      ipcRenderer.invoke(MODEL_OVERRIDES_IPC.get),
+    /** 写入一条覆盖补丁（字段 null = 删除回到默认）并重载存活会话。 */
+    set: (req: PiModelOverrideSetRequest): Promise<IpcResult<PiModelOverrideSetResult>> =>
+      ipcRenderer.invoke(MODEL_OVERRIDES_IPC.set, req),
   },
 
   session: {

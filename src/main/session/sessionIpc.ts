@@ -125,18 +125,31 @@ function mapModels(data: unknown): PiModelOption[] {
   const out: PiModelOption[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
-    const record = item as { provider?: unknown; id?: unknown; name?: unknown; input?: unknown };
+    const record = item as {
+      provider?: unknown;
+      id?: unknown;
+      name?: unknown;
+      input?: unknown;
+      contextWindow?: unknown;
+    };
     if (typeof record.provider !== "string" || typeof record.id !== "string") continue;
     const label =
       typeof record.name === "string" && record.name
         ? record.name
         : `${record.provider}/${record.id}`;
     const input = mapModelInput(record.input);
+    const contextWindow =
+      typeof record.contextWindow === "number" &&
+      Number.isFinite(record.contextWindow) &&
+      record.contextWindow > 0
+        ? record.contextWindow
+        : undefined;
     out.push({
       provider: record.provider,
       modelId: record.id,
       label,
       ...(input ? { input } : {}),
+      ...(contextWindow !== undefined ? { contextWindow } : {}),
     });
   }
   return out;

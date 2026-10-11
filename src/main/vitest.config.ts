@@ -18,6 +18,7 @@ export default defineConfig({
       "git/**/*.test.ts",
       "fs/**/*.test.ts",
       "mcp/**/*.test.ts",
+      "models/**/*.test.ts",
       "usage/**/*.test.ts",
       `${sharedDir}/**/*.test.ts`,
     ],

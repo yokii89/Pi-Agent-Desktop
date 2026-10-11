@@ -1045,6 +1045,119 @@ export const settingsMessages = defineMessages({
     "en-US": "Registry: {path}",
   },
 
+  "settings.models.overrides.title": {
+    "zh-CN": "模型能力",
+    "en-US": "Model capabilities",
+  },
+  "settings.models.overrides.sectionHint": {
+    "zh-CN": "默认值来自模型目录，可能不准。改完立即生效。",
+    "en-US": "Defaults come from the model catalog and may be wrong. Changes apply immediately.",
+  },
+  "settings.models.overrides.searchPlaceholder": {
+    "zh-CN": "搜索模型",
+    "en-US": "Search models",
+  },
+  "settings.models.overrides.filterAll": {
+    "zh-CN": "全部",
+    "en-US": "All",
+  },
+  "settings.models.overrides.filterModified": {
+    "zh-CN": "已修改",
+    "en-US": "Modified",
+  },
+  "settings.models.overrides.filterReview": {
+    "zh-CN": "待确认",
+    "en-US": "Needs review",
+  },
+  "settings.models.overrides.currentBadge": {
+    "zh-CN": "当前",
+    "en-US": "Current",
+  },
+  "settings.models.overrides.showAll": {
+    "zh-CN": "展开全部 {count} 个",
+    "en-US": "Show all {count}",
+  },
+  "settings.models.overrides.collapse": {
+    "zh-CN": "收起",
+    "en-US": "Collapse",
+  },
+  "settings.models.overrides.empty": {
+    "zh-CN": "暂无可用模型，请检查激活凭据",
+    "en-US": "No models available. Check the active credential",
+  },
+  "settings.models.overrides.noMatch": {
+    "zh-CN": "没有匹配的模型",
+    "en-US": "No matching models",
+  },
+  "settings.models.overrides.modelField": {
+    "zh-CN": "模型",
+    "en-US": "Model",
+  },
+  "settings.models.overrides.windowField": {
+    "zh-CN": "上下文窗口",
+    "en-US": "Context window",
+  },
+  "settings.models.overrides.inputField": {
+    "zh-CN": "多模态",
+    "en-US": "Input",
+  },
+  "settings.models.overrides.inputImages": {
+    "zh-CN": "支持图片",
+    "en-US": "Images",
+  },
+  "settings.models.overrides.inputText": {
+    "zh-CN": "纯文本",
+    "en-US": "Text only",
+  },
+  "settings.models.overrides.usingDefault": {
+    "zh-CN": "未修改，沿用默认 {value}",
+    "en-US": "Using default {value}",
+  },
+  "settings.models.overrides.useDefault": {
+    "zh-CN": "用默认值",
+    "en-US": "Use default",
+  },
+  "settings.models.overrides.customWindowPlaceholder": {
+    "zh-CN": "自定义数值（tokens）",
+    "en-US": "Custom value (tokens)",
+  },
+  "settings.models.overrides.windowLabel": {
+    "zh-CN": "{model} 的上下文窗口",
+    "en-US": "Context window for {model}",
+  },
+  "settings.models.overrides.inputLabel": {
+    "zh-CN": "{model} 的多模态",
+    "en-US": "Image support for {model}",
+  },
+  "settings.models.overrides.resetWindowAria": {
+    "zh-CN": "恢复 {model} 的上下文窗口默认值",
+    "en-US": "Reset context window for {model}",
+  },
+  "settings.models.overrides.resetInputAria": {
+    "zh-CN": "恢复 {model} 的多模态默认值",
+    "en-US": "Reset image support for {model}",
+  },
+  "settings.models.overrides.invalidWindow": {
+    "zh-CN": "需为正整数",
+    "en-US": "Must be a positive integer",
+  },
+  "settings.models.overrides.savedLive": {
+    "zh-CN": "已保存，当前会话已生效",
+    "en-US": "Saved — live sessions reloaded",
+  },
+  "settings.models.overrides.savedIdle": {
+    "zh-CN": "已保存，新会话生效",
+    "en-US": "Saved — applies to new sessions",
+  },
+  "settings.models.overrides.savedBusy": {
+    "zh-CN": "已保存；运行中的会话重开后生效",
+    "en-US": "Saved — running sessions apply after reopen",
+  },
+  "settings.models.overrides.saveFailed": {
+    "zh-CN": "保存失败",
+    "en-US": "Failed to save",
+  },
+
   "settings.extensions.selectiveLoadUnsupported": {
     "zh-CN": "当前 pi 版本不支持独立加载扩展设置，请升级后重试。",
     "en-US": "This pi version can't load extension settings independently. Upgrade and try again.",

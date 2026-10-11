@@ -389,8 +389,45 @@ export interface PiModelOption {
   label: string;
   /** 模型接受的输入模态；缺失表示未知（不拦附图）。 */
   input?: PiModelInputModality[];
+  /** 模型上下文窗口（tokens）；含 modelOverrides 生效后的值，未知时缺失。 */
+  contextWindow?: number;
   /** 是否已应用到存活会话；仅落盘默认模型或无会话时为 false。 */
   sessionApplied?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// 模型能力覆盖（~/.pi/agent/models.json → providers.<id>.modelOverrides，docs/design/49）
+// ---------------------------------------------------------------------------
+
+export const MODEL_OVERRIDES_IPC = {
+  /** 读取覆盖快照（provider → modelId → 本 UI 管理的两个字段）。 */
+  get: "pidesk:modelOverrides:get",
+  /** 写入一条覆盖补丁并重载存活会话（null 表示删除该键，回到默认）。 */
+  set: "pidesk:modelOverrides:set",
+} as const;
+
+/** 单模型覆盖补丁；字段为 null 表示删除该键。 */
+export interface PiModelOverridePatch {
+  contextWindow?: number | null;
+  input?: PiModelInputModality[] | null;
+}
+
+/** 覆盖快照投影：provider → modelId → 覆盖字段（只含本 UI 管理的键）。 */
+export type PiModelOverridesSnapshot = Record<
+  string,
+  Record<string, { contextWindow?: number; input?: PiModelInputModality[] }>
+>;
+
+export interface PiModelOverrideSetRequest {
+  provider: string;
+  modelId: string;
+  patch: PiModelOverridePatch;
+}
+
+/** set 结果：写盘后自动重载的存活会话计数。 */
+export interface PiModelOverrideSetResult {
+  reloaded: number;
+  failed: number;
 }
 
 // ---------------------------------------------------------------------------

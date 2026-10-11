@@ -850,6 +850,342 @@
   color: var(--color-text-strong);
 }
 
+/* ---------- 模型能力（docs/design/50：三列表 + 值即控件） ---------- */
+
+.ovHint {
+  margin: 0 0 var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.ovToolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.ovSearch {
+  flex: 1;
+  min-width: 0;
+}
+
+.ovSeg {
+  display: inline-flex;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.ovSegBtn {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ovSegBtnOn {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-strong);
+}
+
+.ovSegNum {
+  margin-left: 4px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ovSegBtnOn .ovSegNum {
+  color: var(--color-accent);
+}
+
+.ovTbl {
+  margin-top: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.ovRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px 132px;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  padding: 0 var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+}
+
+.ovRow:last-child {
+  border-bottom: none;
+}
+
+/* 表头随设置浮窗的内容区吸顶：表格不再套一层内滚动（双滚动条很难用） */
+.ovRowHead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 30px;
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.ovRow:not(.ovRowHead):hover {
+  background: var(--color-bg-hover);
+}
+
+/* 已修改的行：唯一的行级强调，字段级强调交给 .ovValOn 的蓝字 */
+.ovRowOv {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.ovName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ovId {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-family-mono);
+  color: var(--color-text-strong);
+}
+
+.ovCurrent {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ovCell {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 值即控件：常态读起来就是普通文字，悬停/聚焦才长出「可点」的边框与箭头 */
+.ovVal {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 22px 0 6px;
+  margin-left: -6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.ovVal:hover,
+.ovVal:focus-visible {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  outline: none;
+}
+
+.ovValOn {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.ovValOn:hover,
+.ovValOn:focus-visible {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+/* 箭头常驻占位（避免悬停时行内跳动），透明度交给悬停/聚焦 */
+.ovValCaret {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.ovVal:hover .ovValCaret,
+.ovVal:focus-visible .ovValCaret {
+  opacity: 1;
+}
+
+.ovReset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.ovRow:hover .ovReset,
+.ovRow:focus-within .ovReset {
+  opacity: 1;
+}
+
+.ovReset:hover {
+  background: var(--color-bg-active);
+  color: var(--color-text);
+}
+
+.ovMore {
+  align-self: flex-start;
+  margin-top: var(--spacing-xs);
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.ovEmpty {
+  margin: var(--spacing-sm) 0 0;
+  padding: 0 var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* popover 内容（外观由 ui/Popover 的面板给出） */
+.ovPop {
+  display: flex;
+  flex-direction: column;
+  min-width: 216px;
+  padding: var(--spacing-xs);
+}
+
+.ovPopTitle {
+  margin: 0 0 9px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.ovPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ovPill {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.ovPill:hover {
+  border-color: var(--color-border-strong);
+}
+
+.ovPillOn {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.ovPopInput {
+  width: 100%;
+  height: 28px;
+  margin-top: 8px;
+  padding: 0 var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.ovPopInput:focus {
+  border-color: var(--color-border-strong);
+}
+
+.ovPopError {
+  margin: 6px 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+}
+
+.ovPopHr {
+  width: calc(100% + var(--spacing-lg));
+  margin: 11px calc(var(--spacing-xs) * -1) 9px;
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.ovPopFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.ovPopFoot button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.ovPopFoot button:hover {
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ovValCaret,
+  .ovReset {
+    transition: none;
+  }
+}
+
 /* ---------- 窄窗口 ---------- */
 
 @media (max-width: 820px) {
