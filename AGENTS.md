@@ -179,15 +179,18 @@ import { Play } from "@phosphor-icons/react";
   `:hover` / `:focus-within` 兜底，否则动画中断时键盘用户会聚焦到透明元素上。
   GSAP 只改自定义属性（如 `--reveal`），真实 `opacity` 交给 CSS 决定。
 
-### 下拉浮层例外：30fps 独立时间轴（docs/design/51）
+### 下拉浮层例外：定帧独立时间轴（封顶 60fps，docs/design/51）
 
 下拉/浮层的开合、高亮药丸滑行、箭头翻转、按压回弹**不走 GSAP 也不走 CSS transition**，
-统一走 `src/renderer/utils/glideMotion.ts` 的 30fps 时间轴（复刻 `docs/ui-design/glide-select-bezier.html`）：
+统一走 `src/renderer/utils/glideMotion.ts` 的定帧时间轴（复刻 `docs/ui-design/glide-select-bezier.html`）：
 
-- **为什么必须自己写**：CSS 只有时长没有帧率，封顶不了 30fps；`gsap.ticker.fps(30)` 是
-  **全局**时间轴，一降档会连带侧栏折叠、行菜单悬浮揭示等已验收动效一起变钝。
-  所以浮层单独一条按固定步长推进的时间轴，实测 60Hz 喂帧派发 30 帧/秒
-  （`src/renderer/utils/glideMotion.test.ts` 断言这一点）。
+- **为什么必须自己写**：CSS 只有时长没有帧率，封顶不了——120/144Hz 屏上同一段动效会跑成
+  120–144 次重绘；而 `gsap.ticker.fps()` 是**全局**时间轴，一动就连带侧栏折叠、行菜单悬浮揭示
+  等已验收动效一起改档。所以浮层单独一条按固定步长推进的时间轴。
+- **帧率只有一个真值**：`GLIDE_MOTION.fps`（当前 60）。60Hz 屏上逐帧推进、高刷屏锁 60；
+  调档只改这一处，时长（pop/glide/…）与曲线都不跟着变。`src/renderer/utils/glideMotion.test.ts`
+  断言 60Hz 喂帧派发 60 帧/秒、144Hz 喂帧不超发。
+- 注释与文档里**不要重复写死帧率数字**（会说谎），一律写"定帧时间轴"并指向 `GLIDE_MOTION.fps`。
 - **时长/缓动登记在** `motionTokens.ts` 的 `GLIDE_MOTION`（曲线 `cubic-bezier(0.23, 1, 0.32, 1)`），
   组件内不得再写第二套浮层时序。
 - 面板进出用 `hooks/useGlideOverlay.ts`（`prime → enter → exit(done)`：收起要演完动画再卸载）；

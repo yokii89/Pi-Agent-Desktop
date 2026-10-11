@@ -29,7 +29,7 @@ interface HistoryHoverCardProps {
  * - **portal 到 body**：侧栏 `.nav` 是 `overflow: auto` 容器，卡片留在里面会被裁掉；
  * - **position: fixed + 首帧前定位**：先用 useLayoutEffect 量出真实尺寸再写坐标
  *   （同步于首次绘制），所以既不会闪一下错位，也不用给卡片写死高度；
- * - **入场走 30fps 浮层补间**（docs/design/51）：与 Popover/右键菜单同一条曲线；
+ * - **入场走浮层定帧补间**（docs/design/51）：与 Popover/右键菜单同一条曲线；
  *   卡片由父级在鼠标离开时立即卸载，没有出场动画（原先的 CSS keyframe 也没有）；
  *   补间内部尊重 prefers-reduced-motion，命中时直接落终态；
  * - **pointer-events: none**：卡片是纯信息展示，不抢行的悬浮与点击，

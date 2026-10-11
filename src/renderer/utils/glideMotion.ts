@@ -2,13 +2,15 @@ import { prefersReducedMotion } from "./animation";
 import { GLIDE_MOTION } from "./motionTokens";
 
 /**
- * 下拉/浮层的 30fps 补间驱动（docs/design/51，复刻 `docs/ui-design/glide-select-bezier.html`）。
+ * 下拉/浮层的定帧补间驱动，封顶 60fps（docs/design/51，复刻 `docs/ui-design/glide-select-bezier.html`）。
  *
- * 为什么不是 CSS transition：CSS 只有"时长"没有"帧率"，表达不了 30fps 封顶，
- * 高刷屏上会把同一段动效跑成 90–144 次重绘，观感更碎、功耗更高。
- * 为什么不是 GSAP：`gsap.ticker.fps()` 是**全局**时间轴，降到 30fps 会连带
- * 侧栏折叠、行菜单悬浮揭示等已验收的动效一起降档（docs/design/45/46）。
- * 浮层这一条独立时间轴按固定步长推进，只服务下拉，互不影响。
+ * 为什么不是 CSS transition：CSS 只有"时长"没有"帧率"，封顶不了——120/144Hz 屏上
+ * 同一段动效会跑成 120–144 次重绘，观感更碎、功耗更高。锁 60 之后，
+ * 60Hz 屏上逐帧推进（等于不封顶），高刷屏上稳定压在 60。
+ * 为什么不是 GSAP：`gsap.ticker.fps()` 是**全局**时间轴，一动就连带
+ * 侧栏折叠、行菜单悬浮揭示等已验收的动效一起改档（docs/design/45/46）。
+ * 浮层这一条独立时间轴按固定步长推进，只服务下拉，互不影响；
+ * 换帧率只改 GLIDE_MOTION.fps 一处，时长（pop/glide/…）不受影响。
  */
 
 /** 一次补间的取消句柄；被打断时由新补间接管当前值，旧句柄只负责停表。 */
@@ -69,7 +71,11 @@ interface GlideEntry {
 }
 
 const FRAME_SECONDS = 1 / GLIDE_MOTION.fps;
-/** 60Hz 下两帧恰好 1/30s，浮点误差会把它判成"不足一帧"而整体掉到 20fps。 */
+/**
+ * 60Hz 屏上一帧恰好 1/60s，浮点误差会把它判成"不足一步"而整条轴掉到 30fps，
+ * 所以阈值留 4ms 余量。平均帧率仍由真实时间决定（每步固定消耗一个 FRAME_SECONDS），
+ * 容差只影响落相位，不会让补间跑快。
+ */
 const FRAME_TOLERANCE = 0.004;
 /** 单帧最多补 3 步：窗口被遮挡或后台恢复时，不按真实流逝时间一次把补间推完。 */
 const MAX_CATCH_UP = 3;
@@ -122,7 +128,7 @@ function stop(): void {
 }
 
 /**
- * 在浮层的 30fps 时间轴上补间一段进度。
+ * 在浮层的定帧时间轴（封顶 60fps）上补间一段进度。
  *
  * `onUpdate` 收到的是**已缓动**的 0→1；调用方用 `mix()` 映射到自己的属性
  * （translateY、scale、rotate…）。同一元素重复触发时，新补间要从"当前视觉值"

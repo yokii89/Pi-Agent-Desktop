@@ -17,7 +17,7 @@ import styles from "./styleEdit.module.css";
 
 /**
  * 添加属性（UI 重设计）：幽灵声明行 `name: value`，聚焦即实线，Enter 提交。
- * 目录建议是自绘列表（滑动药丸 + 30fps 进出），portal 到 body 挂在声明行下方；
+ * 目录建议是自绘列表（滑动药丸 + 定帧进出），portal 到 body 挂在声明行下方；
  * 焦点始终留在属性名输入框，方向键只挪药丸不交焦点。未命中目录按文本写入。
  */
 

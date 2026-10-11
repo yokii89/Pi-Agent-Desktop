@@ -1,4 +1,4 @@
-/* 按压回弹：--gs-press 由 Popover 在 30fps 时间轴上补间（docs/design/51）。
+/* 按压回弹：--gs-press 由 Popover 在浮层定帧时间轴上补间（docs/design/51）。
    静息值是 0，缩放系数落回 1，不依赖 JS 也能正常显示。 */
 .root {
   position: relative;

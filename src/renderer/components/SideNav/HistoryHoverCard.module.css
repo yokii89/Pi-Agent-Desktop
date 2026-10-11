@@ -1,5 +1,5 @@
 /* 悬浮详情卡：经 portal 挂在 body 下，不参与侧栏布局，也不被侧栏的 overflow 裁剪。
-   外壳外观走共享配方（overlayShell，圆角即 --radius-overlay）；入场由 30fps 补间
+   外壳外观走共享配方（overlayShell，圆角即 --radius-overlay）；入场由浮层定帧补间
    （utils/glideMotion）逐帧写内联样式，CSS 只描述静息态，命中 reduced-motion 时补间
    直接落终态，与原 `animation: none` 的降级行为一致。 */
 .card {

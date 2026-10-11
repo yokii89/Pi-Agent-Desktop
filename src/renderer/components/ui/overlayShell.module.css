@@ -4,7 +4,7 @@
  *
  * 圆角走 --radius-overlay（壳）一档，条目再套 --radius-overlay-item（见 docs/design/51）。
  * left/top 由 Popover / ContextMenu 在首帧前按锚点矩形写入，这里只给默认值与外观；
- * 开合动效不在此处（CSS transition 表达不了 30fps 封顶），由 utils/glideMotion 逐帧写内联样式，
+ * 开合动效不在此处（CSS transition 表达不了帧率封顶），由 utils/glideMotion 逐帧写内联样式，
  * 所以 CSS 描述的是**静息（展开）态**。
  */
 .shell {

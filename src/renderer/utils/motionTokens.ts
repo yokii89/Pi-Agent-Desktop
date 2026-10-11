@@ -37,8 +37,8 @@ export const NAV_MOTION = {
  * 不走 CSS transition（CSS 表达不了帧率封顶），也不动全局 gsap.ticker（会连带侧栏动效降档）。
  */
 export const GLIDE_MOTION = {
-  /** 浮层动效统一封顶帧率。 */
-  fps: 30,
+  /** 浮层动效统一封顶帧率（60 = 在 60Hz 屏上等于不封顶，高刷屏上仍锁在 60）。 */
+  fps: 60,
   /** 贝塞尔控制点：菜单弹出、药丸滑行、箭头翻转共用同一条曲线。 */
   easeOut: [0.23, 1, 0.32, 1],
   /** 菜单入场（scale 0.95→1 + 淡入）。 */

@@ -3,8 +3,8 @@ import { glide, makeCubicBezier, mix } from "./glideMotion";
 import { GLIDE_MOTION } from "./motionTokens";
 
 /**
- * 30fps 时间轴与贝塞尔曲线的纯逻辑验证（vitest 只跑无 DOM 的部分，见 AGENTS.md「测试」）。
- * 帧率不是"配了个 30"就算数：调度器靠 rAF 取整，容差不对就会在 60Hz 上掉到 20fps，
+ * 定帧时间轴（封顶 60fps）与贝塞尔曲线的纯逻辑验证（vitest 只跑无 DOM 的部分，见 AGENTS.md「测试」）。
+ * 帧率不是"配了个 60"就算数：调度器靠 rAF 取整，容差不对就会在 60Hz 上掉到 30fps，
  * 所以这里用假时钟按真实刷新率喂帧，数实际派发的帧数。
  */
 
@@ -66,40 +66,40 @@ describe("makeCubicBezier", () => {
   });
 });
 
-describe("glide 30fps 调度", () => {
-  it("60Hz 取帧仍派发 30 帧/秒", () => {
+describe("glide 60fps 调度", () => {
+  it("60Hz 取帧逐帧推进：派发 60 帧/秒", () => {
     const clock = installFakeClock();
     let updates = 0;
     let done = 0;
     glide({ duration: 1, onUpdate: () => updates++, onComplete: () => done++ });
 
-    // 16.666…ms 一帧，跑满 1 秒
+    // 16.666…ms 一帧，跑满 1 秒：每一帧都该推进一步
     for (let i = 0; i < 60; i++) clock.tick(1000 / 60);
 
-    expect(updates).toBe(30);
+    expect(updates).toBe(60);
     expect(done).toBe(1);
   });
 
-  it("144Hz 取帧不会超发（封顶 30fps）", () => {
+  it("144Hz 取帧不会超发（封顶 60fps）", () => {
     const clock = installFakeClock();
     let updates = 0;
     glide({ duration: 1, onUpdate: () => updates++ });
 
     for (let i = 0; i < 144; i++) clock.tick(1000 / 144);
 
-    expect(updates).toBeLessThanOrEqual(31);
-    expect(updates).toBeGreaterThanOrEqual(28);
+    expect(updates).toBeLessThanOrEqual(62);
+    expect(updates).toBeGreaterThanOrEqual(58);
   });
 
   it("补间按固定步长推进，被打断时不越界", () => {
     const clock = installFakeClock();
     const seen: number[] = [];
     const cancel = glide({ duration: GLIDE_MOTION.glide, onUpdate: (p) => seen.push(p) });
-    // 30fps 下 220ms ≈ 6.6 帧
+    // 60fps 下 220ms ≈ 13.2 帧
     for (let i = 0; i < 4; i++) clock.tick(1000 / 60);
     cancel();
     for (let i = 0; i < 4; i++) clock.tick(1000 / 60);
-    expect(seen.length).toBe(2);
+    expect(seen.length).toBe(4);
     expect(seen.every((p) => p > 0 && p <= 1)).toBe(true);
   });
 

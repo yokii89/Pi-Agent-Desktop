@@ -15,7 +15,7 @@ const VIEWPORT_MARGIN = 8;
  * 元素详情浮窗：锚定在芯片旁，portal + fixed，避免被输入框 overflow 裁剪。
  * 点击外部 / Escape 关闭。
  *
- * 开合走 30fps 时间轴（docs/design/51）：收起要先演完动画再通知父级卸载，
+ * 开合走浮层定帧时间轴（docs/design/51）：收起要先演完动画再通知父级卸载，
  * 内部用 `closing` 闩住防止重复触发；父级直接卸载（如芯片消失）则没有出场动画。
  */
 export function ElementDetailPopover({

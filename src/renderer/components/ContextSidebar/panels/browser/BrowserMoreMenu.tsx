@@ -172,7 +172,7 @@ export function BrowserMoreMenu() {
   );
 }
 
-/** 菜单面板：贴「…」下方、右对齐；放不下则翻到上方。进出场都走 30fps 补间（docs/design/51）。 */
+/** 菜单面板：贴「…」下方、右对齐；放不下则翻到上方。进出场都走浮层定帧补间（docs/design/51）。 */
 function MoreMenuPanel({
   panelRef,
   anchor,
