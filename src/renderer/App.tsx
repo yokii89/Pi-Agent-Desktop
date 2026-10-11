@@ -15,6 +15,7 @@ import { SideNav } from "./components/SideNav/SideNav";
 import { TerminalPanel } from "./components/TerminalPanel/TerminalPanel";
 import { TitleBar } from "./components/TitleBar/TitleBar";
 import { Toast } from "./components/ui/Toast";
+import { useContextSidebarCollapse } from "./hooks/useContextSidebarCollapse";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import { useNotificationSounds } from "./hooks/useNotificationSounds";
 import { procService } from "./services/procService";
@@ -144,18 +145,23 @@ function TerminalPanelHost() {
 
 function AppLayout() {
   const { navCollapsed, rightSidebarOpen, rightSidebarWidth, reviewWindowOpen } = useUiStore();
+  // 右侧侧栏收展走下拉曲线补间（docs/design/53）：mounted/closed 滞后于 store，
+  // 收起演完才卸载 aside、才套 sidebarClosed，补间写的就是下面的同一个 CSS 变量
+  const sidebar = useContextSidebarCollapse(rightSidebarOpen, rightSidebarWidth);
   useGlobalShortcuts();
 
   return (
     <div
+      ref={sidebar.ref}
       className={[
         styles.app,
         navCollapsed ? styles.navCollapsed : "",
-        rightSidebarOpen ? "" : styles.sidebarClosed,
+        sidebar.closed ? styles.sidebarClosed : "",
       ]
         .filter(Boolean)
         .join(" ")}
-      // 用拖拽后的宽度覆盖 --context-sidebar-width，三栏网格与侧栏自身宽度一并生效
+      // 用拖拽后的宽度覆盖 --context-sidebar-width，三栏网格与侧栏自身宽度一并生效；
+      // 收展补间也写这个变量，不补间时由本值兜底
       style={{ "--context-sidebar-width": `${rightSidebarWidth}px` } as CSSProperties}
     >
       <TitleBar />
@@ -166,7 +172,7 @@ function AppLayout() {
         </div>
         <TerminalPanelHost />
       </main>
-      {rightSidebarOpen && <ContextSidebar />}
+      {sidebar.mounted && <ContextSidebar />}
       <SettingsDialog />
       <AppErrorBoundary>
         <ExtensionViewHost />

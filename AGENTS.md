@@ -228,6 +228,20 @@ import { Play } from "@phosphor-icons/react";
 - **可关闭的文档页签不属于它**：项内带关闭 × / 重命名输入框的（终端页签、浏览器页签）留作待统一，
   要转得先给原语加"项内可放交互控件"的形态，别在站点绕。
 
+### 大面板收展：下拉曲线 + 定帧时间轴（docs/design/53）
+
+右侧上下文侧栏与中央工作区底部的终端栏，收起/展开**一律走 `glide()` 定帧时间轴补间尺寸**
+（曲线即浮层默认缓动 `GLIDE_MOTION.easeOut`，时长用 `NAV_MOTION.collapseEnter/collapseExit`），
+禁止退回瞬时显隐：
+
+- **侧栏补间的是 `--context-sidebar-width` 变量**（`hooks/useContextSidebarCollapse.ts`）：
+  网格 aside 轨道与侧栏宽度吃同一个变量，直写根元素内联值（与拖拽把手同路）；
+  aside 与 `sidebarClosed` 类**滞后到补间落定**才卸载/生效，半途反向切换从内联变量的当前视觉值接管。
+- **终端栏补间的是面板高度**（`TerminalPanel` 内 `animHeight`）：收起演完才 `display:none`
+  （pty 全程存活）；拖拽把手真正开始拖动时取消补间、从当前视觉值重新起算。
+- 两者都遵守：首次挂载不播动画、`prefers-reduced-motion` 直接落终态（`glide()` 内建）、
+  补间的中间产物（inline overflow、动画高度 state）落定后清干净。
+
 ## Git 约定
 
 - 分支：`main` 为稳定分支，功能开发用 `feat/<主题>`、修复用 `fix/<主题>`。
