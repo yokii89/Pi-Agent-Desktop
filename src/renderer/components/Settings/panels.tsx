@@ -8,7 +8,7 @@ import type {
   PiShellSource,
   TerminalShellKind,
 } from "../../../shared/ipc";
-import { UPDATE_RELEASES_URL, type UpdateStatus } from "../../../shared/update";
+import { PIDESK_REPO_URL, UPDATE_RELEASES_URL, type UpdateStatus } from "../../../shared/update";
 import { useT } from "../../hooks/useT";
 import { fsService } from "../../services/fsService";
 import { piService } from "../../services/piService";
@@ -247,12 +247,15 @@ export function EnvironmentPanel() {
   const t = useT();
   const { showToast } = useUiStore();
   const [terminalShell, setTerminalShell] = useState<TerminalShellKind>("powershell");
+  const [menuCompletion, setMenuCompletion] = useState(true);
   const [shellProbe, setShellProbe] = useState<PiShellProbe | null>(null);
   const [shellValidating, setShellValidating] = useState(false);
 
   useEffect(() => {
     settingsService.get().then((settings) => {
-      if (settings) setTerminalShell(settings.terminalShell);
+      if (!settings) return;
+      setTerminalShell(settings.terminalShell);
+      setMenuCompletion(settings.terminalMenuCompletion);
     });
     piService.shell.get().then(setShellProbe);
   }, []);
@@ -260,6 +263,11 @@ export function EnvironmentPanel() {
   const changeShell = async (shell: TerminalShellKind): Promise<void> => {
     setTerminalShell(shell);
     await settingsService.set({ terminalShell: shell });
+  };
+
+  const changeMenuCompletion = async (checked: boolean): Promise<void> => {
+    setMenuCompletion(checked);
+    await settingsService.set({ terminalMenuCompletion: checked });
   };
 
   const applyShellPath = async (path: string | null): Promise<void> => {
@@ -322,6 +330,17 @@ export function EnvironmentPanel() {
                 label: value === "powershell" ? "PowerShell" : value === "cmd" ? "CMD" : "Git Bash",
               }))}
               onChange={(next) => changeShell(next)}
+            />
+          }
+        />
+        <SettingRow
+          label={t("settings.environment.terminalMenuCompletion")}
+          description={t("settings.environment.terminalMenuCompletion.description")}
+          control={
+            <Toggle
+              checked={menuCompletion}
+              aria-label={t("settings.environment.terminalMenuCompletion")}
+              onChange={(next) => void changeMenuCompletion(next)}
             />
           }
         />
@@ -567,7 +586,15 @@ export function AboutPanel() {
       </SettingsSection>
       <SettingsSection title={t("settings.about.group.openSource")}>
         <SettingRow
-          label={t("settings.about.repo")}
+          label={t("settings.about.repo.pidesk")}
+          control={
+            <a href={PIDESK_REPO_URL} target="_blank" rel="noreferrer">
+              github.com/yokii89/Pi-Agent-Desktop
+            </a>
+          }
+        />
+        <SettingRow
+          label={t("settings.about.repo.pi")}
           control={
             <a href={PI_REPO_URL} target="_blank" rel="noreferrer">
               github.com/earendil-works/pi

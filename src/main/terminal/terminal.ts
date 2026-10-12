@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import { app } from "electron";
 import type { IPty } from "node-pty";
 import { spawn } from "node-pty";
@@ -8,6 +9,7 @@ import { TERMINAL_IPC } from "../../shared/ipc";
 import { resolveBashForTerminal } from "../session/piShell";
 import { getSettings } from "../settings/settings";
 import { getMainWindow } from "../window/createMainWindow";
+import { buildPowerShellCommand, ensureBashInputrc } from "./completionInit";
 
 interface TerminalEntry {
   pty: IPty;
@@ -38,28 +40,48 @@ function flushTerminalOutput(id: string, entry: TerminalEntry): void {
   push({ id, type: "data", payload });
 }
 
+interface ShellLaunch {
+  file: string;
+  args: string[];
+  /** 叠加在 process.env 上的变量（bash 的 INPUTRC）。 */
+  env?: Record<string, string>;
+  fallbackNotice?: string;
+}
+
 /**
  * 终端 Shell 启动参数。中文 Windows 下 PowerShell/CMD 默认 GBK 代码页，
  * 固定先切换到 UTF-8（65001），避免 xterm 按 UTF-8 渲染出现乱码。
  * Git Bash 原生 UTF-8，无需 chcp；解析顺序见 resolveBashForTerminal。
+ * Tab 菜单式补全只改这里（docs/design/60）：命令串与 INPUTRC 由 completionInit 拼装，
+ * cmd 自身没有补全设施，开关对它无意义。
  */
-function resolveShell(): { file: string; args: string[]; fallbackNotice?: string } {
-  if (getSettings().terminalShell === "cmd") {
+function resolveShell(): ShellLaunch {
+  const settings = getSettings();
+  const menuCompletion = settings.terminalMenuCompletion;
+  const powershell = (fallbackNotice?: string): ShellLaunch => ({
+    file: "powershell.exe",
+    args: ["-NoLogo", "-NoExit", "-Command", buildPowerShellCommand(menuCompletion)],
+    ...(fallbackNotice ? { fallbackNotice } : {}),
+  });
+
+  if (settings.terminalShell === "cmd") {
     return { file: "cmd.exe", args: ["/d", "/k", "chcp 65001 >nul"] };
   }
-  if (getSettings().terminalShell === "gitbash") {
+  if (settings.terminalShell === "gitbash") {
     const bash = resolveBashForTerminal();
     if (bash) {
       // --login 加载 Git Bash profile，得到彩色提示符；env 透传 process.env
-      return { file: bash, args: ["--login"] };
+      return {
+        file: bash,
+        args: ["--login"],
+        ...(menuCompletion
+          ? { env: { INPUTRC: ensureBashInputrc(path.join(app.getPath("userData"), "terminal")) } }
+          : {}),
+      };
     }
-    return {
-      file: "powershell.exe",
-      args: ["-NoLogo", "-NoExit", "-Command", "chcp 65001 >$null"],
-      fallbackNotice: "\r\n\x1b[33m[PiDesk] 未找到 Git Bash，已回退到 PowerShell\x1b[0m\r\n\r\n",
-    };
+    return powershell("\r\n\x1b[33m[PiDesk] 未找到 Git Bash，已回退到 PowerShell\x1b[0m\r\n\r\n");
   }
-  return { file: "powershell.exe", args: ["-NoLogo", "-NoExit", "-Command", "chcp 65001 >$null"] };
+  return powershell();
 }
 
 /** 新建终端实例，返回实例 id。cwd 不存在时回落到用户主目录。 */
@@ -76,7 +98,7 @@ export function createTerminal(cwd?: string): string {
     cols: 80,
     rows: 24,
     cwd: workdir,
-    env: process.env as Record<string, string>,
+    env: { ...(process.env as Record<string, string>), ...shell.env },
   });
   const entry: TerminalEntry = { pty, outBuf: "", flushTimer: null };
   pty.onData((data) => {

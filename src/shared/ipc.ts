@@ -107,6 +107,8 @@ export interface PideskSettings {
   /** pi 可执行文件路径；null 时主进程从 PATH 解析。 */
   piExecutablePath: string | null;
   terminalShell: TerminalShellKind;
+  /** Tab 一次列出全部候选（docs/design/60）；false 时回到 shell 出厂手感。 */
+  terminalMenuCompletion: boolean;
   theme: ThemeId;
   /** 界面语言；system 跟随 OS，否则固定 zh-CN / en-US。 */
   locale: LocalePreference;

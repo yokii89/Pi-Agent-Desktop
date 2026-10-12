@@ -661,6 +661,16 @@ export const settingsMessages = defineMessages({
     "en-US":
       "Applies to new terminal instances. Falls back to PowerShell when Git Bash is missing.",
   },
+  "settings.environment.terminalMenuCompletion": {
+    "zh-CN": "Tab 列出全部候选",
+    "en-US": "List completions on Tab",
+  },
+  "settings.environment.terminalMenuCompletion.description": {
+    "zh-CN":
+      "对新开终端实例生效：按 Tab 一次列出全部候选，不再逐个循环。PowerShell 里选中候选后需再按一次回车才执行；CMD 没有补全，此项对它无效。",
+    "en-US":
+      "Applies to new terminal instances: Tab lists every candidate instead of cycling. In PowerShell press Enter once more to run the selected candidate; CMD has no completion, so this has no effect there.",
+  },
   "settings.environment.piShell": {
     "zh-CN": "pi Shell（bash）",
     "en-US": "pi shell (bash)",
@@ -866,7 +876,14 @@ export const settingsMessages = defineMessages({
     "zh-CN": "开源",
     "en-US": "Open source",
   },
-  "settings.about.repo": { "zh-CN": "开源地址", "en-US": "Repository" },
+  "settings.about.repo.pidesk": {
+    "zh-CN": "PiDesk 开源地址",
+    "en-US": "PiDesk repository",
+  },
+  "settings.about.repo.pi": {
+    "zh-CN": "pi 开源地址",
+    "en-US": "pi repository",
+  },
 
   "settings.models.defaultModel": {
     "zh-CN": "默认模型",
