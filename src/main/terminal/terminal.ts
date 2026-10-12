@@ -57,10 +57,10 @@ interface ShellLaunch {
  */
 function resolveShell(): ShellLaunch {
   const settings = getSettings();
-  const menuCompletion = settings.terminalMenuCompletion;
+  const tabCompletion = settings.terminalTabCompletion;
   const powershell = (fallbackNotice?: string): ShellLaunch => ({
     file: "powershell.exe",
-    args: ["-NoLogo", "-NoExit", "-Command", buildPowerShellCommand(menuCompletion)],
+    args: ["-NoLogo", "-NoExit", "-Command", buildPowerShellCommand(tabCompletion)],
     ...(fallbackNotice ? { fallbackNotice } : {}),
   });
 
@@ -71,12 +71,13 @@ function resolveShell(): ShellLaunch {
     const bash = resolveBashForTerminal();
     if (bash) {
       // --login 加载 Git Bash profile，得到彩色提示符；env 透传 process.env
+      // 两档都要键表：cycle 靠 menu-complete 换掉出厂 complete，list 靠 show-all-if-ambiguous 提前铺清单
       return {
         file: bash,
         args: ["--login"],
-        ...(menuCompletion
-          ? { env: { INPUTRC: ensureBashInputrc(path.join(app.getPath("userData"), "terminal")) } }
-          : {}),
+        env: {
+          INPUTRC: ensureBashInputrc(path.join(app.getPath("userData"), "terminal"), tabCompletion),
+        },
       };
     }
     return powershell("\r\n\x1b[33m[PiDesk] 未找到 Git Bash，已回退到 PowerShell\x1b[0m\r\n\r\n");

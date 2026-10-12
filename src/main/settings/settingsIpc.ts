@@ -6,6 +6,7 @@ import type {
   PideskProject,
   PideskSettings,
   TerminalShellKind,
+  TerminalTabCompletion,
   ThemeId,
 } from "../../shared/ipc";
 import {
@@ -147,6 +148,10 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         if (value === "powershell" || value === "cmd" || value === "gitbash")
           clean.terminalShell = value as TerminalShellKind;
         break;
+      case "terminalTabCompletion":
+        if (value === "cycle" || value === "list")
+          clean.terminalTabCompletion = value as TerminalTabCompletion;
+        break;
       case "theme":
         if (value === "dark" || value === "light") clean.theme = value as ThemeId;
         break;
@@ -155,7 +160,6 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
       case "browserEnabled":
       case "browserLoginImportConsent":
       case "sessionPrefetchEnabled":
-      case "terminalMenuCompletion":
       case "welcomeRecentsEnabled":
         if (typeof value === "boolean") clean[key] = value;
         break;

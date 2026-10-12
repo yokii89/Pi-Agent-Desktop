@@ -661,15 +661,23 @@ export const settingsMessages = defineMessages({
     "en-US":
       "Applies to new terminal instances. Falls back to PowerShell when Git Bash is missing.",
   },
-  "settings.environment.terminalMenuCompletion": {
-    "zh-CN": "Tab 列出全部候选",
-    "en-US": "List completions on Tab",
+  "settings.environment.terminalTabCompletion": {
+    "zh-CN": "Tab 补全方式",
+    "en-US": "Tab completion",
   },
-  "settings.environment.terminalMenuCompletion.description": {
+  "settings.environment.terminalTabCompletion.cycle": {
+    "zh-CN": "循环切换",
+    "en-US": "Cycle",
+  },
+  "settings.environment.terminalTabCompletion.list": {
+    "zh-CN": "列出全部",
+    "en-US": "List all",
+  },
+  "settings.environment.terminalTabCompletion.description": {
     "zh-CN":
-      "对新开终端实例生效：按 Tab 一次列出全部候选，不再逐个循环。PowerShell 里选中候选后需再按一次回车才执行；CMD 没有补全，此项对它无效。",
+      "对新开终端实例生效。循环切换：按 Tab 逐个替换候选词；列出全部：按 Tab 一次铺出候选清单（PowerShell 下选中候选后需再按一次回车才执行）。",
     "en-US":
-      "Applies to new terminal instances: Tab lists every candidate instead of cycling. In PowerShell press Enter once more to run the selected candidate; CMD has no completion, so this has no effect there.",
+      "Applies to new terminal instances. Cycle replaces the word with each candidate on Tab; List all shows every candidate at once (in PowerShell, press Enter once more to run the selected candidate).",
   },
   "settings.environment.piShell": {
     "zh-CN": "pi Shell（bash）",

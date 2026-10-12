@@ -7,6 +7,7 @@ import type {
   PiShellProbe,
   PiShellSource,
   TerminalShellKind,
+  TerminalTabCompletion,
 } from "../../../shared/ipc";
 import { PIDESK_REPO_URL, UPDATE_RELEASES_URL, type UpdateStatus } from "../../../shared/update";
 import { useT } from "../../hooks/useT";
@@ -247,7 +248,7 @@ export function EnvironmentPanel() {
   const t = useT();
   const { showToast } = useUiStore();
   const [terminalShell, setTerminalShell] = useState<TerminalShellKind>("powershell");
-  const [menuCompletion, setMenuCompletion] = useState(true);
+  const [tabCompletion, setTabCompletion] = useState<TerminalTabCompletion>("cycle");
   const [shellProbe, setShellProbe] = useState<PiShellProbe | null>(null);
   const [shellValidating, setShellValidating] = useState(false);
 
@@ -255,7 +256,7 @@ export function EnvironmentPanel() {
     settingsService.get().then((settings) => {
       if (!settings) return;
       setTerminalShell(settings.terminalShell);
-      setMenuCompletion(settings.terminalMenuCompletion);
+      setTabCompletion(settings.terminalTabCompletion);
     });
     piService.shell.get().then(setShellProbe);
   }, []);
@@ -265,9 +266,9 @@ export function EnvironmentPanel() {
     await settingsService.set({ terminalShell: shell });
   };
 
-  const changeMenuCompletion = async (checked: boolean): Promise<void> => {
-    setMenuCompletion(checked);
-    await settingsService.set({ terminalMenuCompletion: checked });
+  const changeTabCompletion = async (mode: TerminalTabCompletion): Promise<void> => {
+    setTabCompletion(mode);
+    await settingsService.set({ terminalTabCompletion: mode });
   };
 
   const applyShellPath = async (path: string | null): Promise<void> => {
@@ -334,13 +335,20 @@ export function EnvironmentPanel() {
           }
         />
         <SettingRow
-          label={t("settings.environment.terminalMenuCompletion")}
-          description={t("settings.environment.terminalMenuCompletion.description")}
+          label={t("settings.environment.terminalTabCompletion")}
+          description={t("settings.environment.terminalTabCompletion.description")}
           control={
-            <Toggle
-              checked={menuCompletion}
-              aria-label={t("settings.environment.terminalMenuCompletion")}
-              onChange={(next) => void changeMenuCompletion(next)}
+            <Segmented
+              ariaLabel={t("settings.environment.terminalTabCompletion")}
+              value={tabCompletion}
+              items={(["cycle", "list"] as TerminalTabCompletion[]).map((value) => ({
+                value,
+                label:
+                  value === "cycle"
+                    ? t("settings.environment.terminalTabCompletion.cycle")
+                    : t("settings.environment.terminalTabCompletion.list"),
+              }))}
+              onChange={(next) => void changeTabCompletion(next)}
             />
           }
         />

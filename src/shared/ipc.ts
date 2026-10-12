@@ -91,6 +91,11 @@ export interface PideskProject {
 
 export type ThemeId = "dark" | "light";
 export type TerminalShellKind = "powershell" | "cmd" | "gitbash";
+/**
+ * 终端 Tab 补全形态（docs/design/60）。两态按 Shell 各自映射到原生机制：
+ * cycle = 逐个替换当前词；list = 一次铺出全部候选。
+ */
+export type TerminalTabCompletion = "cycle" | "list";
 
 /** 浏览器面板最近访问的一条 URL（docs/design/05 P0-5）。 */
 export interface BrowserRecentUrl {
@@ -107,8 +112,8 @@ export interface PideskSettings {
   /** pi 可执行文件路径；null 时主进程从 PATH 解析。 */
   piExecutablePath: string | null;
   terminalShell: TerminalShellKind;
-  /** Tab 一次列出全部候选（docs/design/60）；false 时回到 shell 出厂手感。 */
-  terminalMenuCompletion: boolean;
+  /** Tab 补全形态；cycle 逐个替换候选，list 一次列出全部（docs/design/60）。 */
+  terminalTabCompletion: TerminalTabCompletion;
   theme: ThemeId;
   /** 界面语言；system 跟随 OS，否则固定 zh-CN / en-US。 */
   locale: LocalePreference;

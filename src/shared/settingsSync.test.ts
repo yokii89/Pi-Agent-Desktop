@@ -14,7 +14,7 @@ function fakeSettings(): PideskSettings {
     lastProjectId: "p1",
     piExecutablePath: "C:/pi/pi.exe",
     terminalShell: "powershell",
-    terminalMenuCompletion: true,
+    terminalTabCompletion: "cycle",
     theme: "dark",
     locale: "zh-CN",
     navCollapsed: true,
