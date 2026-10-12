@@ -56,6 +56,24 @@ function pageLabel(page: { title: string; url: string; started: boolean }, t: Tr
 }
 
 /**
+ * 页签站点图标：主进程推来的 favicon URL；加载失败（含 CSP 拦截的 file: 图标）
+ * 回退 Phosphor 图标。key=src 使换站时重挂载、失败态清零。
+ */
+function PageTabFavicon({ src }: { src: string | null | undefined }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return <Browsers size={14} weight="regular" />;
+  return (
+    <img
+      src={src}
+      alt=""
+      className={styles.pageFavicon}
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+/**
  * 右侧"浏览器"面板（docs/design/05）：本地开发预览 + 元素拾取。
  * 页面内容由主进程 WebContentsView 覆盖渲染在宿主区域上方；
  * 需要叠在页面上的菜单（更多）走 portal 浮层 + setOverlaySuppressed。
@@ -185,7 +203,7 @@ export function BrowserPanel() {
                 title={page.url || pageLabel(page, t)}
                 onClick={() => void store.setActivePage(page.id)}
               >
-                <Browsers size={14} weight="regular" />
+                <PageTabFavicon key={page.favicon ?? ""} src={page.favicon} />
                 <span className={styles.pageTabLabel}>{pageLabel(page, t)}</span>
               </button>
               {store.pages.length > 1 && (

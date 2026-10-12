@@ -1630,6 +1630,8 @@ export interface BrowserInstanceInfo {
   url: string;
   title: string;
   started: boolean;
+  /** 页签站点图标（page-favicon-updated 推来的远程 URL；null/缺省=用兜底图标）。 */
+  favicon?: string | null;
 }
 
 export interface BrowserSetActiveInstanceRequest {
@@ -1984,6 +1986,7 @@ export type BrowserPushBody =
       };
     }
   | { type: "picked"; payload: BrowserPickedElement }
+  | { type: "favicon"; payload: string | null }
   | { type: "console"; payload: BrowserConsoleError }
   | { type: "error"; payload: string }
   | { type: "loading"; payload: boolean }

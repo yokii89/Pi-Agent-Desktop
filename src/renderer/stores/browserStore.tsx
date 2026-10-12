@@ -100,6 +100,7 @@ type BrowserAction =
       commit: boolean;
     }
   | { type: "loading"; loading: boolean }
+  | { type: "favicon"; favicon: string | null }
   | { type: "started" }
   | { type: "pick"; active: boolean; mode: BrowserPickMode }
   | { type: "consoleError"; error: BrowserConsoleError }
@@ -202,6 +203,12 @@ function browserReducer(state: BrowserState, action: BrowserAction): BrowserStat
     }
     case "loading":
       return { ...state, loading: action.loading };
+    case "favicon": {
+      const pages = state.pages.map((page) =>
+        page.id === state.activePageId ? { ...page, favicon: action.favicon } : page,
+      );
+      return { ...state, pages };
+    }
     case "started":
       return { ...state, started: true };
     case "pick":
@@ -423,6 +430,9 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
           break;
         case "loading":
           dispatch({ type: "loading", loading: message.payload });
+          break;
+        case "favicon":
+          dispatch({ type: "favicon", favicon: message.payload });
           break;
         case "pick":
           dispatch({ type: "pick", active: message.payload.active, mode: message.payload.mode });

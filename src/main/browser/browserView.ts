@@ -78,6 +78,7 @@ interface BrowserInstance {
   errors: BrowserConsoleError[];
   errorSeq: number;
   zoomFactor: number;
+  favicon: string | null;
 }
 
 const instances = new Map<string, BrowserInstance>();
@@ -159,6 +160,7 @@ export function createBrowserInstance(): string {
     errors: [],
     errorSeq: 0,
     zoomFactor: 1,
+    favicon: null,
   };
   instances.set(id, entry);
   // 同步切换活跃 id：navigate 必须立刻作用在新实例上，
@@ -231,6 +233,7 @@ export function listBrowserInstances(): BrowserInstanceInfo[] {
     url: entry.view?.webContents.getURL() ?? "",
     title: entry.view?.webContents.getTitle() ?? "",
     started: entry.view !== null,
+    favicon: entry.favicon,
   }));
 }
 
@@ -238,6 +241,7 @@ function syncActiveInstanceState(entry: BrowserInstance): void {
   const wc = entry.view?.webContents;
   if (!wc) {
     push(entry.id, { type: "loading", payload: false });
+    push(entry.id, { type: "favicon", payload: null });
     push(entry.id, {
       type: "navigated",
       payload: {
@@ -252,6 +256,9 @@ function syncActiveInstanceState(entry: BrowserInstance): void {
   }
   const url = wc.getURL();
   push(entry.id, { type: "loading", payload: wc.isLoading() });
+  // favicon 是缓存字段（url/title 从 webContents 实时读）：后台页换过图标，
+  // 换页时必须在这里重新对齐一次，否则页签带着旧图标
+  push(entry.id, { type: "favicon", payload: entry.favicon });
   push(entry.id, {
     type: "navigated",
     payload: {
@@ -291,9 +298,18 @@ function ensureView(entry: BrowserInstance): WebContentsView {
   wc.on("did-stop-loading", () => push(entry.id, { type: "loading", payload: false }));
   wc.on("did-navigate", (_event, url) => {
     if (/^https?:\/\//i.test(url)) recordRecentUrl(url);
+    // 旧站的 favicon 不能带进新导航；新图标由 page-favicon-updated 异步补推
+    entry.favicon = null;
+    push(entry.id, { type: "favicon", payload: null });
     // nodeId 与 backendNodeId 在导航后全部失效（06 §5.1）：清空检查器并提示重新拾取
     invalidateInspector("navigated");
     pushNavigated(entry, "commit");
+  });
+  wc.on("page-favicon-updated", (_event, favicons) => {
+    const url = favicons[favicons.length - 1] ?? null;
+    if (url === entry.favicon) return;
+    entry.favicon = url;
+    push(entry.id, { type: "favicon", payload: url });
   });
   // 页内导航（SPA 路由）只更新地址栏，不让托盘元素过期，也不动检查器（DOM 未重建）
   wc.on("did-navigate-in-page", (_event, _url, isMainFrame) => {
@@ -516,6 +532,7 @@ function destroyInstanceView(entry: BrowserInstance): void {
     hideInstanceView(entry);
     entry.view.webContents.close();
     entry.view = null;
+    entry.favicon = null;
   }
   entry.addedToWindow = false;
   entry.errors = [];
