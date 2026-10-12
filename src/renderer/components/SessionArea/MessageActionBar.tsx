@@ -3,6 +3,7 @@ import styles from "./MessageActionBar.module.css";
 
 export interface MessageAction {
   key: string;
+  /** 图标按钮的无障碍名（不渲染为可见文字）。 */
   label: string;
   /** 悬浮提示（默认用 label）。 */
   title?: string;
@@ -30,11 +31,11 @@ export function MessageActionBar({
           key={item.key}
           type="button"
           className={styles.action}
+          aria-label={item.label}
           title={item.title ?? item.label}
           onClick={item.onClick}
         >
           <item.icon size={14} weight="regular" />
-          <span>{item.label}</span>
         </button>
       ))}
     </div>

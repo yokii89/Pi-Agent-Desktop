@@ -10,13 +10,12 @@
 .action {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px var(--spacing-xs);
+  justify-content: center;
+  padding: var(--spacing-xs);
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
   cursor: pointer;
   transition:
     color 0.12s cubic-bezier(0.22, 1, 0.36, 1),
