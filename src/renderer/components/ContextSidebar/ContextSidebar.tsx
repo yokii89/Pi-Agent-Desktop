@@ -1,4 +1,4 @@
-import { Browsers, FileCode, GitPullRequest, PuzzlePiece, X } from "@phosphor-icons/react";
+import { FileCode, GitPullRequest, Globe, PuzzlePiece, X } from "@phosphor-icons/react";
 import {
   type PointerEvent as ReactPointerEvent,
   useEffect,
@@ -43,7 +43,7 @@ interface SidebarTabDef {
 
 const TABS: SidebarTabDef[] = [
   { id: "files", labelKey: "panels.context.files", icon: FileCode },
-  { id: "browser", labelKey: "panels.context.browser", icon: Browsers },
+  { id: "browser", labelKey: "panels.context.browser", icon: Globe },
 ];
 
 interface ResizeSession {
