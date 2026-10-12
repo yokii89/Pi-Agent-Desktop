@@ -28,8 +28,6 @@ interface HistoryListProps {
   innerRef?: RefObject<HTMLUListElement | null>;
   /** 是否绘制树状引导线（仅项目子列表）。 */
   withTreeGuides?: boolean;
-  /** 项目子列表形态：条目标题按字数截断（顶层"任务"列表按宽度截断）。 */
-  compactTitle?: boolean;
 }
 
 /**
@@ -48,7 +46,6 @@ export function HistoryList({
   containerRef,
   innerRef,
   withTreeGuides = false,
-  compactTitle = false,
 }: HistoryListProps) {
   const t = useT();
   const [showAll, setShowAll] = useState(false);
@@ -85,7 +82,6 @@ export function HistoryList({
             /* 树线 └ 只画在真实末条上：收起态的"可见末条"下面还有"显示更多"行，
                分支未结束，须画贯穿线（├）让树线延续下去 */
             treeLast={index === sessions.length - 1}
-            compactTitle={compactTitle}
             opening={openingFile === session.file}
             processAlive={isFileProcessAlive(session.file)}
             running={isFileRunning(session.file)}

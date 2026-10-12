@@ -198,7 +198,6 @@ function ProjectSessions({
         emptyText={t("sidenav.projects.noHistory")}
         className={styles.nestedList}
         withTreeGuides
-        compactTitle
       />
     </div>
   );

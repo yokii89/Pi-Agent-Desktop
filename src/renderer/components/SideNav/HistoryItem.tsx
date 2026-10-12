@@ -5,7 +5,7 @@ import { useT } from "../../hooks/useT";
 import { procStore, refreshSessionProcesses } from "../../stores/procStore";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
-import { sessionTitle, truncateTitle } from "../../utils/sessionTitle";
+import { sessionTitle } from "../../utils/sessionTitle";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ExtensionReloadNotice } from "./ExtensionReloadNotice";
 import { HistoryHoverCard } from "./HistoryHoverCard";
@@ -44,8 +44,6 @@ interface HistoryItemProps {
   treeDepth?: number;
   /** 是否为同级最后一项（决定引导线分支钩的长度）。 */
   treeLast?: boolean;
-  /** 项目子列表形态：标题按字数截断（顶层"任务"列表保持按宽度截断）。 */
-  compactTitle?: boolean;
   /** 该会话是否有存活 pi 实例（「结束进程」菜单可见性）。 */
   processAlive?: boolean;
   /** 该会话是否正在 running（结束确认文案区分）。 */
@@ -74,7 +72,6 @@ export function HistoryItem({
   spaceName,
   treeDepth,
   treeLast = false,
-  compactTitle = false,
   processAlive = false,
   running = false,
   onOpen,
@@ -191,7 +188,7 @@ export function HistoryItem({
         />
       ) : (
         <button type="button" className={styles.historyMain} disabled={disabled} onClick={onOpen}>
-          <span className={styles.historyTitle}>{compactTitle ? truncateTitle(title) : title}</span>
+          <span className={styles.historyTitle}>{title}</span>
           <ExtensionReloadNotice sessionFile={session.file} />
         </button>
       )}
