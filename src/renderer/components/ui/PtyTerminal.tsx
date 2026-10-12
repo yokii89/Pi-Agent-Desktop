@@ -68,6 +68,34 @@ export function PtyTerminal({
     if (buffered) term.write(buffered);
     const unsubscribe = subscribeData((chunk) => term.write(chunk));
 
+    // 剪贴板：桌面终端惯例走 Ctrl+Shift+C / Ctrl+Shift+V（Ctrl+C 归 SIGINT）。
+    // 必须抢在 xterm 之前拦下：xterm 把 Ctrl 字母组合一律折成控制字符写进 pty，
+    // 不拦的话这组键等于往 shell 发信号，正在跑的命令会被打断。
+    term.attachCustomKeyEventHandler((event) => {
+      if (event.type !== "keydown" || !event.ctrlKey || !event.shiftKey) return true;
+      if (event.altKey || event.metaKey || event.isComposing) return true;
+      if (event.code === "KeyC") {
+        const selected = term.getSelection();
+        event.preventDefault();
+        event.stopPropagation();
+        if (selected) void navigator.clipboard.writeText(selected).catch(() => {});
+        return false;
+      }
+      if (event.code === "KeyV") {
+        event.preventDefault();
+        event.stopPropagation();
+        void navigator.clipboard
+          .readText()
+          .then((text) => {
+            // 空剪贴板不注入，避免把 shell 的提示符当成内容处理
+            if (text) term.paste(text);
+          })
+          .catch(() => {});
+        return false;
+      }
+      return true;
+    });
+
     // 用户键盘输入 → 上层写入 pty
     const dataDisposable = term.onData((data) => onData(data));
 
