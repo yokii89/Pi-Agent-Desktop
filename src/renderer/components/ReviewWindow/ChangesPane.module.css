@@ -177,10 +177,14 @@
   color: var(--color-text-muted);
 }
 
+/* 滚动一律交给 diff 盒自己（docs/design/59）：这里若也 overflow:auto，
+   窄侧栏堆叠态会同时出现内外两根纵向条。 */
 .detailBody {
+  display: flex;
   flex: 1;
+  flex-direction: column;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: var(--spacing-sm);
 }
 
