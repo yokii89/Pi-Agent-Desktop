@@ -1,6 +1,6 @@
 import { X } from "@phosphor-icons/react";
 import { useT } from "../../hooks/useT";
-import type { TerminalTab as TerminalTabData } from "../../stores/terminalStore";
+import type { TerminalTab as TerminalTabData } from "../../stores/terminalPanes";
 import styles from "./TerminalPanel.module.css";
 
 interface TerminalTabProps {

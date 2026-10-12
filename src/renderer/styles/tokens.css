@@ -85,6 +85,9 @@
   /* 终端（比主背景更深） */
   --terminal-bg: #0d0d0f;
   --terminal-fg: #cccccc;
+  /* 分屏焦点窗格描边（docs/design/57）：比 --color-accent-soft 实一档，
+     1px 内描边在 --terminal-bg 上也要读得出「焦点在哪个窗格」 */
+  --terminal-pane-ring: rgba(74, 140, 255, 0.45);
 
   /* 会话工具流（中间栏事件流，docs 中间栏对话流设计 v3） */
   --color-tool-bg: rgba(255, 255, 255, 0.03);
@@ -290,6 +293,7 @@
   /* 终端 */
   --terminal-bg: #ffffff;
   --terminal-fg: #1e1e1e;
+  --terminal-pane-ring: rgba(47, 111, 224, 0.45);
 
   /* 会话工具流 */
   --color-tool-bg: rgba(0, 0, 0, 0.02);

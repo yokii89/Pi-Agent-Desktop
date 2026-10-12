@@ -146,6 +146,65 @@
   overflow: hidden;
 }
 
+/* 分屏容器：row = 左右并排、column = 上下堆叠；窗格比例由内联 flex-grow 承担 */
+.paneGroup {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.splitRow {
+  flex-direction: row;
+}
+
+.splitColumn {
+  flex-direction: column;
+}
+
+/* 单个窗格：与 .content 同一套「占满」配方（xterm 容器 / 退出态都要撑满） */
+.pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 焦点窗格描边：必须用 ::after 才盖得住 xterm canvas，直接给 .pane 上 box-shadow 会被子元素遮住 */
+.paneFocused::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 1px var(--terminal-pane-ring);
+  pointer-events: none;
+}
+
+/* 窗格分隔条：与面板顶部高度把手同一档视觉（底色同工具栏、悬停/拖拽走 accent-soft）。
+   3px 即拖拽热区，轴向由 .splitRow / .splitColumn 决定 */
+.splitHandle {
+  flex: none;
+  background: var(--color-bg-surface);
+  transition: background-color 0.12s ease;
+}
+
+.splitRow > .splitHandle {
+  width: 3px;
+  cursor: col-resize;
+}
+
+.splitColumn > .splitHandle {
+  height: 3px;
+  cursor: row-resize;
+}
+
+.splitHandle:hover,
+.splitHandleDragging {
+  background: var(--color-accent-soft);
+}
+
 .emptyState,
 .exitState {
   flex: 1;

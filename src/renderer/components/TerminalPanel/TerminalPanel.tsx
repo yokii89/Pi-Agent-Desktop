@@ -1,5 +1,13 @@
-import { Plus, Stop, Terminal, X } from "@phosphor-icons/react";
 import {
+  Plus,
+  SquareSplitHorizontal,
+  SquareSplitVertical,
+  Stop,
+  Terminal,
+  X,
+} from "@phosphor-icons/react";
+import {
+  Fragment,
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
@@ -11,11 +19,11 @@ import { resolveFontMonoStack } from "../../../shared/fontPresets";
 import { useT } from "../../hooks/useT";
 import { terminalService } from "../../services/terminalService";
 import { useProjectStore } from "../../stores/projectStore";
-import {
-  MAX_TERMINAL_TABS,
-  type TerminalTab as TerminalTabData,
-  useTerminalStore,
-} from "../../stores/terminalStore";
+import type {
+  TerminalSplitDirection,
+  TerminalTab as TerminalTabData,
+} from "../../stores/terminalPanes";
+import { MAX_TERMINAL_TABS, useTerminalStore } from "../../stores/terminalStore";
 import { useUiStore } from "../../stores/uiStore";
 import { type GlideCancel, glide, mix } from "../../utils/glideMotion";
 import { NAV_MOTION } from "../../utils/motionTokens";
@@ -30,6 +38,9 @@ import { TerminalTab } from "./TerminalTab";
 /** 面板高度边界：下限固定像素，上限为中央工作区高度的占比。 */
 const MIN_HEIGHT = 160;
 const MAX_HEIGHT_RATIO = 0.7;
+/** 分屏比例边界：两侧各留出可读宽度，避免把另一侧压成 0。 */
+const MIN_SPLIT_RATIO = 0.2;
+const MAX_SPLIT_RATIO = 0.8;
 
 interface TerminalPanelProps {
   /** true 时收起面板：补间到 0 后 display:none，pty 进程与 xterm 缓冲保持存活。 */
@@ -44,21 +55,53 @@ interface ResizeSession {
   moved: boolean;
 }
 
+interface SplitResizeSession {
+  /** 按下时的指针坐标（row 取 clientX、column 取 clientY）。 */
+  start: number;
+  startRatio: number;
+  /** 分屏容器在拖拽轴上的总尺寸，比例按像素增量换算。 */
+  span: number;
+  moved: boolean;
+}
+
 /**
  * 中央工作区底部终端面板：拖拽把手 + Tab 工具条 + pty 终端视图。
  * 面板可见性由 uiStore（terminalPanelVisible）控制，终端进程生命周期由
  * terminalStore（tabs/pty）控制：隐藏面板不 kill 进程，kill 进程不隐藏面板。
  * 收起/展开走下拉曲线补间（docs/design/53）：高度 0 ↔ store 目标值，
  * 演完收起才 display:none，pty 与 xterm 缓冲全程保持存活。
+ * 分屏（docs/design/57）：窗口内容渲染 terminalStore.panes 的 1..2 个窗格，
+ * 比例走内联 flex-grow、分隔条拖拽改比例（双击复位），焦点窗格带描边。
  */
 export function TerminalPanel({ hidden }: TerminalPanelProps) {
   const t = useT();
-  const { tabs, activeTab, createTab, closeTab, renameTab, setActiveTab } = useTerminalStore();
+  const {
+    tabs,
+    activeTab,
+    panes,
+    focusedPane,
+    split,
+    createTab,
+    closeTab,
+    renameTab,
+    setActiveTab,
+    toggleSplit,
+    focusPane,
+  } = useTerminalStore();
   const { currentProject, ready } = useProjectStore();
   const { theme, fontMonoPreset, terminalPanelHeight, dispatch, shortcuts } = useUiStore();
   const rootRef = useRef<HTMLElement>(null);
-  const terminalRef = useRef<PtyTerminalHandle | null>(null);
   const resizeRef = useRef<ResizeSession | null>(null);
+  // 窗格句柄按窗格位置存：焦点跟随 focusedPane，切换 Tab / 进入分屏后要能动到对应实例
+  const paneRefs = useRef<(PtyTerminalHandle | null)[]>([]);
+  const groupRef = useRef<HTMLDivElement>(null);
+  const splitResizeRef = useRef<SplitResizeSession | null>(null);
+  // 两个方向各记一份比例：换向时不把上一方向的比例带过去
+  const [splitRatio, setSplitRatio] = useState<Record<TerminalSplitDirection, number>>({
+    row: 0.5,
+    column: 0.5,
+  });
+  const [splitDragging, setSplitDragging] = useState(false);
   // 拖拽中的高度走本地 state，pointerup 时一次性提交 store，避免拖拽帧反复重渲染全局
   const [dragHeight, setDragHeight] = useState<number | null>(null);
   // 收展补间期间接管高度；null 时交回「拖拽 → store」的常规链路。
@@ -86,11 +129,11 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
     });
   }, [tabs.length, ready, createTab, currentProject?.dir]);
 
-  // 展开面板 / 切换 Tab 时聚焦终端输入区，可直接敲命令
+  // 展开面板 / 切换 Tab / 焦点窗格变化时聚焦对应窗格的输入区，可直接敲命令
   const activeTabId = activeTab?.id;
   useEffect(() => {
-    if (!hidden && activeTabId) terminalRef.current?.focus();
-  }, [hidden, activeTabId]);
+    if (!hidden && activeTabId) paneRefs.current[focusedPane]?.focus();
+  }, [hidden, activeTabId, focusedPane]);
 
   // 收起/展开补间（docs/design/53）：走浮层同一条定帧时间轴，曲线用下拉曲线
   //（glide() 默认缓动 = GLIDE_MOTION.easeOut），时长沿用面板折叠档（NAV_MOTION）。
@@ -233,6 +276,51 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
     dispatch({ type: "setTerminalPanelHeight", height: clampHeight(next, session.maxHeight) });
   };
 
+  // 点击窗格：把焦点（工具条高亮 / 结束进程的目标）与键盘输入都交给它。
+  // 空白处点击不会落到 xterm 的 textarea 上，必须显式 focus 一次
+  const focusPaneAt = (index: number): void => {
+    focusPane(index);
+    paneRefs.current[index]?.focus();
+  };
+
+  const onSplitResizeStart = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    const group = groupRef.current;
+    const direction = split;
+    if (event.button !== 0 || !group || !direction) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const rect = group.getBoundingClientRect();
+    splitResizeRef.current = {
+      start: direction === "row" ? event.clientX : event.clientY,
+      startRatio: splitRatio[direction],
+      span: direction === "row" ? rect.width : rect.height,
+      moved: false,
+    };
+    setSplitDragging(true);
+  };
+
+  const onSplitResizeMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    const session = splitResizeRef.current;
+    const direction = split;
+    if (!session || !direction || session.span <= 0) return;
+    if (!session.moved) {
+      session.moved = true;
+      document.body.style.cursor = direction === "row" ? "col-resize" : "row-resize";
+      document.body.style.userSelect = "none";
+    }
+    const position = direction === "row" ? event.clientX : event.clientY;
+    const ratio = clampSplitRatio(session.startRatio + (position - session.start) / session.span);
+    setSplitRatio((prev) => (prev[direction] === ratio ? prev : { ...prev, [direction]: ratio }));
+  };
+
+  const onSplitResizeEnd = (): void => {
+    if (!splitResizeRef.current) return;
+    splitResizeRef.current = null;
+    setSplitDragging(false);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  };
+
   const height = dragHeight ?? animHeight ?? terminalPanelHeight;
 
   return (
@@ -292,6 +380,24 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
         <div className={styles.actions}>
           <IconButton
             className={styles.iconBtnCompact}
+            title={split === "row" ? t("terminal.unsplit") : t("terminal.splitRow")}
+            active={split === "row"}
+            disabled={!activeTab}
+            onClick={() => void toggleSplit("row", currentProject?.dir)}
+          >
+            <SquareSplitHorizontal size={16} weight={split === "row" ? "fill" : "regular"} />
+          </IconButton>
+          <IconButton
+            className={styles.iconBtnCompact}
+            title={split === "column" ? t("terminal.unsplit") : t("terminal.splitColumn")}
+            active={split === "column"}
+            disabled={!activeTab}
+            onClick={() => void toggleSplit("column", currentProject?.dir)}
+          >
+            <SquareSplitVertical size={16} weight={split === "column" ? "fill" : "regular"} />
+          </IconButton>
+          <IconButton
+            className={styles.iconBtnCompact}
             title={activeTab ? t("terminal.killCurrent") : t("terminal.noneRunning")}
             disabled={!activeTab}
             onClick={() => activeTab && closeTab(activeTab.id)}
@@ -308,29 +414,76 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
         </div>
       </div>
       <div className={styles.content}>
-        {activeTab ? (
-          activeTab.exited ? (
-            <div className={styles.exitState}>
-              <p>
-                {t("panels.terminal.exited", {
-                  code: activeTab.exitCode ?? t("common.unknown"),
-                })}
-              </p>
-              <Button onClick={newTerminal}>{t("panels.terminal.newTab")}</Button>
-            </div>
-          ) : (
-            <PtyTerminal
-              key={activeTab.id}
-              ref={terminalRef}
-              ariaLabel={t("terminal.instanceAria", { title: activeTab.title })}
-              theme={theme}
-              fontFamily={resolveFontMonoStack(fontMonoPreset)}
-              subscribeData={(callback) => terminalService.subscribeData(activeTab.id, callback)}
-              backlog={() => terminalService.peekBacklog(activeTab.id)}
-              onData={(data) => terminalService.write(activeTab.id, data)}
-              onResize={(cols, rows) => terminalService.resize(activeTab.id, cols, rows)}
-            />
-          )
+        {panes.length > 0 ? (
+          <div
+            ref={groupRef}
+            className={[
+              styles.paneGroup,
+              split === "row" ? styles.splitRow : split === "column" ? styles.splitColumn : "",
+            ].join(" ")}
+          >
+            {panes.map((paneId, index) => {
+              const tab = tabs.find((item) => item.id === paneId) ?? null;
+              return (
+                <Fragment key={paneId}>
+                  {index > 0 && (
+                    <div
+                      className={[
+                        styles.splitHandle,
+                        splitDragging ? styles.splitHandleDragging : "",
+                      ].join(" ")}
+                      title={t("terminal.splitHandle")}
+                      onPointerDown={onSplitResizeStart}
+                      onPointerMove={onSplitResizeMove}
+                      onPointerUp={onSplitResizeEnd}
+                      onPointerCancel={onSplitResizeEnd}
+                    />
+                  )}
+                  <div
+                    className={[
+                      styles.pane,
+                      split !== null && index === focusedPane ? styles.paneFocused : "",
+                    ].join(" ")}
+                    style={
+                      split
+                        ? { flexGrow: index === 0 ? splitRatio[split] : 1 - splitRatio[split] }
+                        : undefined
+                    }
+                    onPointerDown={() => focusPaneAt(index)}
+                  >
+                    {tab?.exited ? (
+                      <div className={styles.exitState}>
+                        <p>
+                          {t("panels.terminal.exited", {
+                            code: tab.exitCode ?? t("common.unknown"),
+                          })}
+                        </p>
+                        <Button onClick={newTerminal}>{t("panels.terminal.newTab")}</Button>
+                      </div>
+                    ) : tab ? (
+                      <PtyTerminal
+                        ref={(handle) => {
+                          paneRefs.current[index] = handle;
+                          return () => {
+                            paneRefs.current[index] = null;
+                          };
+                        }}
+                        ariaLabel={t("terminal.instanceAria", { title: tab.title })}
+                        theme={theme}
+                        fontFamily={resolveFontMonoStack(fontMonoPreset)}
+                        subscribeData={(callback) =>
+                          terminalService.subscribeData(tab.id, callback)
+                        }
+                        backlog={() => terminalService.peekBacklog(tab.id)}
+                        onData={(data) => terminalService.write(tab.id, data)}
+                        onResize={(cols, rows) => terminalService.resize(tab.id, cols, rows)}
+                      />
+                    ) : null}
+                  </div>
+                </Fragment>
+              );
+            })}
+          </div>
         ) : (
           <div className={styles.emptyState}>
             <p>{t("terminal.empty")}</p>
@@ -347,4 +500,8 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
 
 function clampHeight(value: number, maxHeight: number): number {
   return Math.min(maxHeight, Math.max(MIN_HEIGHT, Math.round(value)));
+}
+
+function clampSplitRatio(value: number): number {
+  return Math.min(MAX_SPLIT_RATIO, Math.max(MIN_SPLIT_RATIO, value));
 }
