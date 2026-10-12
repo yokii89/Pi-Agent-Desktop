@@ -6,3 +6,20 @@
   background: var(--terminal-bg);
   overflow: hidden;
 }
+
+/* 滚动条在 xterm 6 里是自绘的（VS Code 血统）：容器与滑条尺寸由 JS 写在内联样式上
+   （实测 width:14px + 同宽滑条），不吃全局 ::-webkit-scrollbar，也只能用 !important 覆盖；
+   视口上那根原生条只是 8px 占位槽（scrollHeight 恒等于 clientHeight，不画滑条）。
+   收成「半宽胶囊」：热区沿用全局细滚动条的 --scrollbar-size，滑条取一半、居中 */
+:global(.xterm-scrollable-element > .scrollbar.vertical) {
+  /* biome-ignore lint/complexity/noImportantStyles: 尺寸是 xterm 写在元素上的内联样式，非 !important 压不过 */
+  width: var(--scrollbar-size) !important;
+}
+
+:global(.xterm-scrollable-element > .scrollbar.vertical > .slider) {
+  /* biome-ignore lint/complexity/noImportantStyles: 同上（内联 width/left） */
+  width: calc(var(--scrollbar-size) / 2) !important;
+  /* biome-ignore lint/complexity/noImportantStyles: 同上（内联 width/left） */
+  left: calc(var(--scrollbar-size) / 4) !important;
+  border-radius: var(--radius-pill);
+}

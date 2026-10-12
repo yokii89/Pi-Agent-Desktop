@@ -119,11 +119,19 @@ function readXtermTheme(): {
   foreground: string;
   cursor: string;
   selectionBackground: string;
+  scrollbarSliderBackground: string;
+  scrollbarSliderHoverBackground: string;
+  scrollbarSliderActiveBackground: string;
 } {
   return {
     background: readToken("--terminal-bg", "#0d0d0f"),
     foreground: readToken("--terminal-fg", "#cccccc"),
     cursor: readToken("--color-accent", "#4a8cff"),
     selectionBackground: readToken("--color-bg-active", "rgba(255, 255, 255, 0.1)"),
+    // 滚动条滑条：xterm 默认取「前景色 20%」，在暗色终端上几乎看不出；
+    // 改走 muted / 正文 / 强化三档（与全局细滚动条的悬停配方同源，见 global.css）
+    scrollbarSliderBackground: readToken("--color-text-muted", "#8a8a90"),
+    scrollbarSliderHoverBackground: readToken("--color-text", "#d4d4d4"),
+    scrollbarSliderActiveBackground: readToken("--color-text-strong", "#e6e6e9"),
   };
 }

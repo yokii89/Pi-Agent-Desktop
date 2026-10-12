@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useReducer,
 } from "react";
@@ -565,7 +566,9 @@ export function UiProvider({ children }: { children: ReactNode }) {
     state.shortcuts,
   ]);
 
-  useEffect(() => {
+  // 主题属性必须用 layout effect：被动 effect 是子先父后，xterm 这类在被动 effect 里
+  // 读 tokens 建配色的子组件会先跑，读到上一套颜色（终端整块不跟主题换）
+  useLayoutEffect(() => {
     document.documentElement.dataset.theme = state.theme;
   }, [state.theme]);
 
