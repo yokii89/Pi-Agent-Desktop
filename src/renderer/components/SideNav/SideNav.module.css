@@ -130,6 +130,70 @@
   min-height: var(--spacing-lg);
 }
 
+/* 底部行：「设置」占剩余宽度，「更新」按钮贴右（docs/design/55：发现新版本才出现） */
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.footer .navItem {
+  /* .navItem 的 width:100% 让位给 flex-basis：更新按钮出现时设置行自己缩 */
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* 更新按钮：主操作强调底，纵向内边距与 .navItem 一致，两行视觉同高 */
+.updateBtn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 7px var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  /* 百分比每帧变宽会推着设置行抖，等宽数字把宽度锁在位数上 */
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.updateBtn:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+/* 下载中是进度读数而非按钮：保留强调底（它仍是"这件事在进行"的提示），只收掉手型 */
+.updateBtn:disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+
+/* 折叠成图标列时与 IconButton 同宽同高，共用那条垂直中轴 */
+.updateBtnMini {
+  position: relative;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+}
+
+/* 图标本身已说明"这是更新"，圆点只补一层"还欠你一次重启/下载"的待办感 */
+.updateDot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-danger);
+  box-shadow: 0 0 0 2px var(--color-bg);
+}
+
 /* 分区头（项目 / 任务）：标题 + 箭头 + 右侧动作按钮 */
 .sectionHeader {
   display: flex;

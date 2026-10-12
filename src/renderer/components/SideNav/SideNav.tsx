@@ -20,6 +20,7 @@ import { PinnedList } from "./PinnedList";
 import { ProjectList } from "./ProjectList";
 import styles from "./SideNav.module.css";
 import { TaskList } from "./TaskList";
+import { UpdateButton } from "./UpdateButton";
 import { useSelectionPill } from "./useSelectionPill";
 
 /** ② 左侧导航：品牌、新建任务、扩展、项目树、任务（无项目归属的历史）、设置入口；支持折叠为图标列。 */
@@ -95,6 +96,7 @@ export function SideNav() {
           <ClockCounterClockwise size={20} weight="regular" />
         </IconButton>
         <div className={styles.spacer} />
+        <UpdateButton collapsed />
         <IconButton title={t("sidenav.settings")} active={settingsOpen} onClick={openSettings}>
           <GearSix size={20} weight="regular" />
         </IconButton>
@@ -174,16 +176,19 @@ export function SideNav() {
 
       <div className={styles.spacer} />
 
-      <button
-        type="button"
-        className={[styles.navItem, settingsOpen ? styles.navItemActive : ""].join(" ")}
-        data-side-active={settingsOpen ? "page" : undefined}
-        data-side-hover=""
-        onClick={openSettings}
-      >
-        <GearSix size={20} weight="regular" />
-        {t("sidenav.settings")}
-      </button>
+      <div className={styles.footer}>
+        <button
+          type="button"
+          className={[styles.navItem, settingsOpen ? styles.navItemActive : ""].join(" ")}
+          data-side-active={settingsOpen ? "page" : undefined}
+          data-side-hover=""
+          onClick={openSettings}
+        >
+          <GearSix size={20} weight="regular" />
+          {t("sidenav.settings")}
+        </button>
+        <UpdateButton />
+      </div>
     </nav>
   );
 }

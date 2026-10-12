@@ -12,6 +12,30 @@ export const sidenavMessages = defineMessages({
   "sidenav.projects": { "zh-CN": "项目", "en-US": "Projects" },
   "sidenav.tasks": { "zh-CN": "任务", "en-US": "Tasks" },
   "sidenav.settings": { "zh-CN": "设置", "en-US": "Settings" },
+  "sidenav.update.action": { "zh-CN": "更新", "en-US": "Update" },
+  "sidenav.update.restart": { "zh-CN": "重启", "en-US": "Restart" },
+  "sidenav.update.retry": { "zh-CN": "重试", "en-US": "Retry" },
+  "sidenav.update.percent": { "zh-CN": "{percent}%", "en-US": "{percent}%" },
+  "sidenav.update.tip.available": {
+    "zh-CN": "发现新版本 v{version}，点击开始下载",
+    "en-US": "v{version} is available — click to download it",
+  },
+  "sidenav.update.tip.downloading": {
+    "zh-CN": "正在下载更新，完成后会提示重启",
+    "en-US": "Downloading — you'll be asked to restart when it's done",
+  },
+  "sidenav.update.tip.restart": {
+    "zh-CN": "下载完成，点击重启完成安装",
+    "en-US": "Downloaded — click to restart and finish installing",
+  },
+  "sidenav.update.tip.retry": {
+    "zh-CN": "上次下载失败，点击重试",
+    "en-US": "The last download failed — click to retry",
+  },
+  "sidenav.update.tip.openDownloads": {
+    "zh-CN": "此版本不能自动安装，点击打开下载页",
+    "en-US": "This version can't install in place — click to open the download page",
+  },
   "sidenav.projects.empty": {
     "zh-CN": "还没有项目。添加本地目录后可按项目归类会话。",
     "en-US": "No projects yet. Add a local folder to group sessions by project.",

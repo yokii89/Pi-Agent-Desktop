@@ -4,9 +4,16 @@ import { updateService } from "../services/updateService";
 
 /**
  * 更新状态的轻量外部存储（docs/design/35）：
- * 设置导航角标与 About 面板共用，不进 uiStore，避免设置域膨胀。
+ * 设置导航角标、About 面板与侧栏更新按钮共用，不进 uiStore，避免设置域膨胀。
  */
 let status: UpdateStatus = { state: "idle" };
+/**
+ * 最近一次「有更新」能否就地安装；null = 本次运行从未发现过更新。
+ *
+ * 必须存这里而不是组件 state：侧栏按钮在折叠/展开时会被卸载重建，About 面板在
+ * 设置浮窗关闭时同理，而 `error` 态已经离开 `available`，状态里不再带 canInstall。
+ */
+let offerCanInstall: boolean | null = null;
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -17,7 +24,12 @@ export const updateStore = {
   get(): UpdateStatus {
     return status;
   },
+  /** 供给记忆；与 `get()` 在同一次 `set` 里更新，渲染期一起读不会读到错配。 */
+  getOfferCanInstall(): boolean | null {
+    return offerCanInstall;
+  },
   set(next: UpdateStatus): void {
+    if (next.state === "available") offerCanInstall = next.canInstall;
     status = next;
     emit();
   },
