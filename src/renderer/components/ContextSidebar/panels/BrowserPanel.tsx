@@ -3,11 +3,11 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowSquareOut,
-  Browsers,
   Camera,
   CaretDown,
   Copy,
   Crosshair,
+  Globe,
   Warning,
   X,
 } from "@phosphor-icons/react";
@@ -61,7 +61,7 @@ function pageLabel(page: { title: string; url: string; started: boolean }, t: Tr
  */
 function PageTabFavicon({ src }: { src: string | null | undefined }) {
   const [failed, setFailed] = useState(false);
-  if (!src || failed) return <Browsers size={14} weight="regular" />;
+  if (!src || failed) return <Globe size={14} weight="regular" />;
   return (
     <img
       src={src}
@@ -337,7 +337,7 @@ export function BrowserPanel() {
                       setShowRecents(false);
                     }}
                   >
-                    <Browsers size={14} weight="regular" />
+                    <Globe size={14} weight="regular" />
                     <span className={styles.recentUrl}>{recent.url}</span>
                   </button>
                 </li>
@@ -395,7 +395,7 @@ export function BrowserPanel() {
       <div ref={hostRef} className={[styles.host, selecting ? styles.hostPicking : ""].join(" ")}>
         {!store.started && !store.regionCapture && (
           <div className={styles.empty}>
-            <Browsers size={32} weight="regular" />
+            <Globe size={32} weight="regular" />
             <p>{t("browser.empty.title")}</p>
             <p className={styles.emptyHint}>{t("browser.empty.hint")}</p>
           </div>
