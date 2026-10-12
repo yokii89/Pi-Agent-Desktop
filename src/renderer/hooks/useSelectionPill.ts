@@ -1,11 +1,11 @@
 import { type RefObject, useCallback, useEffect, useRef } from "react";
-import { type GlideCancel, glide, mix } from "../../utils/glideMotion";
-import { GLIDE_MOTION } from "../../utils/motionTokens";
+import { type GlideCancel, glide, mix } from "../utils/glideMotion";
+import { GLIDE_MOTION } from "../utils/motionTokens";
 
-/** 页面级选中（顶部导航项 / 设置）优先于会话行：查询顺序即优先级。 */
+/** 选中行标记：SideNav 里 page（导航项 / 设置）优先于 session（会话行）；设置左栏只有 page。 */
 const PAGE_TARGET = '[data-side-active="page"]';
 const SESSION_TARGET = '[data-side-active="session"]';
-/** 可被悬浮药丸指向的行：选项行 / 项目行 / 历史会话行。 */
+/** 可被悬浮药丸指向的行：选项行 / 项目行 / 历史会话行 / 设置分区行。 */
 const HOVER_TARGET = "[data-side-hover]";
 
 /** 几何比对容差：亚像素布局读数的抖动不值得一次重对齐。 */
@@ -31,35 +31,40 @@ const INITIAL_STATE = {
   /** 滑行起点记录的目标几何：结构变化时判断「落点是否已被布局挪走」。 */
   tweenTarget: null as PillRect | null,
   moving: false,
-  /** 指针当前指向的行；离开侧栏即清空（药丸滑回选中行或淡出）。 */
+  /** 指针当前指向的行；离开列表即清空（药丸滑回选中行或淡出）。 */
   hoverRow: null as HTMLElement | null,
 };
 
 /**
- * 左侧边栏的「选中药丸」（docs/design/54）：顶部导航项（扩展 / MCP / 定时任务 / 设置）
- * 与历史会话行（置顶 / 项目嵌套 / 任务）共用同一块高亮底，沿下拉曲线
+ * 导航列表共用的「选中药丸」（docs/design/54 / 56）：左侧边栏（顶部导航项、设置入口、
+ * 历史会话行）与设置浮窗左栏（分区列表）共用同一套高亮表达——整条列表只渲染一块
+ * `.selectionPill`（绝对定位、`pointer-events: none`），沿下拉曲线
  * （`GLIDE_MOTION.easeOut`，定帧时间轴封顶 `GLIDE_MOTION.fps`）在行之间滑行。
  *
  * 药丸同时表达两层指向，单一写入方收敛到「有效落点 = 悬停行 ?? 选中行」：
- * - **悬浮跟随**：指针扫过 `data-side-hover` 行（选项 / 项目 / 历史）时药丸滑过去，
- *   跨行连续移动时是同一条连续滑行（对齐下拉药丸的擦选手感）；
- * - **选中落位**：离开侧栏后药丸滑回 `data-side-active` 选中行——这里不能像下拉的
- *   `rememberPosition` 那样停在原地，因为侧栏药丸还承担选中高亮，行上的选中底色已删。
+ * - **悬浮跟随**：指针扫过 `data-side-hover` 行（选项 / 项目 / 历史 / 设置分区）时
+ *   药丸滑过去，跨行连续移动时是同一条连续滑行（对齐下拉药丸的擦选手感）；
+ * - **选中落位**：离开列表后药丸滑回 `data-side-active` 选中行——这里不能像下拉的
+ *   `rememberPosition` 那样停在原地，因为药丸还承担选中高亮，行上的选中底色已删。
  *   指向非药丸行（分区头、显示更多、空态行）时药丸保持原位，不做两次语义。
+ *   承担药丸的行不得再写 `:hover` 底色与常驻填充——「指向哪一行」只有药丸一个写入方。
  *
  * 与 `useGlidePill`（下拉列表的指向药丸）的分工：下拉行自身透明、悬浮/擦选全归药丸；
  * 侧栏行的 ⋯ 揭示、标题位移、悬浮卡等反馈仍由行自己承担，药丸只接管「指向哪一行」
- * 的底色。没有实现按住擦选：侧栏行按住拖动跨行松手会误触发打开会话。
+ * 的底色。没有实现按住擦选：列表行按住拖动跨行松手会误触发点击。
  *
  * 落点时机全部由 DOM / 指针事件说话（hook 不知道选中真值是哪几个 store 字段）：
- * 标记换行（page / settingsOpen / activeSessionFile 变化）是 `data-side-active`
- * 属性变更，分区折叠展开、「显示更多」、会话增删是节点增删，都由 MutationObserver
- * 驱动；悬浮由 pointerover / pointerleave 驱动。落点逻辑统一：目标行没变就按当前
- * 几何对齐（行被布局挪动），变了才滑行/瞬移（瞬移只认「没有停驻目标」或「正在淡出」）。
+ * 标记换行（page / settingsOpen / activeSessionFile / 设置分区变化）是
+ * `data-side-active` 属性变更，分区折叠展开、「显示更多」、条目增删（设置左栏还有
+ * 搜索过滤）是节点增删，都由 MutationObserver 驱动；悬浮由 pointerover / pointerleave
+ * 驱动。落点逻辑统一：目标行没变就按当前几何对齐（行被布局挪动），变了才滑行/瞬移
+ * （瞬移只认「没有停驻目标」或「正在淡出」）。
  *
- * 几何用 getBoundingClientRect 差值 + 滚动补偿，而不是 offsetTop：
- * 不依赖「nav 恰好是行的 offsetParent」，未来任何中间层挂上定位都不静默漂移；
- * 侧栏全程没有 scale 变换（折叠是高度补间），rect 不存在 doc 52 量小的坑。
+ * `nav` 传「承载行的滚动容器」：它同时是药丸的定位父级（position: relative），
+ * 行坐标按它的 scrollTop/scrollLeft 补偿。几何用 getBoundingClientRect 差值 +
+ * 滚动补偿，而不是 offsetTop：不依赖「nav 恰好是行的 offsetParent」，未来任何
+ * 中间层挂上定位都不静默漂移；两个使用方全程没有 scale 变换（SideNav 折叠是高度
+ * 补间、设置浮窗无入场缩放），rect 不存在 doc 52 量小的坑。
  */
 export function useSelectionPill(nav: HTMLElement | null): {
   pillRef: RefObject<HTMLSpanElement | null>;
@@ -84,7 +89,7 @@ export function useSelectionPill(nav: HTMLElement | null): {
       if (!nav?.isConnected) return null;
       const navRect = nav.getBoundingClientRect();
       const rowRect = row.getBoundingClientRect();
-      // 坐标落在滚动内容上：药丸是滚动容器（.nav）的绝对定位子元素，随内容一起滚
+      // 坐标落在滚动内容上：药丸是滚动容器（nav）的绝对定位子元素，随内容一起滚
       return {
         x: rowRect.left - navRect.left + nav.scrollLeft,
         y: rowRect.top - navRect.top + nav.scrollTop,

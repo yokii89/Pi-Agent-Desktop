@@ -8,6 +8,7 @@ import {
   Timer,
 } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
+import { useSelectionPill } from "../../hooks/useSelectionPill";
 import { useT } from "../../hooks/useT";
 import { useExtensionViewStore } from "../../stores/extensionViewStore";
 import { useProjectStore } from "../../stores/projectStore";
@@ -21,7 +22,6 @@ import { ProjectList } from "./ProjectList";
 import styles from "./SideNav.module.css";
 import { TaskList } from "./TaskList";
 import { UpdateButton } from "./UpdateButton";
-import { useSelectionPill } from "./useSelectionPill";
 
 /** ② 左侧导航：品牌、新建任务、扩展、项目树、任务（无项目归属的历史）、设置入口；支持折叠为图标列。 */
 export function SideNav() {

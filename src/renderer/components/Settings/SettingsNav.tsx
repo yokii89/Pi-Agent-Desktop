@@ -15,7 +15,8 @@ import {
   User,
   Wrench,
 } from "@phosphor-icons/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
+import { useSelectionPill } from "../../hooks/useSelectionPill";
 import { useT } from "../../hooks/useT";
 import { useUpdateStatus } from "../../stores/updateStore";
 import styles from "./Settings.module.css";
@@ -189,6 +190,12 @@ export function SettingsNav({ active, query, onQueryChange, onSelect }: Settings
   const updateStatus = useUpdateStatus();
   const updateBadge = updateStatus.state === "available" || updateStatus.state === "downloaded";
   const keyword = query.trim().toLowerCase();
+
+  // 选中药丸（docs/design/56）：与左侧边栏同一块高亮表达（hooks/useSelectionPill），
+  // 选中分区变化时沿下拉曲线滑过去；锚在 navList（滚动容器）上，药丸随内容一起滚。
+  const [listEl, setListEl] = useState<HTMLElement | null>(null);
+  const { pillRef } = useSelectionPill(listEl);
+
   const groups = NAV_GROUPS.map((group) => ({
     ...group,
     items: keyword
@@ -215,7 +222,9 @@ export function SettingsNav({ active, query, onQueryChange, onSelect }: Settings
           onChange={(event) => onQueryChange(event.target.value)}
         />
       </div>
-      <nav className={styles.navList} aria-label={t("settings.navLabel")}>
+      <nav ref={setListEl} className={styles.navList} aria-label={t("settings.navLabel")}>
+        {/* 选中药丸：分区行共用的一块选中底色，由 useSelectionPill 沿下拉曲线滑行 */}
+        <span ref={pillRef} className={styles.selectionPill} aria-hidden="true" />
         {groups.map((group) => (
           <div key={group.labelKey} className={styles.navGroup}>
             <div className={styles.navGroupLabel}>{t(group.labelKey)}</div>
@@ -226,6 +235,8 @@ export function SettingsNav({ active, query, onQueryChange, onSelect }: Settings
                 className={[styles.navItem, active === item.id ? styles.navItemActive : ""]
                   .join(" ")
                   .trim()}
+                data-side-active={active === item.id ? "page" : undefined}
+                data-side-hover=""
                 onClick={() => onSelect(item.id)}
               >
                 <span className={styles.navItemIcon}>{item.icon}</span>

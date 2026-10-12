@@ -242,18 +242,19 @@ import { Play } from "@phosphor-icons/react";
 - 两者都遵守：首次挂载不播动画、`prefers-reduced-motion` 直接落终态（`glide()` 内建）、
   补间的中间产物（inline overflow、动画高度 state）落定后清干净。
 
-### 侧栏选中高亮：一块选中药丸（docs/design/54）
+### 导航列表选中高亮：一块选中药丸（docs/design/54 / 56）
 
-左侧边栏的选中底色只有一块：`SideNav` 的选中药丸（`SideNav/useSelectionPill.ts`）。
-顶部导航项 / 设置与历史会话行的 `data-side-active` 标记换行时，药丸沿同一条
+左侧边栏与设置浮窗左栏的选中底色各只有一块，共用同一个选中药丸 hook
+（`hooks/useSelectionPill.ts`，`nav` 传「承载行的滚动容器」）。顶部导航项 / 设置、
+历史会话行、设置分区行的 `data-side-active` 标记换行时，药丸沿同一条
 `GLIDE_MOTION.glide` 时长与 easeOut 曲线、定帧时间轴（封顶 60fps）滑到新行：
 
 - 可承载选中的新行**必须打 `data-side-active` 标记**（页面级 `"page"`、会话行
   `"session"`，查询顺序即 page 先于 session 的优先级），禁止再在行 CSS 里写
   选中 `background`——行上只保留文字强调与强调条，底色一律药丸承担。
 - 药丸同时表达「指向」与「选中」，有效落点 = 悬停行 ?? 选中行：指针悬停在
-  `data-side-hover` 行（新建任务、选项 / 项目 / 历史）上时药丸沿曲线跟随，离开侧栏
-  后滑回选中行（不能像下拉那样停在原地——侧栏药丸还承担选中高亮）。承担药丸的行
+  `data-side-hover` 行（新建任务、选项 / 项目 / 历史 / 设置分区）上时药丸沿曲线跟随，
+  离开列表后滑回选中行（不能像下拉那样停在原地——药丸还承担选中高亮）。承担药丸的行
   **不得再写 `:hover` 底色与常驻填充**——newTask 的 bg-surface 常驻底曾被读成
   "一直处于激活态"；标题位移、⋯ 揭示、悬浮卡等其余悬浮反馈仍归行自身。
   不做按住擦选：跨行拖动松手会误开会话。

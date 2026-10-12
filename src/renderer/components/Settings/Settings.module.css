@@ -71,6 +71,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  /* 选中药丸（.selectionPill）的定位父级：绝对定位子元素随滚动内容一起移动 */
+  position: relative;
 }
 
 .navGroup {
@@ -97,16 +99,26 @@
   color: var(--color-text);
   font-size: var(--font-size-md);
   text-align: left;
-  transition: background-color 0.12s ease;
-}
-
-.navItem:hover {
-  background: var(--color-bg-hover);
+  /* 悬停与选中底色都由选中药丸接管（docs/design/56），这里只保留选中文字强调的过渡 */
+  transition: color 0.12s ease;
 }
 
 .navItemActive {
-  background: var(--color-bg-active);
   color: var(--color-text-strong);
+}
+
+/* 选中药丸（docs/design/56）：与左侧边栏（docs/design/54）同一块高亮底，
+   悬浮时沿下拉曲线跟随指针，离开左栏后滑回选中分区行；半透明底盖在行上方，
+   「指向哪一行」只有药丸一个写入方，行上不再有 :hover / 选中 background。 */
+.selectionPill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-active);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .navItemIcon {
