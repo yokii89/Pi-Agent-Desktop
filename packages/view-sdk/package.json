@@ -29,8 +29,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/earendil-works/pi",
+    "url": "git+https://github.com/yokii89/Pi-Agent-Desktop.git",
     "directory": "packages/view-sdk"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",

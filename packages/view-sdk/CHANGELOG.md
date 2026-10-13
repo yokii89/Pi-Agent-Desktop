@@ -1,6 +1,8 @@
 # @pidesk/view-sdk
 
-## Unreleased
+## 0.2.0 — 2026-10-13 (first npm publish)
+
+Implements PiDesk docs/design/20 (O1–O7). Measured before/after in that doc's §4.
 
 - **`session.coalesced().set()` can carry frame meta** (docs/design/20 §9):
   `set(root, ops?, meta?)` where `meta` is
@@ -56,10 +58,6 @@
   - Versioning judgement: the SDK's own code and `view/v1` wire format are unchanged, so
     no minor bump here — the change ships with the Host and is recorded in
     `docs/design/08` §5.3.3.
-
-## 0.2.0 — 2026-09-22
-
-Implements PiDesk docs/design/20 (O1–O7). Measured before/after in that doc's §4.
 
 - **Failure semantics no longer collapse** (准则 §6, O2):
   - `openPanelResult()` / `openSidebarResult()` / `openSettingsViewResult()` return
