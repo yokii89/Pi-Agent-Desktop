@@ -2,173 +2,165 @@
 
 # PiDesk
 
-**A Windows desktop client for [pi](https://github.com/earendil-works/pi)** · **[pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户端**
+**A Windows desktop client for [pi](https://github.com/earendil-works/pi)**
 
+[![Official website](https://img.shields.io/badge/official_website-pidesk--web.pages.dev-2E6BF0?logo=cloudflare&logoColor=white)](https://pidesk-web.pages.dev/)
 [![Release](https://github.com/yokii89/Pi-Agent-Desktop/actions/workflows/release.yml/badge.svg)](https://github.com/yokii89/Pi-Agent-Desktop/releases)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-0078D4?logo=windows11&logoColor=white)
 ![Electron](https://img.shields.io/badge/Electron%20%7C%20React%2019%20%7C%20TypeScript-19354C?logo=electron&logoColor=9FEAF9)
 [![License: MIT](https://img.shields.io/badge/license-MIT-3DA639)](./LICENSE)
 
-![PiDesk session area](assets/images/hero.png)
+![PiDesk workbench: session area, file panel and split terminal](./assets/images/hero-session.webp)
 
-*Session area: document-flow Markdown replies · tool-call summaries · file panel*
-
-**English** ｜ [简体中文](#简体中文)
+**English** ｜ [简体中文](./README.zh-CN.md) ｜ 🌐 **[Official website](https://pidesk-web.pages.dev/)**
 
 </div>
 
-<a id="english"></a>
+> There are many agent clients — this one runs on your own pi.
 
-PiDesk runs pi as a `--mode rpc` child process (JSONL over stdio) and wraps it in a desktop workbench built with Electron + React 19 + TypeScript. Session history stays in pi's native JSONL files — PiDesk keeps no store of its own.
+PiDesk is the Windows desktop client for the open-source coding agent [pi](https://github.com/earendil-works/pi). It does not reimplement the agent: pi runs as a `--mode rpc` child process (JSONL over stdio) and PiDesk drives it. Session history stays in pi's native JSONL files, so the pi in your terminal and the pi in PiDesk are the same data. The **[official website](https://pidesk-web.pages.dev/)** carries the visual tour and two recorded walkthroughs.
 
-### Features
+## The client, not a second agent
 
-- **Session area** — streaming AI replies rendered as document-flow Markdown (no chat bubbles); tool calls as compact status rows with collapsible group summaries; collapsed thinking blocks; up to 8 parallel pi processes; archived chats; `@` file references, image and file attachments; a question rail for jumping between turns; access modes (full access / plan, extensible via the SDK)
-- **Panels** — file tree with Shiki-highlighted read-only preview; multi-tab node-pty + xterm terminal bound to the project cwd; embedded Chromium with cookie login import, element picking into the conversation, live style editing and inspector; git-based review panel with diff and commit
-- **Extensions** — manage pi packages; **MCP server management** with config editing, status probing and hot reload into running sessions, plus an MCP market with official registry search and curated one-click templates; in-conversation rendering of `mcp__*` tool calls; the **Extension View SDK** (`@pidesk/view-sdk`) exposes a serializable View protocol with 8 placement slots (modal / stream / widget / panel / sidebar / header / settings / access-mode), requiring zero changes to pi; scheduled tasks; usage statistics
-- **Desktop** — zh-CN / en-US, light & dark themes, system tray, Windows toasts and per-scenario sounds, GitHub login with settings sync, in-app auto-update
+- The agent loop, model auth, context compaction and tool execution all happen inside the pi process. What PiDesk adds is the desktop workbench around them: the event stream rendered as a readable document, and the project, terminal, browser and git changes kept within reach.
+- **Session history stays in pi's own files.** No transcript copy, no second sync, no question of which copy wins — PiDesk keeps only markers such as titles, archive flags and pins. Uninstall it and your sessions still open in the terminal.
+- **MCP config lives in pi's user-level `mcp.json`**, shared with the CLI.
+- **No PiDesk account and no PiDesk model quota.** Model auth stays in pi's own config; GitHub sign-in is optional and exists to sync settings.
+- When pi evolves the protocol, there is no second implementation to chase.
 
-### Getting started
+## Features
 
-Download the NSIS installer from [Releases](https://github.com/yokii89/Pi-Agent-Desktop/releases), install the [pi](https://github.com/earendil-works/pi) CLI, point PiDesk at the pi executable, and start a task.
+### Session area
 
-For development (Windows 10/11, Node.js ≥ 20, pnpm):
+- AI replies render as **document-flow Markdown** — GFM tables, numbered lists, inline code chips, one-click code block copy. No chat bubbles: a 200-line answer is a document, not twenty colored blocks.
+- Tool calls collapse into compact status rows, and consecutive calls group into a summary header ("Ran 2 commands · Read 3 files"). Thinking folds into a single row until you expand it.
+- **Parallel sessions**: 8 live pi processes by default, tunable from 1 to 32. Switching never kills one, and hitting the ceiling refuses the new session instead of evicting an old one.
+- `@` file references as atomic tokens with read-only file chips; paste or drop images, attach any file.
+- A **question rail** — one anchor per question, so you can jump straight back after fifty turns.
+- Context usage next to the composer; a **per-turn file-edit summary** with undo and review on the same row; whole-session **Markdown export** (bodies in order, thinking and tool calls folded, images counted rather than embedded).
+- Access modes: full access is built in, and extensions can register their own (plan mode ships as an extension example) through the SDK.
+- Streaming is a ~32ms-batched event stream routed by `sessionId`, so parallel chats never bleed into each other.
+
+![Session area: user bubble, run header, collapsed thinking and tool-call summary rows](./assets/images/session-flow.webp)
+
+*User bubble · run header (32s · 64.1K tokens) · collapsed thinking · "Ran 2 commands" summary rows · edit row with +1 −1*
+
+### Workbench panels
+
+Real components, not iframe placeholders: a real terminal on node-pty, a real embedded Chromium, a real git working-tree diff.
+
+| ![File tree with Shiki preview](./assets/images/file-preview.webp) | ![Terminal split into two panes](./assets/images/terminal-split.webp) |
+| :---: | :---: |
+| **Files** — project tree, Shiki-highlighted read-only preview, fuzzy quick-open. Edits belong to the agent. | **Terminal** — node-pty + xterm, tabs and side-by-side / stacked splits, cwd bound to the project. |
+
+| ![Element picking in the embedded browser](./assets/images/browser-pick-hover.webp) | ![Floating review panel](./assets/images/review-floating.webp) |
+| :---: | :---: |
+| **Browser** — import your cookie session, hover-highlight and select in pick mode, press Enter to drop the element into the composer, hot-edit styles, inspect. | **Review** — working-tree change list plus line-by-line diff, docked or floating, with stage / commit / push and rollbackable git snapshots. |
+
+Splitting reuses a terminal that is already running rather than starting another session, and hiding the panel never kills the pty — panes are a way of looking at terminals, not a way of killing them.
+
+### pi's ecosystem, hosted in a panel
+
+PiDesk doesn't invent an ecosystem, it hosts one.
+
+- **Extensions** — manage pi packages: install, uninstall, enable, globally or per project, with resource-level toggles for extensions, skills, prompt templates and themes.
+- **MCP servers** — edit configs, probe status, hot-reload into running sessions; the market offers official-registry search plus curated one-click templates, so you never hand-type JSON. `mcp__*` calls render in the transcript with the same status rows. (Requires pi ≥ 0.99.0.)
+- **View SDK** (`@pidesk/view-sdk`) — a serializable View protocol with capability negotiation and graceful degradation, so extensions ship UI into 8 placement slots while pi itself stays untouched.
+- **Scheduled tasks** and **usage statistics** (summary cards, daily / monthly trends, per-model breakdown).
+
+| ![Extensions page managing pi packages](./assets/images/extensions.webp) | ![MCP market with registry search and curated list](./assets/images/mcp-market.webp) |
+| :---: | :---: |
+| **Extensions** — pi packages plus per-resource toggles for extensions, skills, prompt templates and themes. | **MCP market** — official-registry search and curated one-click templates. |
+
+### Desktop integration
+
+zh-CN / en-US interfaces, light and dark themes, custom title bar, system tray, Windows toasts with per-scenario sounds, optional GitHub sign-in for settings sync, and in-app auto-update from GitHub Releases — an **Update** button appears beside *Settings* when there is something new.
+
+## Six things we deliberately didn't build
+
+A client should not become a second agent. Each of these was buildable, and each would have competed with pi for the same job.
+
+| Not built | Why |
+| --- | --- |
+| A copy of the transcript | Message bodies stay in pi's native JSONL; PiDesk keeps markers plus a whole-session Markdown export. |
+| Bundled pi | No agent in the installer. You point PiDesk at your local pi executable; it probes the version and launches it. |
+| An account system | Model auth belongs to pi. Skip GitHub sign-in and everything still works. |
+| Chat bubbles | Agent output was always a document. |
+| Reinvented agent features | Sub-agents, permission gates and sandboxing belong to pi's extension ecosystem — PiDesk renders them, and lets extensions register views and access modes through the SDK. |
+| Cross-platform | Windows 10/11 only. The saved budget went into desktop integration: tray, native toasts, scenario sounds, auto-update. |
+
+## Get started
+
+1. Install the pi CLI — `npm install -g @earendil-works/pi-coding-agent` — and configure model auth in pi.
+2. Download the NSIS installer from [Releases](https://github.com/yokii89/Pi-Agent-Desktop/releases) (SHA-256 checksums included).
+3. On first launch, set the pi executable path and a working directory in Settings, then create a task.
+
+![Settings → Configuration: pi executable path and probed version](./assets/images/pi-executable.webp)
+
+*Settings → Configuration: point PiDesk at your local pi executable — it probes the version and reports readiness.*
+
+Prefer to watch before you install? The [website](https://pidesk-web.pages.dev/#demo) has two walkthroughs captured from a running build: the full MCP flow, and picking a page element into the chat.
+
+## Local development
+
+Requirements: Windows 10/11 · Node.js ≥ 20 · [pnpm](https://pnpm.io) (locked by `packageManager`) · pi CLI
 
 ```bash
-pnpm install             # add pnpm run rebuild:native if node-pty needs an Electron ABI rebuild
-pnpm dev                 # tsc-compiled main process + Vite HMR renderer, auto-restarting Electron
-pnpm dist                # Windows NSIS installer + SHA-256 checksums into release/
+pnpm install   # run pnpm run rebuild:native first if node-pty needs an Electron ABI rebuild
+pnpm dev       # tsc-compiled main process + Vite HMR renderer + automatic Electron restarts
+pnpm dist      # NSIS installer and SHA-256 checksums into release/
 ```
 
-Pushing a `v*` tag triggers GitHub Actions to build and publish to Releases.
+| Script | Purpose |
+| --- | --- |
+| `pnpm dev` / `pnpm dev:renderer` | Full dev loop / Vite dev server only (renderer in a plain browser) |
+| `pnpm build` / `pnpm start` | Build, then run the built output |
+| `pnpm dist` / `pnpm release` | Package / bump version + tag to trigger the CI release |
+| `pnpm typecheck` / `pnpm lint` | tsc strict / Biome format + lint |
+| `pnpm test:view` / `pnpm test:sdk:coverage` | Protocol & SDK tests / SDK coverage |
 
-### Architecture
+Pushing a `v*` tag triggers GitHub Actions to build and publish to Releases. Release notes live in `release-notes/<tag>.md`, bilingual.
+
+## Architecture
 
 | Directory | Role |
 | --- | --- |
-| `src/main` | Electron main process: pi RPC driver, terminal pty, embedded browser, window & settings |
+| `src/main` | Electron main process: pi RPC driver, terminal pty, embedded browser, git, MCP, window & settings |
 | `src/preload` | `contextBridge` whitelisted API (`window.pidesk`) |
 | `src/renderer` | React 19 UI: session area, panels, settings, extension view host |
 | `src/shared` | IPC protocol, i18n message tables, shared types |
-| `packages/view-sdk` | Client SDK for extensions (published as `@pidesk/view-sdk`) |
+| `packages/view-sdk` | Extension-facing SDK, published as `@pidesk/view-sdk` |
 
-### Docs
+Main ↔ renderer talk over `ipcMain.handle` (request-response, always `{ ok, data \| error }`) and `webContents.send` (pushes such as terminal and session streams). The renderer has no Node capabilities. Session pushes carry `sessionId`, so multiple pi processes multiplex over one channel.
 
-- [AGENTS.md](./AGENTS.md) — development conventions and tech stack
-- [packages/view-sdk/README.md](./packages/view-sdk/README.md) — full View SDK reference
-
-### License
-
-PiDesk is released under the [MIT License](./LICENSE). Third-party assets keep their own licenses — see [src/renderer/fileIcons/NOTICE.md](./src/renderer/fileIcons/NOTICE.md) for the JetBrains icon set (Apache 2.0).
-
----
-
-<a id="简体中文"></a>
-
-<div align="center">
-
-## 简体中文
-
-**[pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户端**
-
-![PiDesk 会话区](assets/images/hero.png)
-
-*中央会话区：文档流 Markdown 回复 · 工具调用摘要 · 右侧文件面板*
-
-</div>
-
-## 这是什么
-
-PiDesk 把开源 coding agent [pi](https://github.com/earendil-works/pi) 装进一个现代桌面工作台：pi 以 `--mode rpc` 子进程运行，PiDesk 通过 JSONL over stdio 驱动它，并提供了完全自研的会话 UI、终端、文件、浏览器与扩展生态。**会话历史始终是 pi 原生的 JSONL 文件**，PiDesk 不自建会话存储，终端里的 pi 与 PiDesk 里的 pi 是同一份数据。
-
-## ✨ 功能特性
-
-**中央会话区**
-
-- 流式渲染的 AI 回复一律走**文档流 Markdown**（GFM 表格、代码块一键复制），不用聊天气泡
-- 工具调用渲染为紧凑状态行，连续调用自动折叠成「Ran 2 commands」式摘要头；思考（thinking）内容默认折叠成一行
-- **多会话并行**：默认最多 8 个 pi 进程同时存活，切换不杀进程；支持会话归档（Archived chats）
-- **@ 文件引用**（原子化 token + 只读文件芯片）、**图片粘贴/拖放**、**任意文件附件**
-- 问题导航分段栏（每条提问一个跳转锚点）、上下文用量提示、消息复制/重发
-- 访问模式：完全访问 / 计划模式，且可由扩展通过 SDK 注册自定义模式
-
-**工作台面板**
-
-- **文件**：项目文件树 + Shiki 语法高亮只读预览 + 模糊搜索快速打开
-- **终端**：node-pty + xterm 独立终端，多 Tab 实例，cwd 跟随当前项目
-- **浏览器**：内嵌 Chromium，登录态（Cookie）导入、元素拾取入会话、样式热更改与检查器浮窗
-- **审查**：基于 git working tree 的变更列表、diff 视图与提交
-
-| ![终端与文件面板](assets/images/workbench.png) | ![Git 审查](assets/images/review.png) |
-| :---: | :---: |
-| **终端 + 会话 + 文件** | **Git 审查** |
-
-**扩展生态**
-
-- 扩展页管理 pi packages：安装 / 卸载 / 启停
-- **MCP 服务器**：左侧面板集中管理——配置增删改、状态探测、会话热重载；MCP 市场支持官方注册表搜索与精选清单一键预填；会话区承接 `mcp__*` 工具调用与结果展示
-- **Extension View SDK**（`@pidesk/view-sdk`）：可序列化 View 协议，8 种挂载槽位（`modal` / `stream` / `widget` / `panel` / `sidebar` / `header` / `settings` / `access-mode`），pi 本体零改动，宿主能力协商 + 软降级
-- 定时任务、用量统计（汇总卡片 + 按天/按月趋势 + 按模型明细）
-
-**桌面体验**
-
-- 中英双语界面、亮暗主题、自定义标题栏、系统托盘
-- Windows 桌面通知与分场景提示音、GitHub 登录与设置 Gist 同步、应用内自动更新（GitHub Releases）
-
-## 📦 下载安装
-
-从 [Releases](https://github.com/yokii89/Pi-Agent-Desktop/releases) 下载 NSIS 安装包（附 SHA-256 校验和）。
-
-首次使用：
-
-1. 本机安装 [pi](https://github.com/earendil-works/pi) CLI（模型鉴权由 pi 自身配置承担，PiDesk 无账号体系）；
-2. 启动 PiDesk，在设置中指定 pi 可执行文件路径、选择工作目录；
-3. 新建任务，开始对话。
-
-![首次启动](assets/images/welcome.png)
-
-## 🛠 本地开发
-
-前置要求：Windows 10/11 · Node.js ≥ 20 · [pnpm](https://pnpm.io)（版本由 `packageManager` 字段锁定）· pi CLI
+## Extension development
 
 ```bash
-pnpm install             # 安装依赖（node-pty 需要时先跑 pnpm run rebuild:native）
-pnpm dev                 # 一条命令：tsc 编译主进程 + Vite HMR 渲染层 + 自动重启 Electron
-pnpm dist                # 产出 Windows NSIS 安装包与 SHA-256 校验和（release/）
+npm install @pidesk/view-sdk
 ```
 
-- `pnpm dev` 覆盖三层热更新：`src/renderer` 走 Vite HMR，`src/main` / `src/preload` / `src/shared` 变更后自动重编译并重启 Electron
-- 推送 `v*` tag 时，GitHub Actions 自动构建并发布到 Releases
+```ts
+import { connectDesktopView, viewOnDesktop } from "@pidesk/view-sdk";
 
-## 🧱 架构一览
+const desktop = connectDesktopView(); // sync env probe, socket is lazy
+if (desktop) {
+  await viewOnDesktop(desktop, {
+    title: "Pick a model",
+    root: { type: "list", id: "model", items: [{ value: "a", label: "A" }] },
+    actions: [{ id: "cancel", label: "Cancel", kind: "submit", variant: "ghost" }],
+  });
+}
+```
 
-| 目录 | 职责 |
-| --- | --- |
-| `src/main` | Electron 主进程：pi RPC 驱动、终端 pty、内嵌浏览器、窗口与设置 |
-| `src/preload` | `contextBridge` 白名单 API（`window.pidesk`） |
-| `src/renderer` | React 19 界面：会话区、面板、设置、扩展 View 宿主 |
-| `src/shared` | IPC 协议、i18n 文案表、共享类型 |
-| `packages/view-sdk` | 扩展端 SDK（发布为 `@pidesk/view-sdk`） |
+Placement slots: `modal` · `stream` · `widget` · `panel` · `sidebar` · `header` · `settings` · `access-mode`. Under plain terminal pi the env probe returns `null`, so an extension falls back to its TUI — the same package runs in both hosts.
 
-主/渲染通信统一走 `ipcMain.handle`（请求-响应）与 `webContents.send`（推送），渲染进程无 Node 能力；会话推送为约 32ms 合批的事件流，渲染层按 `sessionId` 路由。
+## Documentation
 
-## 📚 文档
+- **[Official website](https://pidesk-web.pages.dev/)** — the visual tour, in zh-CN and en-US
+- [AGENTS.md](./AGENTS.md) — development conventions, fixed tech stack, session-area rendering rules
+- [@pidesk/view-sdk reference](./packages/view-sdk/README.md) — protocol, slots, capabilities, limits
+- [pi](https://github.com/earendil-works/pi) — the agent PiDesk drives
 
-- [AGENTS.md](./AGENTS.md) —— 开发约定与技术栈（含中央会话区渲染规则）
-- [packages/view-sdk/README.md](./packages/view-sdk/README.md) —— View SDK 完整参考（挂载槽位、生命周期、限额）
+## License
 
-## 🧰 常用脚本
-
-| 脚本 | 说明 |
-| --- | --- |
-| `pnpm dev` | 开发态：渲染层 HMR + 主进程热重启 |
-| `pnpm dev:renderer` | 只起 Vite dev server（纯浏览器调试渲染层） |
-| `pnpm build` / `pnpm start` | 构建产物并以产物启动 |
-| `pnpm dist` / `pnpm release` | 打 NSIS 包 / bump+tag 触发 CI 发版 |
-| `pnpm typecheck` / `pnpm lint` | tsc strict 检查 / Biome 格式化与 Lint |
-| `pnpm test:view` | view-sdk 与主进程协议逻辑测试 |
-| `pnpm test:sdk:coverage` | view-sdk 行/分支覆盖率 |
-
-## 📄 开源协议
-
-PiDesk 以 [MIT](./LICENSE) 协议开源。仓库内第三方资产沿用其自身许可：文件类型图标源自 [vscode-jetbrains-icon-theme](https://github.com/peakoss/vscode-jetbrains-icon-theme)（JetBrains Design Resources，Apache 2.0），许可见 [src/renderer/fileIcons/NOTICE.md](./src/renderer/fileIcons/NOTICE.md)。
+PiDesk is released under the [MIT License](./LICENSE). Third-party assets keep their own licenses — the file-type icons come from [vscode-jetbrains-icon-theme](https://github.com/peakoss/vscode-jetbrains-icon-theme) (JetBrains Design Resources, Apache 2.0), see [src/renderer/fileIcons/NOTICE.md](./src/renderer/fileIcons/NOTICE.md).
