@@ -1,5 +1,6 @@
 import { ipcMain } from "electron";
 import { isFontMonoPreset, isFontUiPreset } from "../../shared/fontPresets";
+import { isLocalePreference } from "../../shared/i18n";
 import type {
   BrowserRecentUrl,
   IpcResult,
@@ -155,6 +156,10 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
       case "theme":
         if (value === "dark" || value === "light") clean.theme = value as ThemeId;
         break;
+      case "locale":
+        // 白名单外的值整项丢弃，不把脏语言写进设置（渲染层每次回写都带这个键）
+        if (isLocalePreference(value)) clean.locale = value;
+        break;
       case "navCollapsed":
       case "showInTray":
       case "browserEnabled":
@@ -210,6 +215,12 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
           });
         }
         break;
+      }
+      default: {
+        // 兜底是编译期的：SETTABLE_KEYS 新增键若忘了写分支，key 收窄不为 never 直接报错，
+        // 而不是像 locale 那样被静默丢弃（渲染层回写带该键却永远进不了 settings.json）
+        const unhandledKey: never = key;
+        throw new Error(`未支持的设置键: ${String(unhandledKey)}`);
       }
     }
   }

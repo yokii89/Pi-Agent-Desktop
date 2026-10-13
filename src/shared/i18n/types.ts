@@ -20,9 +20,14 @@ export type TranslateFn = (key: string, params?: MessageParams) => string;
 /** 各语言完整文案表（扁平 key → 译文）。 */
 export type Catalog = Readonly<Record<LocaleId, Readonly<Record<string, string>>>>;
 
+/** 是否为合法的语言偏好（设置写入侧的白名单校验，与 isRailStyle / isFontUiPreset 同规则）。 */
+export function isLocalePreference(value: unknown): value is LocalePreference {
+  return value === "system" || value === "zh-CN" || value === "en-US";
+}
+
 /** 校验 LocalePreference；非法值回退 system。 */
 export function normalizeLocalePreference(value: unknown): LocalePreference {
-  return value === "zh-CN" || value === "en-US" ? value : "system";
+  return isLocalePreference(value) ? value : "system";
 }
 
 /** 把偏好解析为实际生效语言；system 时按浏览器/系统语言猜，默认中文。 */

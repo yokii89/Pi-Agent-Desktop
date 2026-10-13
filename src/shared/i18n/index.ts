@@ -8,6 +8,7 @@ export { createTranslate, interpolate } from "./translate";
 export {
   type Catalog,
   defineMessages,
+  isLocalePreference,
   LOCALE_IDS,
   type LocaleId,
   type LocalePreference,
