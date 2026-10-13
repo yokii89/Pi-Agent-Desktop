@@ -1,13 +1,14 @@
 import {
   app,
   type BrowserWindow,
+  type HandlerDetails,
   type Session,
   session,
   type WebContents,
   type WindowOpenHandlerResponse,
 } from "electron";
 import { getMainWindow } from "../window/createMainWindow";
-import { BROWSER_PARTITION, isInAppPopupUrl } from "./browserPolicyRules";
+import { BROWSER_PARTITION, resolvePageOpenTarget } from "./browserPolicyRules";
 
 /**
  * 内嵌浏览器面板的「在应用内浏览」策略（docs/design/42）。
@@ -31,6 +32,25 @@ const MAX_BROWSER_POPUPS = 4;
 const livePopups = new Set<BrowserWindow>();
 
 let popupBlockedListener: ((limit: number) => void) | null = null;
+
+/**
+ * 「这条开窗请求请面板开一个新页签」的执行入口。由 `browserView` 注入（它才持有页面实例表
+ * 与推送通道），与 `setBrowserPopupBlockedListener` 同形，避免策略层反向依赖 `browserView`
+ * 造成循环引用（docs/design/63 §四 P1）。
+ */
+let pageOpenHandler: ((opener: WebContents, url: string) => void) | null = null;
+
+/**
+ * 页签落地形态的执行入口注入。
+ *
+ * 注入点在 `registerBrowserLifecycle()`（`src/main/index.ts:24`，模块加载即执行），
+ * 早于任何 WebContents 存在，因此不可能出现「开窗请求没人接」。
+ */
+export function setBrowserPageOpenHandler(
+  handler: ((opener: WebContents, url: string) => void) | null,
+): void {
+  pageOpenHandler = handler;
+}
 
 /**
  * 弹窗被上限拒绝时的上报入口。由 `browserView` 注入（它才持有页面实例与推送通道），
@@ -76,19 +96,29 @@ export function isBrowserContents(contents: WebContents): boolean {
  */
 
 /**
- * 面板内 `window.open` 的响应：http(s) / `about:blank` 在应用内开原生子窗，
- * 其余 scheme 一律拒绝（不交给系统浏览器，与既有行为一致）；
- * 存活弹窗到上限后一并拒绝并上报，避免一个页面反复开窗刷满渲染进程。
+ * 面板内一次开窗请求的落地（docs/design/63 §四 P1，取代 42 §二 L2 的「一律开子窗」）：
  *
- * 为什么是独立子窗而不是面板新标签页：OAuth 回调靠 `window.opener`（postMessage /
- * `window.close()`）收尾，换成面板里的新页面会断链；登录态本身走共享 session 的 Cookie，
- * 与 opener 无关。子窗以主窗为 parent：跟随 PiDesk 最小化 / 关闭，不留孤儿窗口。
+ * - `tab`：交 `browserView` 在面板里开新页签，这里返回 `deny`——不 deny 的话 Electron
+ *   已经把子窗建出来了，页签和浮窗会同时出现。
+ * - `window`：应用内原生子窗（`action:"allow"` + `parent` = 主窗）。留给带 `features` 的
+ *   显式弹窗（OAuth / 支付靠 `window.opener` 收尾）、`about:blank`（站点要**活句柄**写内容）、
+ *   命名 target（语义是复用同一个窗）、Shift+左键（用户显式要开新窗）。子窗以主窗为 parent：
+ *   跟随 PiDesk 最小化 / 关闭，不留孤儿窗口。
+ * - `deny`：非 Web 协议，不交给系统浏览器（与 42 §二 L6 一致）。
+ *
+ * 分类本身是纯函数 `resolvePageOpenTarget`（实测依据见 63 §二 矩阵），本函数只做 Electron
+ * 侧接线。弹窗上限仍只对 `window` 生效——页签有自己的上限（`MAX_BROWSER_INSTANCES`）。
  */
 export function browserWindowOpenResponse(
   opener: WebContents,
-  url: string,
+  details: HandlerDetails,
 ): WindowOpenHandlerResponse {
-  if (!isInAppPopupUrl(url)) return { action: "deny" };
+  const target = resolvePageOpenTarget(details);
+  if (target === "deny") return { action: "deny" };
+  if (target === "tab") {
+    pageOpenHandler?.(opener, details.url);
+    return { action: "deny" };
+  }
   if (livePopups.size >= MAX_BROWSER_POPUPS) {
     popupBlockedListener?.(MAX_BROWSER_POPUPS);
     return { action: "deny" };

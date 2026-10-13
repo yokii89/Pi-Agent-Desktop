@@ -19,3 +19,42 @@ export const BROWSER_PARTITION = "persist:browser";
 export function isInAppPopupUrl(url: string): boolean {
   return /^https?:\/\//i.test(url) || url === "about:blank";
 }
+
+/** 开窗请求的落地形态（docs/design/63 §四 P1）。 */
+export type PageOpenTarget = "tab" | "window" | "deny";
+
+/** `resolvePageOpenTarget` 的入参：Electron `HandlerDetails` 里参与判定的四个字段。 */
+export interface PageOpenSignals {
+  url: string;
+  disposition: string;
+  frameName: string;
+  features: string;
+}
+
+/**
+ * 面板内一次「新窗口意图」该落在哪里（docs/design/63 §二 实测矩阵 → §四 规则表）。
+ *
+ * 判定顺序即优先级：
+ * 1. 非 Web 协议一律拒绝（42 §二 L6，不借这次修复扩大可打开的协议面）。
+ * 2. `about:blank` 留子窗：这类弹窗是「先开空窗再 `document.write`」，页面要的是**活句柄**，
+ *    转成页签会让 `window.open()` 返回 `null`，站点写句柄当场抛错（63 F6）。
+ * 3. `features` 非空留子窗：显式带尺寸才是「弹窗」（OAuth / 支付的标准形态），
+ *    实测它与普通链接点击在 `disposition` 与 `features` 两个字段上同时不同（63 §二 结论 1）。
+ * 4. `frameName` 非空留子窗：命名 target 的语义是「复用同一个窗反复导航」，子窗自带复用。
+ * 5. `new-window` 留子窗：Shift+左键是用户**显式**要开新窗（实测 `features` 仍为空），
+ *    顺带保留一条「我就想要浮窗」的手动逃生口。
+ * 6. 其余（`foreground-tab` / `background-tab` / `default` / `other`）进**面板页签**：
+ *    这是 `<a target=_blank>` 左键与裸 `window.open(httpUrl)` 的共同签名——两者实测逐字段
+ *    相同、无法区分（63 §二 结论 2），故一并转页签，代价与缓解见 63 §六。
+ *
+ * P1 一律前台开；`background-tab` 的「开在后台不抢视图」留 63 §四 P2。
+ */
+export function resolvePageOpenTarget(signals: PageOpenSignals): PageOpenTarget {
+  const { url, disposition, frameName, features } = signals;
+  if (!isInAppPopupUrl(url)) return "deny";
+  if (url === "about:blank") return "window";
+  if (features.trim() !== "") return "window";
+  if (frameName.trim() !== "") return "window";
+  if (disposition === "new-window") return "window";
+  return "tab";
+}

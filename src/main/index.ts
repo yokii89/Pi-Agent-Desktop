@@ -156,12 +156,13 @@ app.on("will-quit", () => {
 app.on("web-contents-created", (_event, contents) => {
   // 判定放在事件触发时而非此处：`window.open` 的子窗在创建后才知道自己的会话归属，
   // 面板弹窗要跟面板走同一条策略（src/main/browser/browserPolicy.ts）
-  contents.setWindowOpenHandler(({ url }) => {
-    // 内嵌浏览器面板：站内弹窗留在应用内（OAuth 登录弹窗就是这条路径）
-    if (isBrowserContents(contents)) return browserWindowOpenResponse(contents, url);
+  contents.setWindowOpenHandler((details) => {
+    // 内嵌浏览器面板：链接点击落进面板变页签，显式弹窗（带 features / about:blank / 命名
+    // target）仍留应用内子窗——OAuth 登录弹窗就是这条路径（docs/design/63 §四 P1）
+    if (isBrowserContents(contents)) return browserWindowOpenResponse(contents, details);
     // 其余（主窗口、扩展 View 等）：外部链接一律交给系统浏览器，禁止在应用内开新窗口
-    if (url.startsWith("https://") || url.startsWith("http://")) {
-      shell.openExternal(url);
+    if (details.url.startsWith("https://") || details.url.startsWith("http://")) {
+      shell.openExternal(details.url);
     }
     return { action: "deny" };
   });

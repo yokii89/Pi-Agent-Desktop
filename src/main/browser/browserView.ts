@@ -36,7 +36,11 @@ import {
   startPick,
   stopPick,
 } from "./browserPick";
-import { getBrowserSession, setBrowserPopupBlockedListener } from "./browserPolicy";
+import {
+  getBrowserSession,
+  setBrowserPageOpenHandler,
+  setBrowserPopupBlockedListener,
+} from "./browserPolicy";
 import { BROWSER_PARTITION } from "./browserPolicyRules";
 import {
   bindInspector,
@@ -114,6 +118,25 @@ function getActive(): BrowserInstance | null {
   return instances.get(activeId) ?? null;
 }
 
+/**
+ * 页签集合广播（docs/design/63 §三 F3/F4）：主进程是页签真源——链接点击开的页签、关闭、
+ * 切换，以及**后台页**的导航与换图标，都要回推整份列表，页签条才不会停留在旧值。
+ */
+function pushPagesChanged(): void {
+  push(activeId, {
+    type: "pagesChanged",
+    payload: { pages: listBrowserInstances(), activePageId: activeId },
+  });
+}
+
+/** 反查某个 WebContents 是哪个页签（开窗请求里的 opener 就是它）。 */
+function findIdByWebContents(wc: WebContents): string | null {
+  for (const entry of instances.values()) {
+    if (entry.view?.webContents === wc) return entry.id;
+  }
+  return null;
+}
+
 /** 取当前活跃页面实例；不存在时抛错（IPC 统一信封会转成 `{ ok: false }`）。 */
 function requireActive(): BrowserInstance {
   const entry = getActive();
@@ -173,6 +196,7 @@ export function createBrowserInstance(): string {
   }
   applyBoundsFor(entry);
   syncActiveInstanceState(entry);
+  pushPagesChanged();
   return id;
 }
 
@@ -187,16 +211,19 @@ export function closeBrowserInstance(id: string): void {
   const closedIndex = idsBefore.indexOf(id);
   destroyInstanceView(entry);
   instances.delete(id);
-  if (activeId !== id) return;
-  const remaining = [...instances.keys()];
-  const next = remaining[closedIndex] ?? remaining[closedIndex - 1] ?? remaining[0] ?? "";
-  activeId = next;
-  if (!next) return;
-  const nextEntry = instances.get(next);
-  if (!nextEntry) return;
-  rebindPickToActive(nextEntry);
-  applyBoundsFor(nextEntry);
-  syncActiveInstanceState(nextEntry);
+  if (activeId === id) {
+    const remaining = [...instances.keys()];
+    const next = remaining[closedIndex] ?? remaining[closedIndex - 1] ?? remaining[0] ?? "";
+    activeId = next;
+    const nextEntry = next ? instances.get(next) : undefined;
+    if (nextEntry) {
+      rebindPickToActive(nextEntry);
+      applyBoundsFor(nextEntry);
+      syncActiveInstanceState(nextEntry);
+    }
+  }
+  // 关掉的是后台页也要推：不然页签条上还挂着一条已经不存在的页
+  pushPagesChanged();
 }
 
 /** 切换活跃实例：停拾取、藏旧视图、显示新视图并同步地址栏状态。 */
@@ -217,6 +244,7 @@ export async function setActiveBrowserInstance(id: string): Promise<void> {
   rebindPickToActive(entry);
   applyBoundsFor(entry);
   syncActiveInstanceState(entry);
+  pushPagesChanged();
 }
 
 /** 拾取/检查器 debugger 会话跟到当前活跃实例（多页面各自独立 WebContents）。 */
@@ -304,12 +332,15 @@ function ensureView(entry: BrowserInstance): WebContentsView {
     // nodeId 与 backendNodeId 在导航后全部失效（06 §5.1）：清空检查器并提示重新拾取
     invalidateInspector("navigated");
     pushNavigated(entry, "commit");
+    // 后台页的导航渲染层收不到（`navigated` 只认活跃 id），页签标题/URL 靠这条整份回推（63 F4）
+    pushPagesChanged();
   });
   wc.on("page-favicon-updated", (_event, favicons) => {
     const url = favicons[favicons.length - 1] ?? null;
     if (url === entry.favicon) return;
     entry.favicon = url;
     push(entry.id, { type: "favicon", payload: url });
+    pushPagesChanged();
   });
   // 页内导航（SPA 路由）只更新地址栏，不让托盘元素过期，也不动检查器（DOM 未重建）
   wc.on("did-navigate-in-page", (_event, _url, isMainFrame) => {
@@ -569,6 +600,29 @@ export async function navigateBrowser(input: string): Promise<void> {
   await wc.loadURL(url).catch(() => {});
 }
 
+/**
+ * 站内链接点击与裸 `window.open` 落进面板：开一个新页签并导航过去（docs/design/63 §四 P1）。
+ *
+ * 由 `browserPolicy` 在开窗请求里注入调用；那条路径同时返回 `deny`，否则页签和子窗一起出现。
+ * 满员不静默：把上限文案推回**发起点击的那个页签**，面板照 `error` 推送出 toast。
+ */
+function openPageFromOpener(opener: WebContents, url: string): void {
+  try {
+    createBrowserInstance();
+  } catch {
+    const target = instances.get(findIdByWebContents(opener) ?? "") ?? getActive();
+    if (target) {
+      push(target.id, {
+        type: "error",
+        payload: t("browser.toast.maxInstances", { count: MAX_BROWSER_INSTANCES }),
+      });
+    }
+    return;
+  }
+  // 新建实例已经是活跃页（createBrowserInstance 同步落 activeId），导航就落在它身上
+  void navigateBrowser(url).catch(() => {});
+}
+
 /** file:// 通道仅服务文件面板的网页预览；其他后缀仍走「用系统应用打开」。 */
 const LOCAL_HTML_EXTS = new Set(["html", "htm"]);
 
@@ -823,6 +877,8 @@ export function registerBrowserLifecycle(): void {
     const entry = getActive();
     if (entry) push(entry.id, { type: "error", payload: t("browser.popup.blocked", { limit }) });
   });
+  // 策略判成「页签」的开窗请求交回这里落地（docs/design/63 §四 P1）
+  setBrowserPageOpenHandler(openPageFromOpener);
   app.on("will-quit", () => {
     destroyBrowser();
   });

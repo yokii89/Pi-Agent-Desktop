@@ -1617,7 +1617,7 @@ export const BROWSER_IPC = {
   setActiveInstance: "pidesk:browser:setActiveInstance",
   /** 列出全部浏览器页面实例。 */
   listInstances: "pidesk:browser:listInstances",
-  /** 主进程推送：导航 / 拾取 / 控制台 / 错误 / 加载 / 拾取状态 / 检查器失效。 */
+  /** 主进程推送：导航 / 页签集合 / 拾取 / 控制台 / 错误 / 加载 / 拾取状态 / 检查器失效。 */
   output: "pidesk:browser:output",
 } as const;
 
@@ -1991,6 +1991,15 @@ export type BrowserPushBody =
         /** commit=真实导航/刷新（托盘元素据此标记过期），inpage=页内导航。 */
         kind: "commit" | "inpage";
       };
+    }
+  /**
+   * 页签集合变化（docs/design/63 §三 F3/F4）：主进程是页签真源，
+   * 链接点击开页签 / 关闭 / 切换 / **后台页**导航与换图标都要重推整份列表。
+   * 属全局推送，渲染层必须在「只认活跃 id」那道过滤**之前**处理。
+   */
+  | {
+      type: "pagesChanged";
+      payload: { pages: BrowserInstanceInfo[]; activePageId: string };
     }
   | { type: "picked"; payload: BrowserPickedElement }
   | { type: "favicon"; payload: string | null }

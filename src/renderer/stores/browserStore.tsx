@@ -88,6 +88,7 @@ interface BrowserState {
 
 type BrowserAction =
   | { type: "setPages"; pages: BrowserInstanceInfo[]; activePageId: string }
+  | { type: "pagesChanged"; pages: BrowserInstanceInfo[]; activePageId: string }
   | { type: "pageCreated"; page: BrowserInstanceInfo }
   | { type: "pageClosed"; id: string }
   | { type: "pageActivated"; id: string }
@@ -142,10 +143,32 @@ function browserReducer(state: BrowserState, action: BrowserAction): BrowserStat
   switch (action.type) {
     case "setPages":
       return { ...state, pages: action.pages, activePageId: action.activePageId };
-    case "pageCreated":
+    case "pagesChanged": {
+      // 主进程是页签真源（docs/design/63 §三 F3/F4）：列表每次按快照整体替换。
+      // 只有「活跃页换了」才顺带对齐展示态——后台页导航也推这条，
+      // 无条件清错误流/拾取态会把用户正在看的页擦掉。
+      if (action.activePageId === state.activePageId) {
+        return { ...state, pages: action.pages };
+      }
+      const active = action.pages.find((page) => page.id === action.activePageId) ?? null;
       return {
         ...state,
-        pages: [...state.pages, action.page],
+        pages: action.pages,
+        activePageId: action.activePageId,
+        // 按主进程快照对齐，否则链接点开的新页签会先闪一下上一页的地址
+        url: active?.url ?? "",
+        title: active?.title ?? "",
+        started: Boolean(active?.started && active.url),
+      };
+    }
+    case "pageCreated": {
+      // 乐观先落一帧；主进程随后推 pagesChanged，同 id 覆盖而不是再插一条
+      const pages = state.pages.some((page) => page.id === action.page.id)
+        ? state.pages.map((page) => (page.id === action.page.id ? action.page : page))
+        : [...state.pages, action.page];
+      return {
+        ...state,
+        pages,
         activePageId: action.page.id,
         // 新页未导航：活跃展示态清空，保留空态
         url: "",
@@ -158,6 +181,7 @@ function browserReducer(state: BrowserState, action: BrowserAction): BrowserStat
         pickMode: "select",
         errors: [],
       };
+    }
     case "pageClosed": {
       const closedIndex = state.pages.findIndex((page) => page.id === action.id);
       const pages = state.pages.filter((page) => page.id !== action.id);
@@ -383,6 +407,17 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
     });
 
     return browserService.subscribe((message) => {
+      // 全局推送必须在「只认活跃 id」那道过滤之前处理：链接点开的新页签正是靠它进页签条，
+      // 而此刻 ref 还指着旧页（docs/design/63 §四 P1）
+      if (message.type === "pagesChanged") {
+        activePageIdRef.current = message.payload.activePageId;
+        dispatch({
+          type: "pagesChanged",
+          pages: message.payload.pages,
+          activePageId: message.payload.activePageId,
+        });
+        return;
+      }
       // 后台页也可能推送（加载中的旧页）；只处理当前活跃页的消息
       if (message.id !== activePageIdRef.current) return;
       switch (message.type) {
