@@ -36,8 +36,11 @@ export const UPDATE_IPC = {
   status: "pidesk:update:status",
 } as const;
 
+/** PiDesk 开源仓库（设置 →「开源」展示，与下面的发布通道同源）。 */
+export const PIDESK_REPO_URL = "https://github.com/yokii89/Pi-Agent-Desktop";
+
 /** 发布页 URL（开发模式降级「打开下载页」、错误兜底）。 */
-export const UPDATE_RELEASES_URL = "https://github.com/yokii89/Pi-Agent-Desktop/releases";
+export const UPDATE_RELEASES_URL = `${PIDESK_REPO_URL}/releases`;
 
 /**
  * 开发模式检查端点（未打包；仓库需可匿名读 Releases）。
@@ -45,8 +48,7 @@ export const UPDATE_RELEASES_URL = "https://github.com/yokii89/Pi-Agent-Desktop/
  * 与 electron-updater 打包路径同源、不受 api.github.com 匿名 60 次/时/IP 限制；
  * 代价：不含发布时间与说明。
  */
-export const UPDATE_GITHUB_LATEST_URL =
-  "https://github.com/yokii89/Pi-Agent-Desktop/releases/latest";
+export const UPDATE_GITHUB_LATEST_URL = `${PIDESK_REPO_URL}/releases/latest`;
 
 /**
  * 解析 `v1.2.3` / `1.2.3-beta.1` 为数值段。
