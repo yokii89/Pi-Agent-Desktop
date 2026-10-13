@@ -62,7 +62,10 @@ jobs:
             release/SHASUMS256.txt
           if-no-files-found: error
 
-      # 仅 tag 构建发布 Release；--generate-notes 用提交历史自动生成说明
+      # 仅 tag 构建发布 Release。正文来自仓库里的 release-notes/v<版本>.md
+      # （双语：英文在前、简体中文在后，同 README 顺序），不再用 --generate-notes——
+      # 本仓库直推 main、没有 PR，自动生成的正文只剩一行 Full Changelog 链接。
+      # 缺文件就失败，而不是静默发一个没有说明的 Release。
       # 必须带上 latest.yml / blockmap，已装客户端的 electron-updater 才能发现并差量升级
       - name: 发布 GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -71,9 +74,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          notes="release-notes/${GITHUB_REF_NAME}.md"
+          if [ ! -s "$notes" ]; then
+            echo "缺少更新日志 $notes（空文件或不存在）。先在仓库里写好该文件、连同 release commit 一起推送，再重打 tag。"
+            exit 1
+          fi
           gh release create "${GITHUB_REF_NAME}" \
             --title "PiDesk ${GITHUB_REF_NAME}" \
-            --generate-notes \
+            --notes-file "$notes" \
             release/PiDesk-Setup-*.exe \
             release/PiDesk-Setup-*.exe.blockmap \
             release/latest.yml \

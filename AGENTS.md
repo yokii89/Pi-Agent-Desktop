@@ -270,3 +270,4 @@ import { Play } from "@phosphor-icons/react";
 - 提交信息遵循 Conventional Commits：`feat:` / `fix:` / `chore:` / `docs:` / `refactor:`。
 - **唯一公开仓库是 `yokii89/Pi-Agent-Desktop`**（`yokii89/PiDesk` 已停用，不再推送）：更新源写死在 `electron-builder.yml` 的 `publish.repo` 与 `src/shared/update.ts` 的常量里，改这两处等于改线上客户端的升级通道。
 - 本地 `main` 就是发布仓库的 `main`：`git push origin main` 直接生效，提交逐条公开可见。发版是 `pnpm release x.y.z`（本地 bump + commit + tag，不自动推）之后按脚本提示 `git push origin main` 与 `git push origin v<版本>`，推 tag 触发 CI 构建并创建 Release。
+- **Release 正文只有一个来源**：`release-notes/v<版本>.md`，**双语**（英文在前、简体中文在后，与 README 顺序一致），面向使用者写「你能做什么」，**不要**出现文件路径、配置键名、docs 编号等内部信息。CI 用 `gh release create --notes-file` 原样发布，不再用 `--generate-notes`（本仓库直推 main、无 PR，自动正文只剩一行 Full Changelog）。`scripts/release.mjs` 在 bump 前校验该文件存在且非空，**必须先把它单独提交再跑发版**——tag 一旦推上去而缺文件，CI 会失败并留下一个没有 Release 的 tag。
