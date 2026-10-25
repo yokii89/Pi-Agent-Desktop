@@ -29,6 +29,7 @@
 
 export {
   supportsCapability,
+  supportsPanelLauncher,
   supportsPatch,
   supportsTable,
   type TableViewOptions,

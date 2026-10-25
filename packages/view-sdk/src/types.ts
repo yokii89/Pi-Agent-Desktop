@@ -270,13 +270,24 @@ export interface ViewHelloPayload {
   limits?: ViewLimits;
 }
 
-/** Host 广告的可选协议能力。 */
+/**
+ * Host 广告的可选协议能力。
+ *
+ * `panel-launcher`：右侧栏把 `panel` 静态贡献呈现为「启动页 + 可关闭页签」。
+ * Catalog 条目在用户打开前不占页签；`openPanel` 仍然直接打开/顶替页签；
+ * 用户关闭页签只把视图移出侧栏，不发送 dismiss（需要结束面板时由面板自身
+ * 的关闭按钮或扩展 `close()` 完成）。用户手动关闭的 `panelId` 会被抑制：
+ * 扩展之后重新 open/断线重连不会自动把页签抢回来，直到用户从启动页/加号菜单
+ * 再次打开。旧 Host 没有该能力时，Catalog 条目会自动成为常驻页签——依赖
+ * 「启动即出现」的扩展应显式 `openPanel`。
+ */
 export type ViewHostCapability =
   | "contribution-binding"
   | "notification"
   | "system-toast"
   | "view-table"
-  | "view-patch";
+  | "view-patch"
+  | "panel-launcher";
 
 /**
  * 本 Host 实际实现的能力集，`hello.capabilities` 的唯一来源。
@@ -289,6 +300,7 @@ export const VIEW_HOST_CAPABILITIES: readonly ViewHostCapability[] = [
   "system-toast",
   "view-table",
   "view-patch",
+  "panel-launcher",
 ];
 
 /**

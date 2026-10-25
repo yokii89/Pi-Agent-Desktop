@@ -137,6 +137,7 @@ await desktop.open(spec, {
 | `playNotification(client, options)` | System notification sound host service (`hello.capabilities` includes `notification`); optional `toast` needs `system-toast` |
 | `client.notify(payload)` | Lower-level notify envelope; soft `{ ok:false }` on old hosts |
 | `session.patch(payload)` | Partial update (`hello.capabilities` includes `view-patch`); soft `false` → fall back to `update()` |
+| `supportsPanelLauncher(client)` | `hello.capabilities` includes `panel-launcher` (launcher + closable panel tabs, see below) |
 | `ACCESS_MODE_ACTIONS` | `mode:activate` / `mode:deactivate` action ids the Host sends back |
 | `viewOnDesktop(client, spec, options?)` | One-shot form shortcut |
 | `column` / `row` / `card` | Tiny ViewNode builders |
@@ -289,6 +290,59 @@ session.update({ root: project(nextState) });
 - `panel` does **not** block the composer's send path (only `modal` and floating
   `widget` do), so a resident panel never gates the user's own messages.
 - Do not route credentials through `settings`: payloads cross IPC and the renderer.
+
+#### Panel launcher (`panel-launcher`)
+
+Hosts that advertise `panel-launcher` surface **every** `pidesk.contributes.panels`
+entry on the right sidebar's start page and “+” menu. A Catalog entry is a
+launchable feature, not a resident tab: it only occupies a tab after the user
+opens it. Opening a cold entry runs the same `view:open` activation chain as the
+extension's own `openPanel()`.
+
+- **Opening is still explicit.** `openPanel()` opens or raises the tab, so an
+  extension that wants its dashboard visible on connect should call it once its
+  session is ready. Probe `supportsPanelLauncher(client)` only when you need to
+  branch; the call itself works on both generations of Hosts (legacy Hosts
+  replace the resident Catalog tab).
+- **Closing a tab hides, it does not dismiss.** The live View keeps its
+  registration and keeps receiving updates/actions. Reopening from “+” shows the
+  same view state. Ending the panel is still the extension's `session.close()`
+  (or the panel's own Close button, which sends the `dismiss` event).
+- **A user close suppresses automatic reopening.** While the user keeps a panel
+  tab closed, later `open()` / reconnect attempts do **not** steal the tab back;
+  the user reopens it from the launcher or “+” menu. Do not build an extension
+  loop that expects `openPanel()` to force a closed tab open.
+- **Stable `panelId` matters more here.** It is the tab identity and the key the
+  launcher uses to match Catalog metadata with the live registration. Do not
+  include a run id or a session id.
+- **Metadata comes from the manifest.** `title`, `description` and `icon` in
+  `pidesk.contributes.panels[]` are what the start page renders. Supported icon
+  names are `shield`, `shield-check`, `clipboard`, `gear`, `gear-six`, `sliders`,
+  `puzzle-piece`, `sparkle`, `warning`, `check-circle`, `info`, `folder`, `globe`,
+  `git-pull-request`, `terminal-window`, `chat-circle`, `robot`, `database`,
+  `code`, `list-checks`, `calendar`, `envelope`, `chart-line`; unknown names fall
+  back to `puzzle-piece`. The Host validates this list when scanning the manifest.
+- **Capability absence is the old behavior.** An older Host does not send
+  `panel-launcher` and keeps Catalog panels as resident tabs. Do not infer the
+  new tab semantics from the package version.
+
+```json
+{
+  "pidesk": {
+    "contributes": {
+      "panels": [
+        {
+          "id": "telegram-bridge",
+          "title": "Telegram",
+          "description": "Bridge 队列与连接状态",
+          "icon": "chat-circle",
+          "activation": "onSessionView"
+        }
+      ]
+    }
+  }
+}
+```
 
 ### Table nodes
 

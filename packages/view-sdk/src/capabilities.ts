@@ -47,6 +47,27 @@ export function supportsPatch(client: DesktopViewClient | null | undefined): boo
   return supportsCapability(client, "view-patch");
 }
 
+/**
+ * The Host renders panel contributions as launcher features + closable tabs
+ * (docs/design/66).
+ *
+ * When false (legacy Host), every Catalog `panel` entry occupies a resident tab
+ * even before the user opens it. When true, Catalog entries are only listed on
+ * the right sidebar's launcher/add menu; opening one is a user action, and
+ * closing its tab hides the panel without sending `dismiss`.
+ *
+ * A user-closed panel stays suppressed: later `open()` / reconnect attempts do
+ * not steal the tab back; the user reopens it from the launcher or add menu.
+ *
+ * Extensions that need a panel visible without a user click should call
+ * `openPanel` after their session is ready. That call is harmless on both
+ * generations of Hosts (it replaces the resident slot on legacy Hosts), but it
+ * does not override a tab the user closed on a `panel-launcher` Host.
+ */
+export function supportsPanelLauncher(client: DesktopViewClient | null | undefined): boolean {
+  return supportsCapability(client, "panel-launcher");
+}
+
 export interface TableViewOptions {
   id: string;
   columns: ViewTableColumn[];

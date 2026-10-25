@@ -16,12 +16,65 @@ export const contextMessages = defineMessages({
     "en-US": "Drag to resize width",
   },
   "panels.context.tabList": { "zh-CN": "工具面板", "en-US": "Tool panels" },
+  "panels.context.launcherLabel": {
+    "zh-CN": "可打开的功能",
+    "en-US": "Available tools",
+  },
+  "panels.context.addFeature": { "zh-CN": "添加功能", "en-US": "Add tool" },
+  "panels.context.noAddableFeatures": {
+    "zh-CN": "没有可添加的功能",
+    "en-US": "Nothing left to add",
+  },
+  "panels.context.openFiles": {
+    "zh-CN": "打开工作区文件",
+    "en-US": "Open workspace files",
+  },
+  "panels.context.openFilesHint": {
+    "zh-CN": "浏览、搜索并预览工作区文件",
+    "en-US": "Browse, search and preview workspace files",
+  },
+  "panels.context.openBrowser": {
+    "zh-CN": "打开内置浏览器",
+    "en-US": "Open built-in browser",
+  },
+  "panels.context.openBrowserHint": {
+    "zh-CN": "预览页面、检查元素与调试",
+    "en-US": "Preview pages, inspect elements and debug",
+  },
+  "panels.context.openReview": {
+    "zh-CN": "打开审阅",
+    "en-US": "Open review",
+  },
+  "panels.context.openReviewHint": {
+    "zh-CN": "查看 Git 变更、提交与历史图谱",
+    "en-US": "Review Git changes, commits and history",
+  },
+  "panels.context.extensionHint": {
+    "zh-CN": "由扩展提供",
+    "en-US": "Provided by an extension",
+  },
+  "panels.context.otherSession": {
+    "zh-CN": "该面板属于其他会话，切换回原会话后可继续使用。",
+    "en-US": "This panel belongs to another session. Switch back to continue using it.",
+  },
+  "panels.context.panelUnavailable": {
+    "zh-CN": "该扩展面板当前不可用。",
+    "en-US": "This extension panel is unavailable.",
+  },
+  "panels.context.maximizeSidebar": {
+    "zh-CN": "放大侧栏",
+    "en-US": "Maximize sidebar",
+  },
+  "panels.context.restoreSidebarWidth": {
+    "zh-CN": "还原侧栏宽度",
+    "en-US": "Restore sidebar width",
+  },
   "panels.context.extensionFallback": { "zh-CN": "扩展", "en-US": "Extension" },
   "panels.context.connecting": { "zh-CN": "连接中…", "en-US": "Connecting…" },
   "panels.context.openPanel": { "zh-CN": "打开面板", "en-US": "Open panel" },
   "panels.context.activateFailed": {
-    "zh-CN": "激活失败，点击上方 Tab 重试",
-    "en-US": "Activation failed. Click the tab above to retry.",
+    "zh-CN": "激活失败，点击下方按钮重试",
+    "en-US": "Activation failed. Use the button below to retry.",
   },
   "panels.context.collapseSidebar": {
     "zh-CN": "收起侧栏",

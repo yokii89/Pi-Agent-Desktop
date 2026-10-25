@@ -1,5 +1,38 @@
 # @pidesk/view-sdk
 
+## 0.3.0 — 2026-10-25
+
+Panel contributions become **launcher features** on Hosts that advertise the new
+`panel-launcher` capability (PiDesk docs/design/66). No new message or node; the
+only wire addition is the additive `hello.capabilities` entry. The same `panel`
+placement and `openPanel()` helper work with both generations.
+
+- **New export `supportsPanelLauncher(client)`.** True when the Host renders
+  `pidesk.contributes.panels` on the right sidebar's start page and “+” menu,
+  where a Catalog entry only occupies a tab after the user opens it. On legacy
+  Hosts (no capability) Catalog panels remain resident tabs as before.
+  - **Migration**: extensions that relied on a Catalog panel being visible
+    without an explicit open should call `openPanel()` after the session is
+    ready. The call replaces the resident slot on old Hosts and is harmless on
+    new ones; probing the capability is only needed for behaviour that differs.
+- **Panel tab close now means “hide” on capable Hosts.** The live View keeps its
+  registration and keeps receiving `update` / action traffic; reopening from the
+  add menu restores it. Ending the panel remains `session.close()` / the panel's
+  own Close button (`dismiss`).
+  - A user close also **suppresses automatic reopening**: later `open()` /
+    reconnect attempts do not steal the tab back; the user reopens it from the
+    launcher or add menu. This is Host UI behaviour and is advertised via
+    `panel-launcher`; the SDK API is unchanged.
+- **Manifest icon set expanded** for launcher cards: `folder`, `globe`,
+  `git-pull-request`, `terminal-window`, `chat-circle`, `robot`, `database`,
+  `code`, `list-checks`, `calendar`, `envelope`, `chart-line` join the existing
+  generic names. Unknown names still fall back to `puzzle-piece`; the Host
+  validates the list during manifest scanning. New shared source:
+  `CONTRIBUTION_ICON_NAMES` (`src/shared/contribution.ts`).
+- **Protocol type sync**: `ViewHostCapability` now includes `panel-launcher`
+  (`src/shared/view.ts` → generated `types.ts`). Old Clients ignore the extra
+  `hello.capabilities` entry.
+
 ## 0.2.0 — 2026-10-13 (first npm publish)
 
 Implements PiDesk docs/design/20 (O1–O7). Measured before/after in that doc's §4.

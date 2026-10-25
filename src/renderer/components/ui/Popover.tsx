@@ -34,6 +34,13 @@ interface PopoverProps {
   rootClassName?: string;
   /** 面板外壳的附加类名（宽度、内距等外壳级差异都从这里进来）。 */
   panelClassName?: string;
+  /**
+   * 显示面板前的异步准备（例如先冻结/摘除原生 WebContentsView）。
+   * resolve 之前不挂载面板，避免浮层先被原生视图盖住；reject 时仍继续打开。
+   */
+  beforeOpen?: () => Promise<void> | void;
+  /** 逻辑开合变化；关闭回调在退场动画与卸载完成后触发（解除抑制的时机）。 */
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -56,6 +63,8 @@ export function Popover({
   direction = "top",
   rootClassName,
   panelClassName,
+  beforeOpen,
+  onOpenChange,
 }: PopoverProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -71,7 +80,17 @@ export function Popover({
   const handBack = useRef(false);
   /** 面板节点是新建的还是从收起动画里复用的：新建才需要写起点，复用要从当前值接着演。 */
   const fresh = useRef(false);
+  /** beforeOpen 在途：忽略重复点击，避免连续两次准备/两次开合。 */
+  const opening = useRef(false);
+  const alive = useRef(true);
   const overlay = useGlideOverlay(panelRef);
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   const animateChevron = useCallback((nextOpen: boolean): void => {
     chevronTween.current();
@@ -98,18 +117,33 @@ export function Popover({
   }, []);
 
   const requestOpen = useCallback(() => {
+    if (opening.current) return;
     // 测量与按压回弹互斥：不先复位就会拿缩放中的触发器矩形去锚定面板
     pressTween.current();
     press.current = 0;
     rootRef.current?.style.setProperty("--gs-press", "0");
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      fresh.current = true;
-      setMounted(true);
+
+    const show = (): void => {
+      opening.current = false;
+      if (!alive.current) return;
+      if (!mountedRef.current) {
+        mountedRef.current = true;
+        fresh.current = true;
+        setMounted(true);
+      }
+      setOpen(true);
+      onOpenChange?.(true);
+      animateChevron(true);
+    };
+
+    if (beforeOpen) {
+      opening.current = true;
+      // 同步 throw / reject 都不阻止面板显示：准备失败最多退回未抑制的旧观感
+      Promise.resolve().then(beforeOpen).then(show, show);
+      return;
     }
-    setOpen(true);
-    animateChevron(true);
-  }, [animateChevron]);
+    show();
+  }, [animateChevron, beforeOpen, onOpenChange]);
 
   const requestClose = useCallback(() => {
     if (!open) return;
@@ -120,12 +154,13 @@ export function Popover({
     overlay.exit(() => {
       mountedRef.current = false;
       setMounted(false);
+      onOpenChange?.(false);
       if (handBack.current) {
         handBack.current = false;
         rootRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus({ preventScroll: true });
       }
     });
-  }, [open, animateChevron, overlay]);
+  }, [open, animateChevron, overlay, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;

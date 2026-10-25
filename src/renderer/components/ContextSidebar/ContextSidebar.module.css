@@ -65,87 +65,209 @@
   }
 }
 
-.tabBar {
+/* 顶栏：启动页只放右上角动作；页签态左侧换成可关闭页签条 */
+.sidebarHeader {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
+  min-height: 44px;
   padding: var(--spacing-sm);
   border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
-/* 审查入口是 toggle（停靠态切 tab、浮窗态开/关窗，高亮可以与当前 tab 同时成立），
-   与 tab 条的互斥语义不同，所以留在橡皮筋轨道外面 */
-.reviewToggle {
+.headerSpacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.headerActions {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  padding: 5px var(--spacing-sm);
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* 页签条：放不下横向滚动，滚动条隐藏（页签数由用户控制，不做换行）。
+   可关闭页签不属于 ui/Segmented（AGENTS「可关闭的文档页签」例外条款）。 */
+.tabStrip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.tabStrip::-webkit-scrollbar {
+  display: none;
+}
+
+.tabItem {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  max-width: 176px;
+  min-width: 0;
+  height: 28px;
   border-radius: var(--radius-md);
   color: var(--color-text-muted);
-  font-size: var(--font-size-md);
-  /* CJK 标签禁止逐字折行；放不下时收成纯图标 */
-  white-space: nowrap;
-  flex-shrink: 0;
   transition:
     background-color 0.12s ease,
     color 0.12s ease;
 }
 
-.reviewToggle:hover {
+.tabItem:hover {
   background: var(--color-bg-hover);
   color: var(--color-text);
 }
 
-.reviewToggleOn {
+.tabItemActive,
+.tabItemActive:hover {
   background: var(--color-bg-active);
   color: var(--color-text-strong);
 }
 
-.tabLabel {
-  white-space: nowrap;
-}
-
-/* tab 条：吃掉行内剩余宽度，槽位按文案宽，放不下先收文案再横向滚动。
-   皮肤与原来那排裸 chip 一致（无轨道底色、无边框、高亮贴标签盒），差异只在动效。 */
-.tabStrip {
-  flex: 1;
+.tabButton {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
   min-width: 0;
-  --seg-h: 26px;
-  --seg-inset: 0px;
-  --seg-pad: var(--spacing-sm);
-  --seg-min: 0px;
-  --seg-gap: var(--spacing-xs);
-  --seg-track: transparent;
-  --seg-border-width: 0;
-  --seg-radius: var(--radius-md);
+  height: 100%;
+  padding: 0 2px 0 var(--spacing-sm);
+  color: inherit;
+  font-size: var(--font-size-md);
 }
 
-/* 侧栏放不下文案时只留图标（轨道与审查按钮一起收），避免换行/挤压 */
-.tabBarIcon .tabLabel {
-  display: none;
+.tabIcon {
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
-.tabBarIcon .reviewToggle {
-  padding: 5px 6px;
+.tabLabel {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.tabStripIcon {
-  --seg-pad: 6px;
+/* 关闭按钮：常驻 DOM 以便键盘可达；非激活页签只在 hover / 聚焦时显形 */
+.tabClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 3px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  opacity: 0;
+  flex-shrink: 0;
+  transition:
+    opacity 0.12s ease,
+    background-color 0.12s ease,
+    color 0.12s ease;
 }
 
-/* 测量「带文案」自然宽时强制展开完整形态（文案 + 标准 padding，覆盖 iconOnly 的收窄），
-   量完立刻撤掉。只还原文案不还原 padding 会让临界宽度量偏小，在带/不带文案之间来回改判。 */
-.tabBarIcon .tabStripIcon.measuring .tabLabel {
-  display: inline;
+.tabItemActive .tabClose,
+.tabItem:hover .tabClose,
+.tabItem:focus-within .tabClose {
+  opacity: 1;
 }
 
-.tabStripIcon.measuring {
-  --seg-pad: var(--spacing-sm);
+.tabClose:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
 }
 
-/* Catalog-only panel 占位 Tab 激活中（docs/design/19 §10.1）；弱化由原语的 :disabled 负责 */
-.tabPending {
-  cursor: progress;
+/* 启动页：卡片列纵向居中，内容超高时 margin auto 归零并正常滚动 */
+.launcher {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--spacing-lg) var(--spacing-md);
+}
+
+.launcherList {
+  width: 100%;
+  max-width: 420px;
+  margin-block: auto;
+  margin-inline: auto;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.launcherCard {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  padding: var(--spacing-md);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+  text-align: left;
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.launcherCard:hover {
+  background: var(--color-bg-hover);
+  border-color: color-mix(in srgb, var(--color-text-muted) 24%, transparent);
+}
+
+.launcherIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-active);
+  color: var(--color-text);
+  flex-shrink: 0;
+}
+
+.launcherText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.launcherTitle {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.launcherHint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabItem,
+  .tabClose,
+  .launcherCard {
+    transition: none;
+  }
 }
 
 /* Tab 内容区：面板在此自行铺满 */

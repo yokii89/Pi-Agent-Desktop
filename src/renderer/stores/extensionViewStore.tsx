@@ -39,6 +39,7 @@ import {
   resolveAccessModeSelection,
 } from "./contributionProjection";
 import { beginModeTransition, isModeTransitioning } from "./modeTransitionBarrier";
+import { type PanelCatalogRow, projectPanelCatalogRows } from "./panelCatalog";
 import { useProjectStore } from "./projectStore";
 import { registerSessionContextBinder } from "./sessionContextBridge";
 import { useUiStore } from "./uiStore";
@@ -282,16 +283,12 @@ interface ExtensionViewStoreValue {
     cwd?: string | null;
     prepareSession?: () => Promise<string | null>;
   }) => Promise<void>;
-  /** 供 ContextSidebar 渲染的 Catalog-only panel 条目（无 live 时）。 */
-  catalogPanelRows: Array<{
-    key: string;
-    contributionKey: string;
-    id: string;
-    title: string;
-    description?: string;
-    state: "advertised" | "activating" | "failed" | "suspended";
-    error?: string;
-  }>;
+  /**
+   * 当前 active 上下文的 Catalog panel 条目（含已有 live 的），供右侧栏启动页 /
+   * 加号菜单 / 冷态占位使用。`state=live` 时同 `panelId` 的 live 面板由
+   * `visiblePanels` 渲染。
+   */
+  catalogPanelRows: PanelCatalogRow[];
   /** live 为真时发送阻断（mode transition）。 */
   sendBlockedReason: string | null;
 }
@@ -345,7 +342,7 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
   const [widgetSlots, setWidgetSlots] = useState<WidgetSlot[]>([]);
   /** SessionProvider 同步的 active 运行时 SessionId。 */
   const [activeViewSessionId, setActiveViewSessionId] = useState<string | null>(null);
-  const { openSidebarTab } = useUiStore();
+  const { openSidebarTab, hiddenSidebarPanelIds } = useUiStore();
   const knownPanelIdsRef = useRef(new Set<string>());
   const activeViewSessionIdRef = useRef(activeViewSessionId);
   activeViewSessionIdRef.current = activeViewSessionId;
@@ -624,7 +621,8 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
    */
   const lastActivatedAccessModeIdRef = useRef<string | null>(null);
 
-  // 新 panel 打开时展开右栏并聚焦该 Tab——仅当该 panel 属于当前 active 会话（B6）。
+  // 新 panel 打开时展开右栏并聚焦该页签——仅当该 panel 属于当前 active 会话（B6）。
+  // 用户手动关过页签的 panelId 不再自动抢焦点（关闭 = 只隐藏，live View 仍在跑）；
   // active 从 ref 读取：只在「新 panel 出现」时判定，切换 active 不回头抢焦点。
   useEffect(() => {
     const active = activeViewSessionIdRef.current;
@@ -633,13 +631,14 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
       knownPanelIdsRef.current.add(panel.id);
       if (!viewBelongsToSession(panel, active)) continue;
       const panelId = panel.panelId ?? `ext-${panel.id}`;
+      if (hiddenSidebarPanelIds.includes(panelId)) continue;
       openSidebarTab(extensionPanelTabId(panelId));
     }
     const alive = new Set(panels.map((p) => p.id));
     for (const id of knownPanelIdsRef.current) {
       if (!alive.has(id)) knownPanelIdsRef.current.delete(id);
     }
-  }, [panels, openSidebarTab]);
+  }, [panels, openSidebarTab, hiddenSidebarPanelIds]);
 
   useEffect(() => {
     return extensionViewService.subscribe((message) => {
@@ -896,39 +895,16 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
         !t.error && t.actionId !== "view:open" && (t.sessionId === active || t.sessionId === null),
     );
 
-    // Catalog-only panel 条目（无 live 时仍可在右栏看到并点击激活）
-    const livePanelKeys = new Set(
-      panels
-        .filter((p) => filterViewsForSession([p], active).length > 0)
-        .map((p) => p.contributionKey)
-        .filter((k): k is string => typeof k === "string"),
-    );
-    const livePanelIds = new Set(
-      panels.filter((p) => filterViewsForSession([p], active).length > 0).map((p) => p.panelId),
-    );
-    const catalogPanelRows = catalogEntries
-      .filter((e) => e.placement === "panel")
-      .filter((e) => !livePanelKeys.has(e.key) && !livePanelIds.has(e.id))
-      .map((e) => {
-        const txn = activationTxns.find(
-          (t) =>
-            t.contributionKey === e.key &&
-            (t.sessionId === active || (t.sessionId === null && !active)),
-        );
-        let state: "advertised" | "activating" | "failed" | "suspended" = "advertised";
-        if (txn && !txn.error) state = "activating";
-        else if (txn?.error) state = "failed";
-        else if (lastKnownModes.some((m) => m.contributionKey === e.key)) state = "suspended";
-        return {
-          key: e.key,
-          contributionKey: e.key,
-          id: e.id,
-          title: e.title,
-          description: e.description,
-          state,
-          error: txn?.error,
-        };
-      });
+    // Catalog panel 条目（docs/design/19 §10.1 / docs/design/66）：
+    // live 与否都保留在列表里——启动页与加号菜单用它呈现可打开的功能，
+    // 页签身份统一为 `ext:<Catalog id>`（= live placementHint.panelId）。
+    const catalogPanelRows = projectPanelCatalogRows({
+      catalogEntries,
+      visiblePanels,
+      activationTxns,
+      lastKnownModes,
+      activeSessionId: active,
+    });
     const accessModeSelection = resolveAccessModeSelection({
       rows: accessModeRows,
       runtimeReady,

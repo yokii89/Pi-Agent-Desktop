@@ -35,12 +35,22 @@ import {
 } from "../actions/actionRegistry";
 import { browserService } from "../services/browserService";
 import { settingsService } from "../services/settingsService";
+import {
+  closeSidebarTab as closeTab,
+  openSidebarTab as openTab,
+  type RightSidebarTab,
+  type SidebarTabsState,
+} from "./sidebarTabs";
 
 /** 页面级路由目标（渲染层内部路由）；设置已改为浮窗，不进路由栈。 */
 export type PageId = "session" | "extensions" | "scheduled" | "mcp";
 
-/** 右侧上下文侧栏的 Tab（终端已独立为中央工作区底部面板）。`ext:<panelId>` 为扩展 View panel；`cat:<panelId>` 为 Catalog 未连接占位。 */
-export type RightSidebarTab = "review" | "files" | "browser" | `ext:${string}` | `cat:${string}`;
+/**
+ * 右侧上下文侧栏的页签。`ext:<panelId>` 为扩展 View panel。
+ * 页签身份即 `panelId`（Catalog id 与 live `placementHint.panelId` 必须一致），
+ * 不再区分 `cat:`：未连接的 Catalog 条目与 live 面板共用同一个页签身份。
+ */
+export type { RightSidebarTab } from "./sidebarTabs";
 
 /** 代码审查的承载形态：停靠在右侧边栏（默认），或独立非模态浮窗。 */
 export type ReviewSurfaceMode = "docked" | "float";
@@ -69,7 +79,7 @@ export const INSPECTOR_COMPACT_WIDTH = 300;
 export const INSPECTOR_WIDEN_TARGET_WIDTH = 380;
 
 /** 右侧上下文侧栏默认宽度（px），可拖拽调整；与 tokens.css 的 --context-sidebar-width 保持一致。 */
-const RIGHT_SIDEBAR_DEFAULT_WIDTH = 300;
+export const RIGHT_SIDEBAR_DEFAULT_WIDTH = 300;
 
 export type Theme = "dark" | "light";
 
@@ -112,10 +122,17 @@ interface UiState {
   localePreference: LocalePreference;
   /** 当前实际生效的界面语言。 */
   locale: LocaleId;
-  /** 右侧上下文侧栏（审查/文件/浏览器）是否展开。 */
+  /** 右侧上下文侧栏（启动页 / 文件 / 浏览器 / 审查 / 扩展面板）是否展开。 */
   rightSidebarOpen: boolean;
-  /** 右侧上下文侧栏当前 Tab；收起时保留，重新展开回到原 Tab。 */
-  rightSidebarTab: RightSidebarTab;
+  /** 已打开的右侧栏页签，按打开顺序排列；收起侧栏不改变它们。 */
+  rightSidebarTabs: RightSidebarTab[];
+  /** 当前右侧栏页签；null = 启动页（一级界面）。 */
+  rightSidebarTab: RightSidebarTab | null;
+  /**
+   * 用户手动关闭过的扩展面板 `panelId`（页签关闭 = 只隐藏，live View 继续运行）。
+   * 新的 live 注册不会自动重开这些页签，直到用户从加号菜单/启动页再次打开。
+   */
+  hiddenSidebarPanelIds: string[];
   /** 右侧上下文侧栏宽度（px），拖拽左缘把手调整；经 .app 根元素覆盖 --context-sidebar-width。 */
   rightSidebarWidth: number;
   /** 底部终端面板是否展开。仅控制可见性，终端进程生命周期独立（隐藏 ≠ kill）。 */
@@ -177,6 +194,7 @@ type UiAction =
   | { type: "setTheme"; theme: Theme }
   | { type: "setLocalePreference"; preference: LocalePreference }
   | { type: "setRightSidebar"; open: boolean; tab?: RightSidebarTab }
+  | { type: "closeSidebarTab"; tab: RightSidebarTab }
   | { type: "setRightSidebarWidth"; width: number }
   | { type: "toggleRightSidebar" }
   | { type: "toggleTerminalPanel" }
@@ -203,8 +221,6 @@ type UiAction =
   | { type: "setReviewWindowOpen"; open: boolean }
   /** 按当前形态打开审查：停靠态切侧栏 tab，浮窗态开浮窗。 */
   | { type: "openReview" }
-  /** 切换审查可见性（侧栏审查按钮用），行为随形态。 */
-  | { type: "toggleReview" }
   /** 浮窗 ⇄ 停靠 互切，保持审查可见。 */
   | { type: "toggleReviewMode" }
   | {
@@ -230,7 +246,10 @@ const initialState: UiState = {
   localePreference: "system",
   locale: resolveLocale("system", navigator.language),
   rightSidebarOpen: true,
-  rightSidebarTab: "files",
+  rightSidebarTabs: [],
+  // 启动页（一级界面）：用户从功能卡或加号菜单打开第一枚页签
+  rightSidebarTab: null,
+  hiddenSidebarPanelIds: [],
   rightSidebarWidth: RIGHT_SIDEBAR_DEFAULT_WIDTH,
   // 终端面板默认收起：首次进入不侵占 Agent 主工作区；展开时才创建 pty
   terminalPanelVisible: false,
@@ -259,6 +278,11 @@ const initialState: UiState = {
 };
 
 let toastSeq = 0;
+
+/** 把页签子状态合并回完整 UiState；子状态无变化时保持原引用。 */
+function applyTabState(state: UiState, next: SidebarTabsState): UiState {
+  return next === state ? state : { ...state, ...next };
+}
 
 function uiReducer(state: UiState, action: UiAction): UiState {
   switch (action.type) {
@@ -301,12 +325,14 @@ function uiReducer(state: UiState, action: UiAction): UiState {
       if (state.localePreference === preference && state.locale === locale) return state;
       return { ...state, localePreference: preference, locale };
     }
-    case "setRightSidebar":
-      return {
-        ...state,
-        rightSidebarOpen: action.open,
-        rightSidebarTab: action.tab ?? state.rightSidebarTab,
-      };
+    case "setRightSidebar": {
+      if (!action.open) return { ...state, rightSidebarOpen: false };
+      return action.tab
+        ? applyTabState(state, openTab(state, action.tab))
+        : { ...state, rightSidebarOpen: true };
+    }
+    case "closeSidebarTab":
+      return applyTabState(state, closeTab(state, action.tab));
     case "setRightSidebarWidth":
       return { ...state, rightSidebarWidth: action.width };
     case "toggleRightSidebar":
@@ -329,17 +355,13 @@ function uiReducer(state: UiState, action: UiAction): UiState {
       return { ...state, inspectorFloatOpen: action.open };
     case "openFilesPanel":
       return {
-        ...state,
-        rightSidebarOpen: true,
-        rightSidebarTab: "files",
+        ...applyTabState(state, openTab(state, "files")),
         fileSearchTick: state.fileSearchTick + 1,
       };
     // 展开文件 Tab 并投递打开请求；不触发 fileSearchTick，避免抢焦点到搜索框
     case "openFileInPanel":
       return {
-        ...state,
-        rightSidebarOpen: true,
-        rightSidebarTab: "files",
+        ...applyTabState(state, openTab(state, "files")),
         fileOpenRequest: {
           path: action.path,
           tick: (state.fileOpenRequest?.tick ?? 0) + 1,
@@ -348,9 +370,7 @@ function uiReducer(state: UiState, action: UiAction): UiState {
     // 展开文件 Tab 并投递树定位请求（命令面板目录命中 → 展开祖先链 + 滚动）
     case "revealInFilePanel":
       return {
-        ...state,
-        rightSidebarOpen: true,
-        rightSidebarTab: "files",
+        ...applyTabState(state, openTab(state, "files")),
         fileRevealRequest: {
           path: action.path,
           tick: (state.fileRevealRequest?.tick ?? 0) + 1,
@@ -367,13 +387,9 @@ function uiReducer(state: UiState, action: UiAction): UiState {
       return state.toast?.id === action.id ? { ...state, toast: null } : state;
     case "setBrowserEnabled": {
       if (state.browserEnabled === action.enabled) return state;
-      // 关闭插件时若正停在浏览器 Tab，切回文件，避免侧栏出现空面板
-      return {
-        ...state,
-        browserEnabled: action.enabled,
-        rightSidebarTab:
-          !action.enabled && state.rightSidebarTab === "browser" ? "files" : state.rightSidebarTab,
-      };
+      // 关闭插件时移除浏览器页签；若它正激活，相邻页签接管（没有则回启动页）
+      const base = { ...state, browserEnabled: action.enabled };
+      return applyTabState(base, closeTab(base, "browser"));
     }
     case "setWelcomeRecentsEnabled":
       if (state.welcomeRecentsEnabled === action.enabled) return state;
@@ -426,37 +442,23 @@ function uiReducer(state: UiState, action: UiAction): UiState {
         : { ...state, reviewWindowOpen: action.open };
     case "openReview":
       if (state.reviewMode === "docked") {
-        return { ...state, rightSidebarOpen: true, rightSidebarTab: "review" };
+        return applyTabState(state, openTab(state, "review"));
       }
       return state.reviewWindowOpen ? state : { ...state, reviewWindowOpen: true };
-    case "toggleReview": {
-      if (state.reviewMode === "docked") {
-        const selected = state.rightSidebarOpen && state.rightSidebarTab === "review";
-        return {
-          ...state,
-          rightSidebarOpen: true,
-          rightSidebarTab: selected ? "files" : "review",
-        };
-      }
-      return { ...state, reviewWindowOpen: !state.reviewWindowOpen };
-    }
     case "toggleReviewMode": {
       if (state.reviewMode === "docked") {
-        // 停靠 → 浮窗：浮窗接手显示；侧栏离开 review 面板，避免留下空 tab
+        // 停靠 → 浮窗：浮窗接手显示；侧栏移除审查页签，避免留下空面板
         return {
-          ...state,
+          ...applyTabState(state, closeTab(state, "review")),
           reviewMode: "float",
           reviewWindowOpen: true,
-          rightSidebarTab: state.rightSidebarTab === "review" ? "files" : state.rightSidebarTab,
         };
       }
-      // 浮窗 → 停靠：浮窗收起，侧栏展开并选中 review
+      // 浮窗 → 停靠：浮窗收起，侧栏打开审查页签
       return {
-        ...state,
+        ...applyTabState(state, openTab(state, "review")),
         reviewMode: "docked",
         reviewWindowOpen: false,
-        rightSidebarOpen: true,
-        rightSidebarTab: "review",
       };
     }
     case "hydrate": {
@@ -499,10 +501,8 @@ interface UiStoreValue extends UiState {
   closeCommandPalette: () => void;
   /** 打开代码审查（按当前形态：停靠切侧栏 tab，浮窗开浮窗）。 */
   openReview: () => void;
-  /** 关闭代码审查浮窗（仅浮窗形态；停靠形态经 tab 切换收起）。 */
+  /** 关闭代码审查浮窗（仅浮窗形态；停靠形态经页签关闭）。 */
   closeReviewWindow: () => void;
-  /** 切换代码审查可见性（侧栏审查按钮）。 */
-  toggleReview: () => void;
   /** 浮窗 ⇄ 停靠互切（审查头部按钮）。 */
   toggleReviewMode: () => void;
 }
@@ -620,7 +620,6 @@ export function UiProvider({ children }: { children: ReactNode }) {
     () => dispatch({ type: "setReviewWindowOpen", open: false }),
     [],
   );
-  const toggleReview = useCallback(() => dispatch({ type: "toggleReview" }), []);
   const toggleReviewMode = useCallback(() => dispatch({ type: "toggleReviewMode" }), []);
 
   const value = useMemo<UiStoreValue>(
@@ -639,7 +638,6 @@ export function UiProvider({ children }: { children: ReactNode }) {
       closeCommandPalette,
       openReview,
       closeReviewWindow,
-      toggleReview,
       toggleReviewMode,
     }),
     [
@@ -654,7 +652,6 @@ export function UiProvider({ children }: { children: ReactNode }) {
       closeCommandPalette,
       openReview,
       closeReviewWindow,
-      toggleReview,
       toggleReviewMode,
     ],
   );

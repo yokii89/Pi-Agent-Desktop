@@ -392,7 +392,11 @@ export function BrowserPanel() {
         </div>
       )}
 
-      <div ref={hostRef} className={[styles.host, selecting ? styles.hostPicking : ""].join(" ")}>
+      <div
+        ref={hostRef}
+        className={[styles.host, selecting ? styles.hostPicking : ""].join(" ")}
+        data-browser-host=""
+      >
         {!store.started && !store.regionCapture && (
           <div className={styles.empty}>
             <Globe size={32} weight="regular" />

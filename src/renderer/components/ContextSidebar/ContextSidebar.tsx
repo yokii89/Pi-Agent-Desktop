@@ -1,25 +1,41 @@
-import { FileCode, GitPullRequest, Globe, PuzzlePiece, X } from "@phosphor-icons/react";
 import {
   type PointerEvent as ReactPointerEvent,
+  useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { useT } from "../../hooks/useT";
-import { extensionPanelTabId, useExtensionViewStore } from "../../stores/extensionViewStore";
+import { useExtensionViewStore } from "../../stores/extensionViewStore";
 import { useSessionMeta } from "../../stores/sessionStore";
-import type { RightSidebarTab } from "../../stores/uiStore";
-import { useUiStore } from "../../stores/uiStore";
+import {
+  RIGHT_SIDEBAR_DEFAULT_WIDTH,
+  type RightSidebarTab,
+  useUiStore,
+} from "../../stores/uiStore";
+import { prefersReducedMotion } from "../../utils/animation";
+import { type GlideCancel, glide, mix } from "../../utils/glideMotion";
+import { NAV_MOTION } from "../../utils/motionTokens";
 import { PanelMount } from "../ExtensionView/PanelMount";
 import { ReviewPanel } from "../ReviewWindow/ReviewPanel";
-import { IconButton } from "../ui/IconButton";
-import { Segmented, type SegmentedItem } from "../ui/Segmented";
 import styles from "./ContextSidebar.module.css";
 import { BrowserPanel } from "./panels/BrowserPanel";
 import { FilePanel } from "./panels/FilePanel";
+import { SidebarActions } from "./SidebarActions";
+import { SidebarLauncher } from "./SidebarLauncher";
+import { SidebarTabBar } from "./SidebarTabBar";
+import {
+  addableFeatures,
+  buildSidebarFeatures,
+  extensionPanelIdOf,
+  livePanelIdOf,
+  type SidebarCatalogPanel,
+  type SidebarFeature,
+} from "./sidebarFeatures";
 
-/** 侧栏宽度硬下限（px）：再窄 tab 与检查器都不可用，任何路径都不得低于它。 */
+/** 侧栏宽度硬下限（px）：再窄页签与检查器都不可用，任何路径都不得低于它。 */
 const MIN_WIDTH = 220;
 /** 中央区最小宽（px）：侧栏上限 = 网格宽 - 左栏 - 该值，保证会话区始终可用。 */
 const MIN_MAIN_WIDTH = 560;
@@ -29,22 +45,6 @@ const MIN_MAIN_WIDTH = 560;
  * 是不可接受的，所以「点击」必须是空操作。
  */
 const DRAG_THRESHOLD = 4;
-/**
- * 纯图标退出滞回（px）：已收成纯图标后，要多出这些空档才重新展开文案。
- * 没有滞回时临界宽度上「带文案 / 不带文案」的判定会贴着 0 来回改，header 闪烁。
- */
-const ICON_ONLY_EXIT_MARGIN = 16;
-
-interface SidebarTabDef {
-  id: Exclude<RightSidebarTab, `ext:${string}`>;
-  labelKey: string;
-  icon: typeof FileCode;
-}
-
-const TABS: SidebarTabDef[] = [
-  { id: "files", labelKey: "panels.context.files", icon: FileCode },
-  { id: "browser", labelKey: "panels.context.browser", icon: Globe },
-];
 
 interface ResizeSession {
   startX: number;
@@ -77,97 +77,125 @@ function clampWidth(value: number, maxWidth: number): number {
   return Math.max(MIN_WIDTH, Math.min(maxWidth, Math.round(value)));
 }
 
-function panelTabKey(panelId: string): RightSidebarTab {
-  return extensionPanelTabId(panelId);
-}
-
 /**
- * ④ 右侧上下文侧栏：审查（停靠态）/ 文件 / 浏览器 + 扩展 View panel（P1）。
- * 审查有停靠/浮窗两种形态（ReviewSurfaceMode），tab 栏的审查按钮随形态切换可见性。
- * 扩展 panel 以动态 Tab 挂在系统 Tab 之后；关闭面板 = dismiss，收起侧栏 ≠ dismiss。
+ * ④ 右侧上下文侧栏：启动页（一级界面）+ 可关闭页签。
+ *
+ * 默认展开并停在启动页；用户从功能卡或加号菜单打开功能后生成页签。关闭全部页签
+ * 回到启动页。扩展 `panel` 贡献进入启动页与加号菜单，打开时才激活/占页签
+ * （docs/design/66）。
  */
 export function ContextSidebar() {
   const t = useT();
   const {
     rightSidebarOpen,
+    rightSidebarTabs,
     rightSidebarTab,
     rightSidebarWidth,
     navCollapsed,
     browserEnabled,
     reviewMode,
     reviewWindowOpen,
-    toggleReview,
+    openSidebarTab,
+    openReview,
+    shortcuts,
     dispatch,
   } = useUiStore();
-  const { visiblePanels: panels, catalogPanelRows, activateViewOpen } = useExtensionViewStore();
+  const {
+    panels: allPanels,
+    visiblePanels,
+    catalogPanelRows,
+    activateViewOpen,
+  } = useExtensionViewStore();
   const { ensureSession } = useSessionMeta();
   const rootRef = useRef<HTMLElement>(null);
-  const tabBarRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<ResizeSession | null>(null);
+  const widthTweenRef = useRef<GlideCancel | null>(null);
+  const lastWidthRef = useRef<number>(RIGHT_SIDEBAR_DEFAULT_WIDTH);
   // 拖拽中的宽度直接写网格根元素的 CSS 变量（不经 React 渲染），松手时一次性提交 store，
   // 避免拖拽帧反复重渲染全局（与终端面板高度拖拽同一策略）
   const [dragging, setDragging] = useState(false);
-  /** 窄栏纯图标：按「带文案是否放得下」实测，而不是写死侧栏宽度阈值（扩展 Tab 一多就会漏）。 */
-  const [iconOnly, setIconOnly] = useState(false);
+  const [maxWidth, setMaxWidth] = useState<number | null>(null);
 
-  const systemTabs = browserEnabled ? TABS : TABS.filter((tab) => tab.id !== "browser");
-  /** 审查在当前形态下是否可见：停靠态看侧栏 tab，浮窗态看浮窗开关。 */
-  const reviewActive =
-    reviewMode === "docked" ? rightSidebarOpen && rightSidebarTab === "review" : reviewWindowOpen;
-  const activePanel = rightSidebarTab.startsWith("ext:")
-    ? (panels.find((p) => panelTabKey(p.panelId ?? `ext-${p.id}`) === rightSidebarTab) ?? null)
+  const features = useMemo(
+    () =>
+      buildSidebarFeatures({
+        tabs: rightSidebarTabs,
+        browserEnabled,
+        reviewWindowOpen,
+        shortcuts: { openFiles: shortcuts.openFiles, openReview: shortcuts.openReview },
+        catalogRows: catalogPanelRows,
+        visiblePanels,
+        allPanels,
+        t,
+      }),
+    [
+      rightSidebarTabs,
+      browserEnabled,
+      reviewWindowOpen,
+      shortcuts.openFiles,
+      shortcuts.openReview,
+      catalogPanelRows,
+      visiblePanels,
+      allPanels,
+      t,
+    ],
+  );
+  const addable = useMemo(() => addableFeatures(features), [features]);
+
+  /** 页签仍开着时以 store 为准；极端状态下 tabs 非空但 active 为空，退回第一枚避免页签失联。 */
+  const activeTab =
+    rightSidebarTab !== null && rightSidebarTabs.includes(rightSidebarTab)
+      ? rightSidebarTab
+      : (rightSidebarTabs[0] ?? null);
+  const activePanelId = activeTab ? extensionPanelIdOf(activeTab) : null;
+  const activePanel = activePanelId
+    ? (visiblePanels.find((panel) => livePanelIdOf(panel) === activePanelId) ?? null)
     : null;
-  /** Catalog-only panel 占位 Tab（未连接）；id 形如 `cat:<panelId>`。 */
-  const activeCatalogPanel = rightSidebarTab.startsWith("cat:")
-    ? (catalogPanelRows.find((r) => `cat:${r.id}` === rightSidebarTab) ?? null)
+  const activeCatalogPanel = activePanelId
+    ? (catalogPanelRows.find((row) => row.id === activePanelId) ?? null)
+    : null;
+  const activePanelElsewhere = activePanelId
+    ? (allPanels.find((panel) => livePanelIdOf(panel) === activePanelId) ?? null)
+    : null;
+  const activeFeature = activeTab
+    ? (features.find((feature) => feature.id === activeTab) ?? null)
     : null;
 
-  // Tab 清单身份：扩展/Catalog 面板会增删，量宽必须跟着重跑
-  const tabListKey = [
-    systemTabs.map((tab) => tab.id).join(","),
-    panels.map((panel) => panel.id).join(","),
-    catalogPanelRows.map((row) => row.key).join(","),
-  ].join("|");
-
-  // 单行 tab 永不换行：带文案放得下就展示文案，放不下收成纯图标。
-  // 用轨道视口的 scrollWidth 实测而不是固定阈值——扩展 Tab 多寡决定所需宽度，280px 之类写死值会漏。
-  // biome-ignore lint/correctness/useExhaustiveDependencies: tabListKey 是「清单变化的触发信号」，宽度从 DOM 实测
-  useLayoutEffect(() => {
-    // 只在本行里找：侧栏 body 里嵌着浏览器检查器等别的分段轨道，从 aside 查会拿到错的实例
-    const row = tabBarRef.current;
-    const strip = row?.querySelector<HTMLElement>("[data-seg-root]");
-    const viewport = row?.querySelector<HTMLElement>("[data-seg-viewport]");
-    if (!row || !strip || !viewport) return;
-    const measure = (): void => {
-      // 临时挂上 .measuring 强制展开完整形态（文案 + 标准 padding），量完立刻撤掉；
-      // 这一步不能经 React 渲染，否则展开态会被当成真的换行失败而反复改判
-      strip.classList.add(styles.measuring);
-      const fullWidth = viewport.scrollWidth;
-      const available = viewport.clientWidth;
-      strip.classList.remove(styles.measuring);
-      setIconOnly((prev) => {
-        // 进入纯图标：文案放不下；退出：留出滞回量才重新展开，避免临界宽度闪烁
-        const next = prev ? fullWidth + ICON_ONLY_EXIT_MARGIN > available : fullWidth > available;
-        return prev === next ? prev : next;
+  const activateCatalogPanel = useCallback(
+    (row: SidebarCatalogPanel): void => {
+      if (row.state === "activating") return;
+      void activateViewOpen({
+        contributionKey: row.contributionKey,
+        prepareSession: () => ensureSession("view-action"),
       });
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(viewport);
-    return () => observer.disconnect();
-  }, [tabListKey]);
+    },
+    [activateViewOpen, ensureSession],
+  );
 
-  // 扩展 panel 关闭后，若当前正停在该 Tab，切回文件
-  useEffect(() => {
-    if (!rightSidebarTab.startsWith("ext:") && !rightSidebarTab.startsWith("cat:")) return;
-    if (rightSidebarTab.startsWith("ext:")) {
-      if (panels.some((p) => panelTabKey(p.panelId ?? `ext-${p.id}`) === rightSidebarTab)) return;
-    }
-    if (rightSidebarTab.startsWith("cat:")) {
-      if (catalogPanelRows.some((r) => `cat:${r.id}` === rightSidebarTab)) return;
-    }
-    dispatch({ type: "setRightSidebar", open: true, tab: "files" });
-  }, [panels, catalogPanelRows, rightSidebarTab, dispatch]);
+  const openFeature = useCallback(
+    (feature: SidebarFeature): void => {
+      if (feature.id === "review") {
+        openReview();
+        return;
+      }
+      openSidebarTab(feature.id);
+      if (feature.source === "extension" && feature.catalog && !feature.live) {
+        activateCatalogPanel(feature.catalog);
+      }
+    },
+    [activateCatalogPanel, openReview, openSidebarTab],
+  );
+
+  const closeTab = useCallback(
+    (tab: RightSidebarTab): void => {
+      dispatch({ type: "closeSidebarTab", tab });
+    },
+    [dispatch],
+  );
+
+  // 扩展 live 消失时不自动关页签：SDK 断线重连会短暂经过「无 live」状态，
+  // 自动关闭会与重连抢跑并把 panelId 记进抑制列表。页签保留为占位，
+  // 由用户点 × 或面板底部「结束面板」收尾。
 
   const resetDragStyles = (): void => {
     document.body.style.cursor = "";
@@ -198,6 +226,15 @@ export function ContextSidebar() {
     if (event.button !== 0 || !root || !grid) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
+    // 放大/还原补间途中按下把手：先落定视觉宽度，再以它作为拖拽起点（纯点击也不回跳）
+    if (widthTweenRef.current) {
+      widthTweenRef.current();
+      widthTweenRef.current = null;
+      dispatch({
+        type: "setRightSidebarWidth",
+        width: clampWidth(root.getBoundingClientRect().width, computeMaxWidth(grid)),
+      });
+    }
     const startWidth = root.getBoundingClientRect().width;
     resizeRef.current = {
       startX: event.clientX,
@@ -254,61 +291,91 @@ export function ContextSidebar() {
     const clampToAvailable = (): void => {
       const grid = rootRef.current?.parentElement;
       if (!grid) return;
-      const maxWidth = computeMaxWidth(grid);
-      if (rightSidebarWidth > maxWidth) {
-        dispatch({ type: "setRightSidebarWidth", width: maxWidth });
+      const nextMax = computeMaxWidth(grid);
+      setMaxWidth((prev) => (prev === nextMax ? prev : nextMax));
+      if (rightSidebarWidth > nextMax) {
+        dispatch({ type: "setRightSidebarWidth", width: nextMax });
       }
     };
     const grid = rootRef.current?.parentElement;
     if (!grid) return;
     clampToAvailable();
+    const observer = new ResizeObserver(clampToAvailable);
+    observer.observe(grid);
     window.addEventListener("resize", clampToAvailable);
     return () => {
+      observer.disconnect();
       window.removeEventListener("resize", clampToAvailable);
     };
   }, [rightSidebarWidth, navCollapsed, dispatch]);
 
-  const tabItems: SegmentedItem<RightSidebarTab>[] = [
-    ...systemTabs.map((tab) => {
-      const Icon = tab.icon;
-      const label = t(tab.labelKey);
-      return {
-        value: tab.id,
-        title: label,
-        ariaLabel: label,
-        icon: <Icon size={16} weight="regular" />,
-        label: <span className={styles.tabLabel}>{label}</span>,
-      };
-    }),
-    ...panels.map((panel) => {
-      const label = panel.title || t("panels.context.extensionFallback");
-      return {
-        value: panelTabKey(panel.panelId ?? `ext-${panel.id}`),
-        title: label,
-        ariaLabel: label,
-        icon: <PuzzlePiece size={16} weight="regular" />,
-        label: <span className={styles.tabLabel}>{label}</span>,
-      };
-    }),
-    // Catalog-only panel（docs/design/19 §10.1）：未连接占位，点击 view:open 激活
-    ...catalogPanelRows.map((row) => {
-      const activating = row.state === "activating";
-      return {
-        value: `cat:${row.id}` as RightSidebarTab,
-        title: row.description ? `${row.title} — ${row.description}` : row.title,
-        ariaLabel: row.title,
-        disabled: activating,
-        icon: <PuzzlePiece size={16} weight="regular" />,
-        label: (
-          <span
-            className={activating ? `${styles.tabLabel} ${styles.tabPending}` : styles.tabLabel}
-          >
-            {activating ? t("panels.context.connecting") : row.title}
-          </span>
-        ),
-      };
-    }),
-  ];
+  // 记录「放大前」的宽度，供还原按钮使用；已处于最大宽度时不覆盖
+  useEffect(() => {
+    if (maxWidth !== null && rightSidebarWidth < maxWidth - 1) {
+      lastWidthRef.current = rightSidebarWidth;
+    }
+  }, [rightSidebarWidth, maxWidth]);
+
+  // 收展钩子也写同一个 CSS 变量；侧栏开始收起时先停掉宽度补间，避免两边抢写
+  useLayoutEffect(() => {
+    if (!rightSidebarOpen) {
+      widthTweenRef.current?.();
+      widthTweenRef.current = null;
+    }
+  }, [rightSidebarOpen]);
+  useEffect(
+    () => () => {
+      widthTweenRef.current?.();
+      widthTweenRef.current = null;
+    },
+    [],
+  );
+
+  const animateWidth = useCallback((from: number, to: number, done: () => void): void => {
+    const grid = rootRef.current?.parentElement;
+    if (!grid) return;
+    widthTweenRef.current?.();
+    widthTweenRef.current = null;
+    // 中途被打断（连点放大）时从当前视觉值接管，不能退回 store 里的旧宽度
+    const visual = Number.parseFloat(grid.style.getPropertyValue("--context-sidebar-width"));
+    const start = Number.isFinite(visual) ? visual : from;
+    if (prefersReducedMotion()) {
+      grid.style.setProperty("--context-sidebar-width", `${to}px`);
+      done();
+      return;
+    }
+    widthTweenRef.current = glide({
+      // 与侧栏收展同一条下拉曲线 / 同一档时长（docs/design/53）
+      duration: NAV_MOTION.collapseEnter,
+      onUpdate: (progress) => {
+        grid.style.setProperty(
+          "--context-sidebar-width",
+          `${Math.round(mix(start, to, progress))}px`,
+        );
+      },
+      onComplete: () => {
+        widthTweenRef.current = null;
+        grid.style.setProperty("--context-sidebar-width", `${to}px`);
+        done();
+      },
+    });
+  }, []);
+
+  const maximized = maxWidth !== null && rightSidebarWidth >= maxWidth - 1;
+  const toggleMaximize = useCallback((): void => {
+    if (maxWidth === null) return;
+    if (maximized) {
+      const target = clampWidth(lastWidthRef.current, maxWidth);
+      animateWidth(rightSidebarWidth, target, () => {
+        dispatch({ type: "setRightSidebarWidth", width: target });
+      });
+      return;
+    }
+    lastWidthRef.current = rightSidebarWidth;
+    animateWidth(rightSidebarWidth, maxWidth, () => {
+      dispatch({ type: "setRightSidebarWidth", width: maxWidth });
+    });
+  }, [animateWidth, dispatch, maxWidth, maximized, rightSidebarWidth]);
 
   return (
     <aside ref={rootRef} className={styles.sidebar} aria-label={t("panels.context.sidebarLabel")}>
@@ -318,93 +385,99 @@ export function ContextSidebar() {
         onPointerDown={onResizeStart}
         onPointerMove={onResizeMove}
       />
-      <div
-        ref={tabBarRef}
-        className={[styles.tabBar, iconOnly ? styles.tabBarIcon : ""].filter(Boolean).join(" ")}
-      >
-        {/* 审查入口：toggleReview 随形态行事——停靠态 = 切换 review 面板 tab，
-            浮窗态 = 开/关浮窗。高亮 = 审查在当前形态下可见。
-            它是 toggle 而不是轨道里的一项：浮窗态下审查高亮时轨道仍停在「文件」，
-            两处同时成立的关系没法用一条互斥的橡皮筋表达，所以留在轨道外。 */}
-        <button
-          type="button"
-          title={t("panels.context.review")}
-          aria-label={t("panels.context.review")}
-          aria-pressed={reviewActive}
-          className={[styles.reviewToggle, reviewActive ? styles.reviewToggleOn : ""]
-            .filter(Boolean)
-            .join(" ")}
-          onClick={toggleReview}
-        >
-          <GitPullRequest size={16} weight="regular" />
-          <span className={styles.tabLabel}>{t("panels.context.review")}</span>
-        </button>
-        {/* 单行 tab 轨道：永不换行；放不下先由上面的实测收成纯图标，仍放不下则横向滚动；
-            关闭按钮留在滚动区外，始终可见 */}
-        <Segmented
-          className={[styles.tabStrip, iconOnly ? styles.tabStripIcon : ""]
-            .filter(Boolean)
-            .join(" ")}
-          ariaLabel={t("panels.context.tabList")}
-          semantics="tab"
-          equal={false}
-          scrollable
-          value={rightSidebarTab}
-          items={tabItems}
-          onChange={(tab) => {
-            dispatch({ type: "setRightSidebar", open: true, tab });
-            const row = catalogPanelRows.find((r) => `cat:${r.id}` === tab);
-            if (!row || row.state === "activating") return;
-            void activateViewOpen({
-              contributionKey: row.contributionKey,
-              prepareSession: () => ensureSession("view-action"),
-            });
-          }}
+      <header className={styles.sidebarHeader}>
+        {activeTab ? (
+          <SidebarTabBar
+            tabs={rightSidebarTabs}
+            activeTab={activeTab}
+            features={features}
+            onSelect={openSidebarTab}
+            onClose={closeTab}
+          />
+        ) : (
+          <div className={styles.headerSpacer} />
+        )}
+        <SidebarActions
+          className={styles.headerActions}
+          features={addable}
+          onSelectFeature={openFeature}
+          nativeOverlayActive={activeTab === "browser" && browserEnabled}
+          maximized={maximized}
+          onToggleMaximize={toggleMaximize}
+          onCollapse={() => dispatch({ type: "toggleRightSidebar" })}
         />
-        <IconButton
-          title={t("panels.context.collapseSidebar")}
-          onClick={() => dispatch({ type: "toggleRightSidebar" })}
-        >
-          <X size={16} weight="regular" />
-        </IconButton>
-      </div>
+      </header>
       <div className={styles.body}>
-        {/* 文件面板跨 Tab 保活：可见壳用 display:contents 保持布局不变，隐藏时仅
-            display:none——预览/搜索/回退历史在切到浏览器等 Tab 期间不丢，
-            HTML「源码 ⇄ 浏览器渲染」的往返动线依赖这一点 */}
-        <div className={rightSidebarTab === "files" ? styles.panelAlive : styles.panelAliveHidden}>
-          <FilePanel active={rightSidebarTab === "files"} />
-        </div>
-        {rightSidebarTab === "review" && reviewMode === "docked" && <ReviewPanel />}
-        {rightSidebarTab === "browser" && browserEnabled && <BrowserPanel />}
-        {activePanel && <PanelMount entry={activePanel} />}
-        {activeCatalogPanel && (
-          <div className={styles.catalogPanelPending} role="status">
-            <p className={styles.catalogPanelTitle}>{activeCatalogPanel.title}</p>
-            <p className={styles.catalogPanelHint}>
-              {activeCatalogPanel.state === "activating"
-                ? t("panels.context.extStarting")
-                : activeCatalogPanel.state === "failed"
-                  ? (activeCatalogPanel.error ?? t("panels.context.activateFailed"))
-                  : (activeCatalogPanel.description ?? t("panels.context.extDisconnected"))}
-            </p>
-            {activeCatalogPanel.state !== "activating" && (
-              <button
-                type="button"
-                className={styles.catalogPanelAction}
-                onClick={() => {
-                  void activateViewOpen({
-                    contributionKey: activeCatalogPanel.contributionKey,
-                    prepareSession: () => ensureSession("view-action"),
-                  });
-                }}
-              >
-                {t("panels.context.openPanel")}
-              </button>
+        {activeTab === null ? (
+          <SidebarLauncher features={features} onOpenFeature={openFeature} />
+        ) : (
+          <>
+            {/* 文件面板跨页签保活：可见壳用 display:contents 保持布局不变，隐藏时仅
+                display:none——预览/搜索/回退历史在切到浏览器等页签期间不丢。
+                关闭文件页签才卸载。 */}
+            {rightSidebarTabs.includes("files") && (
+              <div className={activeTab === "files" ? styles.panelAlive : styles.panelAliveHidden}>
+                <FilePanel active={activeTab === "files"} />
+              </div>
             )}
-          </div>
+            {activeTab === "review" && reviewMode === "docked" && <ReviewPanel />}
+            {activeTab === "browser" && browserEnabled && <BrowserPanel />}
+            {activePanel && <PanelMount entry={activePanel} />}
+            {!activePanel && activeCatalogPanel && (
+              <CatalogPanelBody
+                row={activeCatalogPanel}
+                onOpen={() => activateCatalogPanel(activeCatalogPanel)}
+              />
+            )}
+            {!activePanel && !activeCatalogPanel && activePanelId && (
+              <UnavailablePanel
+                title={
+                  activeFeature?.tabTitle ??
+                  activeFeature?.title ??
+                  t("panels.context.extensionFallback")
+                }
+                hint={
+                  activePanelElsewhere
+                    ? t("panels.context.otherSession")
+                    : t("panels.context.panelUnavailable")
+                }
+              />
+            )}
+          </>
         )}
       </div>
     </aside>
+  );
+}
+
+/** Catalog-only / 断线页签的占位体：明确「未连接」，不伪装成 live。 */
+function CatalogPanelBody({ row, onOpen }: { row: SidebarCatalogPanel; onOpen: () => void }) {
+  const t = useT();
+  const activating = row.state === "activating";
+  return (
+    <div className={styles.catalogPanelPending} role="status">
+      <p className={styles.catalogPanelTitle}>{row.title}</p>
+      <p className={styles.catalogPanelHint}>
+        {activating
+          ? t("panels.context.extStarting")
+          : row.state === "failed"
+            ? (row.error ?? t("panels.context.activateFailed"))
+            : (row.description ?? t("panels.context.extDisconnected"))}
+      </p>
+      {!activating && (
+        <button type="button" className={styles.catalogPanelAction} onClick={onOpen}>
+          {row.state === "failed" ? t("common.retry") : t("panels.context.openPanel")}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function UnavailablePanel({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className={styles.catalogPanelPending} role="status">
+      <p className={styles.catalogPanelTitle}>{title}</p>
+      <p className={styles.catalogPanelHint}>{hint}</p>
+    </div>
   );
 }

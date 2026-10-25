@@ -2,8 +2,8 @@ import { defineMessages } from "../types";
 
 /** 右栏、底部终端、标题栏等主界面 chrome 文案。 */
 export const panelMessages = defineMessages({
-  "panels.context.review": { "zh-CN": "审查", "en-US": "Review" },
-  "panels.context.files": { "zh-CN": "文件", "en-US": "Files" },
+  "panels.context.review": { "zh-CN": "审阅", "en-US": "Review" },
+  "panels.context.files": { "zh-CN": "工作区文件", "en-US": "Workspace files" },
   "panels.context.browser": { "zh-CN": "浏览器", "en-US": "Browser" },
   "panels.context.terminal": { "zh-CN": "终端", "en-US": "Terminal" },
   "panels.context.extStarting": {
@@ -11,8 +11,8 @@ export const panelMessages = defineMessages({
     "en-US": "Starting session and connecting extensions…",
   },
   "panels.context.extDisconnected": {
-    "zh-CN": "扩展尚未连接。点击上方 Tab 启动会话并打开面板。",
-    "en-US": "Extension not connected. Click the tab above to start a session and open the panel.",
+    "zh-CN": "扩展尚未连接。点击下方按钮启动会话并打开面板。",
+    "en-US": "Extension not connected. Use the button below to start a session and open the panel.",
   },
   "panels.context.widenHint": {
     "zh-CN": "加宽侧栏以查看完整检查器",

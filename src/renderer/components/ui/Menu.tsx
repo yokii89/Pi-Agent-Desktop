@@ -28,6 +28,12 @@ interface MenuProps {
   direction?: "top" | "bottom";
   /** 根节点类名，见 Popover。 */
   rootClassName?: string;
+  /** 隐藏列表滚动条（仍可滚动）；用于内容可能很多、但不希望出现轨道感的动作菜单。 */
+  hideScrollbar?: boolean;
+  /** 显示前准备（如抑制原生浏览器视图），见 Popover。 */
+  beforeOpen?: () => Promise<void> | void;
+  /** 开合完成回调，见 Popover。 */
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -37,10 +43,12 @@ interface MenuProps {
 export function MenuList({
   items,
   afterSelect,
+  hideScrollbar,
 }: {
   items: MenuItem[];
   /** 选中任意（未禁用）条目后的收尾动作：弹出式菜单传 close，右键菜单传 onClose。 */
   afterSelect?: () => void;
+  hideScrollbar?: boolean;
 }) {
   const rows: OptionRow[] = [];
   for (const item of items) {
@@ -68,7 +76,9 @@ export function MenuList({
     <OptionList
       rows={rows}
       role="menu"
-      className={styles.list}
+      className={[styles.list, hideScrollbar ? styles.listNoScrollbar : ""]
+        .filter(Boolean)
+        .join(" ")}
       onSelect={(index) => {
         items[index]?.onSelect?.();
         afterSelect?.();
@@ -84,10 +94,20 @@ export function Menu({
   align = "left",
   direction = "bottom",
   rootClassName,
+  hideScrollbar,
+  beforeOpen,
+  onOpenChange,
 }: MenuProps) {
   return (
-    <Popover trigger={trigger} align={align} direction={direction} rootClassName={rootClassName}>
-      {(close) => <MenuList items={items} afterSelect={close} />}
+    <Popover
+      trigger={trigger}
+      align={align}
+      direction={direction}
+      rootClassName={rootClassName}
+      beforeOpen={beforeOpen}
+      onOpenChange={onOpenChange}
+    >
+      {(close) => <MenuList items={items} afterSelect={close} hideScrollbar={hideScrollbar} />}
     </Popover>
   );
 }

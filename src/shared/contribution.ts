@@ -25,8 +25,14 @@ export type ContributionActivation = "onAccessMode" | "onSettingsView" | "onSess
 
 export type ContributionAccent = "default" | "warning" | "success" | "danger";
 
-/** 宿主允许的 Phosphor 图标映射名（manifest.icon 只能取自这里）。 */
-export const CONTRIBUTION_ICONS: ReadonlySet<string> = new Set([
+/**
+ * 宿主允许的 Phosphor 图标映射名（manifest.icon / mode.icon 只能取自这里）。
+ *
+ * 右侧栏启动页与页签需要区分不同面板，因此除通用状态图标外还开放了一组
+ * 领域图标；新增名字必须同时在 `components/ExtensionView/contributionIcons.tsx`
+ * 补映射（该映射以 `Record<ContributionIconName, Icon>` 声明，漏一个会编译失败）。
+ */
+export const CONTRIBUTION_ICON_NAMES = [
   "shield",
   "shield-check",
   "clipboard",
@@ -38,7 +44,23 @@ export const CONTRIBUTION_ICONS: ReadonlySet<string> = new Set([
   "warning",
   "check-circle",
   "info",
-]);
+  "folder",
+  "globe",
+  "git-pull-request",
+  "terminal-window",
+  "chat-circle",
+  "robot",
+  "database",
+  "code",
+  "list-checks",
+  "calendar",
+  "envelope",
+  "chart-line",
+] as const;
+
+export type ContributionIconName = (typeof CONTRIBUTION_ICON_NAMES)[number];
+
+export const CONTRIBUTION_ICONS: ReadonlySet<string> = new Set(CONTRIBUTION_ICON_NAMES);
 
 /** 单包贡献数量上限；超出项跳过并记诊断。 */
 export const CONTRIBUTION_LIMITS = {

@@ -25,6 +25,16 @@
   background: color-mix(in srgb, var(--color-text-muted) 65%, transparent);
 }
 
+/* 站点级开关：列表仍可滚动，但不画滚动条（右侧栏「添加功能」等动作菜单）。
+   两条覆盖必须放在上面的滚动条声明之后，否则同权重会被 thin/8px 抢回去。 */
+.listNoScrollbar {
+  scrollbar-width: none;
+}
+
+.listNoScrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .hint {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);

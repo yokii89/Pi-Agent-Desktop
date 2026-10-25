@@ -24,7 +24,7 @@ export const uiMessages = defineMessages({
   "ui.view.fallbackTitleSettings": { "zh-CN": "扩展设置", "en-US": "Extension settings" },
   "ui.view.closeTitled": { "zh-CN": "关闭 {title}", "en-US": "Close {title}" },
   "ui.view.closeExtension": { "zh-CN": "关闭扩展", "en-US": "Close extension" },
-  "ui.view.closePanel": { "zh-CN": "关闭面板", "en-US": "Close panel" },
+  "ui.view.closePanel": { "zh-CN": "结束面板", "en-US": "End panel" },
   "ui.view.removeSettings": {
     "zh-CN": "移除此扩展设置",
     "en-US": "Remove this extension settings card",
