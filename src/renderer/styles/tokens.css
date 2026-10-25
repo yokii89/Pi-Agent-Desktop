@@ -140,6 +140,12 @@
   /** 右侧上下文侧栏（审查/文件）宽度。 */
   --context-sidebar-width: 300px;
   /**
+   * 右侧上下文侧栏左缘的拖拽让位带：把手宽度 = 该值，浏览器面板整体让出同宽。
+   * 浏览器页面是主进程 WebContentsView（原生合成，永远盖在渲染层之上），
+   * 宿主区若贴着侧栏左缘，把手在页面区域就收不到 pointerdown。
+   */
+  --context-sidebar-resize-gutter: 8px;
+  /**
    * 悬浮输入栏实测高度（SessionArea 运行时写入 --session-input-height）。
    * 此默认值仅作首帧兜底；多行/附件/建议面板长高后必须跟上，否则末尾正文会被压住（docs/design/10 C4）。
    */

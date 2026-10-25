@@ -7,6 +7,9 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  /* 页面是原生 WebContentsView，会盖住渲染层；让出侧栏左缘的拖拽带，
+     宿主区左缘落在把手右侧，把手才能在页面区域收到 pointerdown */
+  padding-left: var(--context-sidebar-resize-gutter);
 }
 
 .panel.picking {

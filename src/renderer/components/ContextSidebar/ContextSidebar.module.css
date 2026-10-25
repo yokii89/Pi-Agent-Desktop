@@ -15,21 +15,54 @@
   border-left: 1px solid var(--glass-border);
 }
 
-/* 拖拽把手：侧栏左缘，向左拖增宽、向右拖变窄 */
+/* 拖拽把手：侧栏左缘，向左拖增宽、向右拖变窄。
+   宽度与浏览器面板的让位带同源（--context-sidebar-resize-gutter），否则原生页面会盖住把手。
+   提示只在让位带中央画一条 2px 竖线，上下渐隐，不再通铺底色（docs/design/65 方案 E） */
 .resizeHandle {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 5px;
+  width: var(--context-sidebar-resize-gutter);
   cursor: col-resize;
   background: transparent;
-  transition: background-color 0.12s ease;
 }
 
-.resizeHandle:hover,
-.resizeHandleDragging {
-  background: var(--color-accent-soft);
+.resizeHandle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-accent);
+  opacity: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 20%,
+    #000 80%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 20%, #000 80%, transparent 100%);
+}
+
+.resizeHandle:hover::before {
+  opacity: 0.78;
+}
+
+.resizeHandle.resizeHandleDragging::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resizeHandle::before {
+    transition: none;
+  }
 }
 
 .tabBar {
