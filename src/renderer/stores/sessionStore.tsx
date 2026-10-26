@@ -360,7 +360,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return null;
   }, [bucketsState.unreadFiles]);
 
-  const runningFiles = useMemo(() => deriveRunningFiles(bucketsState), [bucketsState]);
+  /**
+   * 生成中的文件集合只随 agent_start / agent_end 这类阶段边界变化，
+   * 但流式 delta 每帧都会改 bucketsState。保留内容相同的旧集合，
+   * meta context 才不会每帧换身份、把整个侧栏列表拖进重渲染。
+   */
+  const runningFilesRef = useRef<ReadonlySet<string>>(new Set());
+  const runningFiles = useMemo(() => {
+    const next = deriveRunningFiles(bucketsState);
+    const prev = runningFilesRef.current;
+    if (next.size === prev.size && [...next].every((file) => prev.has(file))) return prev;
+    runningFilesRef.current = next;
+    return next;
+  }, [bucketsState]);
 
   // runningFiles 只含生成中的会话；存活但空闲的进程是 processAlive && phase === "idle"，
   // 不在内。MCP 面板的重载 / /mcp 动作面向所有活跃会话（主进程回退到任一存活实例），
@@ -1354,14 +1366,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const canRetryLastUser = lastUserPayload !== null && phase !== "running";
 
+  // 最新用户消息走 ref：entries 每帧变化会让闭包里的对象换身份，
+  // 若作为 useCallback 依赖，meta context 就会跟着流式 delta 每帧重算。
+  const lastUserPayloadRef = useRef(lastUserPayload);
+  lastUserPayloadRef.current = lastUserPayload;
+
   const retryLastUserMessage = useCallback(async (): Promise<void> => {
-    if (!lastUserPayload || phase === "running") return;
-    const displayImages = lastUserPayload.images ?? [];
+    const payload = lastUserPayloadRef.current;
+    if (!payload || phase === "running") return;
+    const displayImages = payload.images ?? [];
     const images = displayImages.map(piImageFromDisplay);
-    await send(lastUserPayload.text, {
+    await send(payload.text, {
       ...(images.length > 0 ? { images, displayImages } : {}),
     });
-  }, [lastUserPayload, phase, send]);
+  }, [phase, send]);
 
   /**
    * 打开 / 切换历史会话（docs/会话进程懒加载方案 Phase 1）：
@@ -1574,9 +1592,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [bindActive, navigate, refreshModelState, refreshSessions, rematerializeSidebar, setState],
   );
 
+  // 读 ref 而非 bucketsState：buckets 每帧都是新 Map，作为依赖会让 meta context
+  // 跟着流式 delta 每帧重算（消费方只在调用时取最新值，不需要渲染期快照）。
   const getSessionFileById = useCallback(
-    (sessionId: string): string | null => bucketsState.buckets.get(sessionId)?.sessionFile ?? null,
-    [bucketsState.buckets],
+    (sessionId: string): string | null =>
+      bucketsStateRef.current.buckets.get(sessionId)?.sessionFile ?? null,
+    [],
   );
 
   /** JSONL 路径 → 运行时 SessionId（后台进程归属查询用）；无存活实例为 null。 */
