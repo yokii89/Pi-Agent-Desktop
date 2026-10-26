@@ -1,5 +1,5 @@
 import { ArrowClockwise, Plus, Storefront, Warning } from "@phosphor-icons/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   McpExposure,
   McpPiSupport,
@@ -46,6 +46,8 @@ export function McpPage() {
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** 只采纳最后一次 list：连续拨开关时先发的请求可能后返回，会把新状态覆盖回旧值。 */
+  const listSeq = useRef(0);
 
   const { probe, probeCwd, probing, probingStartedAt, probeError, dirty } = useMcpPageState();
   // 换项目后旧快照不适用（项目级报告属于另一个目录）：不展示，等下次探测
@@ -88,12 +90,15 @@ export function McpPage() {
   const mcpFrozen = piSupport?.status === "unsupported";
 
   const refreshList = useCallback(async (): Promise<void> => {
+    const seq = ++listSeq.current;
     setListError(null);
     try {
       const snapshot = await mcpService.list();
+      if (seq !== listSeq.current) return;
       setEntries(snapshot.entries);
       setConfigFile(snapshot.file);
     } catch (err) {
+      if (seq !== listSeq.current) return;
       setListError(err instanceof Error ? err.message : String(err));
     }
   }, []);
@@ -160,9 +165,11 @@ export function McpPage() {
 
   const markChanged = useCallback(async (): Promise<void> => {
     mcpStore.set({ dirty: true });
+    const seq = ++listSeq.current;
     setListError(null);
     try {
       const snapshot = await mcpService.list();
+      if (seq !== listSeq.current) return;
       setEntries(snapshot.entries);
       setConfigFile(snapshot.file);
       // 修剪已不存在的配置项的过期探测报告（项目级报告保留，由下次探测刷新）
@@ -255,36 +262,48 @@ export function McpPage() {
     }
   }, [markChanged, removeTarget, showToast, t]);
 
+  /**
+   * 开关 / 暴露级别乐观更新：点击即改本地条目。
+   * 不能再用 setBusy 把整页置为 disabled——`Toggle:disabled` 是 `opacity: .4`
+   * 且无过渡，写盘 + 重新拉取期间所有卡片的开关/菜单图标会一起变暗再恢复。
+   */
+  const patchEntry = useCallback((name: string, patch: Partial<McpServerEntry>): void => {
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.name === name ? { ...entry, config: { ...entry.config, ...patch } } : entry,
+      ),
+    );
+  }, []);
+
   const handleSetEnabled = useCallback(
     async (name: string, config: McpServerEntry, enabled: boolean): Promise<void> => {
-      setBusy(true);
+      patchEntry(name, { enabled });
       try {
         await mcpService.save({ previousName: name, name, config: { ...config, enabled } });
         showSavedToast();
         await markChanged();
       } catch (err) {
         showToast(err instanceof Error ? err.message : String(err));
-      } finally {
-        setBusy(false);
+        // 写盘失败：按磁盘状态回滚乐观改动
+        await refreshList();
       }
     },
-    [markChanged, showSavedToast, showToast],
+    [markChanged, patchEntry, refreshList, showSavedToast, showToast],
   );
 
   const handleSetExposure = useCallback(
     async (name: string, config: McpServerEntry, exposure: McpExposure): Promise<void> => {
-      setBusy(true);
+      patchEntry(name, { exposure });
       try {
         await mcpService.save({ previousName: name, name, config: { ...config, exposure } });
         showSavedToast();
         await markChanged();
       } catch (err) {
         showToast(err instanceof Error ? err.message : String(err));
-      } finally {
-        setBusy(false);
+        await refreshList();
       }
     },
-    [markChanged, showSavedToast, showToast],
+    [markChanged, patchEntry, refreshList, showSavedToast, showToast],
   );
 
   const handleAction = useCallback(
