@@ -97,6 +97,10 @@
   --color-success-soft: rgba(78, 201, 176, 0.14);
   --color-muted-soft: rgba(138, 138, 144, 0.16);
 
+  /* 运行态边框流光（中央会话区的用户输入卡）：一束光绕整圈的时间。
+     比工具流文字扫光慢一档——绕一圈要能被眼睛跟上，不能快成故障灯。 */
+  --session-run-ring-duration: 4200ms;
+
   /* 间距（4px 基准） */
   --spacing-xs: 4px;
   --spacing-sm: 8px;

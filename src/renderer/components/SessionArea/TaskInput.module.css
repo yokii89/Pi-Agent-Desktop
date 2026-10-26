@@ -43,6 +43,96 @@
   opacity: 1;
 }
 
+/*
+ * 运行态边框流光（phase === "running"）：一束强调色光沿输入卡边框顺时针匀速绕行，
+ * 光尾渐隐，边框内侧带一层随光同行的微弱辉光。
+ * 做法是「遮罩渐变旋转」：整卡铺 conic-gradient，再由 mask 裁成描边/羽化光带，
+ * 旋转由 @property 角度补间驱动（linear 即匀速）；纯 CSS 动画不占 JS 主线程。
+ * 辉光用四条边缘渐变掩码羽化，而不是 filter:blur——模糊会随渐变每帧重算整卡。
+ */
+@property --pidesk-run-ring-angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+
+.runBorder {
+  position: absolute;
+  /* 卡片自身有 1px 边框：-1px 让流光压在边框线上，而不是浮在内侧 */
+  inset: -1px;
+  /* 卡片自成堆叠上下文（z-index:1）：高于卡内内容，低于外置建议浮层 */
+  z-index: 2;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 260ms var(--motion-ease-out);
+  /* 头亮尾淡的彗星：0deg 是硬头，300deg 起是渐隐的尾巴；
+     角度由本层统一驱动，描边与辉光两层读同一个渐变，永远同相位 */
+  --run-border-light: conic-gradient(
+    from var(--pidesk-run-ring-angle),
+    transparent 0deg,
+    transparent 300deg,
+    color-mix(in oklab, var(--color-accent) 18%, transparent) 318deg,
+    color-mix(in oklab, var(--color-accent) 55%, transparent) 342deg,
+    var(--color-accent) 356deg,
+    var(--color-accent) 360deg
+  );
+  animation: runBorderSpin var(--session-run-ring-duration) linear infinite;
+  /* 非运行态暂停而不是空转：淡出后不再让样式引擎逐帧重算 */
+  animation-play-state: paused;
+}
+
+.runBorder[data-active="true"] {
+  opacity: 1;
+  animation-play-state: running;
+}
+
+/* 1.5px 描边：padding 撑出环带，content-box 与整盒做 exclude 镂空 */
+.runBorderBeam {
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: var(--run-border-light);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+/* 内侧辉光：四条边各叠一层向内渐隐的掩码，合成沿边柔光带 */
+.runBorderGlow {
+  --run-border-glow-size: 10px;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--run-border-light);
+  opacity: 0.3;
+  mask:
+    linear-gradient(to bottom, #000, transparent var(--run-border-glow-size)) top / 100%
+    var(--run-border-glow-size) no-repeat,
+    linear-gradient(to top, #000, transparent var(--run-border-glow-size)) bottom / 100%
+    var(--run-border-glow-size) no-repeat,
+    linear-gradient(to right, #000, transparent var(--run-border-glow-size)) left /
+    var(--run-border-glow-size) 100% no-repeat,
+    linear-gradient(to left, #000, transparent var(--run-border-glow-size)) right /
+    var(--run-border-glow-size) 100% no-repeat;
+}
+
+@keyframes runBorderSpin {
+  to {
+    --pidesk-run-ring-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runBorder {
+    animation: none;
+    transition: none;
+  }
+}
+
 .inputSession {
   /* 会话态无 ContextBar，表面即整卡 */
 }

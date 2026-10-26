@@ -741,6 +741,18 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
             onStop={stop}
           />
         </div>
+        {/* 运行态边框流光：只挂在会话态输入卡上，running 时点亮；
+            纯装饰层，不参与布局，也不拦截输入/点击。 */}
+        {variant === "session" && (
+          <div
+            className={styles.runBorder}
+            data-active={running ? "true" : "false"}
+            aria-hidden="true"
+          >
+            <span className={styles.runBorderGlow} />
+            <span className={styles.runBorderBeam} />
+          </div>
+        )}
       </div>
     </div>
   );
