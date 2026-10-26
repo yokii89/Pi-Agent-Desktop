@@ -887,6 +887,8 @@ export type PiAgentEvent =
       toolName?: string;
       result?: unknown;
       isError?: boolean;
+      /** execute() 实测耗时（毫秒，单调钟）；工具未实际执行时 pi 不携带该字段。 */
+      durationMs?: number;
     }
   | {
       type: "auto_retry_start";

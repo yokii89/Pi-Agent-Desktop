@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { t } from "../../shared/i18n";
 import type { PiAgentEvent, PiChatMessage } from "../../shared/ipc";
 import { findRetrySurfaceId, type SessionEntry, sessionEntriesReducer } from "./sessionTranscript";
@@ -545,5 +545,87 @@ describe("noop compaction notice (docs/design/47/48 F2)", () => {
     if (notice?.kind !== "notice") throw new Error("expected notice entry");
     expect(notice.text).toContain("73.4k");
     expect(notice.text).not.toBe(t("session.compact.skipped"));
+  });
+});
+
+describe("tool row duration (pi durationMs + wall-clock fallback)", () => {
+  const TOOL_CALL_ID = "call_duration_1";
+
+  function toolOf(entries: SessionEntry[]) {
+    for (const entry of entries) {
+      if (entry.kind !== "assistant") continue;
+      const tool = entry.blocks.find((block) => block.kind === "tool");
+      if (tool?.kind === "tool") return tool;
+    }
+    throw new Error("missing tool block");
+  }
+
+  function startTool(entries: SessionEntry[]): SessionEntry[] {
+    let next = entries;
+    next = sessionEntriesReducer(next, { type: "event", event: { type: "agent_start" } });
+    next = sessionEntriesReducer(next, {
+      type: "event",
+      event: { type: "message_start", message: { role: "assistant", content: [] } },
+    });
+    next = sessionEntriesReducer(next, {
+      type: "event",
+      event: {
+        type: "tool_execution_start",
+        toolCallId: TOOL_CALL_ID,
+        toolName: "bash",
+        args: { command: "sleep 5" },
+      },
+    });
+    return next;
+  }
+
+  it("stores the pi durationMs from tool_execution_end", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      let entries = startTool([]);
+      // 墙钟推进 5s，但 pi 实测值优先
+      vi.advanceTimersByTime(5000);
+      entries = sessionEntriesReducer(entries, {
+        type: "event",
+        event: {
+          type: "tool_execution_end",
+          toolCallId: TOOL_CALL_ID,
+          toolName: "bash",
+          result: { content: [{ type: "text", text: "ok" }] },
+          isError: false,
+          durationMs: 1234,
+        },
+      });
+      expect(toolOf(entries).durationMs).toBe(1234);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("falls back to wall clock when durationMs is missing", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      let entries = startTool([]);
+      vi.advanceTimersByTime(5000);
+      entries = sessionEntriesReducer(entries, {
+        type: "event",
+        event: {
+          type: "tool_execution_end",
+          toolCallId: TOOL_CALL_ID,
+          toolName: "bash",
+          result: undefined,
+          isError: false,
+        },
+      });
+      expect(toolOf(entries).durationMs).toBe(5000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps duration null for tools cancelled by run close", () => {
+    const entries = sessionEntriesReducer(startTool([]), { type: "userStop" });
+    expect(toolOf(entries).status).toBe("cancelled");
+    expect(toolOf(entries).durationMs).toBeNull();
   });
 });

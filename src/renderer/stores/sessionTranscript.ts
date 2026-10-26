@@ -112,6 +112,11 @@ export interface ToolAssistantBlock {
   resultText: string | null;
   startedAt: number | null;
   endedAt: number | null;
+  /**
+   * execute() 实测耗时（pi durationMs）；字段缺失时回退墙钟（endedAt - startedAt）。
+   * 历史装载 / 未执行行保持 null（工具行不显示耗时）。
+   */
+  durationMs: number | null;
   /** 在 assistant content 数组中的槽位（并行工具与 message_end 对账用）。 */
   contentIndex: number;
 }
@@ -316,6 +321,12 @@ function applyEvent(entries: SessionEntry[], event: PiAgentEvent): SessionEntry[
             result,
             resultText: capRawResultText(rawText ?? block.resultText),
             endedAt: Date.now(),
+            durationMs:
+              typeof event.durationMs === "number"
+                ? event.durationMs
+                : block.startedAt != null
+                  ? Math.max(0, Date.now() - block.startedAt)
+                  : null,
           };
         },
       );
@@ -1172,6 +1183,7 @@ function createToolBlock(
     resultText: null,
     startedAt: Date.now(),
     endedAt: null,
+    durationMs: null,
     contentIndex,
   };
 }

@@ -89,6 +89,12 @@ function shortKind(t: TranslateFn, kind: ToolKind): string {
   }
 }
 
+/** 完成态 execute 耗时：亚秒显示毫秒（formatElapsed 整秒档会把 400ms 显示成 0s）。 */
+function formatToolDuration(ms: number): string {
+  if (ms < 1000) return `${Math.max(0, Math.round(ms))}ms`;
+  return formatElapsed(ms);
+}
+
 function rowAction(t: TranslateFn, block: ToolAssistantBlock): { text: string; tone: string } {
   if (block.status === "running")
     return {
@@ -139,6 +145,12 @@ export const ToolCall = memo(function ToolCall({ block, railed, defaultOpen }: T
   const elapsedStats = elapsedText ? { text: elapsedText, tone: styles.statRun } : null;
   const changeStats = changeStat(block);
   const fallbackStats = elapsedStats || changeStats ? null : statusStats(t, block);
+  // 完成态 execute 耗时（pi durationMs 或墙钟回退）；cancelled / pending 行不显示
+  const finished = block.status === "ok" || block.status === "error";
+  const durationStats =
+    finished && block.durationMs != null
+      ? { text: formatToolDuration(block.durationMs), tone: "" }
+      : null;
 
   // MCP 调用芯片显示 `server · tool` 短名（title 给全名）；args 里的 path 等
   // 不再顶替芯片——原始身份是用户认不出 MCP 调用的根因，展开后的参数里仍可见
@@ -189,6 +201,11 @@ export const ToolCall = memo(function ToolCall({ block, railed, defaultOpen }: T
         {fallbackStats && (
           <span className={`${styles.stats} ${fallbackStats.tone}`} aria-hidden="true">
             {fallbackStats.text}
+          </span>
+        )}
+        {durationStats && (
+          <span className={`${styles.stats} ${durationStats.tone}`} aria-hidden="true">
+            {durationStats.text}
           </span>
         )}
         {expandable && <span className={styles.caret} />}
