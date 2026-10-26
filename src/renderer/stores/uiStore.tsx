@@ -24,6 +24,11 @@ import {
   resolveLocale,
   setI18nLocale,
 } from "../../shared/i18n";
+import {
+  DEFAULT_INPUT_BUDDY,
+  type InputBuddyKind,
+  normalizeInputBuddy,
+} from "../../shared/inputBuddy";
 import { clampSessionStreamFontPx, DEFAULT_SESSION_STREAM_FONT_PX } from "../../shared/ipc";
 import { DEFAULT_RAIL_STYLE, normalizeRailStyle, type RailStyle } from "../../shared/railStyles";
 import { normalizeShortcutsMap, type ShortcutsMap } from "../../shared/shortcuts";
@@ -176,6 +181,8 @@ interface UiState {
   fontMonoPreset: FontMonoPreset;
   /** 对话流问题导航分段栏的标记样式（设置 → 个性化）。 */
   questionRailStyle: RailStyle;
+  /** 输入栏右上角的动物伙伴（设置 → 个性化）；none 表示不显示。 */
+  inputBuddy: InputBuddyKind;
   /** 全局快捷键映射（设置 → 键盘快捷键）。 */
   shortcuts: ShortcutsMap;
   /** 命令面板浮层是否打开（Ctrl+Shift+P）。 */
@@ -215,6 +222,7 @@ type UiAction =
   | { type: "setFontUiPreset"; preset: FontUiPreset }
   | { type: "setFontMonoPreset"; preset: FontMonoPreset }
   | { type: "setQuestionRailStyle"; style: RailStyle }
+  | { type: "setInputBuddy"; kind: InputBuddyKind }
   | { type: "setShortcut"; id: BindableActionId; combo: string }
   | { type: "resetShortcuts" }
   | { type: "setCommandPaletteOpen"; open: boolean }
@@ -233,6 +241,7 @@ type UiAction =
       fontUiPreset: FontUiPreset;
       fontMonoPreset: FontMonoPreset;
       questionRailStyle: RailStyle;
+      inputBuddy: InputBuddyKind;
       localePreference: LocalePreference;
       shortcuts: ShortcutsMap;
     };
@@ -271,6 +280,7 @@ const initialState: UiState = {
   fontUiPreset: "default",
   fontMonoPreset: "default",
   questionRailStyle: DEFAULT_RAIL_STYLE,
+  inputBuddy: DEFAULT_INPUT_BUDDY,
   shortcuts: { ...DEFAULT_SHORTCUTS },
   commandPaletteOpen: false,
   reviewWindowOpen: false,
@@ -414,6 +424,11 @@ function uiReducer(state: UiState, action: UiAction): UiState {
       if (state.questionRailStyle === style) return state;
       return { ...state, questionRailStyle: style };
     }
+    case "setInputBuddy": {
+      const kind = normalizeInputBuddy(action.kind);
+      if (state.inputBuddy === kind) return state;
+      return { ...state, inputBuddy: kind };
+    }
     case "setShortcut": {
       const next = normalizeShortcutsMap(SHORTCUT_BINDINGS, DEFAULT_SHORTCUTS, {
         ...state.shortcuts,
@@ -473,6 +488,7 @@ function uiReducer(state: UiState, action: UiAction): UiState {
         fontUiPreset: normalizeFontUiPreset(action.fontUiPreset),
         fontMonoPreset: normalizeFontMonoPreset(action.fontMonoPreset),
         questionRailStyle: normalizeRailStyle(action.questionRailStyle),
+        inputBuddy: normalizeInputBuddy(action.inputBuddy),
         localePreference,
         locale: resolveLocale(localePreference, navigator.language),
         shortcuts: normalizeShortcutsMap(SHORTCUT_BINDINGS, DEFAULT_SHORTCUTS, action.shortcuts),
@@ -528,6 +544,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
         fontUiPreset: settings.fontUiPreset ?? "default",
         fontMonoPreset: settings.fontMonoPreset ?? "default",
         questionRailStyle: settings.questionRailStyle ?? DEFAULT_RAIL_STYLE,
+        inputBuddy: settings.inputBuddy ?? DEFAULT_INPUT_BUDDY,
         localePreference: settings.locale ?? "system",
         shortcuts: settings.shortcuts ?? { ...DEFAULT_SHORTCUTS },
       });
@@ -549,6 +566,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
       fontUiPreset: state.fontUiPreset,
       fontMonoPreset: state.fontMonoPreset,
       questionRailStyle: state.questionRailStyle,
+      inputBuddy: state.inputBuddy,
       locale: state.localePreference,
       shortcuts: state.shortcuts,
     });
@@ -562,6 +580,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     state.fontUiPreset,
     state.fontMonoPreset,
     state.questionRailStyle,
+    state.inputBuddy,
     state.localePreference,
     state.shortcuts,
   ]);

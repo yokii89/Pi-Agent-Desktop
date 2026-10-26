@@ -1,5 +1,6 @@
 import type { FontMonoPreset, FontUiPreset } from "../../../shared/fontPresets";
 import { FONT_MONO_PRESETS, FONT_UI_PRESETS } from "../../../shared/fontPresets";
+import { INPUT_BUDDY_KINDS } from "../../../shared/inputBuddy";
 import { RAIL_STYLES } from "../../../shared/railStyles";
 import { useT } from "../../hooks/useT";
 import { useUiStore } from "../../stores/uiStore";
@@ -29,6 +30,7 @@ export function PersonalizationPanel() {
     fontUiPreset,
     fontMonoPreset,
     questionRailStyle,
+    inputBuddy,
     hydrated,
     dispatch,
   } = useUiStore();
@@ -129,6 +131,26 @@ export function PersonalizationPanel() {
             />
           ))}
         </div>
+      </SettingsSection>
+
+      <SettingsSection title={t("settings.personalization.group.buddy")}>
+        <SettingRow
+          label={t("settings.personalization.buddy")}
+          description={t("settings.personalization.buddy.description")}
+          control={
+            <Segmented
+              ariaLabel={t("settings.personalization.buddy")}
+              semantics="radio"
+              value={inputBuddy}
+              items={INPUT_BUDDY_KINDS.map((kind) => ({
+                value: kind,
+                label: t(`settings.personalization.buddy.option.${kind}`),
+                disabled: !hydrated,
+              }))}
+              onChange={(next) => dispatch({ type: "setInputBuddy", kind: next })}
+            />
+          }
+        />
       </SettingsSection>
     </div>
   );

@@ -266,6 +266,10 @@ export const sessionMessages = defineMessages({
     "en-US": "Scaled to {width}×{height}",
   },
   "session.input.aria": { "zh-CN": "任务输入", "en-US": "Task input" },
+  "session.input.buddy.greet": {
+    "zh-CN": "和它打个招呼",
+    "en-US": "Say hello to your companion",
+  },
   "session.input.sendAfterReply": {
     "zh-CN": "回复结束后可发送",
     "en-US": "You can send after the reply finishes",

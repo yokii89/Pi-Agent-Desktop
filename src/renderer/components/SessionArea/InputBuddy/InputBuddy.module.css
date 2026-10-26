@@ -1,0 +1,716 @@
+/*
+ * 输入栏动物伙伴（docs/动物形象）：
+ * 三款形象从原设计 360×250 的舞台里裁出「卡沿以上」的部分（x 50–340 / y 0–203），
+ * 视图底边正好落在输入卡上沿——爪子、尾巴、爪尖搭在卡沿上，像趴在桌子后面的小家伙。
+ * 定位挂在 .inputBox 内（该卡 position: relative 且 overflow: visible）。
+ */
+.buddy {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  height: 53px;
+  aspect-ratio: 290 / 203;
+  /* 点击彩蛋：整块裁切区可点（角色本体之外的透明余量只有十几像素） */
+  padding: 0;
+  border: 0;
+  appearance: none;
+  background: none;
+  color: var(--buddy-ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* 键盘聚焦时才画焦点环：鼠标按下已被 onMouseDown 拦掉，不会抢输入框焦点 */
+.buddy:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* 姿态会把头顶 / 汗线推到 viewBox 上边界之外（警觉 y=-12、睡觉羽冠 y=-2），
+     SVG 视口默认会裁掉；宿主到输入卡一路都是 overflow: visible，放开即可完整显示 */
+  overflow: visible;
+}
+
+/* 毛面 / 配件填色：角色自身配色，不是 UI 语义色（值见 tokens.css 的 --buddy-*） */
+.dogCoat {
+  fill: var(--buddy-dog-coat);
+}
+
+.catCoat {
+  fill: var(--buddy-cat-coat);
+}
+
+.catBib {
+  fill: var(--buddy-cat-bib);
+}
+
+.catInner {
+  fill: var(--buddy-cat-inner);
+}
+
+.catCollar {
+  fill: var(--buddy-cat-collar);
+}
+
+.catStripe {
+  fill: none;
+  stroke: var(--buddy-cat-stripe);
+}
+
+.parrotCoat {
+  fill: var(--buddy-parrot-coat);
+}
+
+.parrotWing {
+  fill: var(--buddy-parrot-wing);
+}
+
+.parrotFace {
+  fill: var(--buddy-parrot-face);
+}
+
+.parrotBeak {
+  fill: var(--buddy-parrot-beak);
+}
+
+.parrotBeakLower {
+  fill: var(--buddy-parrot-beak-lower);
+}
+
+.parrotCheek {
+  fill: var(--buddy-parrot-cheek);
+}
+
+.parrotCollar {
+  fill: var(--buddy-parrot-collar);
+}
+
+.parrotFeather {
+  fill: none;
+  stroke: var(--buddy-parrot-feather);
+}
+
+.gold {
+  fill: var(--buddy-gold);
+}
+
+.tongue {
+  fill: var(--buddy-tongue);
+}
+
+.glint {
+  fill: var(--buddy-glint);
+}
+
+/* 落到应用背景上的记号（胡须 / 问号 / Zzz / 警觉射线 / 音符）：
+   深色主题必须提亮，否则这些没有毛面衬托的线条会整组消失 */
+.mark {
+  stroke: var(--buddy-mark);
+}
+
+.markFill {
+  fill: var(--buddy-mark);
+}
+
+/* 所有可动关节同一份过渡曲线（沿用设计稿的轻微回弹） */
+.art [data-part] {
+  transform-box: view-box;
+  transition:
+    transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 默认隐藏的表情与氛围特效 */
+.art [data-part="eyes-happy"],
+.art [data-part="eyes-sleep"],
+.art [data-part="eyes-alert"],
+.art [data-part="tongue"],
+.art [data-part="mouth-open"],
+.art [data-part="fish"],
+.art [data-part="notes"],
+.art [data-part="question"],
+.art [data-part="zzz"],
+.art [data-part="sweat"],
+.art [data-part="shock"] {
+  opacity: 0;
+}
+
+.art [data-part="tongue"],
+.art [data-part="mouth-open"] {
+  transform: scaleY(0);
+}
+
+/* ---------- 骨骼锚点（viewBox 从 x=50 起，故设计稿坐标统一减 50） ---------- */
+.dog [data-part="head"] {
+  transform-origin: 130px 135px;
+}
+.dog [data-part="ear-left"] {
+  transform-origin: 82px 38px;
+}
+.dog [data-part="ear-right"] {
+  transform-origin: 178px 38px;
+}
+.dog [data-part="paw-left"] {
+  transform-origin: 64px 203px;
+}
+.dog [data-part="paw-right"] {
+  transform-origin: 196px 203px;
+}
+.dog [data-part="tag"] {
+  transform-origin: 130px 168px;
+}
+.dog [data-part="tongue"] {
+  transform-origin: 130px 132px;
+}
+
+.cat [data-part="head"] {
+  transform-origin: 130px 135px;
+}
+.cat [data-part="ear-left"] {
+  transform-origin: 86px 52px;
+}
+.cat [data-part="ear-right"] {
+  transform-origin: 174px 52px;
+}
+.cat [data-part="paw-left"] {
+  transform-origin: 68px 203px;
+}
+.cat [data-part="paw-right"] {
+  transform-origin: 192px 203px;
+}
+.cat [data-part="bell"] {
+  transform-origin: 130px 168px;
+}
+.cat [data-part="tail"] {
+  transform-origin: 180px 195px;
+}
+.cat [data-part="whiskers-left"] {
+  transform-origin: 75px 106px;
+}
+.cat [data-part="whiskers-right"] {
+  transform-origin: 185px 106px;
+}
+.cat [data-part="mouth-open"] {
+  transform-origin: 130px 115px;
+}
+
+.parrot [data-part="head"] {
+  transform-origin: 130px 135px;
+}
+.parrot [data-part="crest"] {
+  transform-origin: 130px 38px;
+}
+.parrot [data-part="wing-left"] {
+  transform-origin: 82px 148px;
+}
+.parrot [data-part="wing-right"] {
+  transform-origin: 178px 148px;
+}
+.parrot [data-part="beak-lower"] {
+  transform-origin: 130px 104px;
+}
+.parrot [data-part="claw-left"] {
+  transform-origin: 85px 203px;
+}
+.parrot [data-part="claw-right"] {
+  transform-origin: 175px 203px;
+}
+.parrot [data-part="seed-tag"] {
+  transform-origin: 130px 162px;
+}
+
+/* ---------- 小狗姿态 ---------- */
+.dog[data-pose="idle"] [data-part="head"] {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+.dog[data-pose="happy"] [data-part="head"] {
+  transform: translateY(-4px);
+}
+.dog[data-pose="happy"] [data-part="ear-left"] {
+  transform: rotate(14deg) translateY(-2px);
+}
+.dog[data-pose="happy"] [data-part="ear-right"] {
+  transform: rotate(-14deg) translateY(-2px);
+}
+.dog[data-pose="happy"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.dog[data-pose="happy"] [data-part="eyes-happy"] {
+  opacity: 1;
+}
+.dog[data-pose="happy"] [data-part="tongue"] {
+  opacity: 1;
+  transform: scaleY(1);
+}
+.dog[data-pose="happy"] [data-part="tag"] {
+  animation: dogTagWag 0.4s ease-in-out infinite alternate;
+}
+
+.dog[data-pose="tilt"] [data-part="head"] {
+  transform: rotate(15deg) translate(6px, -2px);
+}
+.dog[data-pose="tilt"] [data-part="ear-left"] {
+  transform: rotate(18deg);
+}
+.dog[data-pose="tilt"] [data-part="ear-right"] {
+  transform: rotate(8deg);
+}
+.dog[data-pose="tilt"] [data-part="question"] {
+  opacity: 1;
+  transform: translateY(-5px);
+}
+
+.dog[data-pose="wave"] [data-part="head"] {
+  transform: rotate(-6deg);
+}
+.dog[data-pose="wave"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.dog[data-pose="wave"] [data-part="eyes-happy"] {
+  opacity: 1;
+}
+.dog[data-pose="wave"] [data-part="paw-right"] {
+  animation: dogWavePaw 0.45s ease-in-out infinite alternate;
+}
+
+.dog[data-pose="sleep"] [data-part="head"] {
+  transform: translateY(12px) rotate(4deg);
+}
+.dog[data-pose="sleep"] [data-part="ear-left"] {
+  transform: rotate(-6deg);
+}
+.dog[data-pose="sleep"] [data-part="ear-right"] {
+  transform: rotate(6deg);
+}
+.dog[data-pose="sleep"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.dog[data-pose="sleep"] [data-part="eyes-sleep"] {
+  opacity: 1;
+}
+.dog[data-pose="sleep"] [data-part="zzz"] {
+  opacity: 1;
+  animation: floatUp 2s ease-in-out infinite;
+}
+
+.dog[data-pose="alert"] [data-part="head"] {
+  transform: translateY(-10px) scale(1.03);
+}
+.dog[data-pose="alert"] [data-part="ear-left"] {
+  transform: rotate(28deg);
+}
+.dog[data-pose="alert"] [data-part="ear-right"] {
+  transform: rotate(-28deg);
+}
+.dog[data-pose="alert"] [data-part="paw-left"] {
+  transform: translateY(5px) scale(0.9);
+}
+.dog[data-pose="alert"] [data-part="paw-right"] {
+  transform: translateY(5px) scale(0.9);
+}
+.dog[data-pose="alert"] [data-part="sweat"] {
+  opacity: 1;
+}
+
+/* ---------- 橘猫姿态 ---------- */
+.cat[data-pose="idle"] [data-part="head"] {
+  animation: breathe 3s ease-in-out infinite;
+}
+.cat[data-pose="idle"] [data-part="tail"] {
+  animation: catTailSway 3.5s ease-in-out infinite alternate;
+}
+
+.cat[data-pose="happy"] [data-part="head"] {
+  transform: translateY(-5px);
+}
+.cat[data-pose="happy"] [data-part="ear-left"] {
+  transform: rotate(-6deg);
+}
+.cat[data-pose="happy"] [data-part="ear-right"] {
+  transform: rotate(6deg);
+}
+.cat[data-pose="happy"] [data-part="whiskers-left"] {
+  transform: rotate(6deg);
+}
+.cat[data-pose="happy"] [data-part="whiskers-right"] {
+  transform: rotate(-6deg);
+}
+.cat[data-pose="happy"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.cat[data-pose="happy"] [data-part="eyes-happy"] {
+  opacity: 1;
+}
+.cat[data-pose="happy"] [data-part="mouth-open"] {
+  opacity: 1;
+  transform: scaleY(1);
+}
+.cat[data-pose="happy"] [data-part="fish"] {
+  opacity: 1;
+  transform: translateY(-6px);
+}
+.cat[data-pose="happy"] [data-part="bell"] {
+  animation: tagWag 0.35s ease-in-out infinite alternate;
+}
+.cat[data-pose="happy"] [data-part="tail"] {
+  animation: catTailFast 0.4s ease-in-out infinite alternate;
+}
+
+.cat[data-pose="tilt"] [data-part="head"] {
+  transform: rotate(15deg) translate(6px, -2px);
+}
+.cat[data-pose="tilt"] [data-part="ear-left"] {
+  transform: rotate(-12deg);
+}
+.cat[data-pose="tilt"] [data-part="ear-right"] {
+  transform: rotate(16deg);
+}
+.cat[data-pose="tilt"] [data-part="tail"] {
+  transform: rotate(-15deg);
+}
+.cat[data-pose="tilt"] [data-part="question"] {
+  opacity: 1;
+  transform: translateY(-5px);
+}
+
+.cat[data-pose="wave"] [data-part="head"] {
+  transform: rotate(-5deg);
+}
+.cat[data-pose="wave"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.cat[data-pose="wave"] [data-part="eyes-happy"] {
+  opacity: 1;
+}
+.cat[data-pose="wave"] [data-part="paw-right"] {
+  animation: catWavePaw 0.45s ease-in-out infinite alternate;
+}
+
+.cat[data-pose="sleep"] [data-part="head"] {
+  transform: translateY(12px) rotate(4deg);
+}
+.cat[data-pose="sleep"] [data-part="ear-left"] {
+  transform: rotate(-18deg);
+}
+.cat[data-pose="sleep"] [data-part="ear-right"] {
+  transform: rotate(18deg);
+}
+.cat[data-pose="sleep"] [data-part="whiskers-left"] {
+  transform: rotate(-8deg);
+}
+.cat[data-pose="sleep"] [data-part="whiskers-right"] {
+  transform: rotate(8deg);
+}
+.cat[data-pose="sleep"] [data-part="tail"] {
+  transform: rotate(28deg) translateY(15px);
+}
+.cat[data-pose="sleep"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.cat[data-pose="sleep"] [data-part="eyes-sleep"] {
+  opacity: 1;
+}
+.cat[data-pose="sleep"] [data-part="zzz"] {
+  opacity: 1;
+  animation: floatUp 2s ease-in-out infinite;
+}
+
+.cat[data-pose="alert"] [data-part="head"] {
+  transform: translateY(-6px) scale(1.02);
+}
+.cat[data-pose="alert"] [data-part="ear-left"] {
+  transform: rotate(-42deg) translate(-4px, 6px);
+}
+.cat[data-pose="alert"] [data-part="ear-right"] {
+  transform: rotate(42deg) translate(4px, 6px);
+}
+.cat[data-pose="alert"] [data-part="whiskers-left"] {
+  transform: rotate(-12deg);
+}
+.cat[data-pose="alert"] [data-part="whiskers-right"] {
+  transform: rotate(12deg);
+}
+.cat[data-pose="alert"] [data-part="paw-left"] {
+  transform: translateY(4px) scale(0.92);
+}
+.cat[data-pose="alert"] [data-part="paw-right"] {
+  transform: translateY(4px) scale(0.92);
+}
+.cat[data-pose="alert"] [data-part="tail"] {
+  transform: rotate(-18deg) scale(1.15);
+}
+.cat[data-pose="alert"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.cat[data-pose="alert"] [data-part="eyes-alert"] {
+  opacity: 1;
+}
+.cat[data-pose="alert"] [data-part="shock"] {
+  opacity: 1;
+}
+
+/* ---------- 鹦鹉姿态 ---------- */
+.parrot[data-pose="idle"] [data-part="head"] {
+  animation: breathe 2.8s ease-in-out infinite;
+}
+.parrot[data-pose="idle"] [data-part="crest"] {
+  animation: crestBob 2.8s ease-in-out infinite;
+}
+
+.parrot[data-pose="happy"] [data-part="head"] {
+  transform: translateY(-6px);
+}
+.parrot[data-pose="happy"] [data-part="crest"] {
+  animation: crestHappy 0.35s ease-in-out infinite alternate;
+}
+.parrot[data-pose="happy"] [data-part="wing-left"] {
+  animation: flapLeft 0.3s ease-in-out infinite alternate;
+}
+.parrot[data-pose="happy"] [data-part="wing-right"] {
+  animation: flapRight 0.3s ease-in-out infinite alternate;
+}
+.parrot[data-pose="happy"] [data-part="beak-lower"] {
+  transform: translateY(6px) scaleY(1.15);
+}
+.parrot[data-pose="happy"] .parrotCheek {
+  transform: scale(1.15);
+  transform-origin: 130px 95px;
+  transform-box: view-box;
+}
+.parrot[data-pose="happy"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.parrot[data-pose="happy"] [data-part="eyes-happy"] {
+  opacity: 1;
+}
+.parrot[data-pose="happy"] [data-part="notes"] {
+  opacity: 1;
+  animation: notesFloat 1.6s ease-in-out infinite;
+}
+.parrot[data-pose="happy"] [data-part="seed-tag"] {
+  animation: tagWag 0.35s ease-in-out infinite alternate;
+}
+
+.parrot[data-pose="tilt"] [data-part="head"] {
+  transform: rotate(18deg) translate(8px, -2px);
+}
+.parrot[data-pose="tilt"] [data-part="crest"] {
+  transform: rotate(12deg);
+}
+.parrot[data-pose="tilt"] [data-part="wing-left"] {
+  transform: rotate(8deg);
+}
+.parrot[data-pose="tilt"] [data-part="question"] {
+  opacity: 1;
+  transform: translateY(-5px);
+}
+
+.parrot[data-pose="wave"] [data-part="head"] {
+  transform: rotate(-6deg);
+}
+.parrot[data-pose="wave"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.parrot[data-pose="wave"] [data-part="eyes-happy"] {
+  opacity: 1;
+}
+.parrot[data-pose="wave"] [data-part="wing-right"] {
+  animation: parrotWingWave 0.4s ease-in-out infinite alternate;
+}
+
+.parrot[data-pose="sleep"] [data-part="head"] {
+  transform: translateY(14px) rotate(3deg);
+}
+.parrot[data-pose="sleep"] [data-part="crest"] {
+  transform: rotate(-28deg) translateY(4px);
+}
+.parrot[data-pose="sleep"] [data-part="wing-left"] {
+  transform: rotate(-4deg) translateY(4px);
+}
+.parrot[data-pose="sleep"] [data-part="wing-right"] {
+  transform: rotate(4deg) translateY(4px);
+}
+.parrot[data-pose="sleep"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.parrot[data-pose="sleep"] [data-part="eyes-sleep"] {
+  opacity: 1;
+}
+.parrot[data-pose="sleep"] [data-part="zzz"] {
+  opacity: 1;
+  animation: floatUp 2s ease-in-out infinite;
+}
+
+.parrot[data-pose="alert"] [data-part="head"] {
+  transform: translateY(-10px) scale(0.98, 1.05);
+}
+.parrot[data-pose="alert"] [data-part="crest"] {
+  transform: rotate(12deg) scale(1.25) translateY(-3px);
+}
+.parrot[data-pose="alert"] [data-part="wing-left"] {
+  transform: rotate(22deg);
+}
+.parrot[data-pose="alert"] [data-part="wing-right"] {
+  transform: rotate(-22deg);
+}
+.parrot[data-pose="alert"] [data-part="claw-left"] {
+  transform: translateY(3px) scale(0.92);
+}
+.parrot[data-pose="alert"] [data-part="claw-right"] {
+  transform: translateY(3px) scale(0.92);
+}
+.parrot[data-pose="alert"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.parrot[data-pose="alert"] [data-part="eyes-alert"] {
+  opacity: 1;
+}
+.parrot[data-pose="alert"] [data-part="shock"] {
+  opacity: 1;
+}
+
+/* ---------- 关键帧 ---------- */
+@keyframes breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+@keyframes floatUp {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(5px, -8px);
+  }
+}
+
+@keyframes notesFloat {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(6px, -8px);
+  }
+}
+
+@keyframes tagWag {
+  from {
+    transform: rotate(-10deg);
+  }
+  to {
+    transform: rotate(10deg);
+  }
+}
+
+@keyframes dogTagWag {
+  from {
+    transform: rotate(-12deg);
+  }
+  to {
+    transform: rotate(12deg);
+  }
+}
+
+@keyframes dogWavePaw {
+  from {
+    transform: translate(8px, -38px) rotate(-15deg);
+  }
+  to {
+    transform: translate(18px, -42px) rotate(22deg);
+  }
+}
+
+@keyframes catTailSway {
+  from {
+    transform: rotate(-6deg);
+  }
+  to {
+    transform: rotate(10deg);
+  }
+}
+
+@keyframes catTailFast {
+  from {
+    transform: rotate(-12deg);
+  }
+  to {
+    transform: rotate(18deg);
+  }
+}
+
+@keyframes catWavePaw {
+  from {
+    transform: translate(6px, -36px) rotate(-12deg);
+  }
+  to {
+    transform: translate(14px, -42px) rotate(18deg);
+  }
+}
+
+@keyframes crestBob {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-6deg);
+  }
+}
+
+@keyframes crestHappy {
+  from {
+    transform: rotate(-12deg);
+  }
+  to {
+    transform: rotate(12deg);
+  }
+}
+
+@keyframes flapLeft {
+  from {
+    transform: rotate(15deg) translate(-4px, -4px);
+  }
+  to {
+    transform: rotate(48deg) translate(-8px, -10px);
+  }
+}
+
+@keyframes flapRight {
+  from {
+    transform: rotate(-15deg) translate(4px, -4px);
+  }
+  to {
+    transform: rotate(-48deg) translate(8px, -10px);
+  }
+}
+
+@keyframes parrotWingWave {
+  from {
+    transform: rotate(-55deg) translate(8px, -15px);
+  }
+  to {
+    transform: translate(12px, -22px) rotate(-85deg);
+  }
+}
+
+/* 纯装饰的呼吸 / 摆动不参与减弱动效偏好：直接落成静止姿态。
+   选择器权重要压过上面的姿态规则（同权重 + 更靠后即可），不用 !important。 */
+@media (prefers-reduced-motion: reduce) {
+  .buddy .art [data-part] {
+    transition: none;
+    animation: none;
+  }
+}

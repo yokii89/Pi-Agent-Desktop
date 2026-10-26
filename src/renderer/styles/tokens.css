@@ -233,6 +233,29 @@
   /* 模糊强度与饱和度增强：与主题无关，亮色沿用 */
   --glass-blur: 24px;
   --glass-saturate: 150%;
+
+  /* 输入栏伙伴（docs/动物形象）：角色插画自身的配色，不属于 UI 语义色。
+     ink 是压在浅色毛面上的线稿色，两套主题同值；mark 是直接落在应用背景上的
+     记号（胡须 / 问号 / Zzz / 警觉射线 / 音符），深底必须提亮，否则整组看不见。 */
+  --buddy-ink: #2b2824;
+  --buddy-mark: #f3ece0;
+  --buddy-glint: #ffffff;
+  --buddy-gold: #fff066;
+  --buddy-tongue: #ff7b89;
+  --buddy-dog-coat: #ffffff;
+  --buddy-cat-coat: #f7a84b;
+  --buddy-cat-stripe: #d97724;
+  --buddy-cat-inner: #ff9eaa;
+  --buddy-cat-bib: #fffaf0;
+  --buddy-cat-collar: #88c999;
+  --buddy-parrot-coat: #88d47e;
+  --buddy-parrot-wing: #6ec264;
+  --buddy-parrot-face: #fef5b8;
+  --buddy-parrot-beak: #ffbe55;
+  --buddy-parrot-beak-lower: #f7a84b;
+  --buddy-parrot-cheek: #ff8c7a;
+  --buddy-parrot-collar: #ff7b7b;
+  --buddy-parrot-feather: #d9c66b;
 }
 
 :root[data-theme="light"] {
@@ -323,4 +346,25 @@
   /* 阴影 */
   --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.15);
   --shadow-overlay-item: 0 2px 6px rgba(0, 0, 0, 0.18);
+
+  /* 输入栏伙伴：浅底上记号与线稿同色；毛面 / 配件配色与暗色一致 */
+  --buddy-ink: #2b2824;
+  --buddy-mark: #2b2824;
+  --buddy-glint: #ffffff;
+  --buddy-gold: #fff066;
+  --buddy-tongue: #ff7b89;
+  --buddy-dog-coat: #ffffff;
+  --buddy-cat-coat: #f7a84b;
+  --buddy-cat-stripe: #d97724;
+  --buddy-cat-inner: #ff9eaa;
+  --buddy-cat-bib: #fffaf0;
+  --buddy-cat-collar: #88c999;
+  --buddy-parrot-coat: #88d47e;
+  --buddy-parrot-wing: #6ec264;
+  --buddy-parrot-face: #fef5b8;
+  --buddy-parrot-beak: #ffbe55;
+  --buddy-parrot-beak-lower: #f7a84b;
+  --buddy-parrot-cheek: #ff8c7a;
+  --buddy-parrot-collar: #ff7b7b;
+  --buddy-parrot-feather: #d9c66b;
 }

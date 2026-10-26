@@ -6,6 +6,7 @@
 import type { SessionStartReason } from "./contribution";
 import type { FontMonoPreset, FontUiPreset } from "./fontPresets";
 import type { LocalePreference } from "./i18n";
+import type { InputBuddyKind } from "./inputBuddy";
 import type { NotificationSettings } from "./notification";
 import type { RailStyle } from "./railStyles";
 import type { ShortcutsMap } from "./shortcuts";
@@ -178,6 +179,8 @@ export interface PideskSettings {
   fontMonoPreset: FontMonoPreset;
   /** 对话流问题导航分段栏的标记样式 id；见 shared/railStyles。 */
   questionRailStyle: RailStyle;
+  /** 输入栏右上角的动物伙伴；见 shared/inputBuddy。 */
+  inputBuddy: InputBuddyKind;
   /** 渲染层全局快捷键映射（设置 → 键盘快捷键）；见 shared/shortcuts。 */
   shortcuts: ShortcutsMap;
 }

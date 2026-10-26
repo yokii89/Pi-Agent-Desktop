@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import { isFontMonoPreset, isFontUiPreset } from "../../shared/fontPresets";
 import { isLocalePreference } from "../../shared/i18n";
+import { isInputBuddyKind } from "../../shared/inputBuddy";
 import type {
   BrowserRecentUrl,
   IpcResult,
@@ -199,6 +200,10 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
       case "questionRailStyle":
         // 白名单外的值整项丢弃，不把脏 id 写进设置
         if (isRailStyle(value)) clean.questionRailStyle = value;
+        break;
+      case "inputBuddy":
+        // 白名单外的值整项丢弃，不把脏 id 写进设置
+        if (isInputBuddyKind(value)) clean.inputBuddy = value;
         break;
       case "notification": {
         const notification = sanitizeNotification(value);

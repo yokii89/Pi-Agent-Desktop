@@ -30,6 +30,7 @@ import glideStyles from "../ui/GlideList.module.css";
 import { Composer, type ComposerHandle } from "./Composer";
 import { FileAttachStrip } from "./FileAttachStrip";
 import { ImageAttachStrip } from "./ImageAttachStrip";
+import { InputBuddy } from "./InputBuddy/InputBuddy";
 import styles from "./TaskInput.module.css";
 import { TaskInputContextBar } from "./TaskInputContextBar";
 import { TaskInputToolbar } from "./TaskInputToolbar";
@@ -45,7 +46,7 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
   const t = useT();
   const { phase, send, stop, getSlashCommands, switchingTo, modelInput, modelLabel } =
     useSessionMeta();
-  const { showToast } = useUiStore();
+  const { showToast, inputBuddy } = useUiStore();
   const browser = useBrowserStore();
   const { currentProject } = useProjectStore();
   const {
@@ -684,6 +685,14 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
         className={[styles.inputBox, variant === "session" ? styles.inputSession : ""].join(" ")}
         data-max={thinkingLevel === "max" ? "" : undefined}
       >
+        {/* 动物伙伴：骑在输入卡右上沿，纯装饰；姿态只跟随会话状态（设置 → 个性化） */}
+        <InputBuddy
+          kind={inputBuddy}
+          running={running}
+          switching={switching || modeTransitioning}
+          alert={staleConfirm || hasBlockingView}
+        />
+
         {/* 思考等级顶档特效：左下角起辉走 .inputBox[data-max]::before，粒子在这里 */}
         {thinkingLevel === "max" && <ThinkingMaxAura />}
 

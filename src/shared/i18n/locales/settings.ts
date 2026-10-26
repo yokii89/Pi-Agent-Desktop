@@ -574,6 +574,36 @@ export const settingsMessages = defineMessages({
     "en-US": "Ring",
   },
 
+  "settings.personalization.group.buddy": {
+    "zh-CN": "输入栏伙伴",
+    "en-US": "Input companion",
+  },
+  "settings.personalization.buddy": {
+    "zh-CN": "动物形象",
+    "en-US": "Mascot",
+  },
+  "settings.personalization.buddy.description": {
+    "zh-CN": "停在你输入栏右上角的小伙伴，会随会话状态换表情；纯装饰，不挡输入。",
+    "en-US":
+      "A companion perched on the top-right of the input bar. Its expression follows the session state; purely decorative.",
+  },
+  "settings.personalization.buddy.option.none": {
+    "zh-CN": "无",
+    "en-US": "None",
+  },
+  "settings.personalization.buddy.option.dog": {
+    "zh-CN": "小狗",
+    "en-US": "Dog",
+  },
+  "settings.personalization.buddy.option.cat": {
+    "zh-CN": "橘猫",
+    "en-US": "Orange cat",
+  },
+  "settings.personalization.buddy.option.parrot": {
+    "zh-CN": "鹦鹉",
+    "en-US": "Parrot",
+  },
+
   "settings.config.group.runtime": {
     "zh-CN": "pi 运行时",
     "en-US": "pi runtime",

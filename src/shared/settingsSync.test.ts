@@ -42,6 +42,7 @@ function fakeSettings(): PideskSettings {
     fontUiPreset: "default",
     fontMonoPreset: "cascadia",
     questionRailStyle: "line",
+    inputBuddy: "dog",
     shortcuts: {},
   } as PideskSettings;
 }

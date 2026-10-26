@@ -17,6 +17,7 @@ export const SYNCABLE_SETTINGS_KEYS = [
   "fontUiPreset",
   "fontMonoPreset",
   "questionRailStyle",
+  "inputBuddy",
   "shortcuts",
 ] as const satisfies readonly (keyof PideskSettings)[];
 
@@ -51,6 +52,7 @@ export function pickSyncableSettings(settings: PideskSettings): SyncableSettings
     fontUiPreset: settings.fontUiPreset,
     fontMonoPreset: settings.fontMonoPreset,
     questionRailStyle: settings.questionRailStyle,
+    inputBuddy: settings.inputBuddy,
     shortcuts: settings.shortcuts,
   };
 }

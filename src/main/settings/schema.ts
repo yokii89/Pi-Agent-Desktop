@@ -1,4 +1,5 @@
 import { DEFAULT_FONT_MONO_PRESET, DEFAULT_FONT_UI_PRESET } from "../../shared/fontPresets";
+import { DEFAULT_INPUT_BUDDY } from "../../shared/inputBuddy";
 import {
   clampSessionStreamFontPx,
   DEFAULT_SESSION_STREAM_FONT_PX,
@@ -52,6 +53,8 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   fontMonoPreset: DEFAULT_FONT_MONO_PRESET,
   // 对话流问题导航分段栏标记样式（设置 → 个性化）；默认短线，向后兼容
   questionRailStyle: DEFAULT_RAIL_STYLE,
+  // 输入栏右上角的动物伙伴（设置 → 个性化）；默认小狗，向后兼容
+  inputBuddy: DEFAULT_INPUT_BUDDY,
   // 渲染层全局快捷键（设置 → 键盘快捷键）；默认映射由渲染层动作注册表提供，
   // 主进程只持有结构校验后的透传值（hydrate 时归一）
   shortcuts: {} as ShortcutsMap,
@@ -107,5 +110,6 @@ export const SETTABLE_KEYS = [
   "fontUiPreset",
   "fontMonoPreset",
   "questionRailStyle",
+  "inputBuddy",
   "shortcuts",
 ] as const satisfies readonly (keyof PideskSettings)[];
