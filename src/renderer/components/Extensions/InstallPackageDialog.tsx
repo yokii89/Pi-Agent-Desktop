@@ -18,6 +18,8 @@ interface InstallPackageDialogProps {
   open: boolean;
   /** 是否展示「当前项目」作用域选项。 */
   hasProject: boolean;
+  /** 打开时默认选中的作用域；项目空态/项目 Tab 下默认装进项目。 */
+  initialLocal?: boolean;
   installing: boolean;
   logs: string[];
   error: string | null;
@@ -29,6 +31,7 @@ interface InstallPackageDialogProps {
 export function InstallPackageDialog({
   open,
   hasProject,
+  initialLocal = false,
   installing,
   logs,
   error,
@@ -37,15 +40,17 @@ export function InstallPackageDialog({
 }: InstallPackageDialogProps) {
   const t = useT();
   const [source, setSource] = useState("");
-  const [local, setLocal] = useState(false);
+  const [local, setLocal] = useState(initialLocal && hasProject);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) {
       setSource("");
       setLocal(false);
+      return;
     }
-  }, [open]);
+    setLocal(initialLocal && hasProject);
+  }, [open, initialLocal, hasProject]);
 
   // 日志追加后滚到底
   // biome-ignore lint/correctness/useExhaustiveDependencies: logs 变化是滚动触发信号

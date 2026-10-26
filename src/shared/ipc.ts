@@ -1094,11 +1094,37 @@ export interface PiPackageEntry {
   resourceItems: PiPackageResourceItems;
 }
 
-/** 用户本地资源目录（settings.extensions/skills/prompts/themes 指向的路径）。 */
+/**
+ * pi 自动发现的本地资源目录（全局）。
+ * - extensions / skills / prompts / themes：agentDir 下的同名目录
+ * - sharedSkills：`~/.agents/skills`，Agent Skills 标准的跨工具共享目录
+ */
+export type PiLocalResourceKind = "extensions" | "skills" | "sharedSkills" | "prompts" | "themes";
+
+export interface PiLocalResourceItem {
+  /** 展示名：技能取目录名，其余取去掉约定后缀的文件名。 */
+  name: string;
+  /** 资源绝对路径（技能为 SKILL.md）。 */
+  path: string;
+  /** 相对 pi 匹配基准目录的路径（`/` 分隔），启停写进 settings 的正是它。 */
+  relativePath: string;
+  enabled: boolean;
+}
+
 export interface PiLocalResourceDir {
-  kind: "extensions" | "skills" | "prompts" | "themes";
+  kind: PiLocalResourceKind;
   path: string;
   exists: boolean;
+  /** 目录内可逐项启停的资源；目录不存在时为空。 */
+  items: PiLocalResourceItem[];
+}
+
+/** 本地资源目录内单资源启停（写 settings.extensions/skills/prompts/themes）。 */
+export interface PiLocalResourceSetEnabledRequest {
+  kind: PiLocalResourceKind;
+  /** 资源绝对路径（技能为 SKILL.md）。 */
+  path: string;
+  enabled: boolean;
 }
 
 export interface PiPackagesSnapshot {
@@ -1159,6 +1185,8 @@ export const EXTENSION_IPC = {
   setEnabled: "pidesk:extension:setEnabled",
   /** 包内单资源启停（对象过滤）。 */
   setResourceEnabled: "pidesk:extension:setResourceEnabled",
+  /** 本地资源目录内单资源启停（settings 数组的 +/- 精确模式）。 */
+  setLocalResourceEnabled: "pidesk:extension:setLocalResourceEnabled",
   /** 主进程推送：安装/卸载子进程日志。 */
   output: "pidesk:extension:output",
 } as const;

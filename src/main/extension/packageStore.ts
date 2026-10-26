@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import type {
-  PiLocalResourceDir,
   PiPackageEntry,
   PiPackageResourceCounts,
   PiPackageResourceItems,
@@ -12,6 +11,7 @@ import type {
   PiPackagesSnapshot,
 } from "../../shared/ipc";
 import { getPiAgentDir } from "../session/piInfo";
+import { listLocalResourceDirs } from "./localResources";
 import {
   applyResourceEnabled,
   isDisabledSettingsItem,
@@ -255,16 +255,16 @@ function entryFromSettingsItem(
   };
 }
 
-function listLocalResourceDirs(agentDir: string): PiLocalResourceDir[] {
-  const kinds = ["extensions", "skills", "prompts", "themes"] as const;
-  return kinds.map((kind) => {
-    const p = path.join(agentDir, kind);
-    return { kind, path: p, exists: fs.existsSync(p) };
-  });
+/** packages 条目与扫描本地资源所需的原始设置。 */
+export interface PiPackageEntries {
+  user: PiPackageEntry[];
+  project: PiPackageEntry[];
+  agentDir: string;
+  userSettings: Record<string, unknown> | null;
 }
 
-/** 组装扩展页快照。projectDir 为空时 project 列表为空。 */
-export function listPackages(projectDir: string | null): PiPackagesSnapshot {
+/** 只读 packages 条目；catalog / worker 不需要本地资源目录，避免递归扫描。 */
+export function listPackageEntries(projectDir: string | null): PiPackageEntries {
   const agentDir = getPiAgentDir();
   const userSettings = readJsonFile(path.join(agentDir, "settings.json"));
   const projectSettings = projectDir
@@ -281,11 +281,17 @@ export function listPackages(projectDir: string | null): PiPackagesSnapshot {
         .filter((e): e is PiPackageEntry => e !== null)
     : [];
 
+  return { user, project, agentDir, userSettings };
+}
+
+/** 组装扩展页快照。projectDir 为空时 project 列表为空。 */
+export function listPackages(projectDir: string | null): PiPackagesSnapshot {
+  const entries = listPackageEntries(projectDir);
   return {
-    user,
-    project,
-    localResources: listLocalResourceDirs(agentDir),
-    agentDir,
+    user: entries.user,
+    project: entries.project,
+    localResources: listLocalResourceDirs(entries.agentDir, entries.userSettings),
+    agentDir: entries.agentDir,
   };
 }
 

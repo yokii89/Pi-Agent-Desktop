@@ -23,7 +23,7 @@ import {
   packageKeyIdentity,
   parsePideskManifest,
 } from "./contributionSchema";
-import { listPackages } from "./packageStore";
+import { listPackageEntries } from "./packageStore";
 
 interface CatalogCacheEntry {
   snapshot: ContributionCatalogSnapshot;
@@ -113,7 +113,7 @@ export function buildCatalogSnapshot(
 ): ContributionCatalogSnapshot {
   const normalized = normalizeProjectDir(projectDir);
   const contextId = computeContextId(normalized);
-  const snapshot = listPackages(normalized);
+  const snapshot = listPackageEntries(normalized);
 
   const inputs = [
     ...packageInputsForScope(snapshot.user, "user", undefined),

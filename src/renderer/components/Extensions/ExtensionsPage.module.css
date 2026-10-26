@@ -6,15 +6,6 @@
   background: var(--color-bg);
 }
 
-.diagnostics {
-  margin: 0;
-  padding: var(--spacing-md) var(--spacing-xl);
-  color: var(--color-text-muted);
-  background: var(--color-bg-surface);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-}
-
 .header {
   display: flex;
   flex-wrap: wrap;
@@ -56,12 +47,6 @@
   flex-wrap: wrap;
 }
 
-.scopeTabs {
-  display: flex;
-  padding: 0 var(--spacing-xl) var(--spacing-sm);
-  flex-shrink: 0;
-}
-
 .body {
   flex: 1;
   min-height: 0;
@@ -72,21 +57,139 @@
   gap: var(--spacing-lg);
 }
 
+.overview {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 74px;
+}
+
+.statValue {
+  font-size: var(--font-size-lg);
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--color-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.statLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.statSep {
+  width: 1px;
+  align-self: stretch;
+  min-height: 28px;
+  background: var(--color-border);
+}
+
+.status,
+.statusWarn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.statusWarn {
+  color: var(--color-warning);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+.statusWarn .dot {
+  background: var(--color-warning);
+}
+
+.toolbarRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.toolbarNote {
+  margin-left: auto;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-sm);
+}
+
 .sectionTitle {
-  margin: 0 0 var(--spacing-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: 0;
   font-size: var(--font-size-md);
   font-weight: 600;
   color: var(--color-text-strong);
 }
 
-.empty {
-  padding: var(--spacing-xl);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-lg);
+.count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
   color: var(--color-text-muted);
-  font-size: var(--font-size-md);
-  text-align: center;
-  line-height: 1.6;
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.sectionNote {
+  margin-left: auto;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.diagnostics {
+  list-style: none;
+  margin: var(--spacing-sm) 0 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  color: var(--color-text-muted);
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
 }
 
 .errorBanner {
@@ -176,37 +279,29 @@
   gap: var(--spacing-sm);
 }
 
-.localGrid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
+@media (max-width: 760px) {
+  .header {
+    padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm);
+  }
 
-.localCard {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-elevated);
-}
+  .body {
+    padding: 0 var(--spacing-md) var(--spacing-lg);
+    gap: var(--spacing-md);
+  }
 
-.localMeta {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+  .statSep {
+    display: none;
+  }
 
-.localName {
-  font-size: var(--font-size-md);
-  color: var(--color-text-strong);
-}
+  .status,
+  .statusWarn {
+    margin-left: 0;
+    width: 100%;
+  }
 
-.localPath {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  word-break: break-all;
+  .toolbarNote,
+  .sectionNote {
+    margin-left: 0;
+    width: 100%;
+  }
 }

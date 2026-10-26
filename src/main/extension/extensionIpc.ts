@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import type {
   IpcResult,
+  PiLocalResourceSetEnabledRequest,
   PiPackageInstallRequest,
   PiPackageRemoveRequest,
   PiPackageSetEnabledRequest,
@@ -9,9 +10,11 @@ import type {
 } from "../../shared/ipc";
 import { EXTENSION_IPC } from "../../shared/ipc";
 import { envelopeAsync } from "../ipc/envelope";
+import { getPiAgentDir } from "../session/piInfo";
 import { markExtensionStale } from "../session/runtimeCoordinator";
 import { invalidateCatalog } from "./contributionCatalog";
 import { reloadWorkerForExtensionChange } from "./extensionWorkerManager";
+import { setLocalResourceEnabled } from "./localResources";
 import { installPackage, removePackage } from "./packageCli";
 import { listPackages, setPackageEnabled, setPackageResourceEnabled } from "./packageStore";
 
@@ -117,6 +120,24 @@ export function registerExtensionIpc(): void {
           cwd: typeof req.cwd === "string" && req.cwd ? req.cwd : null,
         });
         afterExtensionMutation();
+        return null;
+      }),
+  );
+
+  ipcMain.handle(
+    EXTENSION_IPC.setLocalResourceEnabled,
+    (_event, req: PiLocalResourceSetEnabledRequest): Promise<IpcResult<null>> =>
+      envelopeAsync(async () => {
+        const kinds = ["extensions", "skills", "sharedSkills", "prompts", "themes"];
+        if (!kinds.includes(req?.kind)) throw new Error("资源类型无效");
+        if (typeof req?.path !== "string" || !req.path.trim()) throw new Error("缺少资源路径");
+        setLocalResourceEnabled(getPiAgentDir(), {
+          kind: req.kind,
+          path: req.path.trim(),
+          enabled: req.enabled === true,
+        });
+        // 本地资源不进入 catalog / extension worker；只需让 pi 会话看到设置变化
+        markExtensionStale();
         return null;
       }),
   );

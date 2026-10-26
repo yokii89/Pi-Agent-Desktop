@@ -1,9 +1,12 @@
-import { ArrowSquareOut, Plus } from "@phosphor-icons/react";
+import { ArrowSquareOut, ArrowsClockwise, Plus } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ContributionCatalogSnapshot } from "../../../shared/contribution";
 import type {
+  PiLocalResourceDir,
+  PiLocalResourceItem,
   PiPackageEntry,
   PiPackageResourceItem,
+  PiPackageResourceItems,
   PiPackageResourceKind,
   PiPackagesSnapshot,
 } from "../../../shared/ipc";
@@ -15,6 +18,7 @@ import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { IconButton } from "../ui/IconButton";
 import { Segmented, type SegmentedItem } from "../ui/Segmented";
 import { ContributionDiagnostics } from "./ContributionDiagnostics";
 import styles from "./ExtensionsPage.module.css";
@@ -55,21 +59,36 @@ export function ExtensionsPage() {
   const [installError, setInstallError] = useState<string | null>(null);
   const installingRef = useRef(false);
   const [removeTarget, setRemoveTarget] = useState<PiPackageEntry | null>(null);
+  /** 只采纳最后一次 refresh：连续拨开关时先发的请求可能后返回，会把新状态覆盖回旧值。 */
+  const refreshSeq = useRef(0);
 
-  const refresh = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    setListError(null);
-    try {
-      const next = await extensionService.list(projectDir);
-      setSnapshot(next);
-      setCatalog(await catalogService.refresh(projectDir));
-    } catch (err) {
-      setSnapshot(null);
-      setListError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [projectDir]);
+  const refresh = useCallback(
+    async (opts?: { includeCatalog?: boolean; silent?: boolean }): Promise<void> => {
+      const includeCatalog = opts?.includeCatalog !== false;
+      const silent = opts?.silent === true;
+      const seq = ++refreshSeq.current;
+      // silent：开关触发的后台对账，不点亮 loading（否则顶栏刷新图标会跟着变暗一下）
+      if (!silent) setLoading(true);
+      setListError(null);
+      try {
+        const next = await extensionService.list(projectDir);
+        if (seq !== refreshSeq.current) return;
+        setSnapshot(next);
+        if (includeCatalog) {
+          const nextCatalog = await catalogService.refresh(projectDir);
+          if (seq !== refreshSeq.current) return;
+          setCatalog(nextCatalog);
+        }
+      } catch (err) {
+        if (seq !== refreshSeq.current) return;
+        setSnapshot(null);
+        setListError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (seq === refreshSeq.current) setLoading(false);
+      }
+    },
+    [projectDir],
+  );
 
   useEffect(() => {
     void refresh();
@@ -97,6 +116,37 @@ export function ExtensionsPage() {
     return scope === "project" ? snapshot.project : snapshot.user;
   }, [snapshot, scope]);
 
+  const diagnostics = useMemo(
+    () => (catalog?.diagnostics ?? []).filter((item) => item.scope === scope),
+    [catalog, scope],
+  );
+
+  const stats = useMemo(() => {
+    const extensionItems = entries.flatMap((entry) => entry.resourceItems.extensions);
+    const extensionsEnabled = entries.reduce(
+      (sum, entry) =>
+        sum +
+        (entry.enabled ? entry.resourceItems.extensions.filter((item) => item.enabled).length : 0),
+      0,
+    );
+    const packageSkills = entries.reduce(
+      (sum, entry) => sum + entry.resourceItems.skills.length,
+      0,
+    );
+    const localDirs = snapshot?.localResources ?? [];
+    const localSkills = localDirs
+      .filter((dir) => dir.kind === "skills" || dir.kind === "sharedSkills")
+      .reduce((sum, dir) => sum + dir.items.length, 0);
+    return {
+      packages: entries.length,
+      extensionsEnabled,
+      extensionsTotal: extensionItems.length,
+      skills: packageSkills + localSkills,
+      localExisting: localDirs.filter((dir) => dir.exists).length,
+      localTotal: localDirs.length,
+    };
+  }, [entries, snapshot]);
+
   const scopeItems: readonly SegmentedItem<ScopeTab>[] = SCOPE_TABS.filter(
     (item) => item.tab === "user" || projectDir !== null,
   ).map(({ tab, labelKey }) => ({ value: tab, label: t(labelKey) }));
@@ -116,9 +166,27 @@ export function ExtensionsPage() {
     });
   }, [showToast]);
 
+  /**
+   * 开关乐观更新：先改当前作用域的包列表，点击即翻转。
+   * 不能再用 setBusy 把整页置为 disabled——`Toggle:disabled` 是 `opacity: .4`
+   * 且无过渡，IPC + catalog 重建期间所有开关/行内图标会一起变暗再恢复，
+   * 读起来就是"点一下闪一下"。
+   */
+  const patchEntries = useCallback(
+    (mutate: (entry: PiPackageEntry) => PiPackageEntry): void => {
+      setSnapshot((prev) => {
+        if (!prev) return prev;
+        return scope === "project"
+          ? { ...prev, project: prev.project.map(mutate) }
+          : { ...prev, user: prev.user.map(mutate) };
+      });
+    },
+    [scope],
+  );
+
   const handleToggle = useCallback(
     async (entry: PiPackageEntry, enabled: boolean) => {
-      setBusy(true);
+      patchEntries((item) => (item.source === entry.source ? { ...item, enabled } : item));
       try {
         await extensionService.setEnabled({
           source: entry.source,
@@ -126,15 +194,15 @@ export function ExtensionsPage() {
           enabled,
           cwd: projectDir,
         });
-        await refresh();
+        await refresh({ silent: true });
         showToast(enabled ? t("extensions.enabled") : t("extensions.disabled"));
       } catch (err) {
         showToast(err instanceof Error ? err.message : String(err));
-      } finally {
-        setBusy(false);
+        // 写盘失败：按磁盘状态回滚乐观改动
+        await refresh({ includeCatalog: false, silent: true });
       }
     },
-    [projectDir, refresh, scope, showToast, t],
+    [patchEntries, projectDir, refresh, scope, showToast, t],
   );
 
   const handleToggleResource = useCallback(
@@ -144,7 +212,18 @@ export function ExtensionsPage() {
       item: PiPackageResourceItem,
       enabled: boolean,
     ) => {
-      setBusy(true);
+      // 包整体停用时主进程不写单项过滤（disabled 项直接原样返回），
+      // 预改本地状态只会被权威快照弹回去，所以这种情况下不做乐观翻转。
+      if (entry.enabled) {
+        patchEntries((pkg) => {
+          if (pkg.source !== entry.source) return pkg;
+          const resourceItems: PiPackageResourceItems = { ...pkg.resourceItems };
+          resourceItems[kind] = resourceItems[kind].map((res) =>
+            res.relativePath === item.relativePath ? { ...res, enabled } : res,
+          );
+          return { ...pkg, resourceItems };
+        });
+      }
       try {
         await extensionService.setResourceEnabled({
           source: entry.source,
@@ -154,7 +233,7 @@ export function ExtensionsPage() {
           enabled,
           cwd: projectDir,
         });
-        await refresh();
+        await refresh({ silent: true });
         showToast(
           enabled
             ? t("extensions.enabledResource", { name: item.name })
@@ -162,11 +241,51 @@ export function ExtensionsPage() {
         );
       } catch (err) {
         showToast(err instanceof Error ? err.message : String(err));
-      } finally {
-        setBusy(false);
+        await refresh({ includeCatalog: false, silent: true });
       }
     },
-    [projectDir, refresh, scope, showToast, t],
+    [patchEntries, projectDir, refresh, scope, showToast, t],
+  );
+
+  const handleToggleLocalResource = useCallback(
+    async (dir: PiLocalResourceDir, item: PiLocalResourceItem, enabled: boolean) => {
+      setSnapshot((prev) =>
+        prev
+          ? {
+              ...prev,
+              localResources: prev.localResources.map((entry) =>
+                entry.kind === dir.kind
+                  ? {
+                      ...entry,
+                      items: entry.items.map((res) =>
+                        res.path === item.path ? { ...res, enabled } : res,
+                      ),
+                    }
+                  : entry,
+              ),
+            }
+          : prev,
+      );
+      try {
+        await extensionService.setLocalResourceEnabled({
+          kind: dir.kind,
+          path: item.path,
+          enabled,
+        });
+        // 本地资源不进入 catalog，无需重建贡献目录
+        await refresh({ includeCatalog: false, silent: true });
+        const kindLabel = t(`extensions.localKind.${dir.kind}`);
+        showToast(
+          enabled
+            ? t("extensions.enabledResource", { kind: kindLabel, name: item.name })
+            : t("extensions.disabledResource", { kind: kindLabel, name: item.name }),
+        );
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : String(err));
+        await refresh({ includeCatalog: false, silent: true });
+      }
+    },
+    [refresh, showToast, t],
   );
 
   const handleRemoveClick = useCallback((entry: PiPackageEntry) => {
@@ -237,9 +356,13 @@ export function ExtensionsPage() {
           <p className={styles.subtitle}>{t("extensions.subtitle")}</p>
         </div>
         <div className={styles.headerActions}>
-          <Button onClick={() => void refresh()} disabled={loading || installing}>
-            {t("common.refresh")}
-          </Button>
+          <IconButton
+            title={t("common.refresh")}
+            disabled={loading || installing}
+            onClick={() => void refresh()}
+          >
+            <ArrowsClockwise size={16} weight="regular" />
+          </IconButton>
           <Button onClick={openGallery}>
             <ArrowSquareOut size={16} weight="regular" /> {t("extensions.gallery")}
           </Button>
@@ -251,39 +374,92 @@ export function ExtensionsPage() {
 
       {listError ? <div className={styles.errorBanner}>{listError}</div> : null}
 
-      <div className={styles.scopeTabs}>
-        <Segmented
-          semantics="tab"
-          ariaLabel={t("extensions.scopeLabel")}
-          value={scope}
-          items={scopeItems}
-          onChange={(next) => setScope(next)}
-        />
-      </div>
-
       <div className={styles.body}>
-        <ContributionDiagnostics
-          diagnostics={(catalog?.diagnostics ?? []).filter((item) => item.scope === scope)}
-        />
-        {loading && !snapshot ? (
-          <div className={styles.loading}>{t("extensions.loadingList")}</div>
-        ) : (
-          <PackageList
-            entries={entries}
-            emptyText={
-              scope === "project" ? t("extensions.emptyProject") : t("extensions.emptyUser")
-            }
+        <div className={styles.overview}>
+          <div className={styles.stat}>
+            <span className={styles.statValue}>{stats.packages}</span>
+            <span className={styles.statLabel}>{t("extensions.overview.packages")}</span>
+          </div>
+          <span className={styles.statSep} aria-hidden="true" />
+          <div className={styles.stat}>
+            <span className={styles.statValue}>
+              {stats.extensionsTotal > 0
+                ? `${stats.extensionsEnabled} / ${stats.extensionsTotal}`
+                : "0"}
+            </span>
+            <span className={styles.statLabel}>{t("extensions.overview.extensions")}</span>
+          </div>
+          <span className={styles.statSep} aria-hidden="true" />
+          <div className={styles.stat}>
+            <span className={styles.statValue}>{stats.skills}</span>
+            <span className={styles.statLabel}>{t("extensions.overview.skills")}</span>
+          </div>
+          <span className={styles.statSep} aria-hidden="true" />
+          <div className={styles.stat}>
+            <span className={styles.statValue}>
+              {stats.localTotal > 0 ? `${stats.localExisting} / ${stats.localTotal}` : "0"}
+            </span>
+            <span className={styles.statLabel}>{t("extensions.overview.localDirs")}</span>
+          </div>
+          {catalog ? (
+            <span className={diagnostics.length > 0 ? styles.statusWarn : styles.status}>
+              <span className={styles.dot} />
+              {diagnostics.length > 0
+                ? t("extensions.overview.statusCount", { count: diagnostics.length })
+                : t("extensions.overview.statusOk")}
+            </span>
+          ) : null}
+        </div>
+
+        <div className={styles.toolbarRow}>
+          <Segmented
+            semantics="tab"
+            ariaLabel={t("extensions.scopeLabel")}
+            value={scope}
+            items={scopeItems}
+            onChange={(next) => setScope(next)}
+          />
+          <span className={styles.toolbarNote}>{t("extensions.toolbar.localNote")}</span>
+        </div>
+
+        <ContributionDiagnostics diagnostics={diagnostics} />
+
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <h2 className={styles.sectionTitle}>
+              {t("extensions.overview.packages")}
+              <span className={styles.count}>{entries.length}</span>
+            </h2>
+            <span className={styles.sectionNote}>{t("extensions.section.packagesNote")}</span>
+          </div>
+          {loading && !snapshot ? (
+            <div className={styles.loading}>{t("extensions.loadingList")}</div>
+          ) : (
+            <PackageList
+              entries={entries}
+              scope={scope}
+              busy={busy || installing}
+              onToggle={(entry, enabled) => void handleToggle(entry, enabled)}
+              onRemove={handleRemoveClick}
+              onOpenPath={openPath}
+              onInstall={() => setInstallOpen(true)}
+              onOpenGallery={openGallery}
+              onToggleResource={(entry, kind, item, enabled) =>
+                void handleToggleResource(entry, kind, item, enabled)
+              }
+            />
+          )}
+        </section>
+
+        {snapshot ? (
+          <LocalResourcesSection
+            dirs={snapshot.localResources}
             busy={busy || installing}
-            onToggle={(entry, enabled) => void handleToggle(entry, enabled)}
-            onRemove={handleRemoveClick}
             onOpenPath={openPath}
-            onToggleResource={(entry, kind, item, enabled) =>
-              void handleToggleResource(entry, kind, item, enabled)
+            onToggleResource={(dir, item, enabled) =>
+              void handleToggleLocalResource(dir, item, enabled)
             }
           />
-        )}
-        {snapshot ? (
-          <LocalResourcesSection dirs={snapshot.localResources} onOpenPath={openPath} />
         ) : null}
       </div>
 
@@ -302,6 +478,7 @@ export function ExtensionsPage() {
       <InstallPackageDialog
         open={installOpen}
         hasProject={Boolean(projectDir)}
+        initialLocal={scope === "project"}
         installing={installing}
         logs={installLogs}
         error={installError}

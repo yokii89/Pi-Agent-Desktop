@@ -1,24 +1,18 @@
-import { CaretDown, CaretRight, FolderOpen, Trash } from "@phosphor-icons/react";
-import { useCallback, useMemo, useState } from "react";
+import { CaretRight, FolderOpen, Package, Trash } from "@phosphor-icons/react";
+import { useId, useState } from "react";
 import type { TranslateFn } from "../../../shared/i18n";
 import type {
   PiPackageEntry,
   PiPackageResourceItem,
   PiPackageResourceKind,
 } from "../../../shared/ipc";
+import { useCollapseAnimation } from "../../hooks/useCollapseAnimation";
 import { useT } from "../../hooks/useT";
-import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 import { Toggle } from "../ui/Toggle";
 import styles from "./PackageCard.module.css";
-import { PackageResources, resourceKindLabel } from "./PackageResources";
-
-const CHIP_ORDER: readonly PiPackageResourceKind[] = ["extensions", "skills", "prompts", "themes"];
-
-function packageKindLabel(t: TranslateFn, kind: PiPackageEntry["kind"]): string {
-  if (kind === "npm" || kind === "git") return kind;
-  return t("extensions.kind.local");
-}
+import { ResourceList } from "./ResourceList";
+import { RESOURCE_KIND_ORDER, resourceKindLabel } from "./resourceKinds";
 
 interface PackageCardProps {
   entry: PiPackageEntry;
@@ -34,7 +28,7 @@ interface PackageCardProps {
   ) => void;
 }
 
-/** 单个 pi package 卡片：名称 / 来源 / 资源计数（可点开展开明细）/ 启停 / 卸载 / 打开目录。 */
+/** 单个 pi package：摘要行 + 展开后的分类资源明细。 */
 export function PackageCard({
   entry,
   busy,
@@ -44,103 +38,62 @@ export function PackageCard({
   onToggleResource,
 }: PackageCardProps) {
   const t = useT();
-  const [openKinds, setOpenKinds] = useState<ReadonlySet<PiPackageResourceKind>>(() => new Set());
-
-  const chips = useMemo(
-    () =>
-      CHIP_ORDER.filter((kind) => entry.resources[kind] > 0).map((kind) => ({
-        kind,
-        count: entry.resources[kind],
-      })),
-    [entry.resources],
+  const detailId = useId();
+  const [expanded, setExpanded] = useState(false);
+  const [activeKind, setActiveKind] = useState<PiPackageResourceKind>(
+    () => RESOURCE_KIND_ORDER.find((kind) => entry.resources[kind] > 0) ?? "extensions",
+  );
+  const { ref, innerRef, rendered } = useCollapseAnimation<HTMLDivElement, HTMLDivElement>(
+    expanded,
   );
 
-  const toggleKind = useCallback((kind: PiPackageResourceKind) => {
-    setOpenKinds((prev) => {
-      const next = new Set(prev);
-      if (next.has(kind)) next.delete(kind);
-      else next.add(kind);
-      return next;
-    });
-  }, []);
-
-  const anyOpen = openKinds.size > 0;
-
-  const expandAll = useCallback(() => {
-    setOpenKinds(new Set(CHIP_ORDER.filter((kind) => entry.resources[kind] > 0)));
-  }, [entry.resources]);
-
-  const collapseAll = useCallback(() => {
-    setOpenKinds(new Set());
-  }, []);
+  const chips = RESOURCE_KIND_ORDER.filter((kind) => entry.resources[kind] > 0);
 
   return (
     <article className={[styles.card, entry.enabled ? "" : styles.cardDisabled].join(" ")}>
-      <div className={styles.main}>
-        <div className={styles.rowTop}>
-          {chips.length > 0 ? (
-            <button
-              type="button"
-              className={styles.expandBtn}
-              aria-expanded={anyOpen}
-              title={anyOpen ? t("extensions.collapseDetails") : t("extensions.expandDetails")}
-              onClick={() => (anyOpen ? collapseAll() : expandAll())}
-            >
-              {anyOpen ? (
-                <CaretDown size={14} weight="regular" />
+      <div className={styles.row}>
+        <button
+          type="button"
+          className={styles.main}
+          aria-expanded={expanded}
+          aria-controls={detailId}
+          onClick={() => setExpanded((prev) => !prev)}
+        >
+          <span className={styles.icon}>
+            <Package size={18} weight="regular" />
+          </span>
+          <span className={styles.text}>
+            <span className={styles.titleRow}>
+              <span className={styles.name}>{entry.name}</span>
+              <span className={styles.badge}>{packageKindLabel(t, entry.kind)}</span>
+              {entry.version ? <span className={styles.badge}>v{entry.version}</span> : null}
+              {entry.enabled ? (
+                <span className={styles.badgeAccent}>{t("extensions.enabled")}</span>
               ) : (
-                <CaretRight size={14} weight="regular" />
+                <span className={styles.badge}>{t("extensions.disabled")}</span>
               )}
-            </button>
-          ) : (
-            <span className={styles.expandSpacer} aria-hidden="true" />
-          )}
-          <span className={styles.name}>{entry.name}</span>
-          <span className={styles.badge}>{packageKindLabel(t, entry.kind)}</span>
-          {entry.version ? <span className={styles.badge}>v{entry.version}</span> : null}
-          {!entry.installed ? (
-            <span className={[styles.badge, styles.badgeWarn].join(" ")}>
-              {t("extensions.dirMissing")}
+              {!entry.installed ? (
+                <span className={styles.badgeWarn}>{t("extensions.dirMissing")}</span>
+              ) : null}
+            </span>
+            <span className={styles.path} title={entry.source}>
+              {entry.source}
+            </span>
+          </span>
+          {chips.length > 0 ? (
+            <span className={styles.chips}>
+              {chips.map((kind) => (
+                <span key={kind} className={styles.chip}>
+                  {resourceKindLabel(t, kind)} {entry.resources[kind]}
+                </span>
+              ))}
             </span>
           ) : null}
-        </div>
-        {entry.description ? <p className={styles.desc}>{entry.description}</p> : null}
-        <div className={styles.meta}>
-          <span className={styles.source}>{entry.source}</span>
-        </div>
-        {chips.length > 0 ? (
-          <div className={styles.chips}>
-            {chips.map((chip) => {
-              const active = openKinds.has(chip.kind);
-              const kindLabel = resourceKindLabel(t, chip.kind);
-              return (
-                <button
-                  key={chip.kind}
-                  type="button"
-                  className={[styles.chip, active ? styles.chipActive : ""].join(" ")}
-                  aria-expanded={active}
-                  title={t("extensions.expandKind", { kind: kindLabel })}
-                  onClick={() => toggleKind(chip.kind)}
-                >
-                  {kindLabel} {chip.count}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-        {chips.length > 0 ? (
-          <PackageResources
-            items={entry.resourceItems}
-            openKinds={openKinds}
-            busy={busy}
-            onOpenPath={onOpenPath}
-            onToggleKind={toggleKind}
-            onToggleResource={(kind, item, enabled) => onToggleResource(entry, kind, item, enabled)}
-          />
-        ) : null}
-      </div>
-      <div className={styles.actions}>
-        {entry.installPath ? (
+          <span className={styles.chev} aria-hidden="true">
+            <CaretRight size={14} weight="regular" />
+          </span>
+        </button>
+        <div className={styles.actions}>
           <IconButton
             title={t("extensions.openInstallDir")}
             disabled={busy || !entry.installed}
@@ -148,21 +101,71 @@ export function PackageCard({
           >
             <FolderOpen size={16} weight="regular" />
           </IconButton>
+          <Toggle
+            checked={entry.enabled}
+            disabled={busy}
+            aria-label={
+              entry.enabled
+                ? t("extensions.disablePackage", { name: entry.name })
+                : t("extensions.enablePackage", { name: entry.name })
+            }
+            onChange={(next) => onToggle(entry, next)}
+          />
+          <IconButton
+            title={t("extensions.uninstall")}
+            disabled={busy}
+            onClick={() => onRemove(entry)}
+          >
+            <Trash size={16} weight="regular" />
+          </IconButton>
+        </div>
+      </div>
+      <div className={styles.detailWrap} id={detailId} ref={ref}>
+        {rendered ? (
+          <div className={styles.detail} ref={innerRef}>
+            <div className={styles.detailToolbar}>
+              <div
+                className={styles.kindTabs}
+                role="tablist"
+                aria-label={t("extensions.resources")}
+              >
+                {RESOURCE_KIND_ORDER.map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeKind === kind}
+                    className={styles.kindTab}
+                    onClick={() => setActiveKind(kind)}
+                  >
+                    {resourceKindLabel(t, kind)}
+                    <span className={styles.kindCount}>{entry.resources[kind]}</span>
+                  </button>
+                ))}
+              </div>
+              <span className={styles.detailHint}>{t("extensions.package.detailHint")}</span>
+            </div>
+            <ResourceList
+              dotKind={activeKind}
+              kindLabel={resourceKindLabel(t, activeKind)}
+              items={entry.resourceItems[activeKind]}
+              busy={busy}
+              emptyText={t("extensions.package.emptyKind", {
+                kind: resourceKindLabel(t, activeKind),
+              })}
+              onOpenPath={onOpenPath}
+              onToggleResource={(item, enabled) =>
+                onToggleResource(entry, activeKind, item, enabled)
+              }
+            />
+          </div>
         ) : null}
-        <Toggle
-          checked={entry.enabled}
-          disabled={busy}
-          aria-label={
-            entry.enabled
-              ? t("extensions.disablePackage", { name: entry.name })
-              : t("extensions.enablePackage", { name: entry.name })
-          }
-          onChange={(next) => onToggle(entry, next)}
-        />
-        <Button disabled={busy} onClick={() => onRemove(entry)}>
-          <Trash size={16} weight="regular" /> {t("extensions.uninstall")}
-        </Button>
       </div>
     </article>
   );
+}
+
+function packageKindLabel(t: TranslateFn, kind: PiPackageEntry["kind"]): string {
+  if (kind === "npm" || kind === "git") return kind;
+  return t("extensions.kind.local");
 }

@@ -1,5 +1,6 @@
 import type {
   ExtensionPushMessage,
+  PiLocalResourceSetEnabledRequest,
   PiPackageInstallRequest,
   PiPackageRemoveRequest,
   PiPackageSetEnabledRequest,
@@ -30,6 +31,9 @@ export const extensionService = {
   },
   async setResourceEnabled(req: PiPackageSetResourceEnabledRequest): Promise<void> {
     await unwrap(api().setResourceEnabled(req));
+  },
+  async setLocalResourceEnabled(req: PiLocalResourceSetEnabledRequest): Promise<void> {
+    await unwrap(api().setLocalResourceEnabled(req));
   },
   onOutput(callback: (message: ExtensionPushMessage) => void): () => void {
     return api().onOutput(callback);

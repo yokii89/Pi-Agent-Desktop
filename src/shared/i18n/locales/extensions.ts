@@ -3,13 +3,13 @@ import { defineMessages } from "../types";
 export const extensionMessages = defineMessages({
   "extensions.title": { "zh-CN": "扩展", "en-US": "Extensions" },
   "extensions.subtitle": {
-    "zh-CN": "管理 pi packages：扩展、技能、提示模板与主题",
-    "en-US": "Manage pi packages: extensions, skills, prompts, and themes",
+    "zh-CN": "管理 pi 包与本地资源 · 安装、启停与目录入口",
+    "en-US": "Manage pi packages and local resources",
   },
   "extensions.marketplace": { "zh-CN": "扩展市场", "en-US": "Marketplace" },
   "extensions.gallery": { "zh-CN": "包市场", "en-US": "Gallery" },
   "extensions.installed": { "zh-CN": "已安装", "en-US": "Installed" },
-  "extensions.install": { "zh-CN": "安装", "en-US": "Install" },
+  "extensions.install": { "zh-CN": "安装扩展", "en-US": "Install extension" },
   "extensions.installLocal": { "zh-CN": "本地安装", "en-US": "Install from disk" },
   "extensions.installDialog.title": {
     "zh-CN": "安装扩展包",
@@ -57,14 +57,22 @@ export const extensionMessages = defineMessages({
   },
   "extensions.reload": { "zh-CN": "重新加载", "en-US": "Reload" },
   "extensions.empty": { "zh-CN": "暂无扩展", "en-US": "No extensions" },
+  "extensions.emptyProjectTitle": {
+    "zh-CN": "当前项目还没有安装包",
+    "en-US": "No packages in this project yet",
+  },
+  "extensions.emptyUserTitle": {
+    "zh-CN": "尚未安装任何包",
+    "en-US": "No packages installed yet",
+  },
   "extensions.emptyProject": {
-    "zh-CN": "当前项目尚未安装任何 pi package。可点击「安装」并选择「当前项目」。",
-    "en-US": "No pi packages in this project yet. Click Install and choose Current project.",
+    "zh-CN": "安装到当前项目后会出现在这里。本地资源为全局目录，仍可在下方管理。",
+    "en-US":
+      "Packages installed into this project appear here. Local resources are global and remain below.",
   },
   "extensions.emptyUser": {
-    "zh-CN": "尚未安装任何 pi package。可从 npm / git / 本地路径安装，或先到包市场挑选。",
-    "en-US":
-      "No pi packages installed yet. Install from npm, git, or a local path — or pick one in the gallery.",
+    "zh-CN": "从 npm、git 或本地路径安装，或先去包市场挑一个。",
+    "en-US": "Install from npm, git, or a local path — or browse the gallery.",
   },
   "extensions.loadingList": {
     "zh-CN": "正在读取已安装扩展…",
@@ -112,12 +120,66 @@ export const extensionMessages = defineMessages({
   "extensions.resourceKind.themes": { "zh-CN": "主题", "en-US": "Themes" },
   "extensions.localKind.extensions": { "zh-CN": "扩展", "en-US": "Extensions" },
   "extensions.localKind.skills": { "zh-CN": "技能", "en-US": "Skills" },
+  "extensions.localKind.sharedSkills": { "zh-CN": "共享技能", "en-US": "Shared skills" },
   "extensions.localKind.prompts": { "zh-CN": "提示模板", "en-US": "Prompt templates" },
   "extensions.localKind.themes": { "zh-CN": "主题", "en-US": "Themes" },
   "extensions.openFolder": { "zh-CN": "打开文件夹", "en-US": "Open folder" },
   "extensions.missing": { "zh-CN": "不存在", "en-US": "Missing" },
   "extensions.resources": { "zh-CN": "资源", "en-US": "Resources" },
   "extensions.localResources": { "zh-CN": "本地资源", "en-US": "Local resources" },
+  "extensions.localEmpty": {
+    "zh-CN": "目录为空。把技能、提示模板或主题放进这里后即可在此管理。",
+    "en-US": "This folder is empty. Add skills, prompts, or themes here to manage them.",
+  },
+  "extensions.localEmptyState": { "zh-CN": "空目录", "en-US": "Empty folder" },
+  "extensions.localState": {
+    "zh-CN": "{enabled} / {total} 启用",
+    "en-US": "{enabled} / {total} on",
+  },
+  "extensions.localNone": {
+    "zh-CN": "还没有已创建的本地资源目录。",
+    "en-US": "No local resource folders yet.",
+  },
+  "extensions.localMissing.title": {
+    "zh-CN": "未创建的目录",
+    "en-US": "Folders not created",
+  },
+  "extensions.localMissing.note": {
+    "zh-CN": "创建后 pi 会自动发现",
+    "en-US": "pi discovers them once created",
+  },
+  "extensions.localMissing.badge": { "zh-CN": "未创建", "en-US": "Not created" },
+  "extensions.showMore": { "zh-CN": "显示其余 {count} 项", "en-US": "Show {count} more" },
+  "extensions.showLess": { "zh-CN": "收起", "en-US": "Show less" },
+  "extensions.overview.packages": { "zh-CN": "已安装包", "en-US": "Packages" },
+  "extensions.overview.extensions": { "zh-CN": "已启用扩展", "en-US": "Extensions on" },
+  "extensions.overview.skills": { "zh-CN": "技能", "en-US": "Skills" },
+  "extensions.overview.localDirs": { "zh-CN": "本地目录可用", "en-US": "Local folders" },
+  "extensions.overview.statusOk": { "zh-CN": "无诊断问题", "en-US": "No diagnostics" },
+  "extensions.overview.statusCount": {
+    "zh-CN": "{count} 条诊断",
+    "en-US": "{count} diagnostics",
+  },
+  "extensions.toolbar.localNote": {
+    "zh-CN": "本地资源为全局目录，切换项目不影响",
+    "en-US": "Local resources are global; project scope does not affect them",
+  },
+  "extensions.section.packagesNote": {
+    "zh-CN": "包来源与启停由 pi 管理",
+    "en-US": "Sources and toggles are managed by pi",
+  },
+  "extensions.section.localNote": {
+    "zh-CN": "pi 自动发现 · 改动对新建会话生效",
+    "en-US": "Discovered by pi · changes apply to new sessions",
+  },
+  "extensions.package.detailHint": {
+    "zh-CN": "关闭后不会加载",
+    "en-US": "Disabled resources are not loaded",
+  },
+  "extensions.package.emptyKind": {
+    "zh-CN": "这个包没有{kind}。",
+    "en-US": "This package has no {kind}.",
+  },
   "extensions.diagnostics": { "zh-CN": "诊断", "en-US": "Diagnostics" },
   "extensions.diagnostics.title": {
     "zh-CN": "桌面能力诊断",

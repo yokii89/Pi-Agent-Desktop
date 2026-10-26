@@ -88,6 +88,7 @@ import type {
   PiChatMessage,
   PideskSettings,
   PiInfo,
+  PiLocalResourceSetEnabledRequest,
   PiModelOption,
   PiModelOverrideSetRequest,
   PiModelOverrideSetResult,
@@ -344,6 +345,7 @@ export interface PideskGlobalApi {
     remove(req: PiPackageRemoveRequest): Promise<IpcResult<null>>;
     setEnabled(req: PiPackageSetEnabledRequest): Promise<IpcResult<null>>;
     setResourceEnabled(req: PiPackageSetResourceEnabledRequest): Promise<IpcResult<null>>;
+    setLocalResourceEnabled(req: PiLocalResourceSetEnabledRequest): Promise<IpcResult<null>>;
     onOutput(callback: (message: ExtensionPushMessage) => void): () => void;
   };
   catalog: {

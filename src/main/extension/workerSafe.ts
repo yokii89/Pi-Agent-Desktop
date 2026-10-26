@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parsePideskManifest } from "./contributionSchema";
-import { listPackages } from "./packageStore";
+import { listPackageEntries } from "./packageStore";
 
 function readJsonFile(file: string): Record<string, unknown> | null {
   try {
@@ -31,7 +31,9 @@ function packageWorkerSafe(installPath: string | null): boolean {
  * 仅：已启用 + 已安装 + `pidesk.worker.safe === true` + 资源级启用的 extensions。
  */
 export function listWorkerSafeExtensionPaths(projectDir?: string | null): string[] {
-  const snapshot = listPackages(typeof projectDir === "string" && projectDir ? projectDir : null);
+  const snapshot = listPackageEntries(
+    typeof projectDir === "string" && projectDir ? projectDir : null,
+  );
   const paths: string[] = [];
   const seen = new Set<string>();
   for (const entry of [...snapshot.user, ...snapshot.project]) {

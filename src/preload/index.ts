@@ -91,6 +91,7 @@ import type {
   PiChatMessage,
   PideskSettings,
   PiInfo,
+  PiLocalResourceSetEnabledRequest,
   PiModelOption,
   PiModelOverrideSetRequest,
   PiModelOverrideSetResult,
@@ -615,6 +616,9 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 包内单资源启停。 */
     setResourceEnabled: (req: PiPackageSetResourceEnabledRequest): Promise<IpcResult<null>> =>
       ipcRenderer.invoke(EXTENSION_IPC.setResourceEnabled, req),
+    /** 本地资源目录内单资源启停（settings 数组的 +/- 精确模式）。 */
+    setLocalResourceEnabled: (req: PiLocalResourceSetEnabledRequest): Promise<IpcResult<null>> =>
+      ipcRenderer.invoke(EXTENSION_IPC.setLocalResourceEnabled, req),
     /** 订阅安装/卸载子进程日志。 */
     onOutput: (callback: (message: ExtensionPushMessage) => void): (() => void) =>
       subscribe<ExtensionPushMessage>(EXTENSION_IPC.output, callback),
