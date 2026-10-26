@@ -243,6 +243,8 @@
   --buddy-gold: #fff066;
   --buddy-tongue: #ff7b89;
   --buddy-dog-coat: #ffffff;
+  /* 小狗叼的骨头：与白毛拉开一档，否则在胸口只剩一圈线稿 */
+  --buddy-bone: #efdcb4;
   --buddy-cat-coat: #f7a84b;
   --buddy-cat-stripe: #d97724;
   --buddy-cat-inner: #ff9eaa;
@@ -364,6 +366,8 @@
   --buddy-gold: #fff066;
   --buddy-tongue: #ff7b89;
   --buddy-dog-coat: #ffffff;
+  /* 小狗叼的骨头：与白毛拉开一档，否则在胸口只剩一圈线稿 */
+  --buddy-bone: #efdcb4;
   --buddy-cat-coat: #f7a84b;
   --buddy-cat-stripe: #d97724;
   --buddy-cat-inner: #ff9eaa;

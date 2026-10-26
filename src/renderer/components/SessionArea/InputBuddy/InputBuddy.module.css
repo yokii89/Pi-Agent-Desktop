@@ -41,6 +41,10 @@
   fill: var(--buddy-dog-coat);
 }
 
+.dogBone {
+  fill: var(--buddy-bone);
+}
+
 .catCoat {
   fill: var(--buddy-cat-coat);
 }
@@ -143,6 +147,42 @@
   fill: var(--buddy-capy-sweat);
 }
 
+.angerMark {
+  stroke: var(--buddy-tongue);
+}
+
+.puffCheek {
+  fill: var(--buddy-parrot-cheek);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.tearDrop,
+.sweatDrop,
+.crumb,
+.confettiPiece,
+.sparkle,
+.dizzySpiral {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.confettiA {
+  fill: var(--buddy-gold);
+}
+
+.confettiB {
+  fill: var(--buddy-cat-collar);
+}
+
+.confettiC {
+  fill: var(--buddy-parrot-cheek);
+}
+
+.confettiD {
+  fill: var(--buddy-capy-leaf);
+}
+
 .gold {
   fill: var(--buddy-gold);
 }
@@ -188,6 +228,23 @@
 .art [data-part="grass"],
 .art [data-part="hearts"],
 .art [data-part="snot-bubble"] {
+  opacity: 0;
+}
+
+/* 情绪反馈姿态的部件：默认整组收起，由各自的 data-pose 点亮 */
+.art [data-part="eyes-thinking"],
+.art [data-part="eyes-angry"],
+.art [data-part="eyes-sad"],
+.art [data-part="eyes-dizzy"],
+.art [data-part="puff-cheeks"],
+.art [data-part="mouth-chew"],
+.art [data-part="snack"],
+.art [data-part="thinking"],
+.art [data-part="anger"],
+.art [data-part="crumbs"],
+.art [data-part="sweat-drops"],
+.art [data-part="confetti"],
+.art [data-part="dizzy-stars"] {
   opacity: 0;
 }
 
@@ -768,6 +825,442 @@
   opacity: 1;
 }
 
+/* ---------- 情绪反馈姿态（思考 / 生气 / 进食 / 委屈 / 庆祝 / 头晕） ----------
+ * 共享部分先写、逐角色覆盖在后：两组规则同权（类 + data-pose + data-part），
+ * 靠顺序取胜，所以新的共享姿态务必放在这一节的最前面。
+ * 圆心 px 与上面的骨骼锚点同口径：设计稿坐标 - 50（viewBox 从 x=50 起）。
+ */
+
+/* ① 思考中：眼神上移、身体前倾、头顶转圈 */
+.art[data-pose="thinking"] [data-part="character"] {
+  transform-origin: 130px 203px;
+  animation: thinkLean 2.6s ease-in-out infinite;
+}
+.art[data-pose="thinking"] [data-part="head"] {
+  animation: thinkTilt 2.6s ease-in-out infinite;
+}
+.art[data-pose="thinking"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.art[data-pose="thinking"] [data-part="eyes-thinking"] {
+  opacity: 1;
+  animation: thinkLook 2.6s ease-in-out infinite;
+}
+.art[data-pose="thinking"] [data-part="thinking"] {
+  opacity: 1;
+}
+.art[data-pose="thinking"] [data-part="thinking-spinner"] {
+  transform-origin: 236px 4px;
+  animation: spin 1.4s linear infinite;
+}
+
+/* ② 生气：倒八字眉 + 独立鼓腮 + 头顶十字筋 */
+.art[data-pose="angry"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.art[data-pose="angry"] [data-part="eyes-angry"] {
+  opacity: 1;
+}
+.art[data-pose="angry"] [data-part="puff-cheeks"] {
+  opacity: 1;
+}
+.art[data-pose="angry"] .puffCheek {
+  animation: cheekPuff 1.5s ease-in-out infinite;
+}
+.art[data-pose="angry"] [data-part="anger"] {
+  opacity: 1;
+  transform-origin: 274px 34px;
+  animation: angerPop 1.1s ease-in-out infinite;
+}
+.art[data-pose="angry"] [data-part="character"] {
+  transform-origin: 130px 203px;
+  animation: angryTremble 0.36s ease-in-out infinite;
+}
+
+/* ③ 进食：眯眼、捧食、掉渣 */
+.art[data-pose="eating"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.art[data-pose="eating"] [data-part="eyes-happy"] {
+  opacity: 1;
+}
+.art[data-pose="eating"] [data-part="snack"] {
+  opacity: 1;
+  animation: snackBite 0.3s ease-in-out infinite alternate;
+}
+.art[data-pose="eating"] [data-part="crumbs"] {
+  opacity: 1;
+}
+.art[data-pose="eating"] .crumb {
+  animation: crumbDrop 1.4s ease-in infinite;
+}
+.art[data-pose="eating"] .crumb:nth-child(2) {
+  animation-delay: 0.35s;
+}
+.art[data-pose="eating"] .crumb:nth-child(3) {
+  animation-delay: 0.7s;
+}
+.art[data-pose="eating"] .crumb:nth-child(4) {
+  animation-delay: 1.05s;
+}
+
+/* ④ 委屈：身体缩下去、泪汪汪、耷拉耳朵 */
+.art[data-pose="sad"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.art[data-pose="sad"] [data-part="eyes-sad"] {
+  opacity: 1;
+}
+.art[data-pose="sad"] [data-part="sweat-drops"] {
+  opacity: 1;
+}
+.art[data-pose="sad"] .tearDrop {
+  animation: tearRoll 2.6s ease-in infinite;
+}
+.art[data-pose="sad"] .sweatDrop {
+  animation: sweatBead 2.6s ease-in infinite;
+}
+.art[data-pose="sad"] [data-part="character"] {
+  transform-origin: 130px 203px;
+  animation: sadSink 3.6s ease-in-out infinite;
+}
+.art[data-pose="sad"] [data-part="head"] {
+  animation: sadHead 3.6s ease-in-out infinite;
+}
+
+/* ⑤ 庆祝：原地弹跳、举爪、礼花 */
+.art[data-pose="celebration"] [data-part="character"] {
+  transform-origin: 130px 203px;
+  animation: cheerJump 0.72s cubic-bezier(0.32, 1.3, 0.55, 1) infinite;
+}
+.art[data-pose="celebration"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.art[data-pose="celebration"] [data-part="eyes-happy"] {
+  opacity: 1;
+}
+.art[data-pose="celebration"] [data-part="confetti"] {
+  opacity: 1;
+}
+.art[data-pose="celebration"] .confettiPiece {
+  animation: confettiPop 1.6s ease-out infinite;
+}
+.art[data-pose="celebration"] .confettiPiece:nth-child(2n) {
+  animation-delay: 0.24s;
+}
+.art[data-pose="celebration"] .confettiPiece:nth-child(3n) {
+  animation-delay: 0.52s;
+}
+.art[data-pose="celebration"] .sparkle {
+  animation: twinkle 1.1s ease-in-out infinite;
+}
+.art[data-pose="celebration"] .sparkle:nth-child(8) {
+  animation-delay: 0.3s;
+}
+.art[data-pose="celebration"] .sparkle:nth-child(9) {
+  animation-delay: 0.6s;
+}
+
+/* ⑥ 头晕：蚊香圈自转、头顶星星绕圈、身体左右晃 */
+.art[data-pose="dizzy"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.art[data-pose="dizzy"] [data-part="eyes-dizzy"] {
+  opacity: 1;
+}
+.art[data-pose="dizzy"] .dizzySpiral {
+  animation: spin 2.8s linear infinite;
+}
+.art[data-pose="dizzy"] [data-part="dizzy-stars"] {
+  opacity: 1;
+  transform-origin: 130px 26px;
+  animation: dizzyOrbit 2.2s ease-in-out infinite;
+}
+.art[data-pose="dizzy"] [data-part="sweat-drops"] {
+  opacity: 1;
+}
+.art[data-pose="dizzy"] .sweatDrop {
+  animation: sweatBead 1.8s ease-in infinite;
+}
+.art[data-pose="dizzy"] [data-part="character"] {
+  transform-origin: 130px 203px;
+  animation: dizzySway 2.2s ease-in-out infinite;
+}
+
+/* ---------- 小狗：情绪姿态的耳朵 / 爪子 / 吊牌 ---------- */
+.dog[data-pose="thinking"] [data-part="ear-left"] {
+  transform: rotate(-8deg) translateY(-4px);
+}
+.dog[data-pose="thinking"] [data-part="ear-right"] {
+  transform: rotate(8deg) translateY(-4px);
+}
+
+.dog[data-pose="angry"] [data-part="ear-left"] {
+  transform: rotate(-14deg) translateY(5px);
+}
+.dog[data-pose="angry"] [data-part="ear-right"] {
+  transform: rotate(14deg) translateY(5px);
+}
+.dog[data-pose="angry"] [data-part="tag"] {
+  animation: tagWag 0.16s ease-in-out infinite alternate;
+}
+
+.dog[data-pose="eating"] [data-part="paw-left"] {
+  transform: translate(24px, -14px);
+}
+.dog[data-pose="eating"] [data-part="paw-right"] {
+  transform: translate(-24px, -14px);
+}
+.dog[data-pose="eating"] [data-part="mouth-chew"] {
+  opacity: 1;
+  transform-origin: 130px 121px;
+  animation: chewMouth 0.28s ease-in-out infinite alternate;
+}
+
+.dog[data-pose="sad"] [data-part="ear-left"] {
+  transform: rotate(-10deg) translateY(5px);
+}
+.dog[data-pose="sad"] [data-part="ear-right"] {
+  transform: rotate(10deg) translateY(5px);
+}
+
+.dog[data-pose="celebration"] [data-part="paw-left"] {
+  animation: cheerPawLeft 0.72s ease-in-out infinite;
+}
+.dog[data-pose="celebration"] [data-part="paw-right"] {
+  animation: cheerPawRight 0.72s ease-in-out infinite;
+}
+.dog[data-pose="celebration"] [data-part="tag"] {
+  animation: dogTagWag 0.22s ease-in-out infinite alternate;
+}
+.dog[data-pose="celebration"] [data-part="tongue"] {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.dog[data-pose="dizzy"] [data-part="ear-left"] {
+  animation: earWobbleLeft 1.1s ease-in-out infinite;
+}
+.dog[data-pose="dizzy"] [data-part="ear-right"] {
+  animation: earWobbleRight 1.1s ease-in-out infinite;
+}
+
+/* ---------- 橘猫：情绪姿态的耳朵 / 尾巴 / 铃铛 / 嘴 ---------- */
+.cat[data-pose="thinking"] [data-part="ear-left"] {
+  transform: rotate(-8deg) translateY(-3px);
+}
+.cat[data-pose="thinking"] [data-part="ear-right"] {
+  transform: rotate(8deg) translateY(-3px);
+}
+.cat[data-pose="thinking"] [data-part="tail"] {
+  animation: catTailSway 2.6s ease-in-out infinite alternate;
+}
+
+.cat[data-pose="angry"] [data-part="ear-left"] {
+  transform: rotate(-38deg) translate(-5px, 8px);
+}
+.cat[data-pose="angry"] [data-part="ear-right"] {
+  transform: rotate(38deg) translate(5px, 8px);
+}
+.cat[data-pose="angry"] [data-part="tail"] {
+  animation: catTailFast 0.24s ease-in-out infinite alternate;
+}
+.cat[data-pose="angry"] [data-part="whiskers-left"] {
+  transform: rotate(-10deg);
+}
+.cat[data-pose="angry"] [data-part="whiskers-right"] {
+  transform: rotate(10deg);
+}
+
+.cat[data-pose="eating"] [data-part="paw-left"] {
+  transform: translate(20px, -12px);
+}
+.cat[data-pose="eating"] [data-part="paw-right"] {
+  transform: translate(-20px, -12px);
+}
+.cat[data-pose="eating"] [data-part="mouth-open"] {
+  opacity: 1;
+  /* 动画期间被关键帧盖掉；关掉动效偏好时靠这条静态值把嘴张开 */
+  transform: scaleY(1);
+  animation: chewMouth 0.3s ease-in-out infinite alternate;
+}
+
+.cat[data-pose="sad"] [data-part="ear-left"] {
+  transform: rotate(-20deg) translate(-4px, 7px);
+}
+.cat[data-pose="sad"] [data-part="ear-right"] {
+  transform: rotate(20deg) translate(4px, 7px);
+}
+.cat[data-pose="sad"] [data-part="tail"] {
+  transform: rotate(18deg) translateY(10px);
+}
+.cat[data-pose="sad"] [data-part="whiskers-left"] {
+  transform: rotate(6deg);
+}
+.cat[data-pose="sad"] [data-part="whiskers-right"] {
+  transform: rotate(-6deg);
+}
+
+.cat[data-pose="celebration"] [data-part="paw-left"] {
+  animation: cheerPawLeft 0.72s ease-in-out infinite;
+}
+.cat[data-pose="celebration"] [data-part="paw-right"] {
+  animation: cheerPawRight 0.72s ease-in-out infinite;
+}
+.cat[data-pose="celebration"] [data-part="tail"] {
+  animation: catTailFast 0.22s ease-in-out infinite alternate;
+}
+.cat[data-pose="celebration"] [data-part="bell"] {
+  animation: tagWag 0.22s ease-in-out infinite alternate;
+}
+.cat[data-pose="celebration"] [data-part="mouth-open"] {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.cat[data-pose="dizzy"] [data-part="ear-left"] {
+  animation: earWobbleLeft 1.1s ease-in-out infinite;
+}
+.cat[data-pose="dizzy"] [data-part="ear-right"] {
+  animation: earWobbleRight 1.1s ease-in-out infinite;
+}
+.cat[data-pose="dizzy"] [data-part="tail"] {
+  animation: catTailSway 1.2s ease-in-out infinite alternate;
+}
+
+/* ---------- 鹦鹉：情绪姿态的羽冠 / 双翅 / 喙 ---------- */
+.parrot[data-pose="thinking"] [data-part="crest"] {
+  transform: rotate(-10deg) scale(1.08);
+}
+
+.parrot[data-pose="angry"] [data-part="crest"] {
+  transform: rotate(-34deg) translateY(5px) scale(0.94);
+}
+.parrot[data-pose="angry"] [data-part="wing-left"] {
+  transform: rotate(14deg);
+}
+.parrot[data-pose="angry"] [data-part="wing-right"] {
+  transform: rotate(-14deg);
+}
+.parrot[data-pose="angry"] .parrotCheek circle {
+  animation: cheekPuff 1.5s ease-in-out infinite;
+}
+
+.parrot[data-pose="eating"] [data-part="wing-left"] {
+  transform: translate(8px, -6px) rotate(6deg);
+}
+.parrot[data-pose="eating"] [data-part="wing-right"] {
+  transform: translate(-8px, -6px) rotate(-6deg);
+}
+.parrot[data-pose="eating"] [data-part="beak-lower"] {
+  animation: beakChew 0.26s ease-in-out infinite alternate;
+}
+
+.parrot[data-pose="sad"] [data-part="crest"] {
+  transform: rotate(-46deg) translateY(8px) scale(0.92);
+}
+.parrot[data-pose="sad"] [data-part="wing-left"] {
+  transform: rotate(-6deg) translateY(6px);
+}
+.parrot[data-pose="sad"] [data-part="wing-right"] {
+  transform: rotate(6deg) translateY(6px);
+}
+
+.parrot[data-pose="celebration"] [data-part="wing-left"] {
+  animation: flapLeft 0.28s ease-in-out infinite alternate;
+}
+.parrot[data-pose="celebration"] [data-part="wing-right"] {
+  animation: flapRight 0.28s ease-in-out infinite alternate;
+}
+.parrot[data-pose="celebration"] [data-part="crest"] {
+  animation: crestHappy 0.3s ease-in-out infinite alternate;
+}
+.parrot[data-pose="celebration"] [data-part="notes"] {
+  opacity: 1;
+  animation: notesFloat 1.4s ease-in-out infinite;
+}
+
+.parrot[data-pose="dizzy"] [data-part="crest"] {
+  animation: crestBob 0.7s ease-in-out infinite;
+}
+.parrot[data-pose="dizzy"] [data-part="wing-left"] {
+  animation: earWobbleLeft 1.1s ease-in-out infinite;
+}
+.parrot[data-pose="dizzy"] [data-part="wing-right"] {
+  animation: earWobbleRight 1.1s ease-in-out infinite;
+}
+
+/* ---------- 卡皮巴拉：情绪姿态的耳朵 / 橘子 / 吻部 / 前爪 ---------- */
+.capy[data-pose="thinking"] [data-part="ear-left"] {
+  transform: rotate(-10deg) translateY(-3px);
+}
+.capy[data-pose="thinking"] [data-part="ear-right"] {
+  transform: rotate(10deg) translateY(-3px);
+}
+.capy[data-pose="thinking"] [data-part="orange"] {
+  animation: capyOrangeBob 1.6s ease-in-out infinite alternate;
+}
+
+.capy[data-pose="angry"] [data-part="ear-left"] {
+  transform: rotate(-16deg) translateY(6px);
+}
+.capy[data-pose="angry"] [data-part="ear-right"] {
+  transform: rotate(16deg) translateY(6px);
+}
+.capy[data-pose="angry"] [data-part="orange"] {
+  animation: capyOrangeBob 0.24s ease-in-out infinite alternate;
+}
+/* 鼓着腮的吻部被气鼓鼓地压扁一点 */
+.capy[data-pose="angry"] [data-part="snout"] {
+  transform: scale(1.04, 0.96);
+}
+
+.capy[data-pose="eating"] [data-part="paw-left"] {
+  transform: translate(36px, -12px);
+}
+.capy[data-pose="eating"] [data-part="paw-right"] {
+  transform: translate(-36px, -12px);
+}
+.capy[data-pose="eating"] [data-part="snout"] {
+  animation: capyChew 0.26s ease-in-out infinite alternate;
+}
+
+.capy[data-pose="sad"] [data-part="ear-left"] {
+  transform: rotate(-18deg) translateY(7px);
+}
+.capy[data-pose="sad"] [data-part="ear-right"] {
+  transform: rotate(18deg) translateY(7px);
+}
+.capy[data-pose="sad"] [data-part="orange"] {
+  transform: rotate(-12deg) translateY(4px);
+}
+
+.capy[data-pose="celebration"] [data-part="paw-left"] {
+  animation: cheerPawLeft 0.72s ease-in-out infinite;
+}
+.capy[data-pose="celebration"] [data-part="paw-right"] {
+  animation: cheerPawRight 0.72s ease-in-out infinite;
+}
+.capy[data-pose="celebration"] [data-part="orange"] {
+  animation: capyOrangeJump 0.4s cubic-bezier(0.25, 1, 0.5, 1) infinite alternate;
+}
+.capy[data-pose="celebration"] [data-part="hearts"] {
+  opacity: 1;
+}
+.capy[data-pose="celebration"] [data-part="hearts"] path {
+  animation: floatUp 1.4s ease-in-out infinite;
+}
+
+.capy[data-pose="dizzy"] [data-part="ear-left"] {
+  animation: earWobbleLeft 1.1s ease-in-out infinite;
+}
+.capy[data-pose="dizzy"] [data-part="ear-right"] {
+  animation: earWobbleRight 1.1s ease-in-out infinite;
+}
+.capy[data-pose="dizzy"] [data-part="orange"] {
+  animation: capyOrangeBob 1.1s ease-in-out infinite alternate;
+}
+
 /* ---------- 关键帧 ---------- */
 @keyframes breathe {
   0%,
@@ -973,10 +1466,296 @@
   }
 }
 
+/* —— 情绪反馈姿态 —— */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 前倾：从卡沿那一端微微抬起，读作「凑近屏幕看」 */
+@keyframes thinkLean {
+  0%,
+  100% {
+    transform: translateY(-2px) scale(1.015);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.022);
+  }
+}
+
+@keyframes thinkTilt {
+  0%,
+  100% {
+    transform: rotate(-2deg) translateY(1px);
+  }
+  50% {
+    transform: rotate(2deg) translateY(-1px);
+  }
+}
+
+@keyframes thinkLook {
+  0%,
+  100% {
+    transform: translate(0, -2px);
+  }
+  55% {
+    transform: translate(-1.6px, -4px);
+  }
+}
+
+@keyframes cheekPuff {
+  0%,
+  100% {
+    transform: scale(0.82);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+}
+
+@keyframes angerPop {
+  0% {
+    transform: scale(0.72) rotate(-8deg);
+    opacity: 0.35;
+  }
+  22% {
+    transform: scale(1.12) rotate(4deg);
+    opacity: 1;
+  }
+  55% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.04) rotate(-3deg);
+    opacity: 0.9;
+  }
+}
+
+@keyframes angryTremble {
+  0%,
+  100% {
+    transform: translateX(-1px) rotate(-0.7deg);
+  }
+  50% {
+    transform: translateX(1px) rotate(0.7deg);
+  }
+}
+
+@keyframes snackBite {
+  from {
+    transform: translateY(0) scale(1);
+  }
+  to {
+    transform: translateY(-1.5px) scale(1.03);
+  }
+}
+
+@keyframes crumbDrop {
+  0% {
+    transform: translateY(-4px) scale(0.6);
+    opacity: 0;
+  }
+  20% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(16px) scale(0.8);
+    opacity: 0;
+  }
+}
+
+@keyframes chewMouth {
+  from {
+    transform: scaleY(0.2);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes beakChew {
+  from {
+    transform: translateY(1px) scaleY(0.85);
+  }
+  to {
+    transform: translateY(8px) scaleY(1.12);
+  }
+}
+
+@keyframes tearRoll {
+  0% {
+    transform: translateY(0) scale(0.7);
+    opacity: 0;
+  }
+  25% {
+    transform: translateY(1px) scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(10px) scale(0.9);
+    opacity: 0;
+  }
+}
+
+@keyframes sweatBead {
+  0% {
+    transform: translateY(-3px) scale(0.5);
+    opacity: 0;
+  }
+  30% {
+    transform: translateY(0) scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(9px) scale(0.85);
+    opacity: 0;
+  }
+}
+
+/* 趴低：以卡沿为支点把身体压扁，头顶自然沉下去 */
+@keyframes sadSink {
+  0%,
+  100% {
+    transform: scaleY(0.972) translateY(0);
+  }
+  50% {
+    transform: scaleY(0.966) translateY(1px);
+  }
+}
+
+@keyframes sadHead {
+  0%,
+  100% {
+    transform: translateY(2px) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(4px) rotate(1.5deg);
+  }
+}
+
+@keyframes cheerJump {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  30%,
+  55% {
+    transform: translateY(-8px) scale(0.985, 1.03);
+  }
+  85% {
+    transform: translateY(1px) scale(1.02, 0.97);
+  }
+}
+
+@keyframes cheerPawLeft {
+  0%,
+  100% {
+    transform: translate(-6px, -30px) rotate(-16deg);
+  }
+  50% {
+    transform: translate(-10px, -38px) rotate(-30deg);
+  }
+}
+
+@keyframes cheerPawRight {
+  0%,
+  100% {
+    transform: translate(6px, -30px) rotate(16deg);
+  }
+  50% {
+    transform: translate(10px, -38px) rotate(30deg);
+  }
+}
+
+@keyframes confettiPop {
+  0% {
+    transform: translateY(5px) scale(0.25) rotate(0deg);
+    opacity: 0;
+  }
+  22% {
+    transform: translateY(-3px) scale(1.15) rotate(12deg);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(-6px) scale(1) rotate(24deg);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(-12px) scale(0.85) rotate(36deg);
+    opacity: 0;
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.15) rotate(18deg);
+    opacity: 1;
+  }
+}
+
+@keyframes dizzyOrbit {
+  0%,
+  100% {
+    transform: rotate(-8deg) translateY(0);
+  }
+  50% {
+    transform: rotate(8deg) translateY(-2px);
+  }
+}
+
+@keyframes dizzySway {
+  0%,
+  100% {
+    transform: rotate(-3deg) translateX(-1.5px);
+  }
+  50% {
+    transform: rotate(3deg) translateX(1.5px);
+  }
+}
+
+@keyframes earWobbleLeft {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(10deg) translateY(3px);
+  }
+}
+
+@keyframes earWobbleRight {
+  0%,
+  100% {
+    transform: rotate(6deg);
+  }
+  50% {
+    transform: rotate(-10deg) translateY(3px);
+  }
+}
+
 /* 纯装饰的呼吸 / 摆动不参与减弱动效偏好：直接落成静止姿态。
    选择器权重要压过上面的姿态规则（同权重 + 更靠后即可），不用 !important。 */
 @media (prefers-reduced-motion: reduce) {
-  .buddy .art [data-part] {
+  /* `.art.art` 是刻意的权重提升（0,4,0）：要压过所有姿态规则，包括挂在形状上的
+     鼓腮 / 碎屑 / 礼花 / 泪珠 / 蚊香圈，以及鹦鹉那两条 (0,3,1) 的腮红规则。
+     这些动画各自成类、不在 [data-part] 上，必须逐个点名，否则关掉动效后还在转。 */
+  .art.art[data-pose] [data-part],
+  .art.art[data-pose] .puffCheek,
+  .art.art[data-pose] .crumb,
+  .art.art[data-pose] .confettiPiece,
+  .art.art[data-pose] .sparkle,
+  .art.art[data-pose] .tearDrop,
+  .art.art[data-pose] .sweatDrop,
+  .art.art[data-pose] .dizzySpiral,
+  .art.art[data-pose] .parrotCheek > * {
     transition: none;
     animation: none;
   }

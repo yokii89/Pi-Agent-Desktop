@@ -30,7 +30,7 @@ import glideStyles from "../ui/GlideList.module.css";
 import { Composer, type ComposerHandle } from "./Composer";
 import { FileAttachStrip } from "./FileAttachStrip";
 import { ImageAttachStrip } from "./ImageAttachStrip";
-import { InputBuddy } from "./InputBuddy/InputBuddy";
+import { InputBuddy, type InputBuddyHandle } from "./InputBuddy/InputBuddy";
 import styles from "./TaskInput.module.css";
 import { TaskInputContextBar } from "./TaskInputContextBar";
 import { TaskInputToolbar } from "./TaskInputToolbar";
@@ -120,6 +120,8 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
   const imageCapability = imageCapabilityFromInput(modelInput);
   const imageHint = imageAttachments.length > 0 ? imageCapabilityHint(imageCapability) : null;
   const visionToastShownFor = useRef<Set<string>>(new Set());
+  // 伙伴的情绪走命令式：误触发送只是「它替你生气一下」，不该让整个输入栏重渲染
+  const buddyRef = useRef<InputBuddyHandle | null>(null);
   const canSend =
     (hasContent ||
       fileMentions.length > 0 ||
@@ -353,10 +355,14 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
     const composer = composerRef.current;
     if (!composer) return;
     // modal 打开时忽略发送（abort 仍可用，走 toolbar stop）；切换中同样忽略
-    if (hasBlockingView || switching) return;
+    if (hasBlockingView || switching) {
+      buddyRef.current?.nudge("angry");
+      return;
+    }
     // running 可编辑草稿但禁止发送（docs/design/12 P1-1）：Enter 误触时说明原因
     if (running) {
       showToast(t("session.input.sendAfterReply"));
+      buddyRef.current?.nudge("angry");
       return;
     }
     const { text, itemIds, filePaths, fileMentions: orderedFiles } = composer.read();
@@ -687,7 +693,9 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
       >
         {/* 动物伙伴：骑在输入卡右上沿，纯装饰；姿态只跟随会话状态（设置 → 个性化） */}
         <InputBuddy
+          ref={buddyRef}
           kind={inputBuddy}
+          sessionId={activeSessionId}
           running={running}
           switching={switching || modeTransitioning}
           alert={staleConfirm || hasBlockingView}
