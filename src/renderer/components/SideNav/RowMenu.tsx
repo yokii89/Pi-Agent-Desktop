@@ -54,6 +54,7 @@ export function RowMenu({ label, items, onOpenChange }: RowMenuProps) {
       <Menu
         align="right"
         direction="bottom"
+        hideScrollbar
         trigger={({ open, onClick }) => (
           <>
             {onOpenChange ? <OpenNotifier open={open} onChange={onOpenChange} /> : null}
