@@ -76,10 +76,6 @@ export const contextMessages = defineMessages({
     "zh-CN": "激活失败，点击下方按钮重试",
     "en-US": "Activation failed. Use the button below to retry.",
   },
-  "panels.context.collapseSidebar": {
-    "zh-CN": "收起侧栏",
-    "en-US": "Collapse sidebar",
-  },
   "context.back": { "zh-CN": "返回", "en-US": "Back" },
 
   // —— FilePanel ——

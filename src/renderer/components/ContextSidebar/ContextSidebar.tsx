@@ -404,7 +404,6 @@ export function ContextSidebar() {
           nativeOverlayActive={activeTab === "browser" && browserEnabled}
           maximized={maximized}
           onToggleMaximize={toggleMaximize}
-          onCollapse={() => dispatch({ type: "toggleRightSidebar" })}
         />
       </header>
       <div className={styles.body}>

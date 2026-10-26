@@ -1,9 +1,4 @@
-import {
-  CaretLineLeft,
-  CaretLineRight,
-  SidebarSimple,
-  TerminalWindow,
-} from "@phosphor-icons/react";
+import { SidebarSimple, SidebarSimpleIcon, TerminalWindow } from "@phosphor-icons/react";
 import { useT } from "../../hooks/useT";
 import { windowService } from "../../services/windowService";
 import { useExtensionViewStore } from "../../stores/extensionViewStore";
@@ -107,11 +102,7 @@ function TitleBarChrome() {
         title={rightSidebarOpen ? t("titleBar.collapseSidebar") : t("titleBar.expandSidebar")}
         onClick={toggleRightSidebar}
       >
-        {rightSidebarOpen ? (
-          <CaretLineRight size={20} weight="regular" />
-        ) : (
-          <CaretLineLeft size={20} weight="regular" />
-        )}
+        <SidebarSimpleIcon size={16} weight="regular" style={{ transform: "rotate(180deg)" }} />
       </IconButton>
       <WindowControls />
     </div>

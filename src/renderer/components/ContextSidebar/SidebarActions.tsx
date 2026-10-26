@@ -1,10 +1,10 @@
-import { ArrowsIn, ArrowsOut, X } from "@phosphor-icons/react";
+import { ArrowsIn, ArrowsOut } from "@phosphor-icons/react";
 import { useT } from "../../hooks/useT";
 import { IconButton } from "../ui/IconButton";
 import { SidebarAddMenu } from "./SidebarAddMenu";
 import type { SidebarFeature } from "./sidebarFeatures";
 
-/** 启动页与页签态共用的右上角动作：添加功能 / 放大还原 / 收起侧栏。 */
+/** 启动页与页签态共用的右上角动作：添加功能 / 放大还原。 */
 export function SidebarActions({
   className,
   features,
@@ -12,7 +12,6 @@ export function SidebarActions({
   nativeOverlayActive,
   maximized,
   onToggleMaximize,
-  onCollapse,
 }: {
   className: string;
   features: readonly SidebarFeature[];
@@ -20,7 +19,6 @@ export function SidebarActions({
   nativeOverlayActive: boolean;
   maximized: boolean;
   onToggleMaximize: () => void;
-  onCollapse: () => void;
 }) {
   const t = useT();
   return (
@@ -42,13 +40,6 @@ export function SidebarActions({
         ) : (
           <ArrowsOut size={16} weight="regular" />
         )}
-      </IconButton>
-      <IconButton
-        title={t("panels.context.collapseSidebar")}
-        data-sidebar-collapse=""
-        onClick={onCollapse}
-      >
-        <X size={16} weight="regular" />
       </IconButton>
     </div>
   );
