@@ -537,8 +537,8 @@
 }
 
 /* 项目行不再有"选中底色"：整行点击 = 展开/收起，底色变化会和展开态打架
-   （展开着的项目看着像被选中的按钮）。当前项目改由文件夹图标（Folder / FolderOpen）
-   与文字颜色区分，见 .projectRowActive .projectMain。 */
+   （展开着的项目看着像被选中的按钮）。图标只表达展开态（Folder / FolderOpen），
+   当前项目改由图标 fill 与文字颜色区分，见 .projectRowActive .projectMain。 */
 
 /* 铺满整行的透明开关按钮：真正的点击目标；操作按钮与菜单浮在其上层。
    z-index 必须压过 .projectMain——悬浮时 .projectMain 带 transform（右移 2px），
