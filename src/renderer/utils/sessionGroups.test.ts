@@ -45,6 +45,21 @@ describe("buildSessionTree / flattenSessionTree", () => {
     ]);
   });
 
+  it("嵌套项目归入路径最深（最具体）的一个", () => {
+    const nested = [project("outer", "D:\\work"), project("inner", "D:\\work\\pi")];
+    const tree = buildSessionTree(
+      [
+        session("deep.jsonl", "D:\\work\\pi\\src", 2),
+        session("shallow.jsonl", "D:\\work\\other", 1),
+      ],
+      nested,
+    );
+    expect(tree.projectGroups.map((g) => [g.project.id, g.sessions.map((s) => s.file)])).toEqual([
+      ["outer", ["shallow.jsonl"]],
+      ["inner", ["deep.jsonl"]],
+    ]);
+  });
+
   it("无项目时全部归入任务段", () => {
     const flat = flattenSessionTree(buildSessionTree(SESSIONS, []));
     expect(flat.map((s) => s.file)).toEqual(["s-pi-1.jsonl", "s-ui.jsonl", "s-task.jsonl"]);

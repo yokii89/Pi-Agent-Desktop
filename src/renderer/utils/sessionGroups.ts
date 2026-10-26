@@ -1,5 +1,5 @@
 import type { PideskProject, SessionSummary } from "../../shared/ipc";
-import { isSameOrInsideDir, normalizeDirPath } from "./paths";
+import { normalizeDirPath } from "./paths";
 
 /** 一个项目及其名下的历史会话（列表顺序与项目列表一致，无会话时为空数组）。 */
 export interface ProjectSessionGroup {
@@ -16,6 +16,26 @@ export interface SessionTree {
 }
 
 /**
+ * 在**已归一化**的项目目录里找最深命中的下标；-1 = 不归属任何项目。
+ * cwd 也必须已归一化——分组时每个会话只归一化一次 cwd，
+ * 避免「每条会话 × 每个项目」反复跑路径归一化（regex 替换）。
+ */
+function findOwnerIndex(normalizedCwd: string, normalizedDirs: readonly string[]): number {
+  if (!normalizedCwd) return -1;
+  let owner = -1;
+  let ownerDepth = -1;
+  for (let index = 0; index < normalizedDirs.length; index += 1) {
+    const dir = normalizedDirs[index];
+    if (!dir || dir.length <= ownerDepth) continue;
+    if (normalizedCwd === dir || normalizedCwd.startsWith(`${dir}/`)) {
+      owner = index;
+      ownerDepth = dir.length;
+    }
+  }
+  return owner;
+}
+
+/**
  * 找到会话工作目录归属的项目：多个项目嵌套时取路径最深（最具体）的一个；
  * 无 cwd 或不属于任何项目返回 null。侧栏分组与悬浮卡"所属空间"共用同一口径。
  */
@@ -24,16 +44,11 @@ export function findOwningProject(
   projects: readonly PideskProject[],
 ): PideskProject | null {
   if (!cwd) return null;
-  let owner: PideskProject | null = null;
-  let ownerDepth = -1;
-  for (const project of projects) {
-    const depth = normalizeDirPath(project.dir).length;
-    if (depth > ownerDepth && isSameOrInsideDir(cwd, project.dir)) {
-      owner = project;
-      ownerDepth = depth;
-    }
-  }
-  return owner;
+  const index = findOwnerIndex(
+    normalizeDirPath(cwd),
+    projects.map((project) => normalizeDirPath(project.dir)),
+  );
+  return index === -1 ? null : projects[index];
 }
 
 /**
@@ -72,10 +87,15 @@ export function buildSessionTree(
 
   const grouped = new Map<string, SessionSummary[]>();
   const tasks: SessionSummary[] = [];
+  // 项目目录只归一化一次（分组是「会话 × 项目」双层循环，逐次归一化会放大成热路径）
+  const normalizedDirs = projects.map((project) => normalizeDirPath(project.dir));
 
   for (const session of rest) {
-    const owner = findOwningProject(session.cwd, projects);
-    if (owner) {
+    const ownerIndex = session.cwd
+      ? findOwnerIndex(normalizeDirPath(session.cwd), normalizedDirs)
+      : -1;
+    if (ownerIndex >= 0) {
+      const owner = projects[ownerIndex];
       const list = grouped.get(owner.id);
       if (list) {
         list.push(session);
