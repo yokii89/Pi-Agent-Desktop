@@ -1,0 +1,85 @@
+/**
+ * 输入栏伙伴选择按钮（设置 → 个性化）。swatch 只负责外框与选中态；
+ * 内部预览是会话区三联 SVG 的默认姿态，配色来自 InputBuddy.module.css 的 --buddy-* 变量，
+ * 这里不重复定义任何角色配色。
+ */
+
+.swatch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  padding: 6px 7px 5px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  /* SVG 的描边与瞳孔走 currentColor，入墨色与输入栏里的伙伴保持一致 */
+  color: var(--buddy-ink);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease-out,
+    background-color 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.swatch:hover:not(:disabled) {
+  border-color: var(--color-text-muted);
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.swatch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 选中态：强调描边 + 浅色底 + 右上角勾选角标（与分段栏样式选项同一套表达） */
+.swatchSelected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.swatchSelected:hover:not(:disabled) {
+  border-color: var(--color-accent-hover);
+}
+
+/* 预览按设计稿裁切区的比例（290 × 203）撑满按钮内宽，底边即伙伴的立足线 */
+.preview {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 290 / 203;
+}
+
+/* 默认姿态自带呼吸 / 摆尾 / 羽冠轻摆，设置页里整排同时动会晃眼：
+   这里按静态快照呈现。选择器要盖过 InputBuddy.module.css 的姿态规则
+   （`.dog[data-pose="idle"] [data-part="head"]` 是 0,3,0），故带上 svg[data-pose] 凑到 0,3,1。 */
+.preview svg[data-pose] [data-part] {
+  animation: none;
+}
+
+.empty {
+  align-self: center;
+  color: var(--color-text-muted);
+}
+
+.check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  pointer-events: none;
+}

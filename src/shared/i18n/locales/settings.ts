@@ -603,6 +603,10 @@ export const settingsMessages = defineMessages({
     "zh-CN": "鹦鹉",
     "en-US": "Parrot",
   },
+  "settings.personalization.buddy.option.capy": {
+    "zh-CN": "卡皮巴拉",
+    "en-US": "Capybara",
+  },
 
   "settings.config.group.runtime": {
     "zh-CN": "pi 运行时",

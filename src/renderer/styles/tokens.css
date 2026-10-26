@@ -256,6 +256,16 @@
   --buddy-parrot-cheek: #ff8c7a;
   --buddy-parrot-collar: #ff7b7b;
   --buddy-parrot-feather: #d9c66b;
+  /* 卡皮巴拉：砂棕毛 + 米色肚皮 + 头顶小橘子；爪子/耳朵用同一个深棕 */
+  --buddy-capy-coat: #c68b59;
+  --buddy-capy-belly: #dec09e;
+  --buddy-capy-ear: #8c583a;
+  --buddy-capy-snout: #9c6644;
+  --buddy-capy-orange: #ff9f2e;
+  --buddy-capy-leaf: #6ec264;
+  --buddy-capy-heart: #ff8c7a;
+  --buddy-capy-bubble: #d8f3fa;
+  --buddy-capy-sweat: #7ec8e3;
 }
 
 :root[data-theme="light"] {
@@ -367,4 +377,14 @@
   --buddy-parrot-cheek: #ff8c7a;
   --buddy-parrot-collar: #ff7b7b;
   --buddy-parrot-feather: #d9c66b;
+  /* 卡皮巴拉：砂棕毛 + 米色肚皮 + 头顶小橘子；爪子/耳朵用同一个深棕 */
+  --buddy-capy-coat: #c68b59;
+  --buddy-capy-belly: #dec09e;
+  --buddy-capy-ear: #8c583a;
+  --buddy-capy-snout: #9c6644;
+  --buddy-capy-orange: #ff9f2e;
+  --buddy-capy-leaf: #6ec264;
+  --buddy-capy-heart: #ff8c7a;
+  --buddy-capy-bubble: #d8f3fa;
+  --buddy-capy-sweat: #7ec8e3;
 }

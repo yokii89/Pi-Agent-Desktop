@@ -1,6 +1,6 @@
 /*
  * 输入栏动物伙伴（docs/动物形象）：
- * 三款形象从原设计 360×250 的舞台里裁出「卡沿以上」的部分（x 50–340 / y 0–203），
+ * 四款形象从原设计 360×250 的舞台里裁出「卡沿以上」的部分（x 50–340 / y 0–203），
  * 视图底边正好落在输入卡上沿——爪子、尾巴、爪尖搭在卡沿上，像趴在桌子后面的小家伙。
  * 定位挂在 .inputBox 内（该卡 position: relative 且 overflow: visible）。
  */
@@ -95,6 +95,54 @@
   stroke: var(--buddy-parrot-feather);
 }
 
+.capyCoat {
+  fill: var(--buddy-capy-coat);
+}
+
+.capyBelly {
+  fill: var(--buddy-capy-belly);
+}
+
+/* 耳朵与爪子同色：设计稿里两处都是深棕 #8c583a */
+.capyEar {
+  fill: var(--buddy-capy-ear);
+}
+
+.capySnout {
+  fill: var(--buddy-capy-snout);
+}
+
+.capyOrange {
+  fill: var(--buddy-capy-orange);
+}
+
+.capyLeaf {
+  fill: var(--buddy-capy-leaf);
+}
+
+/* 嘴里的草只走绿描边，轮廓交给继承的线稿色 */
+.capyGrass {
+  fill: none;
+  stroke: var(--buddy-capy-leaf);
+}
+
+.capyHeart {
+  fill: var(--buddy-capy-heart);
+}
+
+.capyBubble {
+  fill: var(--buddy-capy-bubble);
+}
+
+.capyBubbleGlint {
+  fill: none;
+  stroke: var(--buddy-glint);
+}
+
+.capySweat {
+  fill: var(--buddy-capy-sweat);
+}
+
 .gold {
   fill: var(--buddy-gold);
 }
@@ -136,7 +184,10 @@
 .art [data-part="question"],
 .art [data-part="zzz"],
 .art [data-part="sweat"],
-.art [data-part="shock"] {
+.art [data-part="shock"],
+.art [data-part="grass"],
+.art [data-part="hearts"],
+.art [data-part="snot-bubble"] {
   opacity: 0;
 }
 
@@ -222,6 +273,31 @@
 }
 .parrot [data-part="seed-tag"] {
   transform-origin: 130px 162px;
+}
+
+.capy [data-part="head"] {
+  transform-origin: 130px 142px;
+}
+.capy [data-part="orange"] {
+  transform-origin: 130px 38px;
+}
+.capy [data-part="ear-left"] {
+  transform-origin: 72px 54px;
+}
+.capy [data-part="ear-right"] {
+  transform-origin: 188px 54px;
+}
+.capy [data-part="snout"] {
+  transform-origin: 130px 110px;
+}
+.capy [data-part="paw-left"] {
+  transform-origin: 38px 203px;
+}
+.capy [data-part="paw-right"] {
+  transform-origin: 222px 203px;
+}
+.capy [data-part="snot-bubble"] {
+  transform-origin: 142px 88px;
 }
 
 /* ---------- 小狗姿态 ---------- */
@@ -575,6 +651,123 @@
   opacity: 1;
 }
 
+/* ---------- 卡皮巴拉姿态 ---------- */
+/* 佛系：比另三款慢一半的呼吸，只有 2px */
+.capy[data-pose="idle"] [data-part="head"] {
+  animation: capyBreathe 4s ease-in-out infinite;
+}
+
+.capy[data-pose="happy"] [data-part="head"] {
+  transform: translateY(-3px);
+}
+.capy[data-pose="happy"] [data-part="ear-left"] {
+  animation: capyEarFlapLeft 0.4s ease-in-out infinite alternate;
+}
+.capy[data-pose="happy"] [data-part="ear-right"] {
+  animation: capyEarFlapRight 0.4s ease-in-out infinite alternate;
+}
+.capy[data-pose="happy"] [data-part="snout"] {
+  animation: capyChew 0.35s ease-in-out infinite alternate;
+}
+.capy[data-pose="happy"] [data-part="orange"] {
+  animation: capyOrangeBob 0.35s ease-in-out infinite alternate;
+}
+.capy[data-pose="happy"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.capy[data-pose="happy"] [data-part="eyes-happy"] {
+  opacity: 1;
+}
+.capy[data-pose="happy"] [data-part="grass"] {
+  opacity: 1;
+}
+.capy[data-pose="happy"] [data-part="hearts"] {
+  opacity: 1;
+}
+/* 浮动只演在内层 path 上：外层 group 的位移写在 transform 属性里，动画会盖掉它 */
+.capy[data-pose="happy"] [data-part="hearts"] path {
+  animation: floatUp 1.8s ease-in-out infinite;
+}
+
+.capy[data-pose="tilt"] [data-part="head"] {
+  transform: rotate(12deg) translate(5px, -1px);
+}
+.capy[data-pose="tilt"] [data-part="orange"] {
+  transform: rotate(-8deg) translate(-3px, 1px);
+}
+.capy[data-pose="tilt"] [data-part="ear-left"] {
+  transform: rotate(10deg);
+}
+.capy[data-pose="tilt"] [data-part="question"] {
+  opacity: 1;
+  transform: translateY(-5px);
+}
+
+.capy[data-pose="wave"] [data-part="head"] {
+  transform: rotate(-4deg);
+}
+.capy[data-pose="wave"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.capy[data-pose="wave"] [data-part="eyes-happy"] {
+  opacity: 1;
+}
+.capy[data-pose="wave"] [data-part="paw-right"] {
+  animation: capyWavePaw 0.6s ease-in-out infinite alternate;
+}
+
+.capy[data-pose="sleep"] [data-part="head"] {
+  transform: translateY(9px) rotate(2deg);
+}
+.capy[data-pose="sleep"] [data-part="ear-left"] {
+  transform: rotate(-12deg);
+}
+.capy[data-pose="sleep"] [data-part="ear-right"] {
+  transform: rotate(12deg);
+}
+.capy[data-pose="sleep"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.capy[data-pose="sleep"] [data-part="eyes-sleep"] {
+  opacity: 1;
+}
+.capy[data-pose="sleep"] [data-part="snot-bubble"] {
+  opacity: 1;
+  animation: capyBubble 2.4s ease-in-out infinite;
+}
+.capy[data-pose="sleep"] [data-part="zzz"] {
+  opacity: 1;
+  animation: floatUp 2s ease-in-out infinite;
+}
+
+.capy[data-pose="alert"] [data-part="head"] {
+  transform: translateY(-6px) scale(0.99, 1.03);
+}
+.capy[data-pose="alert"] [data-part="ear-left"] {
+  transform: rotate(22deg);
+}
+.capy[data-pose="alert"] [data-part="ear-right"] {
+  transform: rotate(-22deg);
+}
+.capy[data-pose="alert"] [data-part="orange"] {
+  animation: capyOrangeJump 0.45s cubic-bezier(0.25, 1, 0.5, 1) infinite alternate;
+}
+.capy[data-pose="alert"] [data-part="paw-left"] {
+  transform: translateY(3px) scale(0.95);
+}
+.capy[data-pose="alert"] [data-part="paw-right"] {
+  transform: translateY(3px) scale(0.95);
+}
+.capy[data-pose="alert"] [data-part="eyes-normal"] {
+  opacity: 0;
+}
+.capy[data-pose="alert"] [data-part="eyes-alert"] {
+  opacity: 1;
+}
+.capy[data-pose="alert"] [data-part="sweat"] {
+  opacity: 1;
+}
+
 /* ---------- 关键帧 ---------- */
 @keyframes breathe {
   0%,
@@ -703,6 +896,80 @@
   }
   to {
     transform: translate(12px, -22px) rotate(-85deg);
+  }
+}
+
+@keyframes capyBreathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(2px);
+  }
+}
+
+@keyframes capyChew {
+  from {
+    transform: scale(1, 1) translateY(0);
+  }
+  to {
+    transform: scale(1.04, 0.95) translateY(-2px);
+  }
+}
+
+@keyframes capyEarFlapLeft {
+  from {
+    transform: rotate(-5deg);
+  }
+  to {
+    transform: rotate(15deg);
+  }
+}
+
+@keyframes capyEarFlapRight {
+  from {
+    transform: rotate(5deg);
+  }
+  to {
+    transform: rotate(-15deg);
+  }
+}
+
+@keyframes capyOrangeBob {
+  from {
+    transform: translateY(0) rotate(-3deg);
+  }
+  to {
+    transform: translateY(-3px) rotate(3deg);
+  }
+}
+
+@keyframes capyOrangeJump {
+  from {
+    transform: translateY(-2px) rotate(-4deg);
+  }
+  to {
+    transform: translateY(-18px) rotate(8deg);
+  }
+}
+
+@keyframes capyWavePaw {
+  from {
+    transform: translate(6px, -32px) rotate(-10deg);
+  }
+  to {
+    transform: translate(14px, -36px) rotate(16deg);
+  }
+}
+
+@keyframes capyBubble {
+  0%,
+  100% {
+    transform: scale(0.4);
+  }
+  50% {
+    transform: scale(1.15);
   }
 }
 

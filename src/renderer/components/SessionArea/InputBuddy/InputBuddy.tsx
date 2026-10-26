@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { InputBuddyKind } from "../../../../shared/inputBuddy";
 import { useT } from "../../../hooks/useT";
+import { BuddyCapy } from "./BuddyCapy";
 import { BuddyCat } from "./BuddyCat";
 import { BuddyDog } from "./BuddyDog";
 import { BuddyParrot } from "./BuddyParrot";
@@ -87,6 +88,7 @@ export function InputBuddy({ kind, running, switching, alert }: InputBuddyProps)
       {kind === "dog" && <BuddyDog pose={pose} />}
       {kind === "cat" && <BuddyCat pose={pose} />}
       {kind === "parrot" && <BuddyParrot pose={pose} />}
+      {kind === "capy" && <BuddyCapy pose={pose} />}
     </button>
   );
 }

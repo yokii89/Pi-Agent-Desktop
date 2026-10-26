@@ -6,6 +6,7 @@ import { useT } from "../../hooks/useT";
 import { useUiStore } from "../../stores/uiStore";
 import { Segmented } from "../ui/Segmented";
 import { Select } from "../ui/Select";
+import { BuddySwatch } from "./BuddySwatch";
 import { RailStyleSwatch } from "./RailStyleSwatch";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import styles from "./Settings.module.css";
@@ -135,20 +136,24 @@ export function PersonalizationPanel() {
 
       <SettingsSection title={t("settings.personalization.group.buddy")}>
         <SettingRow
+          // 形象比名字更好认：每一格直接给默认姿态的 SVG，形名只留在读屏与悬停提示里。
+          // 档位会随新形象增加而变宽（已 5 款），故不像其余条目那样贴在右侧控件列。
+          stack
           label={t("settings.personalization.buddy")}
           description={t("settings.personalization.buddy.description")}
           control={
-            <Segmented
-              ariaLabel={t("settings.personalization.buddy")}
-              semantics="radio"
-              value={inputBuddy}
-              items={INPUT_BUDDY_KINDS.map((kind) => ({
-                value: kind,
-                label: t(`settings.personalization.buddy.option.${kind}`),
-                disabled: !hydrated,
-              }))}
-              onChange={(next) => dispatch({ type: "setInputBuddy", kind: next })}
-            />
+            <div className={styles.buddySwatches}>
+              {INPUT_BUDDY_KINDS.map((kind) => (
+                <BuddySwatch
+                  key={kind}
+                  kind={kind}
+                  label={t(`settings.personalization.buddy.option.${kind}`)}
+                  selected={inputBuddy === kind}
+                  disabled={!hydrated}
+                  onSelect={(next) => dispatch({ type: "setInputBuddy", kind: next })}
+                />
+              ))}
+            </div>
           }
         />
       </SettingsSection>
