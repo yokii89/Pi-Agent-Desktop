@@ -467,7 +467,14 @@ async function collectElement(
   };
 }
 
-/** 元素截图：bbox + 少量余量裁剪，超出视口部分收拢。 */
+/**
+ * 元素截图：bbox + 少量余量裁剪，超出视口部分收拢。
+ *
+ * 用 `capturePage(rect)` 而非 CDP `Page.captureScreenshot` 的裁剪截图：
+ * 后者带 `clip` 时会让 WebContentsView 闪一帧空白（Windows 实测每次必现），
+ * 用户点选元素时肉眼可见；capturePage 只拷当前合成帧，不触发视图尺寸变更。
+ * rect 单位是 DIP：页面缩放后 `getBoundingClientRect` 的 CSS px 需按 zoomFactor 换算。
+ */
 async function captureElementScreenshot(
   wc: WebContents,
   info: CollectedInfo,
@@ -478,14 +485,27 @@ async function captureElementScreenshot(
   const width = Math.min(viewport.width - x, rect.width + SHOT_MARGIN * 2 + (rect.x - x));
   const height = Math.min(viewport.height - y, rect.height + SHOT_MARGIN * 2 + (rect.y - y));
   if (width < 1 || height < 1) return null;
-  const scale = Math.min(viewport.dpr || 1, 2);
+  const zoom = wc.getZoomFactor() || 1;
   try {
-    const shot = await send<CaptureScreenshotResult>(wc, "Page.captureScreenshot", {
-      format: "png",
-      captureBeyondViewport: false,
-      clip: { x, y, width, height, scale },
+    let image = await wc.capturePage({
+      x: Math.round(x * zoom),
+      y: Math.round(y * zoom),
+      width: Math.max(1, Math.round(width * zoom)),
+      height: Math.max(1, Math.round(height * zoom)),
     });
-    return { base64: shot.data, path: savePng(shot.data, "element") };
+    if (image.isEmpty()) return null;
+    // capturePage 给设备像素；沿用旧 CDP 路径的 2x 上限，避免 3x 屏把截图撑大
+    const cap = Math.min(1, 2 / (viewport.dpr || 1));
+    if (cap < 1) {
+      const size = image.getSize();
+      image = image.resize({
+        width: Math.max(1, Math.round(size.width * cap)),
+        height: Math.max(1, Math.round(size.height * cap)),
+        quality: "good",
+      });
+    }
+    const base64 = image.toPNG().toString("base64");
+    return { base64, path: savePng(base64, "element") };
   } catch (err) {
     console.warn("[browser] 元素截图失败", err);
     return null;
