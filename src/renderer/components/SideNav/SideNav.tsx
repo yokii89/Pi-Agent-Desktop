@@ -7,13 +7,14 @@ import {
   PuzzlePiece,
   Timer,
 } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSelectionPill } from "../../hooks/useSelectionPill";
 import { useT } from "../../hooks/useT";
 import { useExtensionViewStore } from "../../stores/extensionViewStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { type PageId, useUiStore } from "../../stores/uiStore";
+import { loadGsap, prefersReducedMotion } from "../../utils/animation";
 import { buildSessionTree, excludeArchivedSessions } from "../../utils/sessionGroups";
 import { SidebarMount } from "../ExtensionView/SidebarMount";
 import { IconButton } from "../ui/IconButton";
@@ -51,6 +52,14 @@ export function SideNav() {
       ),
     [allSessions, archivedFiles, projects, pinnedFiles, globalPinnedFiles],
   );
+
+  // 启动空闲时预热 GSAP chunk：首次展开项目的图标回弹、行内操作揭示不再等下载。
+  // 仍是动态 import 的独立 chunk（不塞回主 bundle），只是把下载时机提前到空闲期。
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const id = window.requestIdleCallback(() => void loadGsap(), { timeout: 2500 });
+    return () => window.cancelIdleCallback(id);
+  }, []);
 
   if (navCollapsed) {
     return (

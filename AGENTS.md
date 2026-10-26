@@ -174,7 +174,8 @@ import { Play } from "@phosphor-icons/react";
   避免与 CSS 的 `height: auto`、响应式布局冲突。
 - **高度展开/收起不要用 CSS**：`grid-template-rows: 0fr → 1fr` 在 Chromium 上
   起始值为 0fr 时不补间，`height: auto` 不可插值；用 `useCollapseAnimation` 走
-  GSAP 补间实测像素高度。
+  `glide()` 定帧时间轴补间实测像素高度（高度每帧触发重排，必须封顶 60fps，
+  与 docs/design/53 的尺寸补间同一条曲线；方向反转从当前视觉值接管）。
 - **关键可交互元素（按钮等）的可见性不能只依赖 JS**：用 CSS 的
   `:hover` / `:focus-within` 兜底，否则动画中断时键盘用户会聚焦到透明元素上。
   GSAP 只改自定义属性（如 `--reveal`），真实 `opacity` 交给 CSS 决定。

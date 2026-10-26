@@ -1,5 +1,5 @@
 import { type RefObject, useLayoutEffect, useRef, useState } from "react";
-import { loadGsap, prefersReducedMotion } from "../utils/animation";
+import { type GlideCancel, glide, mix } from "../utils/glideMotion";
 import { NAV_MOTION } from "../utils/motionTokens";
 
 /** 折叠容器与内容元素都只需读高度，故收窄到 HTMLElement。 */
@@ -15,12 +15,17 @@ interface CollapseAnimation<E extends CollapsibleElement, I extends CollapsibleE
 }
 
 /**
- * 容器展开/折叠动画：把被折叠的元素交给本 Hook，动画期间由 GSAP 接管高度，
+ * 容器展开/折叠动画：把被折叠的元素交给本 Hook，动画期间由定帧时间轴接管高度，
  * 结束后恢复自动高度并移除内联样式，DOM 上不留残留。
  *
  * 为什么不用 CSS `grid-template-rows: 0fr → 1fr` 或过渡 `height: auto`：
  * 前者在起始值为 0fr 时 Chromium 不补间（内容是瞬变），后者 auto 不可插值。
- * 用 GSAP 把高度补间到实测像素值对任意内容都稳定。
+ * 用补间到实测像素值对任意内容都稳定。
+ *
+ * 为什么不是 GSAP：高度补间逐帧触发祖先重排，是纯粹的布局动画；
+ * GSAP ticker 跟随屏幕刷新率，120/144Hz 上会把同一段补间跑成 120–144 次布局。
+ * 这里改用浮层/侧栏共用的 glide() 定帧时间轴（封顶 GLIDE_MOTION.fps），
+ * 与 docs/design/53 的尺寸补间同一条曲线；同时省掉首次展开等 GSAP chunk 的下载延迟。
  *
  * 折叠时不能立刻卸载 DOM（否则无从播放收起的补间），所以是否渲染由内部
  * `rendered` 状态决定，而不是直接跟随 `expanded`。因此**调用方必须先渲染
@@ -46,6 +51,8 @@ export function useCollapseAnimation<
   const onCollapsed = useRef(options?.onCollapsed);
   onCollapsed.current = options?.onCollapsed;
   const [rendered, setRendered] = useState(expanded);
+  /** 在跑的补间（高度 + 内容淡入淡出）；切换方向时先停旧补间再从当前视觉值接管。 */
+  const cancelRef = useRef<GlideCancel | null>(null);
 
   useLayoutEffect(() => {
     const element = ref.current;
@@ -69,55 +76,79 @@ export function useCollapseAnimation<
     if (lastExpanded.current === expanded) return;
     lastExpanded.current = expanded;
 
+    cancelRef.current?.();
+    cancelRef.current = null;
+
     const settle = (): void => {
-      element.style.removeProperty("height");
-      element.style.removeProperty("overflow");
-      element.style.removeProperty("will-change");
+      cancelRef.current = null;
+      if (expanded) {
+        element.style.removeProperty("height");
+        element.style.removeProperty("overflow");
+        element.style.removeProperty("will-change");
+        inner.style.removeProperty("opacity");
+      } else {
+        // 收起落定后**先保持高度 0 / 透明度 0**，再交出渲染权：settle 在 rAF 里执行，
+        // setRendered(false) 要等 React 下一次提交才卸载容器；若此刻摘掉内联高度，
+        // 浏览器可能先画一帧 height:auto 的满高列表，表现为收起后闪一下。
+        // 容器随后被卸载，内联样式随之消失；万一调用方仍保留节点，它也只是保持收起态。
+        element.style.height = "0px";
+        element.style.setProperty("overflow", "hidden");
+        element.style.removeProperty("will-change");
+        inner.style.opacity = "0";
+      }
+      inner.style.removeProperty("will-change");
       setRendered(expanded);
       if (!expanded) onCollapsed.current?.();
     };
 
-    if (prefersReducedMotion()) {
-      settle();
-      return;
-    }
-
     // 实际渲染高度（受 max-height 约束）；scrollHeight 会拿到溢出内容的完整高度
     const contentHeight = inner.offsetHeight;
-    // 展开：0 → 内容高；收起：当前实际高 → 0。方向必须显式区分，
-    // 否则收起会朝内容高补间（看起来"纹丝不动然后消失"）。
-    const from = expanded ? 0 : element.offsetHeight;
+    // 起点取「当前视觉高度」：首次展开从 0 起；收起或半途反向都从实际盒高接着演，
+    // 否则补间进行中再点击会把高度瞬间拉回 0/满高，肉眼就是一次跳变
+    const from = expanded
+      ? element.style.height
+        ? element.offsetHeight
+        : 0
+      : element.offsetHeight;
     const to = expanded ? contentHeight : 0;
-    // 同步写入起始高度（在 setRendered 触发重渲染之前），避免 React 提交后闪现完整高度
-    element.style.overflow = "hidden";
-    element.style.willChange = "height, opacity";
-    element.style.height = `${from}px`;
+    // 半途反向时透明度也从当前值接着演；透明度只在补间期间写内联，落定即摘除
+    const opacityFrom =
+      inner.style.opacity === "" ? (expanded ? 0 : 1) : Number(inner.style.opacity);
 
-    let cancelled = false;
-    void loadGsap().then((gsap) => {
-      if (cancelled || !element.isConnected) return;
-      // 补间期间若用户再次点击，新 timeline 会从当前高度接管，不会跳变
-      gsap
-        .timeline({ onComplete: settle })
-        .to(element, {
-          height: to,
-          duration: expanded ? NAV_MOTION.collapseEnter : NAV_MOTION.collapseExit,
-          ease: expanded ? NAV_MOTION.easeOut : NAV_MOTION.easeIn,
-        })
-        .fromTo(
-          inner,
-          { opacity: expanded ? 0 : 1 },
-          {
-            opacity: expanded ? 1 : 0,
-            duration: NAV_MOTION.fade,
-            ease: NAV_MOTION.easeOut,
-          },
-          "<",
-        );
-    });
+    // 同步写入起始值（在浏览器绘制之前），避免 React 提交后闪现完整高度
+    element.style.overflow = "hidden";
+    element.style.willChange = "height";
+    element.style.height = `${from}px`;
+    inner.style.willChange = "opacity";
+    inner.style.opacity = String(opacityFrom);
+
+    const duration = expanded ? NAV_MOTION.collapseEnter : NAV_MOTION.collapseExit;
+    const cancels: GlideCancel[] = [];
+    cancels.push(
+      glide({
+        duration,
+        onUpdate: (progress) => {
+          element.style.height = `${mix(from, to, progress)}px`;
+        },
+        onComplete: settle,
+      }),
+    );
+    // 内容淡入淡出比高度先收尾（两段补间同帧启动，与原来的 timeline 同构）
+    cancels.push(
+      glide({
+        duration: Math.min(NAV_MOTION.fade, duration),
+        onUpdate: (progress) => {
+          inner.style.opacity = String(mix(opacityFrom, expanded ? 1 : 0, progress));
+        },
+      }),
+    );
+    cancelRef.current = () => {
+      for (const cancel of cancels) cancel();
+    };
 
     return () => {
-      cancelled = true;
+      cancelRef.current?.();
+      cancelRef.current = null;
     };
   }, [expanded, rendered]);
 
