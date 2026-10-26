@@ -5,9 +5,11 @@ import {
   closeInspectorWindow,
   focusInspectorWindow,
   isInspectorWindowOpen,
+  isInspectorWindowPinned,
   openInspectorWindow,
   relayChatAddToMainWindow,
   requestDockFromHost,
+  setInspectorWindowPinned,
   setPendingHandoff,
   takePendingHandoff,
 } from "./inspectorWindow";
@@ -51,5 +53,11 @@ export function registerInspectorFloatIpc(): void {
       relayChatAddToMainWindow();
       return null;
     }),
+  );
+
+  ipcMain.handle(INSPECTOR_FLOAT_IPC.getPinned, () => envelope(() => isInspectorWindowPinned()));
+
+  ipcMain.handle(INSPECTOR_FLOAT_IPC.setPinned, (_event, req?: { pinned?: boolean }) =>
+    envelope(() => setInspectorWindowPinned(req?.pinned === true)),
   );
 }

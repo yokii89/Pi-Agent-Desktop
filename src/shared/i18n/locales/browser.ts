@@ -680,6 +680,14 @@ export const browserMessages = defineMessages({
     "zh-CN": "停靠回主窗口",
     "en-US": "Dock back to main window",
   },
+  "browser.inspector.floatPin": {
+    "zh-CN": "固定在最前",
+    "en-US": "Keep on top",
+  },
+  "browser.inspector.floatUnpin": {
+    "zh-CN": "取消固定（不再置顶）",
+    "en-US": "Unpin (no longer on top)",
+  },
   "browser.inspector.floatClose": {
     "zh-CN": "关闭浮窗（停靠回来）",
     "en-US": "Close float (dock back)",

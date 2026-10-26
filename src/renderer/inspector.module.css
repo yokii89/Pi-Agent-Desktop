@@ -63,6 +63,12 @@
   color: var(--color-text);
 }
 
+/* 已置顶（pin）时给按住态：accent 与悬停同权重，写在其后覆盖 hover */
+.titleBtnActive,
+.titleBtnActive:hover {
+  color: var(--color-accent);
+}
+
 .titleBtn:disabled {
   opacity: 0.45;
   cursor: default;

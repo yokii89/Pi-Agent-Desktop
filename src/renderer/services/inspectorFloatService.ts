@@ -52,6 +52,18 @@ export const inspectorFloatService = {
     if (!api) return Promise.resolve();
     return unwrap(api.inspectorFloat.chatAdd()).then(() => undefined);
   },
+  /** 读取浮窗置顶（pin）状态。 */
+  getPinned(): Promise<boolean> {
+    const api = pideskApi();
+    if (!api) return Promise.resolve(false);
+    return unwrap(api.inspectorFloat.getPinned());
+  },
+  /** 设置浮窗置顶（pin），返回应用后的状态。 */
+  setPinned(pinned: boolean): Promise<boolean> {
+    const api = pideskApi();
+    if (!api) return Promise.resolve(false);
+    return unwrap(api.inspectorFloat.setPinned(pinned));
+  },
   onState(callback: (message: InspectorFloatStateMessage) => void): () => void {
     const api = pideskApi();
     if (!api) return () => {};

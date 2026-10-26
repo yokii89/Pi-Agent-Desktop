@@ -1,4 +1,10 @@
-import { ArrowsClockwise, ArrowsIn, X } from "@phosphor-icons/react";
+import {
+  ArrowsClockwise,
+  ArrowsIn,
+  PushPinIcon,
+  PushPinSimpleIcon,
+  X,
+} from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { InspectorFloatHandoff } from "../shared/ipc";
@@ -27,6 +33,7 @@ function FloatChrome({ children }: { children: ReactNode }) {
   const edit = useStyleEditStore();
   const inspector = useInspectorStore();
   const [hydrated, setHydrated] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const editRef = useRef(edit);
   editRef.current = edit;
   const tabRef = useRef(browserPanelTab);
@@ -47,6 +54,21 @@ function FloatChrome({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [dispatch]);
+
+  // 置顶开关由主进程持有（重开浮窗沿用），挂载时取一次初值
+  useEffect(() => {
+    let cancelled = false;
+    void inspectorFloatService.getPinned().then((value) => {
+      if (!cancelled) setPinned(value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const togglePin = (): void => {
+    void inspectorFloatService.setPinned(!pinned).then(setPinned);
+  };
 
   // 点窗口 X / 主窗请求停靠：交回草稿后再关
   useEffect(() => {
@@ -79,6 +101,19 @@ function FloatChrome({ children }: { children: ReactNode }) {
       <header className={styles.titleBar}>
         <span className={styles.title}>{t("browser.inspector.floatTitle")}</span>
         <div className={styles.titleActions}>
+          <button
+            type="button"
+            className={[styles.titleBtn, pinned ? styles.titleBtnActive : ""].join(" ")}
+            title={t(pinned ? "browser.inspector.floatUnpin" : "browser.inspector.floatPin")}
+            aria-pressed={pinned}
+            onClick={togglePin}
+          >
+            {pinned ? (
+              <PushPinIcon size={16} weight="fill" />
+            ) : (
+              <PushPinSimpleIcon size={16} weight="regular" />
+            )}
+          </button>
           <button
             type="button"
             className={styles.titleBtn}

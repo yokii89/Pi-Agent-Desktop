@@ -50,6 +50,10 @@ export const INSPECTOR_FLOAT_IPC = {
   requestDock: "pidesk:inspectorFloat:requestDock",
   /** 浮窗「加入对话」意图 → 主窗 pickConfirm 路径。 */
   chatAdd: "pidesk:inspectorFloat:chatAdd",
+  /** 读取浮窗置顶（pin）状态。 */
+  getPinned: "pidesk:inspectorFloat:getPinned",
+  /** 设置浮窗置顶（pin）。payload = { pinned }。 */
+  setPinned: "pidesk:inspectorFloat:setPinned",
   /** 主进程推送：浮窗开/关（主窗占位条）。payload = { open }。 */
   state: "pidesk:inspectorFloat:state",
 } as const;

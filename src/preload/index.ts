@@ -221,6 +221,11 @@ contextBridge.exposeInMainWorld("pidesk", {
       ipcRenderer.invoke(INSPECTOR_FLOAT_IPC.dock, { handoff: null, fromHost: true }),
     /** 浮窗「加入对话」：主窗走 pickConfirm 写入会话芯片。 */
     chatAdd: (): Promise<IpcResult<null>> => ipcRenderer.invoke(INSPECTOR_FLOAT_IPC.chatAdd),
+    /** 读取浮窗置顶（pin）状态。 */
+    getPinned: (): Promise<IpcResult<boolean>> => ipcRenderer.invoke(INSPECTOR_FLOAT_IPC.getPinned),
+    /** 设置浮窗置顶（pin），返回应用后的状态。 */
+    setPinned: (pinned: boolean): Promise<IpcResult<boolean>> =>
+      ipcRenderer.invoke(INSPECTOR_FLOAT_IPC.setPinned, { pinned }),
     /** 订阅浮窗开/关（主窗占位条）。 */
     onState: (callback: (message: InspectorFloatStateMessage) => void): (() => void) =>
       subscribe<InspectorFloatStateMessage>(INSPECTOR_FLOAT_IPC.state, callback),

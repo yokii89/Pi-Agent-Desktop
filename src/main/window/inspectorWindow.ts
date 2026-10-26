@@ -35,6 +35,8 @@ let pendingHandoff: InspectorFloatHandoff | null = null;
 let forceClosed = false;
 /** 会话内位置/尺寸记忆（不落盘，与 ReviewWindow 同策略）。 */
 let persistedBounds: { x: number; y: number; width: number; height: number } | null = null;
+/** 置顶（pin）开关：会话内记忆，重开浮窗沿用。 */
+let pinned = false;
 
 function isAlive(win: BrowserWindow | null): win is BrowserWindow {
   return win !== null && !win.isDestroyed();
@@ -114,6 +116,7 @@ export function openInspectorWindow(handoff?: InspectorFloatHandoff | null): voi
     minHeight: MIN_HEIGHT,
     frame: false,
     show: false,
+    alwaysOnTop: pinned,
     backgroundColor: "#111113",
     title: "PiDesk Inspector",
     webPreferences: {
@@ -162,6 +165,18 @@ export function getInspectorWindow(): BrowserWindow | null {
 
 export function isInspectorWindowOpen(): boolean {
   return isAlive(inspectorWindow);
+}
+
+/** 读取浮窗置顶（pin）状态；浮窗未打开时返回记住的开关值。 */
+export function isInspectorWindowPinned(): boolean {
+  return pinned;
+}
+
+/** 设置浮窗置顶（pin）；浮窗未打开时只记状态，下次打开沿用。 */
+export function setInspectorWindowPinned(next: boolean): boolean {
+  pinned = next;
+  if (isAlive(inspectorWindow)) inspectorWindow.setAlwaysOnTop(pinned);
+  return pinned;
 }
 
 export function focusInspectorWindow(): boolean {

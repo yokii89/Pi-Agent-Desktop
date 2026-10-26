@@ -159,6 +159,10 @@ export interface PideskGlobalApi {
     onRequestReturn(callback: () => void): () => void;
     onRequestDock(callback: () => void): () => void;
     chatAdd(): Promise<IpcResult<null>>;
+    /** 读取浮窗置顶（pin）状态。 */
+    getPinned(): Promise<IpcResult<boolean>>;
+    /** 设置浮窗置顶（pin），返回应用后的状态。 */
+    setPinned(pinned: boolean): Promise<IpcResult<boolean>>;
     onState(callback: (message: InspectorFloatStateMessage) => void): () => void;
   };
   settings: {
