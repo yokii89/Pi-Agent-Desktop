@@ -48,6 +48,16 @@ export function supportsPatch(client: DesktopViewClient | null | undefined): boo
 }
 
 /**
+ * `ViewListOption.preview` renders beside a `list` on hosts with
+ * `view-option-preview` (docs/design/79). Older hosts drop the field in
+ * `sanitizeOptions`, so extensions that need the preview must keep their
+ * sibling-`markdown` fallback until this returns true.
+ */
+export function supportsOptionPreview(client: DesktopViewClient | null | undefined): boolean {
+  return supportsCapability(client, "view-option-preview");
+}
+
+/**
  * The Host renders panel contributions as launcher features + closable tabs
  * (docs/design/66).
  *

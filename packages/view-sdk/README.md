@@ -138,11 +138,12 @@ await desktop.open(spec, {
 | `client.notify(payload)` | Lower-level notify envelope; soft `{ ok:false }` on old hosts |
 | `session.patch(payload)` | Partial update (`hello.capabilities` includes `view-patch`); soft `false` → fall back to `update()` |
 | `supportsPanelLauncher(client)` | `hello.capabilities` includes `panel-launcher` (launcher + closable panel tabs, see below) |
+| `supportsOptionPreview(client)` | `hello.capabilities` includes `view-option-preview` (`ViewListOption.preview`, see below) |
 | `ACCESS_MODE_ACTIONS` | `mode:activate` / `mode:deactivate` action ids the Host sends back |
 | `viewOnDesktop(client, spec, options?)` | One-shot form shortcut |
 | `column` / `row` / `card` | Tiny ViewNode builders |
 | `ViewHostError` | Thrown when Host refuses open / fatal protocol |
-| Types | `ViewNode`, `ViewSpec`, `ViewEvent`, `ViewPlacement`, `HeaderSide`, … |
+| Types | `ViewNode`, `ViewSpec`, `ViewEvent`, `ViewPlacement`, `HeaderSide`, `ViewListOption`, `ViewTextTone`, … |
 
 ### Placement
 
@@ -380,6 +381,50 @@ const tableCapable = hello?.capabilities?.includes("view-table") === true;
 // tableCapable === false → compose the same rows from `row` / `text` instead
 ```
 
+### Option preview (`list`)
+
+`ViewListOption.preview` (Markdown, ≤ `VIEW_OPTION_PREVIEW_MAX_CHARS` = 4000
+characters) asks the Host to render a side pane next to a `list`:
+
+```ts
+const root = column([
+  {
+    type: "list",
+    id: "plan",
+    value,
+    items: plans.map((plan) => ({
+      value: plan.id,
+      label: plan.name,
+      description: plan.summary,
+      preview: plan.markdown,
+    })),
+  },
+]);
+
+if (!supportsOptionPreview(desktop)) {
+  // Older Hosts drop the field in sanitizeOptions — keep the sibling-Markdown fallback.
+}
+```
+
+- **Preview is not a form value.** It never appears in `values`; selection is still
+  `list.value`.
+- The pane follows the hovered / focused row (the Host owns that state locally, so
+  no focus events are involved) and keeps the last row when the pointer leaves the
+  list. Fallback order: last active row → current selection → first item with a
+  preview → first item.
+- In preview mode an item without a `preview` shows its label + description.
+- Works on single- and multi-select `list`; `select` options have no `preview`.
+- Only the active preview is rendered; a longer string is truncated by the Host,
+  never treated as a protocol error.
+- Side-by-side above 440px, stacked below (right sidebar vs composer overlay).
+
+### Text tone
+
+`text.tone` (`muted` | `success` | `warning` | `danger`) tints a paragraph with the
+Host's semantic color tokens. It is emphasis only — the status word must still be
+in `content`, because older Hosts drop the field and color must never be the only
+signal. `variant` (body / caption / heading) still controls size and weight.
+
 ### Partial update (`patch`)
 
 When the Host advertises `view-patch`, replace only the subtrees that changed
@@ -602,7 +647,7 @@ fallback. One connection multiplexes many views by `id`.
 
 Tree depth ≤ 32 · nodes ≤ 512 · strings ≤ 64 KiB · options ≤ 1000 ·
 open views ≤ 8 · message ≤ 1 MiB · table rows ≤ 200 · table columns ≤ 12 ·
-patch ops ≤ 32. Unknown `type` becomes a diagnostic placeholder — never a disconnect.
+patch ops ≤ 32 · option preview ≤ 4000 chars. Unknown `type` becomes a diagnostic placeholder — never a disconnect.
 
 A `table` row counts as **one** node against `maxNodes` (cells are not nodes), so
 a full 200-row table costs ~201 nodes. Each `tabs` entry also costs one.
@@ -703,9 +748,9 @@ in Host / this SDK; the rest are open protocol or Host items.
 | Full-tree `update` wiped live form input | **Fixed** | Host store now keeps previous values for ids still present; tree `value`/`checked` still win when the Client echoes them. |
 | `connectDesktopView()` documented as sync, but socket connect is async | **SDK design** | Env probe is sync; socket is lazy on first `open()` / `ensureConnected()`. |
 | `tabs` ViewNode | **Implemented** | `tabs` + `ViewTab` exist in `src/types.ts`; Host renders via `components/ExtensionView/tabs-node.ts`. (This row previously claimed "compose" — it was stale.) |
-| `checkbox` has no `description` | Workaround | Questionnaire uses `list` items (label + description) instead of checkboxes. |
-| `ViewOption` has no `preview` | Workaround | Client pairs `list` + sibling `markdown` and re-renders on `change`. |
-| Notes / free-text per option | Workaround | Extra `input` nodes; protocol has no first-class annotation. |
+| `checkbox` has no `description` | No consumer | Multi-select with explanations uses `list multiple` + `description`; no extension constructs a `checkbox` today. |
+| `ViewOption` has no `preview` | **Fixed (0.4.0)** | `ViewListOption.preview` + `view-option-preview` capability. The Host owns hover/focus, so preview no longer depends on a selection `change`. See “Option preview” above. |
+| Notes / free-text per option | No consumer | Extra `input` nodes are fine; a first-class annotation would change the `values` shape. |
 | Per-connection open-view limit was a **global** counter | **Fixed** | Host now counts open views per connection id. |
 | `select` ignored option `description` | **Fixed** | Host renders `label — description` in the native `<option>`. |
 | Dependent controls (e.g. thinking levels follow model) need full-tree update | Works | `session.update(buildSpec())` after `change`; keep control `id`s stable. |

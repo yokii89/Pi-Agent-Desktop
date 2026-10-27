@@ -13,6 +13,7 @@ export const uiMessages = defineMessages({
     "en-US": "[Unsupported node]",
   },
   "ui.view.tableEmpty": { "zh-CN": "暂无数据", "en-US": "No data" },
+  "ui.view.optionPreview": { "zh-CN": "选项预览", "en-US": "Option preview" },
   "ui.view.tableTruncation": {
     "zh-CN": "显示 {shown} / 共 {total}",
     "en-US": "Showing {shown} of {total}",

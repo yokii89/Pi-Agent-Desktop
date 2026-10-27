@@ -39,6 +39,19 @@ export interface ViewOption {
   description?: string;
 }
 
+/**
+ * `list` 的选项（docs/design/79）：在 ViewOption 之上带一份并排预览。
+ * `preview` 是 Markdown 纯展示内容，不是表单值，永不进入 `values`；
+ * `select.options` 仍是 ViewOption，没有预览。
+ */
+export interface ViewListOption extends ViewOption {
+  /** 并排预览（Markdown）；缺省时预览面板回落到 label + description。 */
+  preview?: string;
+}
+
+/** 文本语义色（docs/design/79）：只做强调，状态词必须写在文案里，不能只靠颜色。 */
+export type ViewTextTone = "muted" | "success" | "warning" | "danger";
+
 /** tabs 节点的单个页签：children 始终属于同一棵树（非激活页仅隐藏不卸载）。 */
 export interface ViewTab {
   id: string;
@@ -71,7 +84,12 @@ export interface ViewTableRow {
 }
 
 export type ViewNode =
-  | { type: "text"; content: string; variant?: "body" | "caption" | "heading" }
+  | {
+      type: "text";
+      content: string;
+      variant?: "body" | "caption" | "heading";
+      tone?: ViewTextTone;
+    }
   | { type: "markdown"; content: string }
   | { type: "divider" }
   | { type: "column"; children: ViewNode[]; gap?: number }
@@ -97,7 +115,7 @@ export type ViewNode =
   | {
       type: "list";
       id: string;
-      items: ViewOption[];
+      items: ViewListOption[];
       value?: string | string[];
       multiple?: boolean;
     }
@@ -279,6 +297,10 @@ export interface ViewHelloPayload {
  * 扩展之后重新 open/断线重连不会自动把页签抢回来，直到用户从启动页/加号菜单
  * 再次打开。旧 Host 没有该能力时，Catalog 条目会自动成为常驻页签——依赖
  * 「启动即出现」的扩展应显式 `openPanel`。
+ *
+ * `view-option-preview`：`list` 支持 `ViewListOption.preview` 并排预览（docs/design/79）。
+ * 旧 Host 会在 `sanitizeOptions` 里静默丢弃该字段，扩展必须先探测再决定是否
+ * 保留自己的回退树。
  */
 export type ViewHostCapability =
   | "contribution-binding"
@@ -286,7 +308,8 @@ export type ViewHostCapability =
   | "system-toast"
   | "view-table"
   | "view-patch"
-  | "panel-launcher";
+  | "panel-launcher"
+  | "view-option-preview";
 
 /**
  * 本 Host 实际实现的能力集，`hello.capabilities` 的唯一来源。
@@ -300,6 +323,7 @@ export const VIEW_HOST_CAPABILITIES: readonly ViewHostCapability[] = [
   "view-table",
   "view-patch",
   "panel-launcher",
+  "view-option-preview",
 ];
 
 /**
@@ -334,6 +358,12 @@ export const VIEW_LIMITS = {
   maxTableColumns: 12,
   maxPatchOps: 32,
 } as const satisfies ViewLimits;
+
+/**
+ * `ViewListOption.preview` 的字符上限（docs/design/79）。截断类限制：
+ * Host 裁剪后继续渲染，不报错、不断连。
+ */
+export const VIEW_OPTION_PREVIEW_MAX_CHARS = 4000;
 
 /** 系统提示音：SDK 可声明的场景（docs/design/18；不含仅内建的 terminalExit）。 */
 export type ViewNotificationScenarioId =

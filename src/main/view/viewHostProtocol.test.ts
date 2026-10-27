@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { VIEW_LIMITS } from "../../shared/view";
+import {
+  VIEW_HOST_CAPABILITIES,
+  VIEW_LIMITS,
+  VIEW_OPTION_PREVIEW_MAX_CHARS,
+} from "../../shared/view";
 import {
   applyPatch,
   buildOpenedPayload,
@@ -149,6 +153,9 @@ type TableLike = {
   maxRows?: number;
   children?: TableLike[];
   content?: string;
+  tone?: string;
+  items?: Array<{ value: string; label: string; description?: string; preview?: string }>;
+  options?: Array<{ value: string; label: string; description?: string; preview?: string }>;
 };
 
 function sanitized(raw: unknown): TableLike {
@@ -433,5 +440,62 @@ describe("applyPatch (docs/design/19 §10.3)", () => {
     if (result.root.type !== "tabs") return;
     expect(result.root.tabs[1]?.children[0]).toEqual({ type: "text", content: "patched" });
     expect(result.root.tabs[0]?.children[0]).toEqual({ type: "text", content: "x" });
+  });
+});
+
+describe("sanitizeTree — list preview and text tone (docs/design/79)", () => {
+  const listParts = (over: Record<string, unknown> = {}) => ({
+    type: "list",
+    id: "q0",
+    items: [
+      { value: "a", label: "A", description: "desc", preview: "## preview" },
+      { value: "b", label: "B" },
+    ],
+    ...over,
+  });
+
+  it("keeps preview on list items", () => {
+    const root = sanitized(listParts());
+    expect(root.items?.[0]?.preview).toBe("## preview");
+    expect(root.items?.[1]?.preview).toBeUndefined();
+  });
+
+  it("truncates a preview to the protocol cap instead of rejecting the frame", () => {
+    const long = "x".repeat(VIEW_OPTION_PREVIEW_MAX_CHARS + 10);
+    const root = sanitized(listParts({ items: [{ value: "a", label: "A", preview: long }] }));
+    expect(root.items?.[0]?.preview).toHaveLength(VIEW_OPTION_PREVIEW_MAX_CHARS);
+  });
+
+  it("drops non-string and empty previews", () => {
+    const root = sanitized(
+      listParts({
+        items: [
+          { value: "a", label: "A", preview: 42 },
+          { value: "b", label: "B", preview: "" },
+          { value: "c", label: "C", preview: "   " },
+        ],
+      }),
+    );
+    expect(root.items?.[0]?.preview).toBeUndefined();
+    expect(root.items?.[1]?.preview).toBeUndefined();
+    expect(root.items?.[2]?.preview).toBeUndefined();
+  });
+
+  it("ignores preview on select options — the field belongs to list", () => {
+    const root = sanitized({
+      type: "select",
+      id: "s",
+      options: [{ value: "a", label: "A", preview: "nope" }],
+    });
+    expect(root.options?.[0]?.preview).toBeUndefined();
+  });
+
+  it("keeps whitelisted text tones and drops unknown values", () => {
+    expect(sanitized({ type: "text", content: "ok", tone: "warning" }).tone).toBe("warning");
+    expect(sanitized({ type: "text", content: "bad", tone: "purple" }).tone).toBeUndefined();
+  });
+
+  it("advertises view-option-preview to clients", () => {
+    expect(VIEW_HOST_CAPABILITIES).toContain("view-option-preview");
   });
 });

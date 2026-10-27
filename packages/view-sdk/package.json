@@ -1,6 +1,6 @@
 {
   "name": "@pidesk/view-sdk",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Client SDK for the PiDesk extension View protocol (view/v1). Lets pi extensions present serializable desktop UIs without touching pi core.",
   "license": "MIT",
   "type": "module",

@@ -59,6 +59,11 @@ interface OptionListProps {
   /** 容器的附加类名（宽度、内滚、分组间距等）。 */
   className?: string;
   rememberPosition?: boolean;
+  /**
+   * 行高亮变化（指针悬停 / 行焦点 / 移出）：预览面板等本地 UI 跟随。
+   * `null` 表示指针离开列表；常驻列表的预览应忽略它，保留最后一个落点。
+   */
+  onActiveChange?: (index: number | null) => void;
   /** 行上的按键委托给调用方：方向键移动光标、单字符做首字符匹配。 */
   onKeyDown?: (event: ReactKeyboardEvent<HTMLButtonElement>) => void;
   /** 列表内部滚动：锚在行上的二级菜单随之失效，由调用方收起。 */
@@ -92,6 +97,7 @@ export function OptionList({
   ariaLabel,
   className,
   rememberPosition,
+  onActiveChange,
   onKeyDown,
   onScroll,
   focusOnMount,
@@ -111,6 +117,7 @@ export function OptionList({
       if (row) activate.current(index, { row, viaKeyboard: false });
     },
     rememberPosition,
+    onActiveChange,
   });
 
   // 行序只数可点的行：分隔线不占 index，否则药丸会停到线上去

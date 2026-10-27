@@ -29,6 +29,7 @@
 
 export {
   supportsCapability,
+  supportsOptionPreview,
   supportsPanelLauncher,
   supportsPatch,
   supportsTable,
@@ -107,6 +108,7 @@ export {
   SLOTTED_VIEW_PLACEMENTS,
   VIEW_HOST_CAPABILITIES,
   VIEW_LIMITS,
+  VIEW_OPTION_PREVIEW_MAX_CHARS,
   VIEW_PROTOCOL_VERSION,
   type ViewAction,
   type ViewClosedPayload,
@@ -119,6 +121,7 @@ export {
   type ViewHelloPayload,
   type ViewHostCapability,
   type ViewLimits,
+  type ViewListOption,
   type ViewModeAccent,
   type ViewModeDescriptor,
   type ViewNode,
@@ -139,6 +142,7 @@ export {
   type ViewTab,
   type ViewTableColumn,
   type ViewTableRow,
+  type ViewTextTone,
   type ViewUpdatePayload,
 } from "./types.js";
 export {

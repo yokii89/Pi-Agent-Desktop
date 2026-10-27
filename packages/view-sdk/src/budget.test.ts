@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import {
   supportsCapability,
+  supportsOptionPreview,
   supportsPanelLauncher,
   supportsPatch,
   supportsTable,
@@ -177,6 +178,7 @@ describe("capability probes and the table fallback fork", () => {
     expect(supportsTable(undefined)).toBe(false);
     expect(supportsPatch(null)).toBe(false);
     expect(supportsPanelLauncher(null)).toBe(false);
+    expect(supportsOptionPreview(null)).toBe(false);
   });
 
   it("reads capabilities straight off hello", () => {
@@ -184,9 +186,13 @@ describe("capability probes and the table fallback fork", () => {
     expect(supportsCapability(withCaps, "view-patch")).toBe(true);
     expect(supportsTable(withCaps)).toBe(false);
     expect(supportsPanelLauncher(withCaps)).toBe(false);
+    expect(supportsOptionPreview(withCaps)).toBe(false);
 
     const launched = helloWith({ capabilities: ["panel-launcher"] });
     expect(supportsPanelLauncher(launched)).toBe(true);
+
+    const preview = helloWith({ capabilities: ["view-option-preview"] });
+    expect(supportsOptionPreview(preview)).toBe(true);
   });
 
   it("falls back to compile-time limits when an old Host sends no limits", () => {

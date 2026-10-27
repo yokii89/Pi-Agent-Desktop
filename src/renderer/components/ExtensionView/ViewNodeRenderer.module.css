@@ -24,6 +24,23 @@
   color: var(--color-text-strong);
 }
 
+/* 语义色（docs/design/79）：只做强调，状态词必须由文案自带，不能只靠颜色 */
+.toneMuted {
+  color: var(--color-text-muted);
+}
+
+.toneSuccess {
+  color: var(--color-success);
+}
+
+.toneWarning {
+  color: var(--color-warning);
+}
+
+.toneDanger {
+  color: var(--color-danger);
+}
+
 .markdown {
   font-size: var(--font-size-md);
   color: var(--color-text);
@@ -235,6 +252,80 @@
 .listItemActive .listDesc {
   color: var(--color-text);
   opacity: 0.85;
+}
+
+/* 选项预览（docs/design/79）：右侧面板约 300px 时上下堆叠，浮层 widget 走左右两栏。
+   container-type 必须挂在外层，容器查询不能作用于容器自身。 */
+.listPreviewOuter {
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.listPreviewWrap {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  min-width: 0;
+}
+
+.listPreviewWrap > .list {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 预览高度固定：内容随 hover 变化，若让高度跟内容走，下面的表单项会跟着跳。
+   列表保持自身内容高度（上限 280），两栏不等高没问题。 */
+.optionPreview {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 280px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-overlay);
+  background: var(--color-bg-surface);
+}
+
+@container (max-width: 440px) {
+  .listPreviewWrap {
+    flex-direction: column;
+    /* 列方向下交叉轴是水平：flex-start 会让两栏收缩到内容宽度 */
+    align-items: stretch;
+  }
+
+  /* 列方向下 flex-basis 作用在高度上：不清零会把两栏都压塌 */
+  .listPreviewWrap > .list,
+  .optionPreview {
+    flex: 0 0 auto;
+  }
+
+  .optionPreview {
+    height: 200px;
+  }
+}
+
+.optionPreviewMarkdown {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.optionPreviewFallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.optionPreviewTitle {
+  font-weight: 500;
+  color: var(--color-text-strong);
+}
+
+.optionPreviewDesc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .progressWrap {

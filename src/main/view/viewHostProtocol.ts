@@ -6,16 +6,20 @@
 import type {
   HeaderSide,
   ViewAction,
+  ViewListOption,
   ViewNode,
   ViewOpenedPayload,
-  ViewOption,
   ViewPatchOp,
   ViewPlacement,
   ViewTab,
   ViewTableColumn,
   ViewTableRow,
 } from "../../shared/view";
-import { IMPLEMENTED_VIEW_PLACEMENTS, VIEW_LIMITS } from "../../shared/view";
+import {
+  IMPLEMENTED_VIEW_PLACEMENTS,
+  VIEW_LIMITS,
+  VIEW_OPTION_PREVIEW_MAX_CHARS,
+} from "../../shared/view";
 
 /**
  * 已知槽位表。写成 `Record<ViewPlacement, true>` 而不是 `||` 比较链：给
@@ -118,18 +122,31 @@ export function truncateString(value: string): string {
   return value.slice(0, end);
 }
 
-export function sanitizeOptions(raw: unknown): ViewOption[] {
+/**
+ * 选项清洗。`allowPreview` 只在 `list` 上开启：`preview` 是截断类字段
+ * （docs/design/79），空串与非字符串直接丢弃，不报错。
+ */
+export function sanitizeOptions(raw: unknown, allowPreview = false): ViewListOption[] {
   if (!Array.isArray(raw)) return [];
-  const out: ViewOption[] = [];
+  const out: ViewListOption[] = [];
   for (const item of raw.slice(0, VIEW_LIMITS.maxOptionItems)) {
     if (!item || typeof item !== "object") continue;
-    const record = item as { value?: unknown; label?: unknown; description?: unknown };
+    const record = item as {
+      value?: unknown;
+      label?: unknown;
+      description?: unknown;
+      preview?: unknown;
+    };
     if (typeof record.value !== "string") continue;
     out.push({
       value: truncateString(record.value),
       label: truncateString(typeof record.label === "string" ? record.label : record.value),
       description:
         typeof record.description === "string" ? truncateString(record.description) : undefined,
+      preview:
+        allowPreview && typeof record.preview === "string" && record.preview.trim().length > 0
+          ? record.preview.slice(0, VIEW_OPTION_PREVIEW_MAX_CHARS)
+          : undefined,
     });
   }
   return out;
@@ -255,10 +272,18 @@ export function sanitizeTree(raw: unknown): { root: ViewNode } | { error: string
       case "text": {
         const variant =
           record.variant === "caption" || record.variant === "heading" ? record.variant : "body";
+        const tone =
+          record.tone === "muted" ||
+          record.tone === "success" ||
+          record.tone === "warning" ||
+          record.tone === "danger"
+            ? record.tone
+            : undefined;
         return {
           type: "text",
           content: truncateString(typeof record.content === "string" ? record.content : ""),
           variant,
+          tone,
         };
       }
       case "markdown":
@@ -352,7 +377,7 @@ export function sanitizeTree(raw: unknown): { root: ViewNode } | { error: string
         return {
           type: "list",
           id: truncateString(record.id),
-          items: sanitizeOptions(record.items),
+          items: sanitizeOptions(record.items, true),
           value,
           multiple: record.multiple === true,
         };

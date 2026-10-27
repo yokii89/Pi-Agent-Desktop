@@ -51,7 +51,17 @@ export function ViewNodeRenderer({ node, bridge }: ViewNodeRendererProps) {
           : node.variant === "caption"
             ? styles.caption
             : styles.body;
-      return <p className={cls}>{node.content}</p>;
+      const tone =
+        node.tone === "success"
+          ? styles.toneSuccess
+          : node.tone === "warning"
+            ? styles.toneWarning
+            : node.tone === "danger"
+              ? styles.toneDanger
+              : node.tone === "muted"
+                ? styles.toneMuted
+                : "";
+      return <p className={[cls, tone].filter(Boolean).join(" ")}>{node.content}</p>;
     }
     case "markdown":
       return (
@@ -173,69 +183,8 @@ export function ViewNodeRenderer({ node, bridge }: ViewNodeRendererProps) {
         </label>
       );
     }
-    case "list": {
-      const raw = bridge.values[node.id];
-      const selected = new Set(
-        Array.isArray(raw)
-          ? raw.filter((v): v is string => typeof v === "string")
-          : typeof raw === "string" && raw
-            ? [raw]
-            : [],
-      );
-      const multi = node.multiple === true;
-      // 每个条目恰好占一个可点行，OptionList 的行序就是 items 下标
-      const rows = node.items.map<OptionRow>((item) => {
-        const active = selected.has(item.value);
-        return {
-          key: item.value,
-          text: item.label,
-          selected: active,
-          className: [styles.listItem, active ? styles.listItemActive : ""].join(" "),
-          node: (
-            <>
-              {multi ? (
-                <span
-                  className={[styles.listCheck, active ? styles.listCheckOn : ""].join(" ")}
-                  aria-hidden
-                >
-                  {active ? "✓" : ""}
-                </span>
-              ) : null}
-              <span className={styles.listText}>
-                <span className={styles.listLabel}>{item.label}</span>
-                {item.description ? (
-                  <span className={styles.listDesc}>{item.description}</span>
-                ) : null}
-              </span>
-            </>
-          ),
-        };
-      });
-      return (
-        <div className={styles.list}>
-          <OptionList
-            rows={rows}
-            role="listbox"
-            className={styles.listRows}
-            // 弹出式列表收起即卸载，药丸留着无所谓；这是常驻面板，指针移出后必须熄灭，
-            // 否则一次悬停的高亮会被读成「已选中」，和左侧强调条打架。
-            rememberPosition={false}
-            onSelect={(index) => {
-              const item = node.items[index];
-              if (!item) return;
-              if (multi) {
-                const next = new Set(selected);
-                if (next.has(item.value)) next.delete(item.value);
-                else next.add(item.value);
-                bridge.onChange(node.id, [...next]);
-              } else {
-                bridge.onChange(node.id, item.value);
-              }
-            }}
-          />
-        </div>
-      );
-    }
+    case "list":
+      return <ListField node={node} bridge={bridge} />;
     case "progress": {
       const pct = Math.round((node.value ?? 0) * 100);
       return (
@@ -262,6 +211,126 @@ export function ViewNodeRenderer({ node, bridge }: ViewNodeRendererProps) {
     default:
       return <p className={styles.caption}>{t("ui.view.unsupportedNodeShort")}</p>;
   }
+}
+
+type ListViewNode = Extract<ViewNode, { type: "list" }>;
+
+/**
+ * 常驻 list 字段。至少一项带 `preview` 时进入两栏（docs/design/79）：
+ * 右栏跟随 hover / 行焦点，指针移出列表后保留最后一个落点，
+ * 而不是退回选中项——用户可能正把指针移进预览里阅读。
+ */
+function ListField({ node, bridge }: { node: ListViewNode; bridge: ViewFormBridge }) {
+  const t = useT();
+  const raw = bridge.values[node.id];
+  const selected = new Set(
+    Array.isArray(raw)
+      ? raw.filter((v): v is string => typeof v === "string")
+      : typeof raw === "string" && raw
+        ? [raw]
+        : [],
+  );
+  const multi = node.multiple === true;
+  const [activeValue, setActiveValue] = useState<string | null>(null);
+
+  const previewMode = node.items.some(
+    (item) => typeof item.preview === "string" && item.preview.length > 0,
+  );
+  const selectedValue =
+    typeof raw === "string" && raw
+      ? raw
+      : Array.isArray(raw)
+        ? (raw.find((value): value is string => typeof value === "string") ?? null)
+        : null;
+  const activeItem =
+    (activeValue !== null ? node.items.find((item) => item.value === activeValue) : undefined) ??
+    (selectedValue !== null
+      ? node.items.find((item) => item.value === selectedValue)
+      : undefined) ??
+    node.items.find((item) => item.preview) ??
+    node.items[0];
+
+  // 每个条目恰好占一个可点行，OptionList 的行序就是 items 下标
+  const rows = node.items.map<OptionRow>((item) => {
+    const active = selected.has(item.value);
+    return {
+      key: item.value,
+      text: item.label,
+      selected: active,
+      className: [styles.listItem, active ? styles.listItemActive : ""].join(" "),
+      node: (
+        <>
+          {multi ? (
+            <span
+              className={[styles.listCheck, active ? styles.listCheckOn : ""].join(" ")}
+              aria-hidden
+            >
+              {active ? "✓" : ""}
+            </span>
+          ) : null}
+          <span className={styles.listText}>
+            <span className={styles.listLabel}>{item.label}</span>
+            {item.description ? <span className={styles.listDesc}>{item.description}</span> : null}
+          </span>
+        </>
+      ),
+    };
+  });
+
+  const list = (
+    <div className={styles.list}>
+      <OptionList
+        rows={rows}
+        role="listbox"
+        className={styles.listRows}
+        // 弹出式列表收起即卸载，药丸留着无所谓；这是常驻面板，指针移出后必须熄灭，
+        // 否则一次悬停的高亮会被读成「已选中」，和左侧强调条打架。
+        rememberPosition={false}
+        // null 是「指针离开列表」：预览保留最后一个落点，别在用户移向预览时闪回选中项
+        onActiveChange={(index) => {
+          if (index === null) return;
+          const item = node.items[index];
+          if (item) setActiveValue(item.value);
+        }}
+        onSelect={(index) => {
+          const item = node.items[index];
+          if (!item) return;
+          if (multi) {
+            const next = new Set(selected);
+            if (next.has(item.value)) next.delete(item.value);
+            else next.add(item.value);
+            bridge.onChange(node.id, [...next]);
+          } else {
+            bridge.onChange(node.id, item.value);
+          }
+        }}
+      />
+    </div>
+  );
+
+  if (!previewMode) return list;
+
+  return (
+    <div className={styles.listPreviewOuter}>
+      <div className={styles.listPreviewWrap}>
+        {list}
+        <section className={styles.optionPreview} aria-label={t("ui.view.optionPreview")}>
+          {activeItem?.preview ? (
+            <div className={styles.optionPreviewMarkdown}>
+              <MarkdownContent text={activeItem.preview} />
+            </div>
+          ) : (
+            <div className={styles.optionPreviewFallback}>
+              <div className={styles.optionPreviewTitle}>{activeItem?.label}</div>
+              {activeItem?.description ? (
+                <div className={styles.optionPreviewDesc}>{activeItem.description}</div>
+              ) : null}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
 }
 
 type TabsViewNode = Extract<ViewNode, { type: "tabs" }>;

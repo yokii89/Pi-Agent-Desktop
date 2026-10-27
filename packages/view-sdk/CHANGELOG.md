@@ -1,6 +1,39 @@
 # @pidesk/view-sdk
 
-## 0.3.0 — 2026-10-25
+## 0.4.0 — 2026-10-28
+
+**Includes 0.3.0** (listed below; 0.3.0 was never published on its own, so this is
+the first npm release since 0.2.0).
+
+```bash
+npm install @pidesk/view-sdk@0.4.0
+```
+
+Implements PiDesk docs/design/79. Two additive node fields; no envelope or message
+change, and no breaking API change. Measured on the questionnaire workaround (one
+question, two options): **9 nodes / depth 4 / 536 B → 5 nodes / depth 2 / 361 B**.
+
+- **`ViewListOption.preview`** — a Markdown side pane for `list` options, gated by
+  the new `view-option-preview` Host capability (`supportsOptionPreview(client)`).
+  The Host follows hover / row focus locally (no focus events are needed), keeps
+  the last active row when the pointer leaves, and falls back to selection → first
+  item with a preview → first item. `preview` is **not** a form value and never
+  enters `values`; `select` options are unchanged. Oversized previews are truncated
+  to `VIEW_OPTION_PREVIEW_MAX_CHARS` (4000).
+  - **Migration**: older Hosts drop the field during `sanitizeOptions`; extensions
+    that need the pane must keep their sibling-`markdown` fallback until
+    `supportsOptionPreview()` returns true.
+- **`text.tone`** (`muted` | `success` | `warning` | `danger`) — semantic color for
+  paragraphs. Emphasis only: the status word must remain in the copy, since older
+  Hosts drop the field and color must never be the only signal.
+- **`VIEW_OPTION_PREVIEW_MAX_CHARS`** is exported from the protocol types, and the
+  type-sync guard now requires it to stay inside the mirrored region.
+
+**Verification**: 174 SDK tests, 453 Host protocol tests, 382 renderer tests,
+typecheck (SDK / main / renderer), `biome check`, and the production build all pass.
+No new dependencies.
+
+## 0.3.0 — 2026-10-25 (unpublished; shipped in 0.4.0)
 
 Panel contributions become **launcher features** on Hosts that advertise the new
 `panel-launcher` capability (PiDesk docs/design/66). No new message or node; the
