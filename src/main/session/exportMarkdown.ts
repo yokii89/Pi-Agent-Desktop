@@ -2,7 +2,7 @@ import { t } from "../../shared/i18n";
 import type { SessionTranscriptPayload } from "../../shared/ipc";
 
 /**
- * 「导出记录」的纯逻辑：会话消息 → Markdown 文档 + 落盘文件名净化。
+ * 「导出记录」Markdown 正文的纯逻辑 + 两种导出格式共用的文件名净化。
  * 与 fs/saveImageName.ts 同款拆分——本模块不依赖 Electron，可在不启动 app 的前提下被测；
  * 保存对话框与写盘在 exportSession.ts。
  */
@@ -25,19 +25,25 @@ export interface ExportDocMeta {
   exportedAt?: number;
 }
 
-/** 标题默认文件名：净化不可信标题，保证结果是单个 .md 文件名而非路径。 */
-export function toExportFileName(raw: string | undefined): string {
+/** 导出格式：Markdown 自研转换，HTML 交给 pi 原生导出。 */
+export type SessionExportFormat = "md" | "html";
+
+/** 标题默认文件名：净化不可信标题，保证结果是单个 .md / .html 文件名而非路径。 */
+export function toExportFileName(
+  raw: string | undefined,
+  format: SessionExportFormat = "md",
+): string {
   const stem = (raw ?? "")
     .split(/[\\/]/)
     .pop()
     ?.replace(ILLEGAL_NAME_CHARS, "")
-    .replace(/\.(markdown|md)$/i, "")
+    .replace(/\.(markdown|md|html|htm)$/i, "")
     .replace(/[. ]+$/, "")
     .slice(0, MAX_STEM_CHARS)
     .replace(/[. ]+$/, "")
     .trim();
   const base = stem || t("session.export.defaultName");
-  return `${WIN_RESERVED_NAMES.test(base) ? `_${base}` : base}.md`;
+  return `${WIN_RESERVED_NAMES.test(base) ? `_${base}` : base}.${format}`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

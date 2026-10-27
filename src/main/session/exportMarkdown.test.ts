@@ -18,6 +18,12 @@ describe("toExportFileName", () => {
     expect(toExportFileName("发布记录.markdown")).toBe("发布记录.md");
   });
 
+  it("HTML 导出换扩展名并去掉原扩展名", () => {
+    expect(toExportFileName("性能优化方案", "html")).toBe("性能优化方案.html");
+    expect(toExportFileName("发布记录.md", "html")).toBe("发布记录.html");
+    expect(toExportFileName("导出.html", "md")).toBe("导出.md");
+  });
+
   it("空标题回退默认名", () => {
     expect(toExportFileName("   ")).toBe("会话记录.md");
     expect(toExportFileName(undefined)).toBe("会话记录.md");

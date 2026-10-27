@@ -60,6 +60,11 @@ export const sidenavMessages = defineMessages({
   "sidenav.session.markUnread": { "zh-CN": "标记为未读", "en-US": "Mark as unread" },
   "sidenav.session.markUnreadCurrent": { "zh-CN": "当前会话", "en-US": "Current session" },
   "sidenav.session.export": { "zh-CN": "导出记录", "en-US": "Export record" },
+  "sidenav.session.exportHtml": { "zh-CN": "导出为 HTML", "en-US": "Export as HTML" },
+  "sidenav.session.exportMarkdown": {
+    "zh-CN": "导出为 Markdown",
+    "en-US": "Export as Markdown",
+  },
   "sidenav.session.exportFailed": { "zh-CN": "导出失败", "en-US": "Export failed" },
   "sidenav.session.archive": {
     "zh-CN": "归档",

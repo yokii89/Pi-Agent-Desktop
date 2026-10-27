@@ -367,6 +367,9 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 导出会话记录为 Markdown 文件（系统保存对话框；取消返回 null）。 */
     exportMarkdown: (req: SessionExportRequest): Promise<IpcResult<{ path: string } | null>> =>
       ipcRenderer.invoke(SESSION_IPC.exportMarkdown, req),
+    /** 导出会话记录为 HTML 文件（pi 原生导出；系统保存对话框；取消返回 null）。 */
+    exportHtml: (req: SessionExportRequest): Promise<IpcResult<{ path: string } | null>> =>
+      ipcRenderer.invoke(SESSION_IPC.exportHtml, req),
     /** 读取 pi 可用斜杠命令（按 sessionId 路由；未启动返回空）。 */
     getCommands: (sessionId: SessionId): Promise<IpcResult<PiSlashCommand[]>> =>
       ipcRenderer.invoke(SESSION_IPC.getCommands, { sessionId }),

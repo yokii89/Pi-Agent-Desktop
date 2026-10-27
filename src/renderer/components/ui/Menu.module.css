@@ -42,6 +42,21 @@
   margin-left: auto;
 }
 
+/* 二级菜单入口的箭头：与 hint 共用"贴右缘"的占位逻辑，二者不会同时出现 */
+.submenuChevron {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  color: var(--color-text-muted);
+}
+
+/* 二级菜单面板：外壳沿用浮层配方；位置由 MenuSubmenu 按行矩形写入内联 left/top。
+   它挂在父面板内部（不是独立 portal），父菜单收起时一起退场。 */
+.submenu {
+  composes: shell from "./overlayShell.module.css";
+  min-width: var(--panel-min-width, 180px);
+}
+
 .itemIcon {
   display: inline-flex;
   align-items: center;

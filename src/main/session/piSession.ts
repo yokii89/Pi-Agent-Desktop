@@ -574,6 +574,15 @@ export function interruptSession(sessionId: SessionId): void {
   request(sessionId, "abort").catch(() => {});
 }
 
+/**
+ * 导出目标会话为 HTML（RPC `export_html`）：读的是 pi 内存中的会话状态，
+ * 比 CLI 的独立导出多出系统提示词与工具定义；仅对存活实例可用。
+ */
+export function exportHtml(sessionId: SessionId, outputPath: string): Promise<void> {
+  markRuntimeUsedByUser(sessionId);
+  return request(sessionId, "export_html", { outputPath }).then(() => undefined);
+}
+
 /** 读取当前会话消息（RPC get_messages，恢复历史会话用）。 */
 export async function fetchSessionMessages(sessionId: SessionId): Promise<unknown[]> {
   const data = await request(sessionId, "get_messages");

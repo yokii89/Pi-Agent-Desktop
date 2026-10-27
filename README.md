@@ -37,7 +37,7 @@ PiDesk is the Windows desktop client for the open-source coding agent [pi](https
 - **Parallel sessions**: 8 live pi processes by default, tunable from 1 to 32. Switching never kills one, and hitting the ceiling refuses the new session instead of evicting an old one.
 - `@` file references as atomic tokens with read-only file chips; paste or drop images, attach any file.
 - A **question rail** — one anchor per question, so you can jump straight back after fifty turns.
-- Context usage next to the composer; a **per-turn file-edit summary** with undo and review on the same row; whole-session **Markdown export** (bodies in order, thinking and tool calls folded, images counted rather than embedded).
+- Context usage next to the composer; a **per-turn file-edit summary** with undo and review on the same row; whole-session **Markdown or HTML export** (Markdown puts bodies in order, folds thinking and tool calls, and counts images rather than embedding them; HTML uses pi's native exporter).
 - Access modes: full access is built in, and extensions can register their own (plan mode ships as an extension example) through the SDK.
 - Streaming is a ~32ms-batched event stream routed by `sessionId`, so parallel chats never bleed into each other.
 
@@ -82,7 +82,7 @@ A client should not become a second agent. Each of these was buildable, and each
 
 | Not built | Why |
 | --- | --- |
-| A copy of the transcript | Message bodies stay in pi's native JSONL; PiDesk keeps markers plus a whole-session Markdown export. |
+| A copy of the transcript | Message bodies stay in pi's native JSONL; PiDesk keeps markers plus whole-session export as Markdown or HTML. |
 | Bundled pi | No agent in the installer. You point PiDesk at your local pi executable; it probes the version and launches it. |
 | An account system | Model auth belongs to pi. Skip GitHub sign-in and everything still works. |
 | Chat bubbles | Agent output was always a document. |

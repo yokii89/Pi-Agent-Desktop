@@ -4,6 +4,8 @@ import {
   DotsThree,
   EnvelopeSimple,
   Export,
+  FileHtml,
+  FileMd,
   FolderOpen,
   Pen,
   PushPin,
@@ -22,6 +24,27 @@ import type { MenuItem } from "../ui/Menu";
 import { Menu } from "../ui/Menu";
 import { RevealOnRowHover } from "./RevealOnRowHover";
 import styles from "./SideNav.module.css";
+
+/**
+ * 行菜单图标只创建一次：React 元素不可变，可在多行/多次渲染间复用。
+ * 历史列表每次重渲染都会重建菜单条目，按行新建 Phosphor 元素是这里的主要分配开销。
+ */
+const ICONS = {
+  more: <DotsThree size={16} weight="regular" />,
+  copy: <Copy size={16} weight="regular" />,
+  rename: <Pen size={16} weight="regular" />,
+  folder: <FolderOpen size={16} weight="regular" />,
+  export: <Export size={16} weight="regular" />,
+  exportHtml: <FileHtml size={16} weight="regular" />,
+  exportMarkdown: <FileMd size={16} weight="regular" />,
+  pinGlobal: <PushPin size={16} weight="regular" />,
+  unpinGlobal: <PushPinSlash size={16} weight="regular" />,
+  pinWorkspace: <PushPinSimple size={16} weight="regular" />,
+  unpinWorkspace: <PushPinSimpleSlash size={16} weight="regular" />,
+  unread: <EnvelopeSimple size={16} weight="regular" />,
+  archive: <Archive size={16} weight="regular" />,
+  trash: <Trash size={16} weight="regular" />,
+} as const;
 
 interface RowMenuProps {
   /** 无障碍标签（如"更多操作：pidesk"）；按钮 tooltip 固定为"更多操作"。 */
@@ -66,7 +89,7 @@ export function RowMenu({ label, items, onOpenChange }: RowMenuProps) {
               aria-haspopup="menu"
               onClick={onClick}
             >
-              <DotsThree size={16} weight="regular" />
+              {ICONS.more}
             </button>
           </>
         )}
@@ -101,7 +124,7 @@ export function openFolderItem(
   return {
     key: "reveal",
     label: translate("sidenav.session.openFolder"),
-    icon: <FolderOpen size={16} weight="regular" />,
+    icon: ICONS.folder,
     onSelect: () => {
       void revealFolder(target, onError);
     },
@@ -114,7 +137,7 @@ export function deleteItem(label: string, onSelect: () => void): MenuItem {
     key: "remove",
     label,
     tone: "danger",
-    icon: <Trash size={16} weight="regular" />,
+    icon: ICONS.trash,
     onSelect,
   };
 }
@@ -124,7 +147,7 @@ export function renameItem(onSelect: () => void): MenuItem {
   return {
     key: "rename",
     label: translate("sidenav.session.rename"),
-    icon: <Pen size={16} weight="regular" />,
+    icon: ICONS.rename,
     onSelect,
   };
 }
@@ -134,7 +157,7 @@ export function copyTaskIdItem(taskId: string, showToast: (message: string) => v
   return {
     key: "copy-id",
     label: translate("sidenav.session.copyTaskId"),
-    icon: <Copy size={16} weight="regular" />,
+    icon: ICONS.copy,
     onSelect: () => {
       void navigator.clipboard
         .writeText(taskId)
@@ -144,8 +167,23 @@ export function copyTaskIdItem(taskId: string, showToast: (message: string) => v
   };
 }
 
+/** 导出结果提示：成功才提示，取消（null）不打扰；失败把可读原因交给 toast。 */
+function runExport(
+  run: () => Promise<{ path: string } | null>,
+  showToast: (message: string) => void,
+): void {
+  void run()
+    .then((result) => {
+      if (result) showToast(translate("session.export.done"));
+    })
+    .catch((err: unknown) => {
+      showToast(err instanceof Error ? err.message : translate("sidenav.session.exportFailed"));
+    });
+}
+
 /**
- * 「导出记录」条目（docs/design/45）：会话 JSONL → Markdown 文件（系统保存对话框）。
+ * 「导出记录」条目（docs/design/45）：点击展开二级菜单，由用户选格式。
+ * Markdown 是 PiDesk 自研转换；HTML 交给 pi 原生导出（存活会话走 RPC，冷会话走 CLI）。
  * 未落盘的新会话没有可导出的文件，返回 null = 整行不展示。
  */
 export function exportItem(
@@ -157,17 +195,21 @@ export function exportItem(
   return {
     key: "export",
     label: translate("sidenav.session.export"),
-    icon: <Export size={16} weight="regular" />,
-    onSelect: () => {
-      void sessionService
-        .exportMarkdown(file, title)
-        .then((result) => {
-          if (result) showToast(translate("session.export.done"));
-        })
-        .catch((err: unknown) => {
-          showToast(err instanceof Error ? err.message : translate("sidenav.session.exportFailed"));
-        });
-    },
+    icon: ICONS.export,
+    submenu: [
+      {
+        key: "export-html",
+        label: translate("sidenav.session.exportHtml"),
+        icon: ICONS.exportHtml,
+        onSelect: () => runExport(() => sessionService.exportHtml(file, title), showToast),
+      },
+      {
+        key: "export-markdown",
+        label: translate("sidenav.session.exportMarkdown"),
+        icon: ICONS.exportMarkdown,
+        onSelect: () => runExport(() => sessionService.exportMarkdown(file, title), showToast),
+      },
+    ],
   };
 }
 
@@ -178,11 +220,7 @@ export function pinGlobalItem(pinned: boolean, onSelect: () => void): MenuItem {
     label: pinned
       ? translate("sidenav.session.unpinGlobal")
       : translate("sidenav.session.pinGlobal"),
-    icon: pinned ? (
-      <PushPinSlash size={16} weight="regular" />
-    ) : (
-      <PushPin size={16} weight="regular" />
-    ),
+    icon: pinned ? ICONS.unpinGlobal : ICONS.pinGlobal,
     onSelect,
   };
 }
@@ -194,11 +232,7 @@ export function pinWorkspaceItem(pinned: boolean, onSelect: () => void): MenuIte
     label: pinned
       ? translate("sidenav.session.unpinWorkspace")
       : translate("sidenav.session.pinWorkspace"),
-    icon: pinned ? (
-      <PushPinSimpleSlash size={16} weight="regular" />
-    ) : (
-      <PushPinSimple size={16} weight="regular" />
-    ),
+    icon: pinned ? ICONS.unpinWorkspace : ICONS.pinWorkspace,
     onSelect,
   };
 }
@@ -208,7 +242,7 @@ export function markUnreadItem(options: { disabled: boolean; onSelect: () => voi
   return {
     key: "mark-unread",
     label: translate("sidenav.session.markUnread"),
-    icon: <EnvelopeSimple size={16} weight="regular" />,
+    icon: ICONS.unread,
     disabled: options.disabled,
     hint: options.disabled ? translate("sidenav.session.markUnreadCurrent") : undefined,
     onSelect: options.onSelect,
@@ -225,7 +259,7 @@ export function archiveItem(file: string, onSelect: () => void): MenuItem | null
   return {
     key: "archive",
     label: translate("sidenav.session.archive"),
-    icon: <Archive size={16} weight="regular" />,
+    icon: ICONS.archive,
     tone: "danger",
     dividerBefore: true,
     onSelect,

@@ -26,7 +26,7 @@ import { AUTH_IPC, PI_IPC, SESSION_IPC } from "../../shared/ipc";
 import { envelope, envelopeAsync } from "../ipc/envelope";
 import { getSettings } from "../settings/settings";
 import { buildContextBreakdown } from "./contextBreakdown";
-import { exportSessionMarkdown } from "./exportSession";
+import { exportSessionHtml, exportSessionMarkdown } from "./exportSession";
 import { invalidateGatewayModelCache, listApiKeyProviders } from "./piAuth";
 import {
   activateCredential,
@@ -392,6 +392,12 @@ export function registerSessionIpc(): void {
     SESSION_IPC.exportMarkdown,
     (_event, req: SessionExportRequest): Promise<IpcResult<{ path: string } | null>> =>
       envelopeAsync(() => exportSessionMarkdown(req)),
+  );
+
+  ipcMain.handle(
+    SESSION_IPC.exportHtml,
+    (_event, req: SessionExportRequest): Promise<IpcResult<{ path: string } | null>> =>
+      envelopeAsync(() => exportSessionHtml(req)),
   );
 
   ipcMain.handle(

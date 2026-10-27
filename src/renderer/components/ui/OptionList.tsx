@@ -10,6 +10,12 @@ import {
 import { useGlidePill } from "../../hooks/useGlidePill";
 import styles from "./GlideList.module.css";
 
+/** 一次行激活的来源：二级菜单要用行元素当锚点，键盘激活还要把焦点交进子列表。 */
+export interface OptionActivation {
+  row: HTMLButtonElement;
+  viaKeyboard: boolean;
+}
+
 export interface OptionRow {
   key: string;
   /** 行内容；行容器（按钮、行序、点击契约）由 OptionList 负责。 */
@@ -24,6 +30,9 @@ export interface OptionRow {
   text?: string;
   /** 分组分隔线：不占行序，也不可点。 */
   separator?: boolean;
+  /** 行会展开浮层（二级菜单等）：告诉读屏这是一个可展开的条目。 */
+  hasPopup?: "menu" | "listbox" | "dialog";
+  expanded?: boolean;
 }
 
 /** 键盘导航入口：焦点在触发器上时，由它把光标交接到某一行。 */
@@ -42,7 +51,8 @@ export interface OptionListHandle {
 
 interface OptionListProps {
   rows: OptionRow[];
-  onSelect: (index: number) => void;
+  /** 第二参数是激活来源：二级菜单要按行矩形定位，需要行元素本身。 */
+  onSelect: (index: number, activation: OptionActivation) => void;
   /** listbox 用于"选一个值"的选取器，menu 用于动作菜单。 */
   role?: "menu" | "listbox";
   ariaLabel?: string;
@@ -51,6 +61,8 @@ interface OptionListProps {
   rememberPosition?: boolean;
   /** 行上的按键委托给调用方：方向键移动光标、单字符做首字符匹配。 */
   onKeyDown?: (event: ReactKeyboardEvent<HTMLButtonElement>) => void;
+  /** 列表内部滚动：锚在行上的二级菜单随之失效，由调用方收起。 */
+  onScroll?: () => void;
   /** 挂载后把焦点交给第 n 行：键盘打开下拉时，光标要直接落在当前值上。 */
   focusOnMount?: number | null;
   /** 多选 listbox：告诉读屏这是一个可多选的选择列表（单选不要传）。 */
@@ -81,6 +93,7 @@ export function OptionList({
   className,
   rememberPosition,
   onKeyDown,
+  onScroll,
   focusOnMount,
   multiple,
   preventFocusOnPointer,
@@ -90,7 +103,13 @@ export function OptionList({
   const activate = useRef(onSelect);
   activate.current = onSelect;
   const pill = useGlidePill(listRef, {
-    onPick: (index) => activate.current(index),
+    // 擦选松手没有 click 事件：行本身从列表里按行序捞，来源仍算指针
+    onPick: (index) => {
+      const row = listRef.current?.querySelector<HTMLButtonElement>(
+        `[data-glide-index="${index}"]`,
+      );
+      if (row) activate.current(index, { row, viaKeyboard: false });
+    },
     rememberPosition,
   });
 
@@ -174,6 +193,7 @@ export function OptionList({
       ref={listRef}
       {...containerAria}
       className={[styles.track, className].filter(Boolean).join(" ")}
+      onScroll={onScroll}
       {...pill.listProps}
     >
       <span ref={pill.pillRef} className={styles.pill} aria-hidden="true" />
@@ -186,7 +206,11 @@ export function OptionList({
             type="button"
             {...(role === "listbox"
               ? { role: "option", "aria-selected": row.selected === true }
-              : { role: "menuitem" })}
+              : {
+                  role: "menuitem",
+                  ...(row.hasPopup ? { "aria-haspopup": row.hasPopup } : {}),
+                  ...(row.hasPopup ? { "aria-expanded": row.expanded === true } : {}),
+                })}
             onMouseDown={preventFocusOnPointer ? (event) => event.preventDefault() : undefined}
             disabled={row.disabled}
             title={row.title}
@@ -197,7 +221,10 @@ export function OptionList({
             onClick={(event) => {
               // 绕回原行松手的擦选已由药丸代为实现，别让同一次点击激活两遍
               if (pill.consumeClick(event.detail)) return;
-              onSelect(index);
+              onSelect(index, {
+                row: event.currentTarget,
+                viaKeyboard: event.detail === 0,
+              });
             }}
           >
             {row.node}

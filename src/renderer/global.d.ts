@@ -243,6 +243,8 @@ export interface PideskGlobalApi {
     readTranscript(file: string): Promise<IpcResult<SessionTranscriptPayload>>;
     /** 导出会话记录为 Markdown 文件（系统保存对话框；取消返回 null）。 */
     exportMarkdown(req: SessionExportRequest): Promise<IpcResult<{ path: string } | null>>;
+    /** 导出会话记录为 HTML 文件（pi 原生导出；系统保存对话框；取消返回 null）。 */
+    exportHtml(req: SessionExportRequest): Promise<IpcResult<{ path: string } | null>>;
     getCommands(sessionId: SessionId): Promise<IpcResult<PiSlashCommand[]>>;
     setThinkingLevel(req: SessionSetThinkingLevelRequest): Promise<IpcResult<null>>;
     getModelState(sessionId: SessionId): Promise<IpcResult<PiModelState>>;

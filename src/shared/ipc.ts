@@ -314,6 +314,8 @@ export const SESSION_IPC = {
   readTranscript: "pidesk:session:readTranscript",
   /** 导出会话记录为 Markdown 文件（保存对话框；docs/design/45）。 */
   exportMarkdown: "pidesk:session:exportMarkdown",
+  /** 导出会话记录为 HTML 文件（pi 原生导出：存活实例走 RPC，冷会话走 CLI）。 */
+  exportHtml: "pidesk:session:exportHtml",
   /** 读取会话用量统计（RPC `get_session_stats`，上下文占用）。 */
   getStats: "pidesk:session:getStats",
 } as const;
@@ -327,7 +329,7 @@ export interface SessionTranscriptPayload {
   truncated: boolean;
 }
 
-/** 导出会话记录（Markdown）请求；title 仅用于默认文件名（经净化）。 */
+/** 导出会话记录请求（Markdown / HTML 共用）；title 仅用于默认文件名（经净化）。 */
 export interface SessionExportRequest {
   /** 会话 JSONL 绝对路径（须位于 pi sessions 目录内）。 */
   file: string;
