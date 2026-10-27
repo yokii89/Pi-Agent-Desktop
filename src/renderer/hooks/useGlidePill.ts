@@ -264,29 +264,36 @@ export function useGlidePill(
     moveTo(row, instant);
   };
 
-  return {
-    listProps: {
-      onPointerOver: (event) => {
-        if (event.pointerType === "touch" || scrub.current) return;
-        follow(event.target, false);
+  // API 只捕获 refs 与 options.current（后者每次渲染更新），因此可以只建一次。
+  // 消费方普遍把整个 API 放进 effect 依赖：每次渲染换新对象会让布局效果重跑，
+  // 弹层里表现为每敲一个字符都重新量一次药丸位置、并把悬停中的药丸拽回选中项。
+  const api = useRef<GlidePillApi | null>(null);
+  if (api.current === null) {
+    api.current = {
+      listProps: {
+        onPointerOver: (event) => {
+          if (event.pointerType === "touch" || scrub.current) return;
+          follow(event.target, false);
+        },
+        onFocus: (event) => {
+          if (scrub.current) return;
+          follow(event.target, false);
+        },
+        onPointerLeave: () => {
+          if (!scrub.current && !options.current.rememberPosition) hide();
+        },
+        onPointerDown,
       },
-      onFocus: (event) => {
-        if (scrub.current) return;
-        follow(event.target, false);
+      pillRef,
+      highlight: (index, instant = false) => moveTo(rowByIndex(index), instant),
+      jumpTo: (index) => moveTo(rowByIndex(index), true),
+      current: () => state.current.index,
+      consumeClick: (detail) => {
+        if (detail === 0 || !picked.current) return false;
+        picked.current = false;
+        return true;
       },
-      onPointerLeave: () => {
-        if (!scrub.current && !options.current.rememberPosition) hide();
-      },
-      onPointerDown,
-    },
-    pillRef,
-    highlight: (index, instant = false) => moveTo(rowByIndex(index), instant),
-    jumpTo: (index) => moveTo(rowByIndex(index), true),
-    current: () => state.current.index,
-    consumeClick: (detail) => {
-      if (detail === 0 || !picked.current) return false;
-      picked.current = false;
-      return true;
-    },
-  };
+    };
+  }
+  return api.current;
 }

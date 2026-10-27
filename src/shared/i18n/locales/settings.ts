@@ -1157,6 +1157,14 @@ export const settingsMessages = defineMessages({
     "zh-CN": "上下文窗口",
     "en-US": "Context window",
   },
+  "settings.models.overrides.maxTokensField": {
+    "zh-CN": "输出上限",
+    "en-US": "Output limit",
+  },
+  "settings.models.overrides.maxTokensHint": {
+    "zh-CN": "单次回复的生成预算，思考内容也计入。",
+    "en-US": "Output budget per reply; thinking counts toward it.",
+  },
   "settings.models.overrides.inputField": {
     "zh-CN": "多模态",
     "en-US": "Input",
@@ -1181,9 +1189,17 @@ export const settingsMessages = defineMessages({
     "zh-CN": "自定义数值（tokens）",
     "en-US": "Custom value (tokens)",
   },
+  "settings.models.overrides.customMaxTokensPlaceholder": {
+    "zh-CN": "自定义数值（tokens）",
+    "en-US": "Custom value (tokens)",
+  },
   "settings.models.overrides.windowLabel": {
     "zh-CN": "{model} 的上下文窗口",
     "en-US": "Context window for {model}",
+  },
+  "settings.models.overrides.maxTokensLabel": {
+    "zh-CN": "{model} 的输出上限",
+    "en-US": "Output limit for {model}",
   },
   "settings.models.overrides.inputLabel": {
     "zh-CN": "{model} 的多模态",
@@ -1193,11 +1209,19 @@ export const settingsMessages = defineMessages({
     "zh-CN": "恢复 {model} 的上下文窗口默认值",
     "en-US": "Reset context window for {model}",
   },
+  "settings.models.overrides.resetMaxTokensAria": {
+    "zh-CN": "恢复 {model} 的输出上限默认值",
+    "en-US": "Reset output limit for {model}",
+  },
   "settings.models.overrides.resetInputAria": {
     "zh-CN": "恢复 {model} 的多模态默认值",
     "en-US": "Reset image support for {model}",
   },
   "settings.models.overrides.invalidWindow": {
+    "zh-CN": "需为正整数",
+    "en-US": "Must be a positive integer",
+  },
+  "settings.models.overrides.invalidMaxTokens": {
     "zh-CN": "需为正整数",
     "en-US": "Must be a positive integer",
   },

@@ -32,6 +32,16 @@ describe("applyModelOverridePatch", () => {
     expect(raw).toEqual({ providers: { newapi: {} } });
   });
 
+  it("写入 / 删除 maxTokens，删键后仍保留同类其他键", () => {
+    const raw: Record<string, unknown> = {
+      providers: { newapi: { modelOverrides: { "gpt-6.1-sol": { contextWindow: 128000 } } } },
+    };
+    const written = applyModelOverridePatch(raw, update({ maxTokens: 32768 }));
+    expect(entryOf(written)).toEqual({ contextWindow: 128000, maxTokens: 32768 });
+    const removed = applyModelOverridePatch(written, update({ maxTokens: null }));
+    expect(entryOf(removed)).toEqual({ contextWindow: 128000 });
+  });
+
   it("null 删键并逐级清理空对象", () => {
     const raw: Record<string, unknown> = {
       providers: { newapi: { modelOverrides: { "gpt-6.1-sol": { contextWindow: 1 } } } },
@@ -63,6 +73,8 @@ describe("applyModelOverridePatch", () => {
     const badInput = ["text", "audio"] as unknown as ("text" | "image")[];
     expect(() => applyModelOverridePatch({}, update({ contextWindow: 0 }))).toThrow(/正整数/);
     expect(() => applyModelOverridePatch({}, update({ contextWindow: 1.5 }))).toThrow(/正整数/);
+    expect(() => applyModelOverridePatch({}, update({ maxTokens: 0 }))).toThrow(/正整数/);
+    expect(() => applyModelOverridePatch({}, update({ maxTokens: 1.5 }))).toThrow(/正整数/);
     expect(() => applyModelOverridePatch({}, update({ input: badInput }))).toThrow(/input/);
     expect(() => applyModelOverridePatch({}, update({ input: [] }))).toThrow(/input/);
     expect(() => applyModelOverridePatch({}, update({}))).toThrow(/补丁为空/);
@@ -101,7 +113,7 @@ describe("setModelOverride / readModelOverrides（真实文件往返）", () => 
       providers: {
         newapi: {
           modelOverrides: {
-            "deepseek-v4.1-flash": { input: ["text", "image"] },
+            "deepseek-v4.1-flash": { input: ["text", "image"], maxTokens: 32768 },
             "gpt-6.1-sol": { compat: { supportsReasoningEffort: false } },
           },
         },
@@ -114,6 +126,7 @@ describe("setModelOverride / readModelOverrides（真实文件往返）", () => 
     expect(written.providers.deepseek).toEqual({ apiKey: "keep" });
     expect(written.providers.newapi.modelOverrides["deepseek-v4.1-flash"]).toEqual({
       input: ["text", "image"],
+      maxTokens: 32768,
     });
     expect(written.providers.newapi.modelOverrides["gpt-6.1-sol"]).toEqual({
       compat: { supportsReasoningEffort: false },
@@ -121,20 +134,20 @@ describe("setModelOverride / readModelOverrides（真实文件往返）", () => 
     });
   });
 
-  it("快照投影只暴露两个管理字段；非法值按未设置处理", () => {
+  it("快照投影只暴露三个管理字段；非法值按未设置处理", () => {
     const file = makeFile({
       providers: {
         newapi: {
           modelOverrides: {
-            a: { contextWindow: 131072, input: ["text", "image"] },
-            b: { contextWindow: -5, input: ["junk"] },
+            a: { contextWindow: 131072, maxTokens: 32768, input: ["text", "image"] },
+            b: { contextWindow: -5, maxTokens: 0, input: ["junk"] },
             c: { compat: { x: 1 } },
           },
         },
       },
     });
     expect(readModelOverrides(file)).toEqual({
-      newapi: { a: { contextWindow: 131072, input: ["text", "image"] } },
+      newapi: { a: { contextWindow: 131072, maxTokens: 32768, input: ["text", "image"] } },
     });
   });
 

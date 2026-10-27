@@ -139,6 +139,7 @@ function mapModels(data: unknown): PiModelOption[] {
       name?: unknown;
       input?: unknown;
       contextWindow?: unknown;
+      maxTokens?: unknown;
     };
     if (typeof record.provider !== "string" || typeof record.id !== "string") continue;
     const label =
@@ -152,12 +153,19 @@ function mapModels(data: unknown): PiModelOption[] {
       record.contextWindow > 0
         ? record.contextWindow
         : undefined;
+    const maxTokens =
+      typeof record.maxTokens === "number" &&
+      Number.isFinite(record.maxTokens) &&
+      record.maxTokens > 0
+        ? record.maxTokens
+        : undefined;
     out.push({
       provider: record.provider,
       modelId: record.id,
       label,
       ...(input ? { input } : {}),
       ...(contextWindow !== undefined ? { contextWindow } : {}),
+      ...(maxTokens !== undefined ? { maxTokens } : {}),
     });
   }
   return out;

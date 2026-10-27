@@ -49,7 +49,7 @@ function writeRawConfig(config: Record<string, unknown>, file: string): void {
   renameSync(tmp, file);
 }
 
-/** 覆盖快照投影：只暴露本 UI 管理的两个字段，未知/非法值按"未设置"处理。 */
+/** 覆盖快照投影：只暴露本 UI 管理的三个字段，未知/非法值按"未设置"处理。 */
 export function readModelOverrides(
   file: string = getUserModelsConfigPath(),
 ): PiModelOverridesSnapshot {
@@ -69,6 +69,13 @@ export function readModelOverrides(
       ) {
         projected.contextWindow = entry.contextWindow;
       }
+      if (
+        typeof entry.maxTokens === "number" &&
+        Number.isSafeInteger(entry.maxTokens) &&
+        entry.maxTokens > 0
+      ) {
+        projected.maxTokens = entry.maxTokens;
+      }
       if (Array.isArray(entry.input)) {
         const modalities = entry.input.filter(isModality);
         if (modalities.length > 0) projected.input = modalities;
@@ -87,6 +94,10 @@ export interface ModelOverrideUpdate {
 }
 
 function validContextWindow(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0;
+}
+
+function validMaxTokens(value: number): boolean {
   return Number.isSafeInteger(value) && value > 0;
 }
 
@@ -110,13 +121,24 @@ export function applyModelOverridePatch(
     throw new Error("上下文窗口必须是正整数");
   }
   if (
+    patch.maxTokens !== undefined &&
+    patch.maxTokens !== null &&
+    !validMaxTokens(patch.maxTokens)
+  ) {
+    throw new Error("输出上限必须是正整数");
+  }
+  if (
     patch.input !== undefined &&
     patch.input !== null &&
     (!Array.isArray(patch.input) || patch.input.length === 0 || !patch.input.every(isModality))
   ) {
     throw new Error('input 只接受 ["text", "image"] 的非空子集');
   }
-  if (patch.contextWindow === undefined && patch.input === undefined) {
+  if (
+    patch.contextWindow === undefined &&
+    patch.maxTokens === undefined &&
+    patch.input === undefined
+  ) {
     throw new Error("补丁为空");
   }
 
@@ -129,6 +151,8 @@ export function applyModelOverridePatch(
 
   if (patch.contextWindow === null) delete entry.contextWindow;
   else if (patch.contextWindow !== undefined) entry.contextWindow = patch.contextWindow;
+  if (patch.maxTokens === null) delete entry.maxTokens;
+  else if (patch.maxTokens !== undefined) entry.maxTokens = patch.maxTokens;
   if (patch.input === null) delete entry.input;
   else if (patch.input !== undefined) entry.input = patch.input;
 

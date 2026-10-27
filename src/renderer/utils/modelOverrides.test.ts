@@ -3,7 +3,9 @@ import type { PiModelOption, PiModelOverridesSnapshot } from "../../shared/ipc";
 import {
   buildModelOverrideRows,
   filterModelOverrideRows,
+  formatModelMaxTokens,
   formatModelWindow,
+  reuseModelOverrideRows,
 } from "./modelOverrides";
 
 /** docs/design/49 起、docs/design/50 改版：行排序（已修改 → 默认 → 原序）、三档过滤与窗口格式化。 */
@@ -15,23 +17,27 @@ function model(modelId: string, extra: Partial<PiModelOption> = {}): PiModelOpti
 describe("buildModelOverrideRows", () => {
   it("已修改置顶、当前默认其次、其余保持清单原序", () => {
     const models = [model("a"), model("b"), model("c"), model("d")];
-    const overrides: PiModelOverridesSnapshot = { newapi: { c: { contextWindow: 131072 } } };
+    const overrides: PiModelOverridesSnapshot = {
+      newapi: { c: { contextWindow: 131072, maxTokens: 32768 } },
+    };
     const rows = buildModelOverrideRows(models, overrides, "newapi/b");
     expect(rows.map((r) => r.modelId)).toEqual(["c", "b", "a", "d"]);
     expect(rows[0].hasOverride).toBe(true);
     expect(rows[0].overrideWindow).toBe(131072);
+    expect(rows[0].overrideMaxTokens).toBe(32768);
     expect(rows[0].isDefault).toBe(false);
     expect(rows[1].isDefault).toBe(true);
     expect(rows[1].hasOverride).toBe(false);
   });
 
-  it("带上当前生效值（含覆盖后的窗口与模态）", () => {
+  it("带上当前生效值（含覆盖后的窗口、输出上限与模态）", () => {
     const rows = buildModelOverrideRows(
-      [model("x", { contextWindow: 262144, input: ["text", "image"] })],
+      [model("x", { contextWindow: 262144, maxTokens: 32768, input: ["text", "image"] })],
       {},
       null,
     );
     expect(rows[0].effectiveWindow).toBe(262144);
+    expect(rows[0].effectiveMaxTokens).toBe(32768);
     expect(rows[0].effectiveInput).toEqual(["text", "image"]);
     expect(rows[0].hasOverride).toBe(false);
   });
@@ -95,5 +101,62 @@ describe("formatModelWindow", () => {
     expect(formatModelWindow(200000)).toBe("200k");
     expect(formatModelWindow(undefined)).toBe("—");
     expect(formatModelWindow(0)).toBe("—");
+  });
+});
+
+describe("formatModelMaxTokens", () => {
+  it("按 1024 进位（16384 → 16k）/ 未知", () => {
+    expect(formatModelMaxTokens(8192)).toBe("8k");
+    expect(formatModelMaxTokens(16384)).toBe("16k");
+    expect(formatModelMaxTokens(32768)).toBe("32k");
+    expect(formatModelMaxTokens(65536)).toBe("64k");
+    expect(formatModelMaxTokens(131072)).toBe("128k");
+    expect(formatModelMaxTokens(20000)).toBe("19.5k");
+    expect(formatModelMaxTokens(undefined)).toBe("—");
+    expect(formatModelMaxTokens(0)).toBe("—");
+  });
+});
+
+describe("reuseModelOverrideRows", () => {
+  const byId = (rows: ReturnType<typeof buildModelOverrideRows>) =>
+    new Map(rows.map((row) => [row.modelId, row]));
+
+  it("未变化的行沿用旧对象（含换序），变化的行生成新对象", () => {
+    const models = [model("a"), model("b"), model("c")];
+    const first = buildModelOverrideRows(models, {}, null);
+    const second = reuseModelOverrideRows(
+      buildModelOverrideRows(
+        models.map((item) => ({ ...item })),
+        { newapi: { b: { maxTokens: 32768 } } },
+        null,
+      ),
+      first,
+    );
+    expect(second.map((row) => row.modelId)).toEqual(["b", "a", "c"]);
+    expect(byId(second).get("a")).toBe(byId(first).get("a"));
+    expect(byId(second).get("c")).toBe(byId(first).get("c"));
+    expect(byId(second).get("b")).not.toBe(byId(first).get("b"));
+  });
+
+  it("模态数组按内容比较；默认模型切换会更新对应行", () => {
+    const previous = buildModelOverrideRows([model("a", { input: ["text", "image"] })], {}, null);
+    const sameContent = reuseModelOverrideRows(
+      buildModelOverrideRows([model("a", { input: ["text", "image"] })], {}, null),
+      previous,
+    );
+    expect(sameContent[0]).toBe(previous[0]);
+
+    const first = buildModelOverrideRows([model("a", { input: ["text"] })], {}, null);
+    const changedInput = reuseModelOverrideRows(
+      buildModelOverrideRows([model("a", { input: ["text", "image"] })], {}, null),
+      first,
+    );
+    expect(changedInput[0]).not.toBe(first[0]);
+
+    const changedDefault = reuseModelOverrideRows(
+      buildModelOverrideRows([model("a")], {}, "newapi/a"),
+      first,
+    );
+    expect(changedDefault[0]).not.toBe(first[0]);
   });
 });

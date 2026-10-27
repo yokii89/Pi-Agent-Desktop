@@ -892,7 +892,7 @@
 
 .ovRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 132px 132px;
+  grid-template-columns: minmax(0, 1fr) 132px 132px 132px;
   align-items: center;
   gap: 12px;
   min-height: 38px;
@@ -1071,6 +1071,13 @@
 .ovPopTitle {
   margin: 0 0 9px;
   font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.ovPopHint {
+  margin: -4px 0 9px;
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
   color: var(--color-text-muted);
 }
 

@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise } from "@phosphor-icons/react";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { TranslateFn } from "../../../shared/i18n";
 import type { PiModelOverridePatch } from "../../../shared/ipc";
 import { useGlidePill } from "../../hooks/useGlidePill";
@@ -7,8 +7,10 @@ import { useT } from "../../hooks/useT";
 import type { ModelOverrideRow } from "../../utils/modelOverrides";
 import {
   filterModelOverrideRows,
+  formatModelMaxTokens,
   formatModelWindow,
   isReviewRow,
+  MAX_OUTPUT_PRESETS,
   type OverrideFilterMode,
   WINDOW_PRESETS,
 } from "../../utils/modelOverrides";
@@ -30,9 +32,9 @@ interface ModelOverridesSectionProps {
 }
 
 /**
- * 设置 →「模型能力」（docs/design/50）：三列表格 + 值即控件。
+ * 设置 →「模型能力」（docs/design/50）：四列表格 + 值即控件。
  *
- * 行上不放常驻下拉：常态只有「模型 / 窗口 / 多模态」三个值，点值才弹 popover 改。
+ * 行上不放常驻下拉：常态只有「模型 / 窗口 / 输出上限 / 多模态」四个值，点值才弹 popover 改。
  * 来源靠字段自身着色（蓝 = 已修改，灰 = 沿用默认），而不是行级的一列文字——
  * 同一行可能窗口是用户设的、多模态仍是目录猜的。
  */
@@ -108,6 +110,7 @@ export function ModelOverridesSection({
           <div className={[styles.ovRow, styles.ovRowHead].join(" ")}>
             <span>{t("settings.models.overrides.modelField")}</span>
             <span>{t("settings.models.overrides.windowField")}</span>
+            <span>{t("settings.models.overrides.maxTokensField")}</span>
             <span>{t("settings.models.overrides.inputField")}</span>
           </div>
           {shown.map((row) => (
@@ -144,8 +147,13 @@ export function ModelOverridesSection({
   );
 }
 
-/** 单行：模型名 + 两个「值即控件」单元格（+ 已修改时的行尾恢复按钮）。 */
-function OverrideRow({
+/**
+ * 单行：模型名 + 三个「值即控件」单元格（+ 已修改时的行尾恢复按钮）。
+ *
+ * memo 是必需的：保存一条覆盖会把 savingKey 置上再清掉，父级因此提交两次；
+ * 展开后 112 行 × 3 个 Popover 全量重渲染约 50ms/次（实测，doc 70 调优）。
+ */
+const OverrideRow = memo(function OverrideRow({
   row,
   saving,
   onSave,
@@ -157,6 +165,7 @@ function OverrideRow({
   t: TranslateFn;
 }) {
   const windowOverridden = row.overrideWindow !== undefined;
+  const maxTokensOverridden = row.overrideMaxTokens !== undefined;
   const inputOverridden = row.overrideInput !== undefined;
 
   return (
@@ -217,6 +226,47 @@ function OverrideRow({
           trigger={({ onClick }) => (
             <button
               type="button"
+              className={[styles.ovVal, maxTokensOverridden ? styles.ovValOn : ""].join(" ")}
+              disabled={saving}
+              aria-label={t("settings.models.overrides.maxTokensLabel", { model: row.modelId })}
+              onClick={onClick}
+            >
+              {formatModelMaxTokens(row.effectiveMaxTokens)}
+              <GlideChevron size={16} className={styles.ovValCaret} />
+            </button>
+          )}
+        >
+          {(close) => (
+            <MaxTokensEditor
+              row={row}
+              saving={saving}
+              t={t}
+              onSubmit={async (patch) => {
+                await onSave(row, patch);
+                close();
+              }}
+            />
+          )}
+        </Popover>
+        {maxTokensOverridden && (
+          <button
+            type="button"
+            className={styles.ovReset}
+            disabled={saving}
+            aria-label={t("settings.models.overrides.resetMaxTokensAria", { model: row.modelId })}
+            onClick={() => void onSave(row, { maxTokens: null })}
+          >
+            <ArrowCounterClockwise size={16} weight="regular" />
+          </button>
+        )}
+      </span>
+
+      <span className={styles.ovCell}>
+        <Popover
+          direction="bottom"
+          trigger={({ onClick }) => (
+            <button
+              type="button"
               className={[styles.ovVal, inputOverridden ? styles.ovValOn : ""].join(" ")}
               disabled={saving}
               aria-label={t("settings.models.overrides.inputLabel", { model: row.modelId })}
@@ -255,7 +305,7 @@ function OverrideRow({
       </span>
     </div>
   );
-}
+});
 
 /**
  * 弹层胶囊组的「高亮药丸」（docs/design/51）：同一套 cubic-bezier 曲线 + 定帧时间轴（封顶
@@ -390,6 +440,96 @@ function WindowEditor({
         saving={saving}
         t={t}
         onUseDefault={() => void onSubmit({ contextWindow: null })}
+      />
+    </div>
+  );
+}
+
+function MaxTokensEditor({
+  row,
+  saving,
+  t,
+  onSubmit,
+}: {
+  row: ModelOverrideRow;
+  saving: boolean;
+  t: TranslateFn;
+  onSubmit: (patch: PiModelOverridePatch) => Promise<void>;
+}) {
+  const presets: readonly number[] = MAX_OUTPUT_PRESETS;
+  const custom = row.overrideMaxTokens !== undefined && !presets.includes(row.overrideMaxTokens);
+  const [draft, setDraft] = useState(custom ? String(row.overrideMaxTokens) : "");
+  const [error, setError] = useState<string | null>(null);
+  const selectedPreset =
+    row.overrideMaxTokens !== undefined ? presets.indexOf(row.overrideMaxTokens) : -1;
+  const { listRef, pill } = useChipPill(selectedPreset, (index) => {
+    if (index >= 0 && index < MAX_OUTPUT_PRESETS.length) {
+      void onSubmit({ maxTokens: MAX_OUTPUT_PRESETS[index] });
+    }
+  });
+
+  const commit = (): void => {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    const value = Number(trimmed);
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      setError(t("settings.models.overrides.invalidMaxTokens"));
+      return;
+    }
+    void onSubmit({ maxTokens: value });
+  };
+
+  return (
+    <div className={styles.ovPop}>
+      <p className={styles.ovPopTitle}>{t("settings.models.overrides.maxTokensField")}</p>
+      <p className={styles.ovPopHint}>{t("settings.models.overrides.maxTokensHint")}</p>
+      <div ref={listRef} className={styles.ovPills} {...pill.listProps}>
+        <span ref={pill.pillRef} className={glideStyles.pill} aria-hidden="true" />
+        {MAX_OUTPUT_PRESETS.map((preset, index) => (
+          <button
+            key={preset}
+            type="button"
+            data-glide-index={index}
+            className={[
+              styles.ovPill,
+              row.overrideMaxTokens === preset ? styles.ovPillOn : "",
+            ].join(" ")}
+            disabled={saving}
+            onClick={(event) => {
+              // 擦选松手已由药丸代为实现，同一次点击在这里跳过
+              if (pill.consumeClick(event.detail)) return;
+              void onSubmit({ maxTokens: preset });
+            }}
+          >
+            {formatModelMaxTokens(preset)}
+          </button>
+        ))}
+      </div>
+      <input
+        className={styles.ovPopInput}
+        type="number"
+        min={1}
+        step={1024}
+        placeholder={t("settings.models.overrides.customMaxTokensPlaceholder")}
+        value={draft}
+        disabled={saving}
+        autoComplete="off"
+        aria-invalid={error !== null}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          setError(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+        }}
+      />
+      {error && <p className={styles.ovPopError}>{error}</p>}
+      <PopoverFoot
+        overridden={row.overrideMaxTokens !== undefined}
+        defaultValue={formatModelMaxTokens(row.effectiveMaxTokens)}
+        saving={saving}
+        t={t}
+        onUseDefault={() => void onSubmit({ maxTokens: null })}
       />
     </div>
   );

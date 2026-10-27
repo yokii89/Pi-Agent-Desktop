@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   PiApiKeyProviderOption,
   PiAuthProviderStatus,
@@ -14,7 +14,11 @@ import { modelOverridesService } from "../../services/modelOverridesService";
 import { sessionService } from "../../services/sessionService";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
-import { buildModelOverrideRows, type ModelOverrideRow } from "../../utils/modelOverrides";
+import {
+  buildModelOverrideRows,
+  type ModelOverrideRow,
+  reuseModelOverrideRows,
+} from "../../utils/modelOverrides";
 import { Button } from "../ui/Button";
 import { GlideChevron } from "../ui/GlideChevron";
 import { Menu, type MenuItem } from "../ui/Menu";
@@ -258,44 +262,51 @@ export function ModelsPanel() {
   // 模型能力（docs/design/50）：即改即存 + 主进程写盘后自动重载存活会话
   // ---------------------------------------------------------------------
 
-  const overrideRows = useMemo(
-    () => buildModelOverrideRows(models, overrides, selectedKey),
-    [models, overrides, selectedKey],
-  );
+  const previousOverrideRows = useRef<ModelOverrideRow[]>([]);
+  const overrideRows = useMemo(() => {
+    const next = reuseModelOverrideRows(
+      buildModelOverrideRows(models, overrides, selectedKey),
+      previousOverrideRows.current,
+    );
+    previousOverrideRows.current = next;
+    return next;
+  }, [models, overrides, selectedKey]);
 
-  const saveOverride = async (
-    row: ModelOverrideRow,
-    patch: PiModelOverridePatch,
-  ): Promise<void> => {
-    const key = `${row.provider}/${row.modelId}`;
-    setSavingOverrideKey(key);
-    try {
-      const result = await modelOverridesService.set({
-        provider: row.provider,
-        modelId: row.modelId,
-        patch,
-      });
-      const snapshot = await modelOverridesService.get();
-      setOverrides(snapshot);
-      if (result.reloaded > 0) showToast(t("settings.models.overrides.savedLive"));
-      else if (result.failed > 0) showToast(t("settings.models.overrides.savedBusy"));
-      else showToast(t("settings.models.overrides.savedIdle"));
-      // 生效值来自 pi（主进程已重载存活会话）；存活路径极快，后台静默刷新
-      void sessionService.getModels().then((list) => {
-        if (list.length > 0) {
-          setModels(activeProviderId ? list.filter((m) => m.provider === activeProviderId) : list);
-        }
-      });
-    } catch (error) {
-      showToast(
-        error instanceof Error && error.message
-          ? error.message
-          : t("settings.models.overrides.saveFailed"),
-      );
-    } finally {
-      setSavingOverrideKey(null);
-    }
-  };
+  const saveOverride = useCallback(
+    async (row: ModelOverrideRow, patch: PiModelOverridePatch): Promise<void> => {
+      const key = `${row.provider}/${row.modelId}`;
+      setSavingOverrideKey(key);
+      try {
+        const result = await modelOverridesService.set({
+          provider: row.provider,
+          modelId: row.modelId,
+          patch,
+        });
+        const snapshot = await modelOverridesService.get();
+        setOverrides(snapshot);
+        if (result.reloaded > 0) showToast(t("settings.models.overrides.savedLive"));
+        else if (result.failed > 0) showToast(t("settings.models.overrides.savedBusy"));
+        else showToast(t("settings.models.overrides.savedIdle"));
+        // 生效值来自 pi（主进程已重载存活会话）；存活路径极快，后台静默刷新
+        void sessionService.getModels().then((list) => {
+          if (list.length > 0) {
+            setModels(
+              activeProviderId ? list.filter((m) => m.provider === activeProviderId) : list,
+            );
+          }
+        });
+      } catch (error) {
+        showToast(
+          error instanceof Error && error.message
+            ? error.message
+            : t("settings.models.overrides.saveFailed"),
+        );
+      } finally {
+        setSavingOverrideKey(null);
+      }
+    },
+    [t, activeProviderId, showToast],
+  );
 
   const modelTriggerLabel = selectedKey || modelLabel || t("settings.models.selectModel");
 
