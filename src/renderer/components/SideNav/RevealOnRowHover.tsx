@@ -8,8 +8,8 @@ interface RevealOnRowHoverProps {
 }
 
 /**
- * 行内操作按钮的"随行悬浮出现"：不靠 CSS opacity 突变，而是由 GSAP 播放
- * 位移 + 缩放 + 回弹的组合（按钮从右侧滑入），观感上像被行主动"让"出来。
+ * 行内操作按钮的"随行悬浮出现"：只淡入淡出，不做位移 / 缩放，
+ * 按钮在右缘原位显隐，不跟着指针滑动。
  *
  * 鼠标悬浮有短暂延迟（NAV_MOTION.revealDelay）：快速扫过列表时不闪按钮，
  * 停留下来才出现；键盘聚焦是明确意图，立即显示不延迟。
@@ -61,8 +61,6 @@ export function RevealOnRowHover({ children }: RevealOnRowHoverProps) {
     const setShown = (next: boolean): void => {
       if (shown.current === next) return;
       shown.current = next;
-      const target = root.firstElementChild as HTMLElement | null;
-      if (!target) return;
       if (prefersReducedMotion()) {
         root.style.setProperty("--reveal", next ? "1" : "0");
         return;
@@ -76,13 +74,6 @@ export function RevealOnRowHover({ children }: RevealOnRowHoverProps) {
           duration: NAV_MOTION.fade,
           ease: NAV_MOTION.easeOut,
         });
-        gsap.fromTo(
-          target,
-          next ? { x: 8, scale: 0.8 } : { x: 0, scale: 1 },
-          next
-            ? { x: 0, scale: 1, duration: NAV_MOTION.hover, ease: NAV_MOTION.easeBack }
-            : { x: 4, scale: 0.9, duration: NAV_MOTION.fade },
-        );
       });
     };
 
