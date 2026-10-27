@@ -14,9 +14,9 @@
   box-sizing: border-box;
   height: 16px;
   padding: 3px;
-  border: 1px solid var(--color-border);
+  border: 1px solid color-mix(in srgb, var(--color-accent-text) 24%, transparent);
   border-radius: var(--radius-sm);
-  background: var(--color-muted-soft);
+  background: color-mix(in srgb, var(--color-accent-text) 12%, transparent);
 }
 
 .segment {
@@ -26,17 +26,18 @@
   transition: background 0.1s ease;
 }
 
-/* 点亮段：accent + 辉光（沿用原型分段轨道的点亮语言，色值换 tokens） */
+/* 点亮段：沿用原型分段轨道的点亮语言。进度条嵌在主题色气泡里，
+   点亮色必须用气泡的反白档，否则和气泡底色同色、整条读不出来 */
 .segmentActive {
-  background: var(--color-accent);
+  background: var(--color-accent-text);
   box-shadow:
-    0 0 6px var(--color-accent-soft),
-    0 0 2px var(--color-accent);
+    0 0 6px color-mix(in srgb, var(--color-accent-text) 30%, transparent),
+    0 0 2px color-mix(in srgb, var(--color-accent-text) 55%, transparent);
 }
 
 .label {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  color: color-mix(in srgb, var(--color-accent-text) 72%, transparent);
   letter-spacing: 0.05em;
 }
