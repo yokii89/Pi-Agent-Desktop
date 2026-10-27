@@ -80,8 +80,6 @@ interface SessionMetaValue {
   globalPinnedFiles: string[];
   /** 已归档的会话（JSONL 绝对路径 → 归档时间 Unix ms）；侧栏主列表不展示，管理入口在设置页（docs/design/32）。 */
   archivedFiles: Record<string, number>;
-  /** 会话自定义标题（JSONL 绝对路径 → 用户重命名后的标题）。 */
-  sessionTitles: Record<string, string>;
   /** 主进程当前 active 会话是否有存活 pi 进程。 */
   processAlive: boolean;
   /** 存活 pi 进程的会话数（含后台 Tab）；> 0 表示存在任意活跃会话。 */
@@ -252,6 +250,7 @@ export function mergeSessionLists(
       phase: SessionPhase;
     }
   >,
+  pendingNames?: ReadonlyMap<string, string | null>,
 ): SessionSummary[] {
   const pending: SessionSummary[] = [];
   for (const bucket of buckets.values()) {
@@ -276,6 +275,7 @@ export function mergeSessionLists(
       startedAt: now,
       updatedAt: now,
       firstUserMessage: firstUser ?? "新会话",
+      sessionName: pendingNames?.get(file) ?? null,
       cwd: bucket.cwd,
     });
   }
@@ -316,7 +316,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [pinnedFiles, setPinnedFiles] = useState<string[]>([]);
   const [globalPinnedFiles, setGlobalPinnedFiles] = useState<string[]>([]);
   const [archivedFiles, setArchivedFiles] = useState<Record<string, number>>({});
-  const [sessionTitles, setSessionTitles] = useState<Record<string, string>>({});
   const [modelLabel, setModelLabel] = useState("pi");
   const [modelInput, setModelInput] = useState<PiModelInputModality[] | null>(null);
   const [piReady, setPiReady] = useState(false);
@@ -327,6 +326,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const pageRef = useRef<PageId>("session");
   pageRef.current = page;
   const allSessionsRef = useRef<SessionSummary[]>([]);
+  /** 未落盘会话的名字（pending key → name）；认领真实文件后随 pi JSONL 走。 */
+  const pendingNamesRef = useRef<Map<string, string | null>>(new Map());
   const cwdRef = useRef<string | undefined>(undefined);
   cwdRef.current = currentProject?.dir;
   /** 高频动作只读 ref，避免 useCallback 依赖桶 state 导致闭包过期。 */
@@ -403,14 +404,39 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const applyDiskSessions = useCallback((disk: SessionSummary[]): SessionSummary[] => {
     diskSessionsRef.current = disk;
     allSessionsRef.current = disk;
-    const merged = mergeSessionLists(disk, bucketsStateRef.current.buckets);
+    const merged = mergeSessionLists(
+      disk,
+      bucketsStateRef.current.buckets,
+      pendingNamesRef.current,
+    );
     setAllSessions(merged);
     return disk;
   }, []);
 
+  /**
+   * 单个会话改名：真实文件同时改磁盘快照（否则下一次 rematerialize 会把名字冲掉）；
+   * pending 行记在 map 里，认领 JSONL 后以磁盘为准。
+   */
+  const applySessionName = useCallback((file: string, name: string | null): void => {
+    if (isPendingFile(file)) pendingNamesRef.current.set(file, name);
+    const patch = (list: SessionSummary[]): SessionSummary[] =>
+      list.map((session) => (session.file === file ? { ...session, sessionName: name } : session));
+    setAllSessions((prev) => patch(prev));
+    allSessionsRef.current = patch(allSessionsRef.current);
+    if (!isPendingFile(file)) {
+      diskSessionsRef.current = patch(diskSessionsRef.current);
+    }
+  }, []);
+
   /** 桶状态变化后重算侧栏（不发起 listAll）。 */
   const rematerializeSidebar = useCallback((): void => {
-    setAllSessions(mergeSessionLists(diskSessionsRef.current, bucketsStateRef.current.buckets));
+    setAllSessions(
+      mergeSessionLists(
+        diskSessionsRef.current,
+        bucketsStateRef.current.buckets,
+        pendingNamesRef.current,
+      ),
+    );
   }, []);
 
   /**
@@ -451,6 +477,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         startedAt: Date.now(),
         updatedAt: Date.now(),
         firstUserMessage: text.replace(/\s+/g, " ").trim() || "新会话",
+        sessionName: pendingNamesRef.current.get(file) ?? null,
         cwd,
       };
       setAllSessions((prev) => [summary, ...prev.filter((s) => s.file !== file)]);
@@ -461,6 +488,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /** 回收预插的 pending 行（start 失败时），避免孤儿占位；下次 merge 本也会自然清掉。 */
   const dropPendingSummary = useCallback((sessionId: SessionId): void => {
     const file = pendingFileKey(sessionId);
+    pendingNamesRef.current.delete(file);
     setAllSessions((prev) => prev.filter((s) => s.file !== file));
   }, []);
 
@@ -512,12 +540,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             return next;
           });
           // 磁盘列表乐观合并，侧栏立刻从 pending 换成真实文件
+          const pendingKey = pendingFileKey(sessionId);
+          const pendingName = pendingNamesRef.current.get(pendingKey) ?? null;
+          const diskMatch = sessions.find((s) => s.file === claimed);
+          pendingNamesRef.current.delete(pendingKey);
           const optimistic: SessionSummary = {
             file: claimed,
             id: sessionId,
             startedAt: Date.now(),
             updatedAt: Date.now(),
             firstUserMessage: firstUserTextOf(bucket?.entries ?? []),
+            sessionName: diskMatch?.sessionName ?? pendingName,
             cwd: bucket?.cwd ?? null,
           };
           diskSessionsRef.current = [
@@ -632,6 +665,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           reason: opts.reason ?? "send",
         });
         if (opts.sessionFile) sessionIdByFileRef.current.set(opts.sessionFile, id);
+        if (id !== bucketId) {
+          // 临时桶换成权威 id 时，pending 行上的名字跟着换 key，别留在旧 id 下
+          const from = pendingFileKey(bucketId);
+          const to = pendingFileKey(id);
+          if (pendingNamesRef.current.has(from)) {
+            if (!pendingNamesRef.current.has(to)) {
+              pendingNamesRef.current.set(to, pendingNamesRef.current.get(from) ?? null);
+            }
+            pendingNamesRef.current.delete(from);
+          }
+        }
         const shouldActivate = opts.makeActive !== false && activeKeyRef.current === activeAtStart;
         setState((prev) => {
           let next = prev;
@@ -768,6 +812,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return sessionService.subscribe((message) => {
       const sessionId = message.sessionId;
 
+      // pi 侧改名（/name、扩展、本应用 rename 的 RPC 回执）：标题只存 session_info
+      if (message.type === "event" && message.payload.type === "session_info_changed") {
+        const raw = message.payload.name;
+        const name = typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
+        const bucket = bucketsStateRef.current.buckets.get(sessionId);
+        if (!bucket) {
+          void refreshSessions();
+          return;
+        }
+        // 尚未认领 JSONL 的会话用 pending key：改名要立刻反映到侧栏，不能等磁盘列表
+        const file = bucket.sessionFile ?? pendingFileKey(sessionId);
+        const known = allSessionsRef.current.some((s) => s.file === file);
+        applySessionName(file, name);
+        if (!known) void refreshSessions();
+        return;
+      }
+
       if (message.type === "event") {
         applySideEffects(sessionId, message.payload.type);
         setState((prev) =>
@@ -817,6 +878,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       );
     });
   }, [
+    applySessionName,
     refreshSessions,
     claimSessionFile,
     scheduleClaim,
@@ -845,7 +907,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setPinnedFiles(settings.pinnedSessions);
       setGlobalPinnedFiles(settings.globalPinnedSessions);
       setArchivedFiles(settings.archivedSessions);
-      setSessionTitles(settings.sessionTitles);
     });
     return () => {
       cancelled = true;
@@ -1042,20 +1103,37 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [archivedFiles, commitArchived],
   );
 
-  const commitTitles = useCallback((next: Record<string, string>): void => {
-    setSessionTitles(next);
-    void settingsService.set({ sessionTitles: next });
-  }, []);
-
+  /**
+   * 重命名：唯一存储是 pi JSONL 的 session_info。
+   * 未落盘的新会话带着运行时 id，由主进程走 RPC；空名 = 清除。
+   */
   const renameSession = useCallback(
     (file: string, title: string): void => {
       const trimmed = title.trim();
-      const next = { ...sessionTitles };
-      if (trimmed) next[file] = trimmed;
-      else delete next[file];
-      commitTitles(next);
+      const sessionId =
+        bucketsStateRef.current.fileIndex.get(file) ??
+        sessionIdByFileRef.current.get(file) ??
+        sessionIdFromPendingFile(file);
+      const previous =
+        allSessionsRef.current.find((session) => session.file === file)?.sessionName ?? null;
+      const optimistic = trimmed || null;
+      applySessionName(file, optimistic);
+      void sessionService
+        .rename({ file, name: trimmed, ...(sessionId ? { sessionId } : {}) })
+        .then((name) => {
+          applySessionName(file, name);
+          void refreshSessions();
+        })
+        .catch((err) => {
+          console.warn("[session] 重命名失败", err);
+          // 回滚乐观值：pending 行没有磁盘列表可刷新，留着错名字会一直显示
+          applySessionName(file, previous);
+          if (isPendingFile(file) && previous === null) pendingNamesRef.current.delete(file);
+          showToast(t("sidenav.session.renameFailed"));
+          void refreshSessions();
+        });
     },
-    [sessionTitles, commitTitles],
+    [applySessionName, refreshSessions, showToast],
   );
 
   /** 侧栏「结束进程」：dispose + 清 fileIndex；bucket/entries 保留。 */
@@ -1121,6 +1199,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           next = dropFileIndex(next, file);
           return next;
         });
+        pendingNamesRef.current.delete(file);
         rematerializeSidebar();
         return;
       }
@@ -1155,11 +1234,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         delete nextArchived[file];
         commitArchived(nextArchived);
       }
-      if (sessionTitles[file] !== undefined) {
-        const next = { ...sessionTitles };
-        delete next[file];
-        commitTitles(next);
-      }
       setState((prev) => {
         let next = dropFileIndex(prev, file);
         next = {
@@ -1190,12 +1264,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       commitArchived,
       commitGlobalPinned,
       commitPinned,
-      commitTitles,
       globalPinnedFiles,
       pinnedFiles,
       refreshSessions,
       rematerializeSidebar,
-      sessionTitles,
       setState,
       showToast,
     ],
@@ -1618,7 +1690,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       pinnedFiles,
       globalPinnedFiles,
       archivedFiles,
-      sessionTitles,
       processAlive,
       liveSessionCount,
       switchingTo: switchingToFile,
@@ -1671,7 +1742,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       pinnedFiles,
       globalPinnedFiles,
       archivedFiles,
-      sessionTitles,
       processAlive,
       liveSessionCount,
       switchingToFile,

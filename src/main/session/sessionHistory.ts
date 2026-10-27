@@ -5,14 +5,13 @@ import { shell } from "electron";
 import type { SessionSummary } from "../../shared/ipc";
 import { getSettings, updateSettings } from "../settings/settings";
 import { getPiAgentDir } from "./piInfo";
+import { type SessionHeader, scanSessionFile } from "./sessionMeta";
 import { invalidateTranscriptCache } from "./sessionTranscriptRead";
 
 /** 单次最多返回的会话数（"最近"列表不需要全量）。 */
 const MAX_SESSIONS = 30;
 /** 全量列举的会话数上限（侧边栏按项目分组的总量控制）。 */
 const MAX_ALL_SESSIONS = 100;
-/** 单文件最多扫描的字节数（找首条用户消息用，避免读入超大文件）。 */
-const MAX_SCAN_BYTES = 256 * 1024;
 
 /**
  * pi 的会话目录编码规则：去掉首位路径分隔符后，将 / \ : 替换为 -，
@@ -23,117 +22,114 @@ export function encodeCwdToSessionDir(cwd: string): string {
   return `--${safe}--`;
 }
 
-interface SessionHeader {
-  type: "session";
-  id: string;
-  timestamp: string;
-  /** 会话工作目录；pi v3 起 JSONL 头部携带，旧文件可能缺失。 */
-  cwd?: string;
-}
-
-interface ParsedUserText {
+interface SessionMeta {
   header: SessionHeader | null;
   firstUserMessage: string | null;
+  sessionName: string | null;
+  lastActivityAt: number | null;
 }
 
-/** 头部解析缓存：mtime/size 未变时跳过 256KB 重读。 */
-interface HeadCacheEntry {
+interface MetaCacheEntry extends SessionMeta {
   mtimeMs: number;
   size: number;
-  parsed: ParsedUserText;
+  /** 已扫描到的绝对字节偏移（最后一个完整换行之后）。 */
+  scannedBytes: number;
 }
 
-const headCache = new Map<string, HeadCacheEntry>();
+/** 会话元数据缓存：文件未变直接命中，追加时只读新增字节。 */
+const metaCache = new Map<string, MetaCacheEntry>();
 
-/** 解析 JSONL：取头部 + 首条用户消息文本（大文件只扫前 MAX_SCAN_BYTES）。 */
-async function parseSessionHead(file: string): Promise<ParsedUserText> {
+const EMPTY_META: SessionMeta = {
+  header: null,
+  firstUserMessage: null,
+  sessionName: null,
+  lastActivityAt: null,
+};
+
+/**
+ * 解析 JSONL 元数据：头部 + 首条用户消息 + 最后一个 session_info 名字。
+ *
+ * pi 自己的会话列表本来就是整文件读取（session-manager buildSessionInfo），
+ * 这里首次遇到文件时也全量扫一次；之后按 mtime/size 缓存，只消费追加区间。
+ */
+export async function getSessionMeta(file: string): Promise<SessionMeta> {
   let stat: fs.Stats;
   try {
     stat = await fsp.stat(file);
   } catch {
-    headCache.delete(file);
-    return { header: null, firstUserMessage: null };
+    metaCache.delete(file);
+    return EMPTY_META;
   }
 
-  const cached = headCache.get(file);
+  const cached = metaCache.get(file);
   if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
-    return cached.parsed;
+    return cached;
   }
 
-  let text = "";
   try {
-    const size = Math.min(stat.size, MAX_SCAN_BYTES);
-    const handle = await fsp.open(file, "r");
-    try {
-      const buffer = Buffer.alloc(size);
-      await handle.read(buffer, 0, size, 0);
-      text = buffer.toString("utf8");
-    } finally {
-      await handle.close();
+    if (cached && stat.size > cached.size && stat.size >= cached.scannedBytes) {
+      const scan = await scanSessionFile(file, cached.scannedBytes);
+      const next: MetaCacheEntry = {
+        mtimeMs: stat.mtimeMs,
+        size: stat.size,
+        header: cached.header,
+        firstUserMessage: cached.firstUserMessage,
+        sessionName: scan.sessionName.found ? scan.sessionName.value : cached.sessionName,
+        lastActivityAt: scan.lastActivityAt ?? cached.lastActivityAt,
+        scannedBytes: Math.max(cached.scannedBytes, scan.scannedBytes),
+      };
+      metaCache.set(file, next);
+      return next;
     }
+
+    const scan = await scanSessionFile(file, 0);
+    const next: MetaCacheEntry = {
+      mtimeMs: stat.mtimeMs,
+      size: stat.size,
+      header: scan.header,
+      firstUserMessage: scan.firstUserMessage,
+      sessionName: scan.sessionName.found ? scan.sessionName.value : null,
+      lastActivityAt: scan.lastActivityAt,
+      scannedBytes: scan.scannedBytes,
+    };
+    metaCache.set(file, next);
+    return next;
   } catch {
-    return { header: null, firstUserMessage: null };
+    // 扫描期间被删除 / 截断：按空元数据处理，下次列表重试
+    metaCache.delete(file);
+    return EMPTY_META;
   }
-
-  let header: SessionHeader | null = null;
-  let firstUserMessage: string | null = null;
-  for (const line of text.split("\n")) {
-    if (!header && line.trim().length > 0) {
-      try {
-        const parsed = JSON.parse(line) as Partial<SessionHeader>;
-        if (parsed.type === "session" && typeof parsed.id === "string") {
-          header = parsed as SessionHeader;
-        }
-      } catch {
-        // 跳过无法解析的行
-      }
-      continue;
-    }
-    if (firstUserMessage === null && line.includes('"role":"user"')) {
-      try {
-        const entry = JSON.parse(line) as {
-          message?: { role?: string; content?: unknown };
-        };
-        if (entry.message?.role === "user") {
-          firstUserMessage = extractUserText(entry.message.content);
-        }
-      } catch {
-        // 跳过无法解析的行
-      }
-    }
-    if (header && firstUserMessage !== null) break;
-  }
-
-  const parsed: ParsedUserText = { header, firstUserMessage };
-  headCache.set(file, { mtimeMs: stat.mtimeMs, size: stat.size, parsed });
-  return parsed;
 }
 
-function extractUserText(content: unknown): string | null {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    const parts: string[] = [];
-    for (const block of content) {
-      if (
-        typeof block === "object" &&
-        block !== null &&
-        (block as { type?: string }).type === "text" &&
-        typeof (block as { text?: unknown }).text === "string"
-      ) {
-        parts.push((block as { text: string }).text);
-      }
-    }
-    return parts.length > 0 ? parts.join("\n") : null;
-  }
-  return null;
+/** 直接写过会话文件后让元数据缓存失效（下一次列表重读）。转写缓存不受影响。 */
+export function invalidateSessionMeta(file: string): void {
+  metaCache.delete(path.resolve(file));
 }
 
-/** toSummaries 解析并发上限（headCache 命中时几乎无 IO）。 */
+/**
+ * 校验并归一化会话文件路径：只接受 pi 会话目录内的 .jsonl。
+ * 渲染层传来的路径不可信，删除 / 重命名共用同一道门。
+ */
+export function resolveSessionFile(file: unknown): string {
+  if (typeof file !== "string" || !file.toLowerCase().endsWith(".jsonl")) {
+    throw new Error("非法的会话文件");
+  }
+  const root = path.join(getPiAgentDir(), "sessions");
+  const resolved = path.resolve(file);
+  const relative = path.relative(root, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative) || relative.length === 0) {
+    throw new Error("会话文件不在 pi 会话目录内");
+  }
+  return resolved;
+}
+
+/** toSummaries 解析并发上限（缓存命中时几乎无 IO）。 */
 const SUMMARY_CONCURRENCY = 8;
 
 /**
- * 把已按时间倒序的会话文件解析为摘要列表（cwd 取自 JSONL 头部）。
- * updatedAt 直接取文件 mtime（列表本已按它排序），不再额外 stat。
+ * 把会话文件解析为摘要列表（cwd 取自 JSONL 头部）。
+ * updatedAt 优先取最后一条消息条目的时间（pi 的 `modified` 同口径），
+ * 改名 / 切思考档这类元数据追加不动排序；没有消息时间时回退文件 mtime。
  * 解析走有限并发，避免侧栏刷新在大量冷文件上串行阻塞。
  */
 async function toSummaries(files: { file: string; mtime: number }[]): Promise<SessionSummary[]> {
@@ -144,15 +140,16 @@ async function toSummaries(files: { file: string; mtime: number }[]): Promise<Se
       const index = next;
       next += 1;
       const { file, mtime } = files[index];
-      const { header, firstUserMessage } = await parseSessionHead(file);
-      const startedAt = header ? Date.parse(header.timestamp) : mtime;
+      const meta = await getSessionMeta(file);
+      const startedAt = meta.header ? Date.parse(meta.header.timestamp) : mtime;
       summaries[index] = {
         file,
-        id: header?.id ?? path.basename(file, ".jsonl"),
+        id: meta.header?.id ?? path.basename(file, ".jsonl"),
         startedAt: Number.isNaN(startedAt) ? 0 : startedAt,
-        updatedAt: mtime,
-        firstUserMessage,
-        cwd: header?.cwd && header.cwd.trim().length > 0 ? header.cwd : null,
+        updatedAt: meta.lastActivityAt ?? mtime,
+        firstUserMessage: meta.firstUserMessage,
+        sessionName: meta.sessionName,
+        cwd: meta.header?.cwd && meta.header.cwd.trim().length > 0 ? meta.header.cwd : null,
       };
     }
   }
@@ -160,7 +157,7 @@ async function toSummaries(files: { file: string; mtime: number }[]): Promise<Se
     worker(),
   );
   await Promise.all(workers);
-  return summaries;
+  return summaries.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 /** 枚举会话根目录下的全部 JSONL 文件（跳过无法读取的目录），按修改时间倒序截断。 */
@@ -203,7 +200,8 @@ export async function collectSessionFiles(
 }
 
 /**
- * 列出某项目目录下的 pi 会话历史（按文件修改时间倒序）。
+ * 列出某项目目录下的 pi 会话历史（候选按文件 mtime 取最近 30 个，
+ * 返回顺序按最后消息时间倒序，改名不改变展示位置）。
  * 目录不存在（该项目从未跑过 pi）时返回空数组。
  */
 export async function listSessions(cwd: string): Promise<SessionSummary[]> {
@@ -230,7 +228,8 @@ export async function listSessions(cwd: string): Promise<SessionSummary[]> {
 }
 
 /**
- * 列出全部 pi 会话历史（按修改时间倒序，上限 MAX_ALL_SESSIONS）。
+ * 列出全部 pi 会话历史（候选按文件 mtime 取最近 MAX_ALL_SESSIONS 个，
+ * 返回顺序按最后消息时间倒序）。
  * 每条带会话自身的工作目录 cwd，渲染层据此把历史归入对应项目或"任务"。
  *
  * 归档会话不参与截断（docs/design/32）：已按 mtime 截掉、但登记在
@@ -271,16 +270,8 @@ export async function listAllSessions(): Promise<SessionSummary[]> {
  * 仅接受 pi 会话目录内的 .jsonl 文件，防止渲染层传入任意路径。
  */
 export async function removeSession(file: string): Promise<null> {
-  if (typeof file !== "string" || !file.toLowerCase().endsWith(".jsonl")) {
-    throw new Error("非法的会话文件");
-  }
-  const root = path.join(getPiAgentDir(), "sessions");
-  const resolved = path.resolve(file);
-  const relative = path.relative(root, resolved);
-  if (relative.startsWith("..") || path.isAbsolute(relative) || relative.length === 0) {
-    throw new Error("会话文件不在 pi 会话目录内");
-  }
-  headCache.delete(resolved);
+  const resolved = resolveSessionFile(file);
+  invalidateSessionMeta(resolved);
   invalidateTranscriptCache(resolved);
   try {
     await shell.trashItem(resolved);

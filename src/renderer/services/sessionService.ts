@@ -7,6 +7,7 @@ import type {
   PiSlashCommand,
   SessionId,
   SessionPushMessage,
+  SessionRenameRequest,
   SessionStartRequest,
   SessionSummary,
   SessionTranscriptPayload,
@@ -129,6 +130,14 @@ export const sessionService = {
     const api = pideskApi();
     if (!api) return;
     await unwrap(api.session.remove(file));
+  },
+
+  /** 重命名会话（写入 pi session_info；空名清除，返回归一化后的名字）。 */
+  async rename(req: SessionRenameRequest): Promise<string | null> {
+    const api = pideskApi();
+    if (!api) throw new Error("preload 未就绪");
+    const result = await unwrap(api.session.rename(req));
+    return result.name;
   },
 
   /** 读取会话 JSONL 转为消息数组（磁盘优先展示，不依赖 pi 进程）。 */

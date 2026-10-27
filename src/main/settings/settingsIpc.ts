@@ -73,17 +73,6 @@ function sanitizePinnedSessions(value: unknown): string[] | undefined {
   return files;
 }
 
-/** 会话自定义标题（JSONL 路径 → 标题）；空标题等于"没自定义"，直接丢掉而不是存空串。 */
-function sanitizeSessionTitles(value: unknown): Record<string, string> | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
-  const titles: Record<string, string> = {};
-  for (const [file, raw] of Object.entries(value as Record<string, unknown>)) {
-    const title = asString(raw);
-    if (file && title) titles[file] = title;
-  }
-  return titles;
-}
-
 /** 提示音配置：与当前设置深合并后再归一，避免局部 patch 冲掉用户音色映射。 */
 function sanitizeNotification(value: unknown): NotificationSettings | undefined {
   if (value === undefined || value === null || typeof value !== "object") return undefined;
@@ -123,11 +112,6 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
       case "globalPinnedSessions": {
         const files = sanitizePinnedSessions(value);
         if (files) clean.globalPinnedSessions = files;
-        break;
-      }
-      case "sessionTitles": {
-        const titles = sanitizeSessionTitles(value);
-        if (titles) clean.sessionTitles = titles;
         break;
       }
       case "archivedSessions": {

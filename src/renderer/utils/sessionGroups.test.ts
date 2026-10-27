@@ -14,6 +14,7 @@ const session = (file: string, cwd: string | null, updatedAt = 0): SessionSummar
   startedAt: 0,
   updatedAt,
   firstUserMessage: file,
+  sessionName: null,
   cwd,
 });
 

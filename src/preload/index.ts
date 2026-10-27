@@ -113,6 +113,8 @@ import type {
   SessionId,
   SessionPromptRequest,
   SessionPushMessage,
+  SessionRenameRequest,
+  SessionRenameResult,
   SessionSetModelRequest,
   SessionSetThinkingLevelRequest,
   SessionStartRequest,
@@ -356,6 +358,9 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 移除历史会话（会话 JSONL 文件移入系统回收站）。 */
     remove: (file: string): Promise<IpcResult<null>> =>
       ipcRenderer.invoke(SESSION_IPC.remove, { file }),
+    /** 重命名会话（写入 pi session_info；空名清除）。 */
+    rename: (req: SessionRenameRequest): Promise<IpcResult<SessionRenameResult>> =>
+      ipcRenderer.invoke(SESSION_IPC.rename, req),
     /** 读取会话 JSONL 转为消息数组（磁盘优先展示，不依赖 pi 进程）。 */
     readTranscript: (file: string): Promise<IpcResult<SessionTranscriptPayload>> =>
       ipcRenderer.invoke(SESSION_IPC.readTranscript, { file }),

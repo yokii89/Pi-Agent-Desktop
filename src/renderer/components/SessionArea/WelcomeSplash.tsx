@@ -5,6 +5,7 @@ import { useProjectStore } from "../../stores/projectStore";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
 import { buildSessionTree, excludeArchivedSessions } from "../../utils/sessionGroups";
+import { sessionTitle } from "../../utils/sessionTitle";
 import { formatShortRelativeTime } from "../../utils/time";
 import { useOpenHistory } from "../SideNav/useOpenHistory";
 import styles from "./WelcomeSplash.module.css";
@@ -55,22 +56,23 @@ export function WelcomeSplash() {
       <h1 className={styles.headline}>{t("session.welcome.headline")}</h1>
       {recents.length > 0 && (
         <div className={styles.recents}>
-          {recents.map(({ session, projectId }) => (
-            <button
-              key={session.file}
-              type="button"
-              className={styles.recentItem}
-              title={session.firstUserMessage ?? undefined}
-              onClick={() => open(session, projectId)}
-            >
-              <span className={styles.recentTitle}>
-                {session.firstUserMessage ?? t("session.emptySession")}
-              </span>
-              <span className={styles.recentTime}>
-                {formatShortRelativeTime(session.updatedAt)}
-              </span>
-            </button>
-          ))}
+          {recents.map(({ session, projectId }) => {
+            const title = sessionTitle(session, t("session.emptySession"));
+            return (
+              <button
+                key={session.file}
+                type="button"
+                className={styles.recentItem}
+                title={title}
+                onClick={() => open(session, projectId)}
+              >
+                <span className={styles.recentTitle}>{title}</span>
+                <span className={styles.recentTime}>
+                  {formatShortRelativeTime(session.updatedAt)}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import { gitService } from "../../services/gitService";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
 import { excludeArchivedSessions } from "../../utils/sessionGroups";
+import { sessionTitle } from "../../utils/sessionTitle";
 import { formatShortRelativeTime } from "../../utils/time";
 import { fuzzyMatch, fuzzyScore } from "./fuzzy";
 import {
@@ -43,7 +44,6 @@ const SECTION_TITLE_KEYS: Record<PaletteSectionId, string> = {
 };
 
 const EMPTY_SESSIONS: SessionSummary[] = [];
-const EMPTY_TITLES: Record<string, string> = {};
 
 /** 输入前缀 → 作用域（`>` 命令 / `#` 会话 / `@` 文件），与 ZCode resolveQueryScope 一致。 */
 function resolveQueryScope(rawQuery: string): {
@@ -139,8 +139,7 @@ export function usePaletteResults(open: boolean): PaletteResults {
   // dispatch / openReview 供文件与最近改动结果源的打开请求使用（保持具体依赖，避免整包 ctx 触发重搜）；
   // 动作执行统一走 actionCtx，与全局快捷键共用装配
   const { dispatch, openReview, closeCommandPalette, showToast } = useUiStore();
-  const { allSessions, archivedFiles, sessionTitles, sessionWorkingDir, openSessionFile } =
-    useSessionMeta();
+  const { allSessions, archivedFiles, sessionWorkingDir, openSessionFile } = useSessionMeta();
   const actionCtx = useActionContext();
 
   const [rawQuery, setRawQueryState] = useState("");
@@ -215,14 +214,11 @@ export function usePaletteResults(open: boolean): PaletteResults {
   const effectiveSessions = open
     ? excludeArchivedSessions(allSessions, archivedFiles)
     : EMPTY_SESSIONS;
-  const effectiveTitles = open ? sessionTitles : EMPTY_TITLES;
 
   const sessionItems = useMemo<PaletteItem[]>(() => {
     const sorted = [...effectiveSessions].sort((a, b) => b.updatedAt - a.updatedAt);
     return sorted.map((session: SessionSummary) => {
-      const title =
-        effectiveTitles[session.file] ??
-        (session.firstUserMessage?.trim() || t("palette.session.untitled"));
+      const title = sessionTitle(session, t("palette.session.untitled"));
       const subtitle = session.cwd ?? undefined;
       return {
         id: `session:${session.file}`,
@@ -235,7 +231,7 @@ export function usePaletteResults(open: boolean): PaletteResults {
         run: () => void openSessionFile(session.file, session.cwd ?? undefined),
       };
     });
-  }, [effectiveSessions, effectiveTitles, openSessionFile, t]);
+  }, [effectiveSessions, openSessionFile, t]);
 
   // 最近改动（空查询上下文分区）：git status 读侧，非 git 仓库时整区缺席
   useEffect(() => {

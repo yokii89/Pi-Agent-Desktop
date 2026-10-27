@@ -1,3 +1,4 @@
+import path from "node:path";
 import { ipcMain } from "electron";
 import type {
   IpcResult,
@@ -12,6 +13,8 @@ import type {
   SessionGetModelsRequest,
   SessionId,
   SessionPromptRequest,
+  SessionRenameRequest,
+  SessionRenameResult,
   SessionSetModelRequest,
   SessionSetThinkingLevelRequest,
   SessionStartRequest,
@@ -43,10 +46,13 @@ import {
   fetchSessionState,
   fetchSessionStats,
   fetchSlashCommands,
+  getLiveSessionFile,
   hasSession,
   interruptSession,
+  liveSessionIdForFile,
   promptSession,
   setSessionModel,
+  setSessionName,
   setThinkingLevel,
 } from "./piSession";
 import { readDefaultModel, setDefaultModel } from "./piSettings";
@@ -57,7 +63,9 @@ import {
   isRuntimeReady,
   noteWarmPrompt,
 } from "./runtimeCoordinator";
-import { listAllSessions, listSessions, removeSession } from "./sessionHistory";
+import { listAllSessions, listSessions, removeSession, resolveSessionFile } from "./sessionHistory";
+import { normalizeSessionName } from "./sessionMeta";
+import { appendSessionName } from "./sessionName";
 import { readSessionTranscript } from "./sessionTranscriptRead";
 
 const THINKING_LEVELS = new Set<string>([
@@ -316,6 +324,54 @@ export function registerSessionIpc(): void {
     SESSION_IPC.remove,
     (_event, req: { file: string }): Promise<IpcResult<null>> =>
       envelopeAsync(() => removeSession(req?.file)),
+  );
+
+  /**
+   * 重命名会话：pi 的 session_info 是唯一存储。
+   * - 存活实例 + 非空名字：走 RPC（pi 自己追加并广播 session_info_changed）。
+   * - 清空或实例未存活：直接追加一条 session_info（pi RPC 拒绝空名）。
+   */
+  ipcMain.handle(
+    SESSION_IPC.rename,
+    (_event, req: SessionRenameRequest): Promise<IpcResult<SessionRenameResult>> =>
+      envelopeAsync(async () => {
+        if (typeof req?.file !== "string" || typeof req?.name !== "string") {
+          throw new Error("参数不完整");
+        }
+        const name = normalizeSessionName(req.name);
+        const requestedId =
+          typeof req.sessionId === "string" && req.sessionId.length > 0 ? req.sessionId : null;
+        const isJsonl = req.file.toLowerCase().endsWith(".jsonl");
+
+        // 未落盘的新会话：只能借运行时实例走 RPC（清空时写它已创建的 JSONL）
+        if (!isJsonl) {
+          if (!requestedId || !hasSession(requestedId)) throw new Error("会话尚未启动");
+          if (name) {
+            await setSessionName(requestedId, name);
+            return { name };
+          }
+          const liveFile = getLiveSessionFile(requestedId);
+          if (!liveFile) throw new Error("会话尚未落盘");
+          await appendSessionName(liveFile, "");
+          return { name };
+        }
+
+        const file = resolveSessionFile(req.file);
+        const explicitFile =
+          requestedId && hasSession(requestedId) ? getLiveSessionFile(requestedId) : null;
+        const liveId =
+          explicitFile && path.resolve(explicitFile) === path.resolve(file)
+            ? requestedId
+            : liveSessionIdForFile(file);
+
+        if (liveId && name) {
+          await setSessionName(liveId, name);
+          return { name };
+        }
+        // 清空（pi RPC 拒绝空名）或实例不存活：直接写文件
+        await appendSessionName(file, name ?? "");
+        return { name };
+      }),
   );
 
   ipcMain.handle(

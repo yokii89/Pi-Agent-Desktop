@@ -33,19 +33,12 @@ function bindSessionTriggers(): () => void {
  * 在 SessionProvider 内使用（依赖 useSessionMeta.activeSessionId 等）。
  */
 export function useNotificationSounds(): void {
-  const {
-    activeSessionId,
-    allSessions,
-    sessionTitles,
-    getSessionFileById,
-    openSessionFile,
-    firstUserText,
-  } = useSessionMeta();
+  const { activeSessionId, allSessions, getSessionFileById, openSessionFile, firstUserText } =
+    useSessionMeta();
 
   const metaRef = useRef({
     activeSessionId,
     allSessions,
-    sessionTitles,
     getSessionFileById,
     openSessionFile,
     firstUserText,
@@ -53,7 +46,6 @@ export function useNotificationSounds(): void {
   metaRef.current = {
     activeSessionId,
     allSessions,
-    sessionTitles,
     getSessionFileById,
     openSessionFile,
     firstUserText,
@@ -72,18 +64,16 @@ export function useNotificationSounds(): void {
     notificationService.setToastSessionResolver((sessionId) => {
       const {
         allSessions: sessions,
-        sessionTitles: titles,
         getSessionFileById: byId,
         activeSessionId: activeId,
         firstUserText: activeFirstUser,
       } = metaRef.current;
       const file = (sessionId ? byId(sessionId) : null) ?? undefined;
       const summary = file ? sessions.find((s) => s.file === file) : undefined;
-      const custom = file ? titles[file] : undefined;
       // 历史列表尚未刷到该文件时，active 桶的首条用户消息可作标题兜底
       const activeFallback =
         sessionId && sessionId === activeId ? activeFirstUser?.trim() || undefined : undefined;
-      const name = summary ? sessionTitle(summary, custom) : custom?.trim() || activeFallback;
+      const name = summary ? sessionTitle(summary, activeFallback ?? "") : activeFallback;
       return { sessionTitle: name, sessionFile: file };
     });
     return () => notificationService.setToastSessionResolver(null);

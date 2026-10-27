@@ -82,7 +82,6 @@ export function HistoryItem({
     renameSession,
     pinnedFiles,
     globalPinnedFiles,
-    sessionTitles,
     unreadFiles,
     togglePin,
     toggleGlobalPin,
@@ -92,7 +91,7 @@ export function HistoryItem({
     getSessionIdForFile,
   } = useSessionMeta();
   const { page, showToast } = useUiStore();
-  const title = sessionTitle(session, sessionTitles[session.file]);
+  const title = sessionTitle(session, t("sidenav.session.untitled"));
   const pinned = pinnedFiles.includes(session.file);
   const globalPinned = globalPinnedFiles.includes(session.file);
   const unread = unreadFiles.has(session.file);
@@ -181,6 +180,8 @@ export function HistoryItem({
             el.select();
           }}
           onKeyDown={(event) => {
+            // 输入法组合期的 Enter/Escape 是候选操作，不是提交 / 取消
+            if (event.nativeEvent.isComposing) return;
             if (event.key === "Enter") commitRename(event.currentTarget.value);
             else if (event.key === "Escape") setRenaming(false);
           }}

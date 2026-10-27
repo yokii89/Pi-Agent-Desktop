@@ -110,6 +110,8 @@ import type {
   SessionId,
   SessionPromptRequest,
   SessionPushMessage,
+  SessionRenameRequest,
+  SessionRenameResult,
   SessionSetModelRequest,
   SessionSetThinkingLevelRequest,
   SessionStartRequest,
@@ -235,6 +237,8 @@ export interface PideskGlobalApi {
     listAll(): Promise<IpcResult<SessionSummary[]>>;
     messages(sessionId: SessionId): Promise<IpcResult<PiChatMessage[]>>;
     remove(file: string): Promise<IpcResult<null>>;
+    /** 重命名会话（写入 pi session_info；空名清除）。 */
+    rename(req: SessionRenameRequest): Promise<IpcResult<SessionRenameResult>>;
     /** 读取会话 JSONL 转为消息数组（磁盘优先展示，不依赖 pi 进程）。 */
     readTranscript(file: string): Promise<IpcResult<SessionTranscriptPayload>>;
     /** 导出会话记录为 Markdown 文件（系统保存对话框；取消返回 null）。 */

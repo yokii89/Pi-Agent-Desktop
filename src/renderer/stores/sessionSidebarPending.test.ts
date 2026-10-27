@@ -70,6 +70,7 @@ describe("mergeSessionLists optimistic pending rows", () => {
         startedAt: 1,
         updatedAt: 2,
         firstUserMessage: "hello",
+        sessionName: null,
         cwd: null,
       },
     ];
@@ -80,6 +81,42 @@ describe("mergeSessionLists optimistic pending rows", () => {
   it("skips empty buckets with no user text and not running", () => {
     const buckets = new Map([["s1", bucketPatch("s1", {})]]);
     expect(mergeSessionLists([], buckets)).toEqual([]);
+  });
+
+  it("pending row uses the name recorded before the JSONL is claimed", () => {
+    const buckets = new Map([
+      ["s1", bucketPatch("s1", { firstUser: "hello", processAlive: true })],
+    ]);
+    const names = new Map<string, string | null>([["pending:s1", "改过的名字"]]);
+    const merged = mergeSessionLists([], buckets, names);
+    expect(merged[0].sessionName).toBe("改过的名字");
+  });
+
+  it("claimed rows keep the disk name instead of the pending override", () => {
+    const buckets = new Map([
+      [
+        "s1",
+        bucketPatch("s1", {
+          sessionFile: "/tmp/real.jsonl",
+          firstUser: "hello",
+          processAlive: true,
+        }),
+      ],
+    ]);
+    const names = new Map<string, string | null>([["pending:s1", "旧名字"]]);
+    const disk: SessionSummary[] = [
+      {
+        file: "/tmp/real.jsonl",
+        id: "real",
+        startedAt: 1,
+        updatedAt: 2,
+        firstUserMessage: "hello",
+        sessionName: "磁盘名字",
+        cwd: null,
+      },
+    ];
+    const merged = mergeSessionLists(disk, buckets, names);
+    expect(merged[0].sessionName).toBe("磁盘名字");
   });
 });
 
@@ -94,6 +131,7 @@ describe("pickClaimedFile claim disambiguation", () => {
     startedAt,
     updatedAt: startedAt,
     firstUserMessage,
+    sessionName: null,
     cwd: null,
   });
 

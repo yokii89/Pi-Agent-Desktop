@@ -137,8 +137,6 @@ export interface PideskSettings {
    * 浏览 / 恢复 / 删除在设置 → 已归档对话分区进行。
    */
   archivedSessions: Record<string, number>;
-  /** 会话自定义标题（JSONL 绝对路径 → 用户重命名后的标题）；未登记的会话回退到首条用户消息。 */
-  sessionTitles: Record<string, string>;
   /** 浏览器面板最近访问 URL（localhost / 内网优先展示）。 */
   browserRecentUrls: BrowserRecentUrl[];
   /** 浏览器面板响应式视口宽度（px）；null 表示跟随面板宽度。 */
@@ -296,6 +294,8 @@ export const SESSION_IPC = {
   messages: "pidesk:session:messages",
   /** 移除历史会话（会话 JSONL 文件移入系统回收站）。 */
   remove: "pidesk:session:remove",
+  /** 重命名会话（写入 pi JSONL 的 session_info；空名 = 清除）。 */
+  rename: "pidesk:session:rename",
   /** 主进程推送：会话事件流 `{ sessionId, type, payload }`。 */
   output: "pidesk:session:output",
   /** 读取 pi 可用斜杠命令（RPC `get_commands`）。 */
@@ -752,6 +752,20 @@ export interface SessionProcessRequest {
   sessionId: SessionId;
 }
 
+export interface SessionRenameRequest {
+  /** 会话 JSONL 绝对路径；未落盘的新会话传 pending key。 */
+  file: string;
+  /** 新标题；空串（或全空白）= 清除，回退首条用户消息。 */
+  name: string;
+  /** 运行时实例 id；新会话尚未认领文件时据此走 RPC。 */
+  sessionId?: SessionId;
+}
+
+/** 重命名结果；null 表示已清除（标题回退首条用户消息）。 */
+export interface SessionRenameResult {
+  name: string | null;
+}
+
 /**
  * pi ImageContent（rpc.md）：base64 无 `data:` 前缀。
  * 用户附件发送与历史回读共用；与工具结果 image 块同形。
@@ -870,6 +884,8 @@ export type PiAgentEvent =
       assistantMessageEvent: PiStreamDelta;
     }
   | { type: "message_end"; message: PiChatMessage }
+  /** 会话名变化（`/name`、扩展或本应用 rename）；name 缺省表示已清除。 */
+  | { type: "session_info_changed"; name?: string }
   | {
       type: "tool_execution_start";
       toolCallId: string;
@@ -944,10 +960,12 @@ export interface SessionSummary {
   id: string;
   /** 会话开始时间（Unix ms）。 */
   startedAt: number;
-  /** 会话最后活动时间（Unix ms，取 JSONL 文件的最后写入时间）；侧栏相对时间与悬浮卡"更新于"用。 */
+  /** 最后一条消息条目的时间（Unix ms），没有消息时回退文件写入时间；改名 / 切换元数据不改变它。 */
   updatedAt: number;
   /** 首条用户消息文本（渲染层自行截断）；尚无消息为 null。 */
   firstUserMessage: string | null;
+  /** pi 会话名（JSONL 最后一条 session_info）；未命名为 null。标题优先取它。 */
+  sessionName: string | null;
   /** 会话工作目录（pi JSONL 头部 `cwd` 字段）；旧格式缺失时为 null。 */
   cwd: string | null;
 }

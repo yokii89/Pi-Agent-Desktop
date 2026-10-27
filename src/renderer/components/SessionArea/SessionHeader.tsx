@@ -40,7 +40,6 @@ export function SessionHeader() {
   const {
     activeSessionFile,
     allSessions,
-    sessionTitles,
     sessionWorkingDir,
     renameSession,
     removeSession,
@@ -60,8 +59,9 @@ export function SessionHeader() {
 
   const firstUser = firstUserText;
 
-  const customTitle = activeSessionFile ? sessionTitles[activeSessionFile] : undefined;
-  const title = summary ? sessionTitle(summary, customTitle) : firstUser || t("session.newSession");
+  const title = summary
+    ? sessionTitle(summary, t("sidenav.session.untitled"))
+    : firstUser || t("session.newSession");
 
   const pinned = activeSessionFile ? pinnedFiles.includes(activeSessionFile) : false;
 
@@ -91,6 +91,8 @@ export function SessionHeader() {
               el.select();
             }}
             onKeyDown={(event) => {
+              // 输入法组合期的 Enter/Escape 是候选操作，不是提交 / 取消
+              if (event.nativeEvent.isComposing) return;
               if (event.key === "Enter") commitRename(event.currentTarget.value);
               else if (event.key === "Escape") setRenaming(false);
             }}

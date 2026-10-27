@@ -12,6 +12,7 @@ import { disposeTaskScheduler, initTaskScheduler } from "./scheduler/taskSchedul
 import { detectPiExecutablePath } from "./session/piLauncher";
 import { disposeAllSessions } from "./session/piSession";
 import { warmPiShellCache } from "./session/piShell";
+import { migrateLegacySessionTitles } from "./session/sessionNameMigration";
 import { getSettings, updateSettings } from "./settings/settings";
 import { registerTerminalLifecycle } from "./terminal/terminal";
 import { disposeUpdater, scheduleStartupCheck } from "./updater/updaterService";
@@ -75,8 +76,14 @@ function bootstrapEnvironmentProbe(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   registerIpc();
+  // 旧 settings.sessionTitles → pi session_info：先于窗口，首屏列表就带名字
+  try {
+    await migrateLegacySessionTitles();
+  } catch (err) {
+    console.warn("[session-name] 旧标题迁移未完成", err);
+  }
   createMainWindow();
   bootstrapEnvironmentProbe();
   bootstrapResidualNotice();

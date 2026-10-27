@@ -11,6 +11,7 @@ import { SCHEDULER_INTERVAL_MAX_MINUTES } from "../../../shared/scheduler";
 import { useT } from "../../hooks/useT";
 import { projectService } from "../../services/projectService";
 import { useProjectStore } from "../../stores/projectStore";
+import { sessionTitle } from "../../utils/sessionTitle";
 import { Button } from "../ui/Button";
 import { Segmented } from "../ui/Segmented";
 import { Select } from "../ui/Select";
@@ -62,7 +63,7 @@ export function ScheduledTaskFormStep({
     { value: "", label: t("scheduled.dialog.target.pick") },
     ...boundSessions.map((session) => ({
       value: session.file,
-      label: (session.firstUserMessage ?? session.file).slice(0, 60),
+      label: sessionTitle(session, session.file).slice(0, 60),
     })),
   ];
 

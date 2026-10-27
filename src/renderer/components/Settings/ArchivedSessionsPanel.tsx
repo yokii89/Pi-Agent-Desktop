@@ -27,8 +27,7 @@ interface ArchivedRow {
  */
 export function ArchivedSessionsPanel() {
   const t = useT();
-  const { allSessions, archivedFiles, unarchiveSession, removeSession, sessionTitles } =
-    useSessionMeta();
+  const { allSessions, archivedFiles, unarchiveSession, removeSession } = useSessionMeta();
   const { projects } = useProjectStore();
   const { open } = useOpenHistory();
   const [pendingDelete, setPendingDelete] = useState<ArchivedRow | null>(null);
@@ -76,7 +75,7 @@ export function ArchivedSessionsPanel() {
         ) : (
           <div className={styles.list}>
             {rows.map((row) => {
-              const title = sessionTitle(row.session, sessionTitles[row.session.file]);
+              const title = sessionTitle(row.session, t("sidenav.session.untitled"));
               const projectId = projectIdByFile.get(row.session.file) ?? null;
               const spaceName = projects.find((p) => p.id === projectId)?.name ?? null;
               return (

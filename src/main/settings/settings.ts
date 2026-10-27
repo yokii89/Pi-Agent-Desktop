@@ -27,6 +27,47 @@ import {
 
 let cache: PideskSettings | null = null;
 
+/**
+ * 旧版会话标题（settings.sessionTitles）只用于一次性迁移到 pi 的 session_info。
+ * 读盘时从缓存对象里剥掉，避免更新设置时又把废弃键写回去；
+ * 但迁移完成前必须把它带回磁盘——否则迁移失败的条目会被任意一次设置写盘抹掉，
+ * 再也没有下次启动重试的机会。
+ */
+type LegacySessionTitles = Record<string, string>;
+
+export interface LegacySessionTitlesSnapshot {
+  titles: LegacySessionTitles;
+  hadKey: boolean;
+}
+
+let legacySessionTitles: LegacySessionTitles = {};
+let legacySessionTitlesPresent = false;
+
+function sanitizeLegacySessionTitles(value: unknown): LegacySessionTitles {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+  const titles: LegacySessionTitles = {};
+  for (const [file, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!file || typeof raw !== "string") continue;
+    const title = raw.trim();
+    if (title) titles[file] = title;
+  }
+  return titles;
+}
+
+/** 取启动时读到的旧标题快照；迁移结束前仍保留在写盘载荷里。 */
+export function takeLegacySessionTitles(): LegacySessionTitlesSnapshot {
+  return { titles: legacySessionTitles, hadKey: legacySessionTitlesPresent };
+}
+
+/**
+ * 迁移收口：remaining 为 null 表示旧键可以移除；非空表示只保留未迁成功的条目，
+ * 随设置一起写回，下次启动重试。
+ */
+export function settleLegacySessionTitles(remaining: LegacySessionTitles | null): void {
+  legacySessionTitles = remaining ?? {};
+  legacySessionTitlesPresent = remaining !== null && Object.keys(remaining).length > 0;
+}
+
 function settingsFilePath(): string {
   return path.join(app.getPath("userData"), SETTINGS_FILENAME);
 }
@@ -37,32 +78,34 @@ function settingsFilePath(): string {
  */
 export function getSettings(): PideskSettings {
   if (cache) return cache;
-  let loaded: Partial<PideskSettings> = {};
+  let loaded: Partial<PideskSettings> & { sessionTitles?: unknown } = {};
   try {
-    loaded = JSON.parse(fs.readFileSync(settingsFilePath(), "utf8")) as Partial<PideskSettings>;
+    loaded = JSON.parse(fs.readFileSync(settingsFilePath(), "utf8")) as Partial<PideskSettings> & {
+      sessionTitles?: unknown;
+    };
   } catch {
     // 首次运行或文件损坏：使用默认值，下次写入时覆盖
   }
+  const { sessionTitles: rawSessionTitles, ...settings } = loaded;
+  if (rawSessionTitles !== undefined) {
+    legacySessionTitles = sanitizeLegacySessionTitles(rawSessionTitles);
+    legacySessionTitlesPresent = true;
+  }
   cache = {
     ...DEFAULT_SETTINGS,
-    ...loaded,
+    ...settings,
     locale: normalizeLocalePreference(loaded.locale),
     projects: Array.isArray(loaded.projects) ? loaded.projects : DEFAULT_SETTINGS.projects,
     // 手改过设置文件时也要保证是字符串数组，避免渲染层拿到非数组后崩溃
-    pinnedSessions: Array.isArray(loaded.pinnedSessions)
-      ? loaded.pinnedSessions.filter((file): file is string => typeof file === "string")
+    pinnedSessions: Array.isArray(settings.pinnedSessions)
+      ? settings.pinnedSessions.filter((file): file is string => typeof file === "string")
       : DEFAULT_SETTINGS.pinnedSessions,
-    globalPinnedSessions: Array.isArray(loaded.globalPinnedSessions)
-      ? loaded.globalPinnedSessions.filter((file): file is string => typeof file === "string")
+    globalPinnedSessions: Array.isArray(settings.globalPinnedSessions)
+      ? settings.globalPinnedSessions.filter((file): file is string => typeof file === "string")
       : DEFAULT_SETTINGS.globalPinnedSessions,
-    // 同理：非对象（手改坏了）时回退空表，避免渲染层读属性时崩
-    sessionTitles:
-      loaded.sessionTitles && typeof loaded.sessionTitles === "object"
-        ? loaded.sessionTitles
-        : DEFAULT_SETTINGS.sessionTitles,
     // 归档表同样只保结构：键为路径、值为归档时间的合法条目才保留（docs/design/32）
     archivedSessions:
-      sanitizeArchivedSessions(loaded.archivedSessions) ?? DEFAULT_SETTINGS.archivedSessions,
+      sanitizeArchivedSessions(settings.archivedSessions) ?? DEFAULT_SETTINGS.archivedSessions,
     maxParallelSessions:
       typeof loaded.maxParallelSessions === "number" &&
       Number.isFinite(loaded.maxParallelSessions) &&
@@ -97,6 +140,9 @@ export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   setI18nLocale(resolveLocale(next.locale, app.getLocale()));
   const file = settingsFilePath();
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(next, null, 2), "utf8");
+  const payload = legacySessionTitlesPresent
+    ? { ...next, sessionTitles: legacySessionTitles }
+    : next;
+  fs.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
   return next;
 }

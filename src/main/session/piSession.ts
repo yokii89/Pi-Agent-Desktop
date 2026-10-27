@@ -2,6 +2,7 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import type {
   PiAgentEvent,
@@ -45,6 +46,8 @@ const FORWARD_EVENT_TYPES = new Set<string>([
   "message_start",
   "message_update",
   "message_end",
+  /** 会话名变化（/name、扩展或 PiDesk rename）；渲染层据此更新侧栏标题。 */
+  "session_info_changed",
   "tool_execution_start",
   "tool_execution_update",
   "tool_execution_end",
@@ -594,6 +597,29 @@ export function fetchSlashCommands(sessionId: SessionId): Promise<unknown> {
 /** 设置思考档位（RPC set_thinking_level）。 */
 export function setThinkingLevel(sessionId: SessionId, level: string): Promise<void> {
   return request(sessionId, "set_thinking_level", { level }).then(() => undefined);
+}
+
+/** 设置会话名（RPC set_session_name；非空名字由 pi 追加 session_info）。 */
+export function setSessionName(sessionId: SessionId, name: string): Promise<void> {
+  return request(sessionId, "set_session_name", { name }).then(() => undefined);
+}
+
+/** 存活实例对应的会话文件；未启动或尚未落盘为 null。 */
+export function getLiveSessionFile(sessionId: SessionId): string | null {
+  return getLiveInstance(sessionId)?.sessionFile ?? null;
+}
+
+/** 会话文件当前是否有本应用存活的 pi 实例。 */
+export function liveSessionIdForFile(file: string): SessionId | null {
+  const direct = registry.sessionIdForFile(file);
+  if (direct && hasSession(direct)) return direct;
+  // 路径大小写 / 分隔符差异时按 resolve 后比较兜底
+  const target = path.resolve(file);
+  for (const id of listLiveSessions()) {
+    const inst = instances.get(id);
+    if (inst?.sessionFile && path.resolve(inst.sessionFile) === target) return id;
+  }
+  return null;
 }
 
 /** 读取会话状态（模型 / 思考档位等）。 */

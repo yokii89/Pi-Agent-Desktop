@@ -21,7 +21,6 @@ function fakeSettings(): PideskSettings {
     pinnedSessions: ["C:/s/a.jsonl"],
     globalPinnedSessions: ["C:/s/c.jsonl"],
     archivedSessions: { "C:/s/b.jsonl": 1 },
-    sessionTitles: { "C:/s/a.jsonl": "标题" },
     browserRecentUrls: [],
     browserViewportWidth: null,
     defaultProjectDir: "C:/projects",
@@ -53,7 +52,6 @@ describe("settingsSync whitelist", () => {
     expect(Object.keys(picked).sort()).toEqual([...SYNCABLE_SETTINGS_KEYS].sort());
     expect(picked).not.toHaveProperty("projects");
     expect(picked).not.toHaveProperty("piExecutablePath");
-    expect(picked).not.toHaveProperty("sessionTitles");
     expect(picked.theme).toBe("dark");
     expect(picked.welcomeRecentsEnabled).toBe(true);
   });

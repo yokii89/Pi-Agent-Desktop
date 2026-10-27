@@ -50,6 +50,7 @@ export const sidenavMessages = defineMessages({
   "sidenav.pinned": { "zh-CN": "置顶", "en-US": "Pinned" },
   "sidenav.pinned.empty": { "zh-CN": "暂无置顶会话", "en-US": "No pinned sessions" },
   "sidenav.session.rename": { "zh-CN": "重命名", "en-US": "Rename" },
+  "sidenav.session.renameFailed": { "zh-CN": "重命名失败", "en-US": "Rename failed" },
   "sidenav.session.pinGlobal": { "zh-CN": "全局置顶", "en-US": "Pin globally" },
   "sidenav.session.unpinGlobal": { "zh-CN": "取消全局置顶", "en-US": "Unpin globally" },
   "sidenav.session.pinWorkspace": { "zh-CN": "在工作区内置顶", "en-US": "Pin in workspace" },
