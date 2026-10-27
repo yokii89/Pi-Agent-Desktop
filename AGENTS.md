@@ -47,7 +47,7 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 | 前端框架 | React 19 + JSX | 函数组件 + Hooks，禁止 class 组件 |
 | 构建工具 | Vite | 渲染进程用 Vite；主进程用 tsc 编译 |
 | 语言 | TypeScript（strict） | 所有新文件一律 `.ts` / `.tsx`，禁止 JS |
-| 图标 | **Phosphor Icons（`@phosphor-icons/react`）** | UI 图标唯一图标库，见下文规范；文件类型图标为资源型资产，见"文件类型图标"一节 |
+| 图标 | **Phosphor Icons（`@phosphor-icons/react`）** | UI 图标唯一图标库，见下文规范；文件类型图标与 AI 厂商品牌 logo 为资源型资产，分别见对应小节 |
 | 样式 | CSS / CSS Modules | 暂不引入 Tailwind 等框架，如需变更先在本文件登记 |
 | 代码质量 | Biome | 格式化 + Lint 一体，配置沿用 pi 仓库的 `biome.json`，禁止再引入 ESLint/Prettier |
 | 测试 | vitest | 仅用于 `packages/view-sdk` 与可纯测的主进程协议逻辑（如 `viewHostProtocol`）；不引入渲染层测试框架 |
@@ -60,7 +60,8 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 已登记依赖补充说明：
 
 - `@types/node`（dev）：主进程 / 预加载的 Node API 类型，TypeScript strict 必需。
-- `@phosphor-icons/react`（runtime）：唯一图标库，见上文图标规范。
+- `@phosphor-icons/react`（runtime）：UI 图标唯一图标库，见上文图标规范。
+- `@lobehub/icons`（runtime）：AI / 模型厂商品牌 logo（设置 →「模型」的 provider 图标），见「第三方 AI 品牌 logo」一节；**只允许深引单图标组件**（`@lobehub/icons/es/<Icon>/components/Mono` / `Color`），禁止整包 `import … from "@lobehub/icons"`——主入口会把 @lobehub/ui、lucide-react 等 peer 一并拉进依赖图。
 - `@xterm/addon-fit`（runtime）：xterm 终端的容器尺寸自适应插件，与 `@xterm/xterm` 配套使用（仅中央工作区底部的终端面板）。
 - `react-markdown` + `remark-gfm`（runtime）：会话区 AI 回复的 Markdown 文档流渲染（GFM 表格/任务列表/删除线）。
 - `remark-breaks`（runtime）：会话正文与思考流的软换行渲染为 `<br>`（模型输出的单换行是段内换行语义）；仅 `MarkdownDoc` 的 `breaks` surface 使用，文件面板预览与 ExtensionView 不开。
@@ -76,6 +77,7 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 ## Phosphor Icons 使用规范
 
 - 统一从 `@phosphor-icons/react` 导入，**禁止**内联 SVG、emoji、或混入其他图标库（如 lucide、Material Icons）。
+- **AI 厂商品牌 logo 是唯一例外**：统一走 `@lobehub/icons`（见「第三方 AI 品牌 logo」），不要用 Phosphor 通用图标冒充品牌。
 - 导入方式：命名导入具体图标，如 `import { Play, GearSix } from "@phosphor-icons/react";`，不要 `import * as Icons`。
 - 图标风格（weight）全应用统一为 **`"regular"`**；强调/选中态用 `"fill"`。不得在一处用 `"duotone"` 另一处用 `"bold"`。
 - 尺寸通过 `size` 属性传递数字（如 `size={20}`），图标尺寸遵循 16 / 20 / 24 三档：行内文字旁 16，工具栏 20，页面级 24。
@@ -95,9 +97,11 @@ import { Play } from "@phosphor-icons/react";
 - **主题适配**：暗色主题优先使用上游 `_dark` 变体，缺失时自动回退浅色图标。
 - **更新**：`pnpm run gen:file-icons`（`scripts/generate-file-icons.mjs`，需要网络）重新拉取并生成；要扩大覆盖范围时修改脚本/上游数据，不手改生成物。该脚本仅在更新图标集时手动运行，日常构建不依赖网络。
 
-## 第三方 logo 资产
+## 第三方 AI 品牌 logo
 
-- `src/renderer/assets/ai-logos/*.svg` 为第三方 logo 资产，已从 Biome 检查中豁免（Biome 会把 SVG 误当 HTML/CSS 解析报错）。
+- 模型 / 厂商品牌图标统一使用 **`@lobehub/icons`**（依赖登记见上文），封装在 `src/renderer/components/AiIcons/`：`AiProviderLogo` 按 provider、`AiModelIcon` 按模型家族优先（网关会混挂多家模型，未命中再回退 provider），映射在 `providerIcons.ts` / `modelIcons.ts`；仓库内不再存放厂商 logo 资产（原 `src/renderer/assets/ai-logos` 已移除）。
+- 品牌 logo 属于第三方资源型图标，不适用 Phosphor 唯一图标库条款；UI 图标（按钮、工具栏、占位符）与设置项图标仍必须使用 Phosphor。
+- 优先取 `@lobehub/icons` 的 `Color` 变体；没有颜色变体时用 `Mono`（`currentColor`，随主题自适应）。
 
 ## Electron 架构规范
 

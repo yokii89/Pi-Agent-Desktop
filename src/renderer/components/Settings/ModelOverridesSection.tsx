@@ -14,6 +14,7 @@ import {
   type OverrideFilterMode,
   WINDOW_PRESETS,
 } from "../../utils/modelOverrides";
+import { AiModelIcon } from "../AiIcons/AiModelIcon";
 import { GlideChevron } from "../ui/GlideChevron";
 import glideStyles from "../ui/GlideList.module.css";
 import { Popover } from "../ui/Popover";
@@ -38,7 +39,7 @@ interface ModelOverridesSectionProps {
  * 来源靠字段自身着色（蓝 = 已修改，灰 = 沿用默认），而不是行级的一列文字——
  * 同一行可能窗口是用户设的、多模态仍是目录猜的。
  */
-export function ModelOverridesSection({
+export const ModelOverridesSection = memo(function ModelOverridesSection({
   rows,
   loading,
   savingKey,
@@ -145,7 +146,7 @@ export function ModelOverridesSection({
       )}
     </section>
   );
-}
+});
 
 /**
  * 单行：模型名 + 三个「值即控件」单元格（+ 已修改时的行尾恢复按钮）。
@@ -171,6 +172,7 @@ const OverrideRow = memo(function OverrideRow({
   return (
     <div className={[styles.ovRow, row.hasOverride ? styles.ovRowOv : ""].join(" ")}>
       <span className={styles.ovName}>
+        <AiModelIcon provider={row.provider} modelId={row.modelId} size={16} />
         <span className={styles.ovId} title={row.modelId}>
           {row.modelId}
         </span>

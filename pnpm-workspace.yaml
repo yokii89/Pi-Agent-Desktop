@@ -3,5 +3,14 @@ allowBuilds:
   electron-winstaller: true
   esbuild: true
   node-pty: true
+# @lobehub/icons 只深引 Mono/Color 单图标组件，不需要 @lobehub/ui / lucide-react 这两个重量级 peer；
+# 标记为 optional，避免重新生成 lock 时把 200+ 个 peer 依赖一起拉进来。
+packageExtensions:
+  '@lobehub/icons':
+    peerDependenciesMeta:
+      '@lobehub/ui':
+        optional: true
+      lucide-react:
+        optional: true
 patchedDependencies:
   node-pty@1.1.0: patches/node-pty@1.1.0.patch

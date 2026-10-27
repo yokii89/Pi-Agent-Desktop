@@ -19,11 +19,12 @@ import {
   type ModelOverrideRow,
   reuseModelOverrideRows,
 } from "../../utils/modelOverrides";
+import { AiModelIcon } from "../AiIcons/AiModelIcon";
+import { AiProviderLogo } from "../AiIcons/AiProviderLogo";
 import { Button } from "../ui/Button";
 import { GlideChevron } from "../ui/GlideChevron";
 import { Menu, type MenuItem } from "../ui/Menu";
 import { Select } from "../ui/Select";
-import { AiProviderLogo } from "./AiProviderLogo";
 import { ModelOverridesSection } from "./ModelOverridesSection";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import styles from "./Settings.module.css";
@@ -119,26 +120,29 @@ export function ModelsPanel() {
       .catch(() => {});
   }, []);
 
-  const applyModel = async (model: PiModelOption): Promise<void> => {
-    setApplying(true);
-    try {
-      const key = `${model.provider}/${model.modelId}`;
-      const next = await sessionService.setModel(model.provider, model.modelId);
-      setSelectedKey(key);
-      await refreshModelState();
-      if (processAlive && next.sessionApplied === false) {
-        showToast(t("settings.models.applied.deferred", { key }));
-      } else if (processAlive) {
-        showToast(t("settings.models.applied.switched", { key }));
-      } else {
-        showToast(t("settings.models.applied.saved", { key }));
+  const applyModel = useCallback(
+    async (model: PiModelOption): Promise<void> => {
+      setApplying(true);
+      try {
+        const key = `${model.provider}/${model.modelId}`;
+        const next = await sessionService.setModel(model.provider, model.modelId);
+        setSelectedKey(key);
+        await refreshModelState();
+        if (processAlive && next.sessionApplied === false) {
+          showToast(t("settings.models.applied.deferred", { key }));
+        } else if (processAlive) {
+          showToast(t("settings.models.applied.switched", { key }));
+        } else {
+          showToast(t("settings.models.applied.saved", { key }));
+        }
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : t("settings.models.applyFailed"));
+      } finally {
+        setApplying(false);
       }
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : t("settings.models.applyFailed"));
-    } finally {
-      setApplying(false);
-    }
-  };
+    },
+    [processAlive, refreshModelState, showToast, t],
+  );
 
   const activateCredential = async (credentialId: string, name: string): Promise<void> => {
     try {
@@ -310,20 +314,32 @@ export function ModelsPanel() {
 
   const modelTriggerLabel = selectedKey || modelLabel || t("settings.models.selectModel");
 
-  const modelMenuItems: MenuItem[] =
-    loadingModels && models.length === 0
-      ? [{ key: "__loading", label: t("settings.models.loading"), disabled: true }]
-      : models.length === 0
-        ? [{ key: "__empty", label: t("settings.models.empty"), disabled: true }]
-        : models.map((model) => {
-            const key = `${model.provider}/${model.modelId}`;
-            return {
-              key,
-              label: model.label,
-              hint: selectedKey === key ? t("settings.models.current") : undefined,
-              onSelect: () => void applyModel(model),
-            };
-          });
+  // 列表已有模型时，后台刷新（loadingModels 翻转）不该重建上百个条目与图标
+  const modelMenuState: "ready" | "loading" | "empty" =
+    models.length > 0 ? "ready" : loadingModels ? "loading" : "empty";
+
+  const modelMenuItems: MenuItem[] = useMemo(() => {
+    if (modelMenuState !== "ready") {
+      const loading = modelMenuState === "loading";
+      return [
+        {
+          key: loading ? "__loading" : "__empty",
+          label: t(loading ? "settings.models.loading" : "settings.models.empty"),
+          disabled: true,
+        },
+      ];
+    }
+    return models.map((model) => {
+      const key = `${model.provider}/${model.modelId}`;
+      return {
+        key,
+        label: model.label,
+        icon: <AiModelIcon provider={model.provider} modelId={model.modelId} size={16} />,
+        hint: selectedKey === key ? t("settings.models.current") : undefined,
+        onSelect: () => void applyModel(model),
+      };
+    });
+  }, [modelMenuState, models, selectedKey, applyModel, t]);
 
   return (
     <div className={styles.panel}>

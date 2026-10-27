@@ -11,7 +11,7 @@ import {
   Sparkle,
   Spinner,
 } from "@phosphor-icons/react";
-import { useCallback, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import type { PiModelOption, ThinkingLevelId } from "../../../shared/ipc";
 import { ACCESS_MODE_ACTIONS } from "../../../shared/view";
 import { useT } from "../../hooks/useT";
@@ -21,6 +21,7 @@ import { THINKING_LABEL_KEY, useComposerStore } from "../../stores/composerStore
 import { useExtensionViewStore } from "../../stores/extensionViewStore";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
+import { AiModelIcon } from "../AiIcons/AiModelIcon";
 import { GlideChevron } from "../ui/GlideChevron";
 import { Menu, type MenuItem } from "../ui/Menu";
 import { OptionList, type OptionRow } from "../ui/OptionList";
@@ -408,7 +409,7 @@ function isSameModel(label: string, model: PiModelOption): boolean {
 }
 
 /** 输入栏模型下拉：打开时拉取凭据可用模型，选中即切换（无会话则写默认模型）。 */
-function ModelMenu({ label }: { label: string }) {
+const ModelMenu = memo(function ModelMenu({ label }: { label: string }) {
   const t = useT();
   const { refreshModelState, refreshContextUsage } = useSessionMeta();
   const { showToast } = useUiStore();
@@ -445,21 +446,33 @@ function ModelMenu({ label }: { label: string }) {
     [refreshModelState, refreshContextUsage, showToast, t],
   );
 
-  const items: MenuItem[] =
-    loading && models.length === 0
-      ? [{ key: "__loading", label: t("session.model.loading"), disabled: true }]
-      : models.length === 0
-        ? [{ key: "__empty", label: t("session.model.empty"), disabled: true }]
-        : models.map((model) => {
-            const key = `${model.provider}/${model.modelId}`;
-            return {
-              key,
-              label: model.label,
-              selected: isSameModel(label, model),
-              hint: isSameModel(label, model) ? t("session.model.current") : undefined,
-              onSelect: () => void applyModel(model),
-            };
-          });
+  // 列表已有模型时，后台刷新（loading 翻转）不该重建上百个条目与图标
+  const menuState: "ready" | "loading" | "empty" =
+    models.length > 0 ? "ready" : loading ? "loading" : "empty";
+
+  const items: MenuItem[] = useMemo(() => {
+    if (menuState !== "ready") {
+      const isLoading = menuState === "loading";
+      return [
+        {
+          key: isLoading ? "__loading" : "__empty",
+          label: t(isLoading ? "session.model.loading" : "session.model.empty"),
+          disabled: true,
+        },
+      ];
+    }
+    return models.map((model) => {
+      const key = `${model.provider}/${model.modelId}`;
+      return {
+        key,
+        label: model.label,
+        icon: <AiModelIcon provider={model.provider} modelId={model.modelId} size={16} />,
+        selected: isSameModel(label, model),
+        hint: isSameModel(label, model) ? t("session.model.current") : undefined,
+        onSelect: () => void applyModel(model),
+      };
+    });
+  }, [menuState, models, label, applyModel, t]);
 
   return (
     <Menu
@@ -484,4 +497,4 @@ function ModelMenu({ label }: { label: string }) {
       items={items}
     />
   );
-}
+});

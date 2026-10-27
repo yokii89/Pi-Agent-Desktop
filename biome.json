@@ -6,7 +6,6 @@
       "!src/renderer/fileIcons/mapping.ts",
       "!src/renderer/fileIcons/assets",
       "!src/renderer/fileIcons/icons-extra",
-      "!src/renderer/assets/ai-logos/*.svg",
       "!session-flow-preview.html"
     ]
   },
