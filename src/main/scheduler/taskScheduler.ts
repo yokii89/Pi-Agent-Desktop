@@ -291,20 +291,15 @@ function armTimer(): void {
   }, delay);
 }
 
-function handleRuntimeActivity(
-  sessionId: string,
-  activity: "busy" | "idle" | "exit",
-  meta?: { willRetry?: boolean },
-): void {
+function handleRuntimeActivity(sessionId: string, activity: "busy" | "idle" | "exit"): void {
   if (activity === "exit") {
     for (const [taskId, entry] of [...inFlight]) {
       if (entry.sessionId === sessionId) inFlight.delete(taskId);
     }
     return;
   }
+  // idle 只在会话级收口点（agent_settled）发出，回填完成时刻即以此为准
   if (activity !== "idle") return;
-  // 自动重试的 agent_end 不是真空闲（agent_start 紧随其后），不回填完成时刻
-  if (meta?.willRetry) return;
   const now = Date.now();
   let dirty = false;
   for (const entry of inFlight.values()) {

@@ -20,7 +20,7 @@
   z-index: 1;
 }
 
-/* 思考等级顶档起辉（设计稿 field::before）：左下角琥珀辉光 500ms 淡入淡出；
+/* 思考等级顶档起辉（设计稿 field::before）：左下角主题色辉光 500ms 淡入淡出；
    z-index:-1 垫在内容之下、卡片背景之上（inputBox 自成堆叠上下文）。粒子特效
    见 ThinkingMaxAura，同层。 */
 .inputBox::before {
@@ -46,16 +46,12 @@
 /*
  * 运行态边框流光（phase === "running"）：一束强调色光沿输入卡边框顺时针匀速绕行，
  * 光尾渐隐，边框内侧带一层随光同行的微弱辉光。
- * 做法是「遮罩渐变旋转」：整卡铺 conic-gradient，再由 mask 裁成描边/羽化光带，
- * 旋转由 @property 角度补间驱动（linear 即匀速）；纯 CSS 动画不占 JS 主线程。
- * 辉光用四条边缘渐变掩码羽化，而不是 filter:blur——模糊会随渐变每帧重算整卡。
+ * 做法是「静态遮罩 + 旋转渐变层」：渐变画在一个覆盖卡片对角线的方形子层上，
+ * 旋转交给 transform——合成器只转图层，不重算渐变与遮罩（docs/design/78）。
+ * 旧做法用 @property 角度补间，每帧都要重算 conic-gradient 与 mask，实测多付
+ * ~200ms/3s 样式重算与 200–400ms/3s 主线程（300Hz 采集）。
+ * 辉光用四条边缘渐变掩码羽化，而不是 filter:blur。
  */
-@property --pidesk-run-ring-angle {
-  syntax: "<angle>";
-  inherits: true;
-  initial-value: 0deg;
-}
-
 .runBorder {
   position: absolute;
   /* 卡片自身有 1px 边框：-1px 让流光压在边框线上，而不是浮在内侧 */
@@ -67,10 +63,10 @@
   pointer-events: none;
   opacity: 0;
   transition: opacity 260ms var(--motion-ease-out);
-  /* 头亮尾淡的彗星：0deg 是硬头，300deg 起是渐隐的尾巴；
-     角度由本层统一驱动，描边与辉光两层读同一个渐变，永远同相位 */
+  /* 头亮尾淡的彗星：0deg 是硬头，300deg 起是渐隐的尾巴。
+     角度不补间——旋转由 .runBorderSpin 的 transform 承担，两者中心重合 */
   --run-border-light: conic-gradient(
-    from var(--pidesk-run-ring-angle),
+    from 0deg,
     transparent 0deg,
     transparent 300deg,
     color-mix(in oklab, var(--color-accent) 18%, transparent) 318deg,
@@ -78,23 +74,24 @@
     var(--color-accent) 356deg,
     var(--color-accent) 360deg
   );
-  animation: runBorderSpin var(--session-run-ring-duration) linear infinite;
-  /* 非运行态暂停而不是空转：淡出后不再让样式引擎逐帧重算 */
-  animation-play-state: paused;
 }
 
 .runBorder[data-active="true"] {
   opacity: 1;
-  animation-play-state: running;
+}
+
+/* 两层遮罩保持静态，只负责裁形状；渐变在子层里旋转 */
+.runBorderBeam,
+.runBorderGlow {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
 }
 
 /* 1.5px 描边：padding 撑出环带，content-box 与整盒做 exclude 镂空 */
 .runBorderBeam {
-  position: absolute;
-  inset: 0;
   padding: 1.5px;
-  border-radius: inherit;
-  background: var(--run-border-light);
   mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -104,10 +101,6 @@
 /* 内侧辉光：四条边各叠一层向内渐隐的掩码，合成沿边柔光带 */
 .runBorderGlow {
   --run-border-glow-size: 10px;
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--run-border-light);
   opacity: 0.3;
   mask:
     linear-gradient(to bottom, #000, transparent var(--run-border-glow-size)) top / 100%
@@ -120,16 +113,37 @@
     var(--run-border-glow-size) 100% no-repeat;
 }
 
+/* 方形渐变层：边长 150% 卡片宽。conic-gradient 只有角度分布，旋转任意角度都等价于
+   补间 from 角度；正方形保证转过任意角仍盖住卡片（输入区高 ≤ 280px，宽度远大于高，
+   对角线远小于边长）。translate 先于 transform 应用，旋转始终绕卡片中心。 */
+.runBorderSpin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: var(--run-border-light);
+  animation: runBorderSpin var(--session-run-ring-duration) linear infinite;
+  animation-play-state: paused;
+}
+
+.runBorder[data-active="true"] .runBorderSpin {
+  animation-play-state: running;
+}
+
 @keyframes runBorderSpin {
   to {
-    --pidesk-run-ring-angle: 360deg;
+    transform: rotate(360deg);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .runBorder {
-    animation: none;
     transition: none;
+  }
+  .runBorderSpin {
+    animation: none;
   }
 }
 

@@ -43,7 +43,7 @@ export interface RunEntry {
   synthetic?: boolean;
   /** 本轮各次 assistant 调用 usage 的累加和（message_end 权威值求和）。 */
   usage: PiUsage | null;
-  /** 本轮最近一次助手结束原因；agent_end 据此判定 failed / interrupted。 */
+  /** 本轮最近一次助手结束原因；agent_settled 据此判定 failed / interrupted。 */
   lastStopReason: AssistantStopReason | null;
   /** 本轮最近一次错误原文（重试中间态先不落卡，最终失败时据此补一张）。 */
   lastErrorMessage: string | null;
@@ -270,12 +270,20 @@ function applyEvent(entries: SessionEntry[], event: PiAgentEvent): SessionEntry[
     case "agent_start":
       return openRun(entries);
     case "agent_end":
-      // willRetry=true：pi 还会自动重试/续跑，run 不应收口；
-      // 中间失败不落错误卡（由后续 attempt 或最终 auto_retry_end 收口）
-      if (event.willRetry === true) return removeTurnErrors(entries, "llm");
+      // 一个低层 run 结束 ≠ 本轮收口：自动重试、溢出压缩恢复、before_settle 续跑
+      // 都接在 agent_end 之后继续，终态一律交给 agent_settled（docs/design/76 §6.1）。
+      // willRetry=true 的中间 attempt 撤掉本 attempt 的模型失败卡（还要重试，不挂着「失败」）；
+      // 中间 run 头由下一个 agent_start 的 openRun 收口，保留「重试多 run 头」的表达。
+      return event.willRetry === true ? removeTurnErrors(entries, "llm") : entries;
+    case "agent_settled": {
+      // 会话级 run 的收口点：此后 pi 不再有任何自动工作。
+      // aborted 是「用户中断」的权威真值——顺带撤掉重试链路留下的模型失败卡，
+      // 不能让用户中断挂着一张模型故障卡；旧 pi 没有该字段时按本轮最近 stopReason 兜底。
+      if (event.aborted === true) {
+        return finalizeRun(removeTurnErrors(entries, "llm"), "interrupted");
+      }
       return finalizeRun(entries, statusFromLastError(entries));
-    case "agent_settled":
-      return finalizeRun(entries, statusFromLastError(entries));
+    }
     case "message_start":
       // 用户角色消息由渲染层发送时乐观插入，忽略 pi 的回显，避免重复
       if (event.message.role !== "assistant") return entries;
@@ -390,7 +398,7 @@ function statusFromLastError(entries: SessionEntry[]): RunStatus {
   return "completed";
 }
 
-/** 把最新错误写入本轮 running run 的 lastStopReason（供 agent_end 判定终态）。 */
+/** 把最新错误写入本轮 running run 的 lastStopReason（供 agent_settled 判定终态）。 */
 function recordStopReason(
   entries: SessionEntry[],
   stopReason: AssistantStopReason,
@@ -1299,11 +1307,17 @@ function applyMessageEnd(entries: SessionEntry[], message: PiChatMessage): Sessi
   }
 
   let next = [...entries];
+  // pi 被中断时会合成一条 stopReason=aborted 的 assistant 消息（首条回复之前中断的那条是空的）。
+  // 标准 abort 文案不出错误卡（card 为 null），但 stopReason 必须落进 run，
+  // 否则 agent_settled 会把中断收口成 completed（docs/design/76 §5.3）。
+  if (message.stopReason === "aborted") {
+    next = recordStopReason(next, "aborted", message.errorMessage);
+  }
   // 空内容且非错误：丢掉空 assistant 壳
   if (rebuilt.length === 0 && !card?.title) {
     if (last.blocks.length === 0) {
       // 空壳也要落 stopReason（abort 残留的空错误消息正好命中这里），
-      // 否则 agent_end 会把 run 误收口为 completed
+      // 否则 agent_settled 会把 run 误收口为 completed
       if (card) {
         next = recordStopReason(next, card.stopReason, card.title ? card.message : undefined);
       }

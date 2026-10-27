@@ -6,8 +6,11 @@ import type { SessionPushMessage } from "../../shared/ipc";
  * 空闲存活实例也会产生 stderr 推送甚至 agent_end（渲染层重载后 running 清空），
  * 但它们没有在运行，不该被当成一次真实收口。
  *
- * 失败去重：auto_retry_end(success=false) 与随后的 agent_end(error) 会连着到达，
- * 同一 run 只发一次 failed。
+ * 收口点：终态以 `agent_end(willRetry≠true)` 为准，`agent_settled` 只在 run 仍未收口时
+ * 兜底——自动重试退避期被中断时 pi 不会发终态 `agent_end`（docs/design/76）。
+ * `agent_settled.aborted` 是「用户中断」的权威真值，优先于上一 attempt 残留的 stopReason。
+ *
+ * 失败去重：stderr 噪音与 `agent_end(error)` 可能属于同一 run，只发一次 failed。
  */
 export type SessionRunSignal =
   | { kind: "started" }
@@ -44,10 +47,8 @@ export function createSessionRunSignalTracker(
       return;
     }
     if (event.type === "auto_retry_end") {
-      if (event.success === false && running.has(sessionId) && !failedEmitted.has(sessionId)) {
-        failedEmitted.add(sessionId);
-        emit(sessionId, { kind: "failed", reason: event.finalError ?? "auto retry failed" });
-      }
+      // 不在此发终态：重试耗尽由终态 agent_end(error) 收口，
+      // 取消重试没有终态 agent_end，交给 agent_settled 兜底（docs/design/76 §5.2）
       return;
     }
     if (event.type === "agent_end") {
@@ -74,9 +75,24 @@ export function createSessionRunSignalTracker(
       return;
     }
     if (event.type === "agent_settled") {
-      // settled 为收口确认，终态以 agent_end 为准，避免双发
-      running.delete(sessionId);
+      // 兜底收口：只有没被终态 agent_end 收过口的 run 才在这里发终态
+      const wasRunning = running.delete(sessionId);
+      const reason = stopReasons.get(sessionId);
       stopReasons.delete(sessionId);
+      if (!wasRunning || failedEmitted.has(sessionId)) {
+        failedEmitted.delete(sessionId);
+        return;
+      }
+      // aborted 优先于 stopReason：退避期残留的是上一 attempt 的 error
+      if (event.aborted === true) {
+        emit(sessionId, { kind: "interrupted" });
+      } else if (reason === "error") {
+        emit(sessionId, { kind: "failed", reason: "agent error" });
+      } else if (reason === "length") {
+        emit(sessionId, { kind: "truncated" });
+      } else {
+        emit(sessionId, { kind: "completed" });
+      }
     }
   };
 

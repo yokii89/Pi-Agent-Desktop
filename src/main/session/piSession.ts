@@ -492,15 +492,10 @@ function handleProtocolLine(inst: SessionInstance, line: string): void {
     const agentEvent = parsed as PiAgentEvent;
     if (agentEvent.type === "agent_start") {
       markRuntimeActivity(inst.id, "busy");
-    } else if (agentEvent.type === "agent_end" || agentEvent.type === "agent_settled") {
-      // willRetry 的 agent_end 不是真空闲（自动重试/压缩续跑），meta 透传给旁路监听
-      markRuntimeActivity(
-        inst.id,
-        "idle",
-        agentEvent.type === "agent_end" && agentEvent.willRetry === true
-          ? { willRetry: true }
-          : undefined,
-      );
+    } else if (agentEvent.type === "agent_settled") {
+      // 会话级收口点才发 idle：agent_end 之后还可能自动重试／压缩恢复／before_settle 续跑，
+      // 在它上面发 idle 会让调度器提前回填完成时刻（docs/design/76 §6.4）
+      markRuntimeActivity(inst.id, "idle");
     }
     // 后台进程监控（docs/design/37）：只读旁路，不改 push 格式
     if (agentEvent.type === "tool_execution_start" && isBashTool(agentEvent.toolName)) {

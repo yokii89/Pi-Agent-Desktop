@@ -31,9 +31,10 @@
   --color-accent-hover: #6aa3ff;
   --color-accent-text: #0b1a2b;
   --color-accent-soft: rgba(74, 140, 255, 0.16);
-  /* 顶档特效色（思考等级「最高」的起辉 / 粒子 / 滑轨强调，docs/ui-design/prompt-bar-micro-interactions
-     的琥珀粒子档）：与 accent 脱钩，避免语义混用 */
-  --color-spark: #f2b46b;
+  /* 顶档特效色（思考等级「最高」的起辉 / 粒子 / 滑轨强调）：从主题色推导而不是直取，
+     因为运行态描边用的就是 accent，同屏时必须比它亮一档才分得出「顶档」与「在跑」。
+     只在 tokens 里声明、不进 applyAccentColor 的内联覆盖表，否则推导链会被屏蔽。 */
+  --color-spark: color-mix(in oklab, var(--color-accent) 72%, white);
   /* 代码底（行内 code / pre / fence 共用）：与 bg-surface 同档，
      深底上"浮起一档"，对齐 ZCode 代码卡对比度（docs/design/33） */
   --color-code-bg: #202024;
@@ -294,8 +295,8 @@
   --color-accent-hover: #1f5ecb;
   --color-accent-text: #ffffff;
   --color-accent-soft: rgba(47, 111, 224, 0.12);
-  /* 顶档特效色：浅底上取深琥珀保证可读 */
-  --color-spark: #b06c00;
+  /* 顶档特效色：浅底上往黑里压一档，同时与 accent 描边拉开（暗色主题往白里提，同一个配比） */
+  --color-spark: color-mix(in oklab, var(--color-accent) 72%, black);
   --color-code-bg: #e2e2e6;
 
   /* 状态色 */

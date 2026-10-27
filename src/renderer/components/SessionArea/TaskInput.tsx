@@ -888,8 +888,12 @@ export function TaskInput({
             data-active={running ? "true" : "false"}
             aria-hidden="true"
           >
-            <span className={styles.runBorderGlow} />
-            <span className={styles.runBorderBeam} />
+            <span className={styles.runBorderGlow}>
+              <span className={styles.runBorderSpin} />
+            </span>
+            <span className={styles.runBorderBeam}>
+              <span className={styles.runBorderSpin} />
+            </span>
           </div>
         )}
       </div>

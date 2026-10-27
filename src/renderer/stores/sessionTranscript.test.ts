@@ -63,7 +63,7 @@ describe("run close resets streaming blocks (docs/design/13 P0-2)", () => {
     expectNoStreamingBlocks(entries);
   });
 
-  it("processError card keeps run open; later agent_end closes and resets", () => {
+  it("processError card keeps run open; later agent_settled closes and resets", () => {
     let entries: SessionEntry[] = [];
     for (const event of streamEvents()) {
       entries = sessionEntriesReducer(entries, { type: "event", event });
@@ -72,17 +72,26 @@ describe("run close resets streaming blocks (docs/design/13 P0-2)", () => {
     entries = sessionEntriesReducer(entries, { type: "processError", message: "进程崩溃" });
     expect(run(entries).status).toBe("running");
 
-    entries = sessionEntriesReducer(entries, { type: "event", event: { type: "agent_end" } });
+    entries = sessionEntriesReducer(entries, {
+      type: "event",
+      event: { type: "agent_settled", aborted: false },
+    });
     expect(run(entries).status).toBe("completed");
     expectNoStreamingBlocks(entries);
   });
 
-  it("agent_end closes streaming blocks when message_end is missing", () => {
+  it("agent_end 不再收口（P1）：run 保持 running，streaming 块要等 agent_settled 才复位", () => {
     let entries: SessionEntry[] = [];
     for (const event of streamEvents()) {
       entries = sessionEntriesReducer(entries, { type: "event", event });
     }
     entries = sessionEntriesReducer(entries, { type: "event", event: { type: "agent_end" } });
+    expect(run(entries).status).toBe("running");
+    // agent_end 之后还可能自动重试／压缩恢复／before_settle 续跑，不能当终态
+    entries = sessionEntriesReducer(entries, {
+      type: "event",
+      event: { type: "agent_settled", aborted: false },
+    });
     expect(run(entries).status).toBe("completed");
     expectNoStreamingBlocks(entries);
   });
@@ -164,6 +173,7 @@ describe("abort residue stop=error is an interruption, not a model failure", () 
         },
       },
       { type: "agent_end" },
+      { type: "agent_settled", aborted: true },
     ] as PiAgentEvent[]) {
       entries = sessionEntriesReducer(entries, { type: "event", event });
     }
@@ -190,6 +200,7 @@ describe("abort residue stop=error is an interruption, not a model failure", () 
         },
       },
       { type: "agent_end" },
+      { type: "agent_settled", aborted: false },
     ] as PiAgentEvent[]) {
       entries = sessionEntriesReducer(entries, { type: "event", event });
     }
@@ -216,6 +227,7 @@ describe("abort residue stop=error is an interruption, not a model failure", () 
         finalError: "Retry cancelled",
       },
       { type: "agent_end" },
+      { type: "agent_settled", aborted: true },
     ] as PiAgentEvent[]) {
       entries = sessionEntriesReducer(entries, { type: "event", event });
     }
@@ -654,5 +666,141 @@ describe("discardOptimisticUser reconciles optimistic sends (docs/design/73)", (
     let entries = sessionEntriesReducer([], { type: "userMessage", text: "loaded" });
     entries = sessionEntriesReducer(entries, { type: "discardOptimisticUser" });
     expect(entries).toHaveLength(1);
+  });
+});
+
+/**
+ * 会话收口统一到 agent_settled（docs/design/76 P0+P1）：
+ * P0 修「中断被误判」——退避期停止没有终态 agent_end、首条 assistant 前的合成消息没有错误卡；
+ * P1 把终态收口点整个搬到 settled，agent_end 之后的一切自动工作（重试／压缩恢复／
+ * before_settle 续跑）都落在同一个 run 头上，aborted 为中断的权威真值。
+ */
+describe("agent_settled 收口 (docs/design/76)", () => {
+  function replay(events: PiAgentEvent[]): SessionEntry[] {
+    let entries: SessionEntry[] = [];
+    for (const event of events) {
+      entries = sessionEntriesReducer(entries, { type: "event", event });
+    }
+    return entries;
+  }
+
+  const assistantEnd = (
+    stopReason: string,
+    errorMessage?: string,
+    content: PiChatMessage["content"] = [],
+  ): PiAgentEvent => ({
+    type: "message_end",
+    message: { role: "assistant", content, stopReason, errorMessage },
+  });
+
+  const errorCards = (entries: SessionEntry[]): SessionEntry[] =>
+    entries.filter((entry) => entry.kind === "error");
+
+  it("重试退避期被中断（无终态 agent_end）：settled(aborted) 落成 interrupted，无错误卡", () => {
+    const entries = replay([
+      { type: "agent_start" },
+      assistantEnd("error", "overloaded_error"),
+      { type: "agent_end", willRetry: true },
+      { type: "auto_retry_start", attempt: 1, maxAttempts: 3, errorMessage: "overloaded_error" },
+      { type: "auto_retry_end", success: false, finalError: "Retry cancelled" },
+      { type: "agent_settled", aborted: true },
+    ]);
+    expect(run(entries).status).toBe("interrupted");
+    expect(errorCards(entries)).toHaveLength(0);
+  });
+
+  it("settled(aborted) 清掉重试链路留下的模型失败卡", () => {
+    const retryFailed: PiAgentEvent[] = [
+      { type: "agent_start" },
+      assistantEnd("error", "overloaded_error"),
+      { type: "agent_end", willRetry: true },
+      { type: "auto_retry_end", success: false, finalError: "overloaded_error" },
+    ];
+    // 前置：这一串把 run 收成「等待重试」，模型失败卡已落、run 仍开着
+    expect(errorCards(replay(retryFailed))).toHaveLength(1);
+
+    const entries = replay([...retryFailed, { type: "agent_settled", aborted: true }]);
+    expect(run(entries).status).toBe("interrupted");
+    expect(errorCards(entries)).toHaveLength(0);
+  });
+
+  it("首条 assistant 前的合成中断消息：补录 stopReason 后收口为 interrupted", () => {
+    const entries = replay([
+      { type: "agent_start" },
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      assistantEnd("aborted", "This operation was aborted"),
+      { type: "agent_end" },
+      { type: "agent_settled", aborted: true },
+    ]);
+    expect(run(entries).status).toBe("interrupted");
+    expect(errorCards(entries)).toHaveLength(0);
+    // 空 assistant 壳仍然不入流
+    expect(entries.some((entry) => entry.kind === "assistant")).toBe(false);
+  });
+
+  it("正常完成：settled(aborted=false) 按最近 stopReason 收口为 completed", () => {
+    const entries = replay([
+      { type: "agent_start" },
+      assistantEnd("stop", undefined, [{ type: "text", text: "答" }]),
+      { type: "agent_end" },
+      { type: "agent_settled", aborted: false },
+    ]);
+    expect(run(entries).status).toBe("completed");
+  });
+
+  it("P1 #9340 边界：失败 attempt 后 agent_end、settled(aborted) 判 interrupted 且不挂失败卡", () => {
+    const entries = replay([
+      { type: "agent_start" },
+      assistantEnd("error", "overloaded_error"),
+      // 终态 agent_end 不再收口（P1），本轮由 settled 落定
+      { type: "agent_end" },
+      { type: "auto_retry_end", success: false, finalError: "overloaded_error" },
+      { type: "agent_settled", aborted: true },
+    ]);
+    expect(run(entries).status).toBe("interrupted");
+    // 卡片与 run 头要么都在、要么都不在：中断不留「模型调用失败」
+    expect(errorCards(entries)).toHaveLength(0);
+  });
+
+  it("P1 before_settle 续跑中被停止：agent_end 已给出但仍按 aborted 判 interrupted", () => {
+    const entries = replay([
+      { type: "agent_start" },
+      assistantEnd("stop", undefined, [{ type: "text", text: "答" }]),
+      { type: "agent_end" },
+      { type: "agent_settled", aborted: true },
+    ]);
+    expect(run(entries).status).toBe("interrupted");
+  });
+
+  it("P1 settled 重复到达不重复收口", () => {
+    const entries = replay([
+      { type: "agent_start" },
+      assistantEnd("stop", undefined, [{ type: "text", text: "答" }]),
+      { type: "agent_end" },
+      { type: "agent_settled", aborted: false },
+      { type: "agent_settled", aborted: true },
+    ]);
+    // 已经收口的 run 不被后到的 settled 改写
+    expect(run(entries).status).toBe("completed");
+  });
+
+  it("旧 pi 无 aborted 字段：沿用 statusFromLastError 的既有判定", () => {
+    const entries = replay([
+      { type: "agent_start" },
+      assistantEnd("error", "overloaded_error"),
+      { type: "agent_end", willRetry: true },
+      { type: "auto_retry_end", success: false, finalError: "overloaded_error" },
+      { type: "agent_settled" },
+    ]);
+    expect(run(entries).status).toBe("failed");
+    expect(errorCards(entries)).toHaveLength(1);
+
+    const ok = replay([
+      { type: "agent_start" },
+      assistantEnd("stop", undefined, [{ type: "text", text: "答" }]),
+      { type: "agent_end", willRetry: true },
+      { type: "agent_settled" },
+    ]);
+    expect(run(ok).status).toBe("completed");
   });
 });

@@ -197,15 +197,11 @@ export function markRuntimeExit(sessionId: SessionId): void {
 /**
  * 运行时活动旁路监听（busy / idle / exit）。
  * 调度器用它做冲突判定与运行台账的完成时刻回填，不侵入渲染层推送链路。
- * idle 附带 willRetry：自动重试的 agent_end 不是真空闲，回填方据此跳过。
+ * idle 只在会话级收口点 `agent_settled` 上发出：自动重试／压缩恢复／before_settle
+ * 续跑都接在 `agent_end` 之后，在那上面发 idle 会让回填方提前收尾（docs/design/76 §6.4）。
  */
 export type RuntimeActivityKind = "busy" | "idle" | "exit";
-export type RuntimeActivityMeta = { willRetry?: boolean };
-export type RuntimeActivityListener = (
-  sessionId: SessionId,
-  activity: RuntimeActivityKind,
-  meta?: RuntimeActivityMeta,
-) => void;
+export type RuntimeActivityListener = (sessionId: SessionId, activity: RuntimeActivityKind) => void;
 
 const activityListeners = new Set<RuntimeActivityListener>();
 
@@ -216,14 +212,10 @@ export function onRuntimeActivity(listener: RuntimeActivityListener): () => void
   };
 }
 
-function notifyActivityListeners(
-  sessionId: SessionId,
-  activity: RuntimeActivityKind,
-  meta?: RuntimeActivityMeta,
-): void {
+function notifyActivityListeners(sessionId: SessionId, activity: RuntimeActivityKind): void {
   for (const listener of activityListeners) {
     try {
-      listener(sessionId, activity, meta);
+      listener(sessionId, activity);
     } catch {
       // 旁路监听失败不拖垮 runtime 状态机
     }
@@ -255,18 +247,14 @@ export function noteRuntimeSessionFile(sessionId: SessionId, sessionFile: string
 }
 
 /** 标记 agent busy/idle（由 session 输出事件调用）。 */
-export function markRuntimeActivity(
-  sessionId: SessionId,
-  activity: "busy" | "idle",
-  meta?: { willRetry?: boolean },
-): void {
+export function markRuntimeActivity(sessionId: SessionId, activity: "busy" | "idle"): void {
   const rec = records.get(sessionId);
   if (!rec) return;
   if (rec.state === "cold" || rec.state === "stopping" || rec.state === "failed") return;
   rec.state = activity;
   rec.lastActivityAt = Date.now();
   pushRuntimeChanged(rec);
-  notifyActivityListeners(sessionId, activity, meta);
+  notifyActivityListeners(sessionId, activity);
 }
 
 /** 显式用户使用过该会话（prompt 等）：speculative 不可再自动回收。 */

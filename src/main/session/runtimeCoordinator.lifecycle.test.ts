@@ -25,9 +25,11 @@ import {
   __resetRuntimeCoordinatorForTests,
   assertNoModeTransition,
   ensureSessionReady,
+  getRuntimeState,
   listRuntimeSnapshots,
   markRuntimeActivity,
   noteSessionSpawned,
+  onRuntimeActivity,
   reclaimSpeculativeSessions,
   waitRuntimeReady,
   withActivationLock,
@@ -91,6 +93,23 @@ describe("runtime lifecycle", () => {
     resolve({ isStreaming: true });
     await Promise.all([first, second]);
     expect(listRuntimeSnapshots()[0]?.state).toBe("busy");
+  });
+
+  it("idle 只由会话级收口点发出：监听器收到 busy→idle，退订后不再回调", () => {
+    fake.alive.add("a");
+    noteSessionSpawned({ sessionId: "a", cwd: "A", sessionFile: null });
+    const seen: string[] = [];
+    const off = onRuntimeActivity((sessionId, activity) => {
+      seen.push(`${sessionId}:${activity}`);
+    });
+    markRuntimeActivity("a", "busy");
+    markRuntimeActivity("a", "idle");
+    off();
+    markRuntimeActivity("a", "busy");
+    // docs/design/76 §6.4：piSession 只在 agent_settled 上发 idle，
+    // 所以回填 finishedAt 的一方不再需要 willRetry 例外就能拿到真正的收口时刻
+    expect(seen).toEqual(["a:busy", "a:idle"]);
+    expect(getRuntimeState("a")).toBe("busy");
   });
 
   it("classifies an unanswered probe and disposes only its new process", async () => {

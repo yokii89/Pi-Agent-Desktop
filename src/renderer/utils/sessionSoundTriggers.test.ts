@@ -101,14 +101,18 @@ describe("createSessionSoundTriggers", () => {
     expect(plays).toEqual([{ scenario: "failed", sessionId: "sess_a", reason: "agent error" }]);
   });
 
-  it("auto_retry_end(success=false) 与 agent_end(error) 去重；不在途的 auto_retry_end 不响", () => {
+  it("auto_retry_end(success=false) 不再直接发声：耗尽后由终态 agent_end(error) 播一次 failed", () => {
     const { plays, push } = harness();
-    // 不在途：静默
-    push({ type: "event", payload: { type: "auto_retry_end", success: false } });
-    expect(plays).toEqual([]);
-    // 在途：响一次
     push({ type: "event", payload: { type: "agent_start" } });
-    push({ type: "event", payload: { type: "auto_retry_end", success: false, finalError: "x" } });
+    push({
+      type: "event",
+      payload: {
+        type: "message_end",
+        message: { role: "assistant", content: [], stopReason: "error" },
+      },
+    });
+    push({ type: "event", payload: { type: "agent_end", willRetry: true } });
+    push({ type: "event", payload: { type: "agent_start" } });
     push({
       type: "event",
       payload: {
@@ -117,7 +121,37 @@ describe("createSessionSoundTriggers", () => {
       },
     });
     push({ type: "event", payload: { type: "agent_end" } });
-    expect(plays).toEqual([{ scenario: "failed", sessionId: "sess_a", reason: "x" }]);
+    expect(plays).toEqual([{ scenario: "failed", sessionId: "sess_a", reason: "agent error" }]);
+    // 耗尽的 auto_retry_end 在其后到达，不能再补一声；settled 也已收口
+    push({ type: "event", payload: { type: "auto_retry_end", success: false, finalError: "x" } });
+    push({ type: "event", payload: { type: "agent_settled", aborted: false } });
+    expect(plays).toHaveLength(1);
+  });
+
+  it("不在途的 auto_retry_end 不响", () => {
+    const { plays, push } = harness();
+    push({ type: "event", payload: { type: "auto_retry_end", success: false, finalError: "x" } });
+    expect(plays).toEqual([]);
+  });
+
+  it("重试退避期被中断：播 interrupted，不播 failed", () => {
+    const { plays, push } = harness();
+    push({ type: "event", payload: { type: "agent_start" } });
+    push({
+      type: "event",
+      payload: {
+        type: "message_end",
+        message: { role: "assistant", content: [], stopReason: "error" },
+      },
+    });
+    push({ type: "event", payload: { type: "agent_end", willRetry: true } });
+    push({
+      type: "event",
+      payload: { type: "auto_retry_end", success: false, finalError: "Retry cancelled" },
+    });
+    expect(plays.filter((p) => p.scenario === "failed")).toHaveLength(0);
+    push({ type: "event", payload: { type: "agent_settled", aborted: true } });
+    expect(plays.map((p) => p.scenario)).toEqual(["interrupted"]);
   });
 
   it("abort 播 interrupted、length 播 needsAttention", () => {

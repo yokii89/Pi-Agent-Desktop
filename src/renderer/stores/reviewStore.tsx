@@ -353,11 +353,12 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         });
         return;
       }
-      if (type === "agent_end" || type === "agent_settled") {
-        // willRetry 中间事件：仍属同一轮，不锁定轮末快照
-        const isRetryContinue = type === "agent_end" && event.willRetry === true;
+      if (type === "agent_settled") {
+        // 轮末只在会话级收口点拍：agent_end 之后还可能自动重试／压缩恢复／before_settle 续跑，
+        // 在它上面切轮会把同一轮的文件编辑截成两段（docs/design/76 §6.3）。
+        // 中断轮仍出卡与撤销资格（docs/design/11），不因 aborted 跳过。
         const cwd = cwdRef.current;
-        if (!isRetryContinue && cwd && roundActiveRef.current && !roundEndTreeOidRef.current) {
+        if (cwd && roundActiveRef.current && !roundEndTreeOidRef.current) {
           const endSeq = ++roundEndSeqRef.current;
           void gitService.snapshot(cwd).then((result) => {
             if (roundEndSeqRef.current !== endSeq) return;

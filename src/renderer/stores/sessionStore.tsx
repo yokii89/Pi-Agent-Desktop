@@ -12,6 +12,7 @@ import {
 import type { SessionStartReason } from "../../shared/contribution";
 import { t } from "../../shared/i18n";
 import type {
+  PiAgentEvent,
   PiContextBreakdownSlice,
   PiContextUsage,
   PiImageContent,
@@ -176,7 +177,7 @@ interface SessionMetaValue {
   /** JSONL 路径 → 运行时 SessionId（后台进程归属查询用）。 */
   getSessionIdForFile: (file: string) => SessionId | null;
   refreshModelState: () => Promise<void>;
-  /** 拉取上下文用量（get_session_stats）；agent_end / compaction_end / 手动点击触发，不轮询。 */
+  /** 拉取上下文用量（get_session_stats）；agent_settled / compaction_end / 手动点击触发，不轮询。 */
   refreshContextUsage: (sessionId?: SessionId) => Promise<void>;
 }
 
@@ -406,7 +407,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [bucketsState.unreadFiles]);
 
   /**
-   * 生成中的文件集合只随 agent_start / agent_end 这类阶段边界变化，
+   * 生成中的文件集合只随 agent_start / agent_settled 这类阶段边界变化，
    * 但流式 delta 每帧都会改 bucketsState。保留内容相同的旧集合，
    * meta context 才不会每帧换身份、把整个侧栏列表拖进重渲染。
    */
@@ -615,7 +616,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [loadSessions, rematerializeSidebar, setState],
   );
 
-  /** 发送后立刻在侧栏出现，并轮询认领 JSONL（不等整轮 agent_end）。 */
+  /** 发送后立刻在侧栏出现，并轮询认领 JSONL（不等整轮收口）。 */
   const scheduleClaim = useCallback(
     (sessionId: SessionId): void => {
       const delays = [250, 600, 1200, 2500, 5000];
@@ -664,7 +665,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [setState]);
 
-  /** 上下文用量：只在 agent_end / compaction_end / set_model / 手动点击时拉取，不挂 message_update。 */
+  /** 上下文用量：只在 agent_settled / compaction_end / set_model / 手动点击时拉取，不挂 message_update。 */
   const refreshContextUsage = useCallback(
     async (sessionId?: SessionId): Promise<void> => {
       const id = sessionId ?? activeKeyRef.current;
@@ -818,7 +819,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshSessions();
 
-    const applySideEffects = (sessionId: SessionId, type: string): void => {
+    const applySideEffects = (sessionId: SessionId, event: PiAgentEvent): void => {
+      const { type } = event;
       setState((prev) => {
         let next = ensureBucket(prev, sessionId);
         const bucket = next.buckets.get(sessionId);
@@ -826,7 +828,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           next = patchBucket(next, sessionId, { phase: "running" });
           return next;
         }
-        if (type === "agent_end" || type === "agent_settled") {
+        if (type === "agent_settled") {
+          // agent_end 不再置 idle：自动重试／压缩恢复／before_settle 续跑都接在它后面，
+          // 只有 settled 表示本轮真的收口（docs/design/76 §6.2）
           next = patchBucket(next, sessionId, { phase: "idle" });
           return next;
         }
@@ -836,10 +840,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (type === "agent_start") {
         void claimSessionFile(sessionId);
         scheduleClaim(sessionId);
-      } else if (type === "agent_end") {
+      } else if (type === "agent_settled") {
+        // 认领 JSONL、侧栏重排、未读、上下文用量都跟着收口点走
+        const aborted = event.aborted === true;
         void claimSessionFile(sessionId).then((file) => {
           rematerializeSidebar();
           if (!file) return;
+          // 用户主动中断的一轮不算「有新结果待读」，不标未读
+          if (aborted) return;
           const st = bucketsStateRef.current;
           const isActive = st.activeKey === sessionId && pageRef.current === "session";
           if (!isActive) {
@@ -848,7 +856,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
         void refreshContextUsage(sessionId);
       } else if (type === "compaction_end") {
-        // 压缩后 percent 可能为 null（pi 契约），chip 显示 `?`；下一次 agent_end 恢复数字
+        // 压缩后 percent 可能为 null（pi 契约），chip 显示 `?`；下一次 settled 恢复数字
         void refreshContextUsage(sessionId);
       }
     };
@@ -895,7 +903,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       if (message.type === "event") {
-        applySideEffects(sessionId, message.payload.type);
+        applySideEffects(sessionId, message.payload);
         setState((prev) =>
           applyEntries(prev, sessionId, { type: "event", event: message.payload }),
         );
@@ -903,7 +911,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       if (message.type === "eventBatch") {
         for (const event of message.payload) {
-          applySideEffects(sessionId, event.type);
+          applySideEffects(sessionId, event);
         }
         setState((prev) =>
           applyEntries(prev, sessionId, { type: "events", events: message.payload }),

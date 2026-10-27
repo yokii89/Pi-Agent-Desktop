@@ -92,7 +92,7 @@
   transition: background-color 300ms ease;
 }
 
-/* 顶档：进度条与 thumb 转琥珀顶档色（设计稿的 spark 档） */
+/* 顶档：进度条与 thumb 转顶档特效色（--color-spark，由主题色推导） */
 .panel[data-max] .fill {
   background: color-mix(in srgb, var(--color-spark) 35%, transparent);
 }

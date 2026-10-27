@@ -27,7 +27,7 @@ interface Particle {
 
 /**
  * 思考等级顶档的输入栏特效（复刻 docs/ui-design/prompt-bar-micro-interactions.html 顶档粒子）：
- * 从输入卡底部上浮、随打字节奏加速增亮的琥珀（--color-spark）粒子。左下角的静态起辉是
+ * 从输入卡底部上浮、随打字节奏加速增亮的主题色（--color-spark，由 accent 推导）粒子。左下角的静态起辉是
  * `.inputBox[data-max]::before`（TaskInput.module.css），不在这里。
  *
  * 生命周期即挂载：active 时才渲染，卸载即清场。高刷屏按 GLIDE_MOTION.fps 封顶重绘
@@ -43,6 +43,7 @@ export function ThinkingMaxAura() {
     if (prefersReducedMotion()) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    // 计算值里的 var() 已替换但 color-mix 不求值，canvas 的色解析器接受这个函数串，无需在 JS 里换算
     let spark = getComputedStyle(canvas).getPropertyValue("--color-spark").trim();
     if (!spark) return;
 
@@ -148,14 +149,23 @@ export function ThinkingMaxAura() {
     };
     host?.addEventListener("input", onInput, true);
 
-    // 主题切换换粒子色（--color-spark 随 data-theme 变）
+    // 粒子色随主题变：data-theme 换两套令牌，style 是 applyAccentColor 写的主题色内联覆盖。
+    // 根元素的内联 style 也会被字号/字体设置改写，先比对这些廉价的内联值，
+    // 变了才读计算样式——否则每次无关写入都强制一次样式重算。
+    const root = document.documentElement;
+    const accentKey = (): string =>
+      `${root.dataset.theme ?? ""}|${root.style.getPropertyValue("--color-accent")}`;
+    let lastAccentKey = accentKey();
     const themeObserver = new MutationObserver(() => {
+      const nextKey = accentKey();
+      if (nextKey === lastAccentKey) return;
+      lastAccentKey = nextKey;
       const next = getComputedStyle(canvas).getPropertyValue("--color-spark").trim();
       if (next) spark = next;
     });
-    themeObserver.observe(document.documentElement, {
+    themeObserver.observe(root, {
       attributes: true,
-      attributeFilter: ["data-theme"],
+      attributeFilter: ["data-theme", "style"],
     });
 
     let lastWidth = canvas.width;

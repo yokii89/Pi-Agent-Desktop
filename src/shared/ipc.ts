@@ -901,7 +901,13 @@ export type PiAgentEvent =
   | { type: "agent_start" }
   /** willRetry=true 表示还有自动重试/压缩续跑，run 不应视为终态。 */
   | { type: "agent_end"; willRetry?: boolean }
-  | { type: "agent_settled" }
+  /**
+   * 会话级 run 的收口点：pi 在此之后不会再有自动工作（自动重试、溢出压缩恢复、
+   * steering/follow-up、`agent_before_settle` 续跑都已落定）。
+   * `aborted` 是「用户中断」的权威真值；缺省表示旧版 pi 未提供该字段，
+   * 消费方只在 `=== true` 时按中断处理，其余回退 stopReason／文案启发式。
+   */
+  | { type: "agent_settled"; aborted?: boolean }
   /** 插话 / 稍后队列变化；两个字段都是当前队列的**全量**快照。 */
   | { type: "queue_update"; steering: string[]; followUp: string[] }
   | { type: "message_start"; message: PiChatMessage }
