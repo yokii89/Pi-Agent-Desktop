@@ -50,7 +50,7 @@ export function ImageLightbox({
     });
     return () => {
       cancelled = true;
-      releaseOverlayFreeze(SUPPRESS_REASON, store.setOverlayFreeze);
+      void releaseOverlayFreeze(SUPPRESS_REASON, store.setOverlayFreeze);
     };
   }, []);
 

@@ -11,10 +11,25 @@ function waitForPaint(): Promise<void> {
 }
 
 /**
+ * 预解码冻结帧。
+ *
+ * data URL 有几百 KB 到 1 MB，`<img>` 挂上后解码是异步的；只等 rAF 只能保证
+ * 布局与绘制提交，等不到位图本身。解码没赶上「摘掉原生视图」的那几帧，
+ * 露出的就是宿主区棋盘底（浅色主题下是白闪）。先按同一 URL 解码一次，
+ * 后面 BrowserPanel 里的 `<img>` 就能直接命中缓存。
+ */
+async function decodeFreeze(src: string): Promise<void> {
+  const image = new Image();
+  image.src = src;
+  await image.decode().catch(() => {});
+}
+
+/**
  * 浮层打开前的防闪流程：
  * 1. 截当前页冻结帧（视图仍可见）
- * 2. 同步写入 store 并等一帧绘制（垫底画面已就位）
- * 3. 再抑制/隐藏 WebContentsView
+ * 2. 预解码，保证垫底图有像素可画
+ * 3. 同步写入 store 并等一帧绘制（垫底画面已就位）
+ * 4. 再抑制/隐藏 WebContentsView
  *
  * 若先藏视图再 setState，中间会露一帧宿主底色（闪烁）。
  *
@@ -26,6 +41,7 @@ export async function prepareOverlayFreeze(
   applyFreeze: (freeze: string | null) => void,
 ): Promise<void> {
   const freeze = await browserService.captureOverlayFreeze();
+  if (freeze) await decodeFreeze(freeze);
   flushSync(() => {
     applyFreeze(freeze);
   });
@@ -34,14 +50,15 @@ export async function prepareOverlayFreeze(
 }
 
 /**
- * 浮层关闭：先恢复视图，再清冻结帧（顺序反过来会闪一下垫底图）。
+ * 浮层关闭：先等主进程把视图挂回，再清冻结帧。
+ * 顺序反过来（先清帧、后挂回）会露 1–2 帧宿主棋盘底（docs/design/43 F3）。
  * 多来源叠加时主进程只在最后一个 reason 释放后才真正显示视图。
  */
-export function releaseOverlayFreeze(
+export async function releaseOverlayFreeze(
   reason: string,
   applyFreeze: (freeze: string | null) => void,
-): void {
-  void browserService.setOverlaySuppressed(false, reason);
+): Promise<void> {
+  await browserService.setOverlaySuppressed(false, reason);
   applyFreeze(null);
 }
 

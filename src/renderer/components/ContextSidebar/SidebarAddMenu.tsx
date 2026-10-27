@@ -46,7 +46,7 @@ export function SidebarAddMenu({
     (open: boolean): void => {
       if (open || !suppressed.current) return;
       suppressed.current = false;
-      releaseOverlayFreeze(SUPPRESS_REASON, setOverlayFreeze);
+      void releaseOverlayFreeze(SUPPRESS_REASON, setOverlayFreeze);
     },
     [setOverlayFreeze],
   );
@@ -56,7 +56,7 @@ export function SidebarAddMenu({
     () => () => {
       if (!suppressed.current) return;
       suppressed.current = false;
-      releaseOverlayFreeze(SUPPRESS_REASON, setOverlayFreeze);
+      void releaseOverlayFreeze(SUPPRESS_REASON, setOverlayFreeze);
     },
     [setOverlayFreeze],
   );

@@ -63,7 +63,7 @@ export function ImportLoginDialog({ open, onClose }: ImportLoginDialogProps) {
       void prepareOverlayFreeze(SUPPRESS_REASON, store.setOverlayFreeze);
     }
     return () => {
-      releaseOverlayFreeze(SUPPRESS_REASON, store.setOverlayFreeze);
+      void releaseOverlayFreeze(SUPPRESS_REASON, store.setOverlayFreeze);
     };
   }, [open]);
 

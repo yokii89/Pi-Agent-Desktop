@@ -90,7 +90,7 @@ export function BrowserMoreMenu() {
       void browserService.setOverlaySuppressed(false, SUPPRESS_REASON);
       return;
     }
-    releaseOverlayFreeze(SUPPRESS_REASON, store.setOverlayFreeze);
+    void releaseOverlayFreeze(SUPPRESS_REASON, store.setOverlayFreeze);
   }, [phase]);
 
   const openMenu = (): void => {
