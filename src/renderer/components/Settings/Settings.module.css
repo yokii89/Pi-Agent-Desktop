@@ -555,6 +555,13 @@
   gap: var(--spacing-sm);
 }
 
+/* 主题色选择：一排色点并排（见 AccentSwatch） */
+.accentSwatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
 .valueText {
   color: var(--color-text-muted);
 }

@@ -1,4 +1,5 @@
 import { ipcMain } from "electron";
+import { normalizeAccentColor } from "../../shared/accentColor";
 import { isFontMonoPreset, isFontUiPreset } from "../../shared/fontPresets";
 import { isLocalePreference } from "../../shared/i18n";
 import { isInputBuddyKind } from "../../shared/inputBuddy";
@@ -140,6 +141,11 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         break;
       case "theme":
         if (value === "dark" || value === "light") clean.theme = value as ThemeId;
+        break;
+      case "accentColor":
+        // null（恢复默认）是合法值；非法 hex 归一为 null 而不是丢弃整项，
+        // 否则渲染层回写时永远清不掉旧值
+        clean.accentColor = normalizeAccentColor(value);
         break;
       case "locale":
         // 白名单外的值整项丢弃，不把脏语言写进设置（渲染层每次回写都带这个键）

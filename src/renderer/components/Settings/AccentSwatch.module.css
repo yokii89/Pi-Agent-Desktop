@@ -1,0 +1,74 @@
+/**
+ * 主题色选择按钮（设置 → 外观）。swatch 只负责外框与选中态；
+ * 预览是纯色圆点，颜色来自预设数据（用户选择值），
+ * 「默认」档吃 var(--color-accent)，即当前主题默认蓝。
+ */
+
+.swatch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease-out,
+    background-color 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.swatch:hover:not(:disabled) {
+  border-color: var(--color-text-muted);
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.swatch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 选中态：强调描边 + 浅色底 + 右上角勾选角标（与伙伴/样式选择同一套表达） */
+.swatchSelected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.swatchSelected:hover:not(:disabled) {
+  border-color: var(--color-accent-hover);
+}
+
+.preview {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+/* 默认档：吃当前主题的 --color-accent，覆盖后也即时反映 */
+.previewDefault {
+  background: var(--color-accent);
+}
+
+.check {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  pointer-events: none;
+}

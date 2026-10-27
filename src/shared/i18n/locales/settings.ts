@@ -416,6 +416,20 @@ export const settingsMessages = defineMessages({
   },
   "settings.appearance.theme.dark": { "zh-CN": "暗色", "en-US": "Dark" },
   "settings.appearance.theme.light": { "zh-CN": "亮色", "en-US": "Light" },
+  "settings.appearance.group.accent": { "zh-CN": "主题色", "en-US": "Accent color" },
+  "settings.appearance.accent": { "zh-CN": "主题色", "en-US": "Accent color" },
+  "settings.appearance.accent.description": {
+    "zh-CN": "用于发送按钮、链接、开关等强调元素；选择后立即生效。",
+    "en-US":
+      "Used for emphasis elements like the send button, links and toggles. Applies immediately.",
+  },
+  "settings.appearance.accent.default": { "zh-CN": "默认", "en-US": "Default" },
+  "settings.appearance.accent.preset.blue": { "zh-CN": "蓝色", "en-US": "Blue" },
+  "settings.appearance.accent.preset.purple": { "zh-CN": "紫色", "en-US": "Purple" },
+  "settings.appearance.accent.preset.red": { "zh-CN": "红色", "en-US": "Red" },
+  "settings.appearance.accent.preset.orange": { "zh-CN": "橙色", "en-US": "Orange" },
+  "settings.appearance.accent.preset.cyan": { "zh-CN": "青色", "en-US": "Cyan" },
+  "settings.appearance.accent.preset.green": { "zh-CN": "绿色", "en-US": "Green" },
   "settings.appearance.navCollapsed": {
     "zh-CN": "侧边栏默认折叠",
     "en-US": "Collapse sidebar by default",

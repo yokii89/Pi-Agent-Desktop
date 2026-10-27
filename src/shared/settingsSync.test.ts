@@ -16,6 +16,7 @@ function fakeSettings(): PideskSettings {
     terminalShell: "powershell",
     terminalTabCompletion: "cycle",
     theme: "dark",
+    accentColor: null,
     locale: "zh-CN",
     navCollapsed: true,
     pinnedSessions: ["C:/s/a.jsonl"],

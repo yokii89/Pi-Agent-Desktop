@@ -25,6 +25,8 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   terminalShell: "powershell",
   terminalTabCompletion: "cycle",
   theme: "dark",
+  // 自定义主题色；null = 跟随主题默认蓝（tokens.css 的 --color-accent）
+  accentColor: null,
   locale: "system",
   navCollapsed: false,
   pinnedSessions: [],
@@ -89,6 +91,7 @@ export const SETTABLE_KEYS = [
   "terminalShell",
   "terminalTabCompletion",
   "theme",
+  "accentColor",
   "locale",
   "navCollapsed",
   "pinnedSessions",

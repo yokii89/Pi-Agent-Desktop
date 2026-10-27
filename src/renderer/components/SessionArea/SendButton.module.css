@@ -29,6 +29,18 @@
   cursor: default;
 }
 
+/* 激活态（有内容可发送）：走主题色令牌，用户自定义主题色时随之变化 */
+.armed {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.armed:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
 .running {
   color: var(--color-danger);
   border-color: var(--color-danger);

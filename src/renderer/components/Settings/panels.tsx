@@ -1,5 +1,6 @@
 import { ArrowRight, ArrowsClockwise, CheckCircle, DownloadSimple } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState } from "react";
+import { ACCENT_PRESETS } from "../../../shared/accentColor";
 import type { TranslateFn } from "../../../shared/i18n";
 import type {
   PiInfo,
@@ -23,6 +24,7 @@ import { GlideChevron } from "../ui/GlideChevron";
 import { Menu, type MenuItem } from "../ui/Menu";
 import { Segmented } from "../ui/Segmented";
 import { Toggle } from "../ui/Toggle";
+import { AccentSwatch } from "./AccentSwatch";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import styles from "./Settings.module.css";
 import type { SettingsSectionId } from "./SettingsNav";
@@ -93,10 +95,10 @@ function shellResolvedDescription(t: TranslateFn, probe: PiShellProbe | null): s
  * 本文件继续承载外观/配置/环境/项目/关于等面板；快捷键拆到 ShortcutsPanel.tsx。
  */
 
-/** 外观：主题与侧边栏折叠（原设置页「外观」）。 */
+/** 外观：主题、主题色与侧边栏折叠（原设置页「外观」）。 */
 export function AppearancePanel() {
   const t = useT();
-  const { theme, navCollapsed, dispatch } = useUiStore();
+  const { theme, navCollapsed, accentColor, hydrated, dispatch } = useUiStore();
   return (
     <div className={styles.panel}>
       <h2 className={styles.panelTitle}>{t("settings.section.appearance")}</h2>
@@ -117,6 +119,33 @@ export function AppearancePanel() {
               }))}
               onChange={(next) => dispatch({ type: "setTheme", theme: next })}
             />
+          }
+        />
+        <SettingRow
+          // 色板比名字更好认：每一格直接给颜色圆点，色名只留在读屏与悬停提示里
+          stack
+          label={t("settings.appearance.accent")}
+          description={t("settings.appearance.accent.description")}
+          control={
+            <div className={styles.accentSwatches}>
+              <AccentSwatch
+                color={null}
+                label={t("settings.appearance.accent.default")}
+                selected={accentColor === null}
+                disabled={!hydrated}
+                onSelect={(next) => dispatch({ type: "setAccentColor", color: next })}
+              />
+              {ACCENT_PRESETS.map((preset) => (
+                <AccentSwatch
+                  key={preset.id}
+                  color={preset.value}
+                  label={t(`settings.appearance.accent.preset.${preset.id}`)}
+                  selected={accentColor === preset.value}
+                  disabled={!hydrated}
+                  onSelect={(next) => dispatch({ type: "setAccentColor", color: next })}
+                />
+              ))}
+            </div>
           }
         />
       </SettingsSection>

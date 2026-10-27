@@ -9,6 +9,7 @@ import {
   useMemo,
   useReducer,
 } from "react";
+import { normalizeAccentColor } from "../../shared/accentColor";
 import {
   type FontMonoPreset,
   type FontUiPreset,
@@ -105,6 +106,36 @@ function applyFontFamilies(uiPreset: FontUiPreset, monoPreset: FontMonoPreset): 
   root.style.setProperty("--font-family-mono", resolveFontMonoStack(monoPreset));
 }
 
+/** 覆盖的 4 个 accent 令牌：派生色（hover/text/soft）依赖主题配方（与 tokens.css 两套默认值对齐）。 */
+const ACCENT_VAR_NAMES = [
+  "--color-accent",
+  "--color-accent-hover",
+  "--color-accent-text",
+  "--color-accent-soft",
+] as const;
+
+/** 主题色覆盖写根元素 CSS 变量；null 移除覆盖还原 tokens.css 默认。派生色用 color-mix 从主题色推导。 */
+function applyAccentColor(color: string | null, theme: Theme): void {
+  const root = document.documentElement;
+  if (!color) {
+    for (const name of ACCENT_VAR_NAMES) root.style.removeProperty(name);
+    return;
+  }
+  const dark = theme === "dark";
+  root.style.setProperty("--color-accent", color);
+  root.style.setProperty(
+    "--color-accent-hover",
+    dark ? `color-mix(in oklab, ${color} 88%, white)` : `color-mix(in oklab, ${color} 84%, black)`,
+  );
+  root.style.setProperty("--color-accent-text", dark ? "#0b1a2b" : "#ffffff");
+  root.style.setProperty(
+    "--color-accent-soft",
+    dark
+      ? `color-mix(in oklab, ${color} 16%, transparent)`
+      : `color-mix(in oklab, ${color} 12%, transparent)`,
+  );
+}
+
 /** Toast 的可选快捷动作（如「重载会话」）；点击后执行并立即收起提示。 */
 export interface ToastAction {
   label: string;
@@ -181,6 +212,8 @@ interface UiState {
   fontMonoPreset: FontMonoPreset;
   /** 对话流问题导航分段栏的标记样式（设置 → 个性化）。 */
   questionRailStyle: RailStyle;
+  /** 自定义主题色（设置 → 外观）；null = 跟随主题默认，见 applyAccentColor。 */
+  accentColor: string | null;
   /** 输入栏右上角的动物伙伴（设置 → 个性化）；none 表示不显示。 */
   inputBuddy: InputBuddyKind;
   /** 全局快捷键映射（设置 → 键盘快捷键）。 */
@@ -222,6 +255,7 @@ type UiAction =
   | { type: "setFontUiPreset"; preset: FontUiPreset }
   | { type: "setFontMonoPreset"; preset: FontMonoPreset }
   | { type: "setQuestionRailStyle"; style: RailStyle }
+  | { type: "setAccentColor"; color: string | null }
   | { type: "setInputBuddy"; kind: InputBuddyKind }
   | { type: "setShortcut"; id: BindableActionId; combo: string }
   | { type: "resetShortcuts" }
@@ -241,6 +275,7 @@ type UiAction =
       fontUiPreset: FontUiPreset;
       fontMonoPreset: FontMonoPreset;
       questionRailStyle: RailStyle;
+      accentColor: string | null;
       inputBuddy: InputBuddyKind;
       localePreference: LocalePreference;
       shortcuts: ShortcutsMap;
@@ -280,6 +315,7 @@ const initialState: UiState = {
   fontUiPreset: "default",
   fontMonoPreset: "default",
   questionRailStyle: DEFAULT_RAIL_STYLE,
+  accentColor: null,
   inputBuddy: DEFAULT_INPUT_BUDDY,
   shortcuts: { ...DEFAULT_SHORTCUTS },
   commandPaletteOpen: false,
@@ -424,6 +460,11 @@ function uiReducer(state: UiState, action: UiAction): UiState {
       if (state.questionRailStyle === style) return state;
       return { ...state, questionRailStyle: style };
     }
+    case "setAccentColor": {
+      const color = normalizeAccentColor(action.color);
+      if (state.accentColor === color) return state;
+      return { ...state, accentColor: color };
+    }
     case "setInputBuddy": {
       const kind = normalizeInputBuddy(action.kind);
       if (state.inputBuddy === kind) return state;
@@ -488,6 +529,7 @@ function uiReducer(state: UiState, action: UiAction): UiState {
         fontUiPreset: normalizeFontUiPreset(action.fontUiPreset),
         fontMonoPreset: normalizeFontMonoPreset(action.fontMonoPreset),
         questionRailStyle: normalizeRailStyle(action.questionRailStyle),
+        accentColor: normalizeAccentColor(action.accentColor),
         inputBuddy: normalizeInputBuddy(action.inputBuddy),
         localePreference,
         locale: resolveLocale(localePreference, navigator.language),
@@ -544,6 +586,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
         fontUiPreset: settings.fontUiPreset ?? "default",
         fontMonoPreset: settings.fontMonoPreset ?? "default",
         questionRailStyle: settings.questionRailStyle ?? DEFAULT_RAIL_STYLE,
+        accentColor: settings.accentColor ?? null,
         inputBuddy: settings.inputBuddy ?? DEFAULT_INPUT_BUDDY,
         localePreference: settings.locale ?? "system",
         shortcuts: settings.shortcuts ?? { ...DEFAULT_SHORTCUTS },
@@ -566,6 +609,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
       fontUiPreset: state.fontUiPreset,
       fontMonoPreset: state.fontMonoPreset,
       questionRailStyle: state.questionRailStyle,
+      accentColor: state.accentColor,
       inputBuddy: state.inputBuddy,
       locale: state.localePreference,
       shortcuts: state.shortcuts,
@@ -580,6 +624,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     state.fontUiPreset,
     state.fontMonoPreset,
     state.questionRailStyle,
+    state.accentColor,
     state.inputBuddy,
     state.localePreference,
     state.shortcuts,
@@ -605,6 +650,11 @@ export function UiProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyFontFamilies(state.fontUiPreset, state.fontMonoPreset);
   }, [state.fontUiPreset, state.fontMonoPreset]);
+
+  // 主题色覆盖同主题一样用 layout effect：子组件在被动 effect 里读 tokens 建配色，父级必须先行
+  useLayoutEffect(() => {
+    applyAccentColor(state.accentColor, state.theme);
+  }, [state.accentColor, state.theme]);
 
   const navigate = useCallback((page: PageId) => dispatch({ type: "navigate", page }), []);
   const openSidebarTab = useCallback(

@@ -107,7 +107,7 @@ export function SendButton({ running, canSend, onSend, onStop }: SendButtonProps
     <button
       ref={btnRef}
       type="button"
-      className={[styles.button, running ? styles.running : ""].join(" ")}
+      className={[styles.button, running ? styles.running : canSend ? styles.armed : ""].join(" ")}
       title={running ? t("session.input.stop") : t("session.input.send")}
       aria-label={running ? t("session.input.stop") : t("session.input.send")}
       disabled={!armed}

@@ -120,6 +120,8 @@ export interface PideskSettings {
   /** Tab 补全形态；cycle 逐个替换候选，list 一次列出全部（docs/design/60）。 */
   terminalTabCompletion: TerminalTabCompletion;
   theme: ThemeId;
+  /** 自定义主题色（#RRGGBB），覆盖 tokens.css 的 --color-accent 及其派生令牌；null = 跟随主题默认。 */
+  accentColor: string | null;
   /** 界面语言；system 跟随 OS，否则固定 zh-CN / en-US。 */
   locale: LocalePreference;
   /** 侧边栏默认折叠。 */
