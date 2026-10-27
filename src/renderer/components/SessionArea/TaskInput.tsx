@@ -1,6 +1,6 @@
 import { Folder } from "@phosphor-icons/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { FsSearchHit, PiSlashCommand } from "../../../shared/ipc";
+import type { FsSearchHit, PiSlashCommand, QueueIntent } from "../../../shared/ipc";
 import { FileIcon } from "../../fileIcons/FileIcon";
 import { useGlideOverlay } from "../../hooks/useGlideOverlay";
 import { useGlidePill } from "../../hooks/useGlidePill";
@@ -25,6 +25,7 @@ import {
   imageCapabilityHint,
   imageCapabilityToast,
 } from "../../utils/imageCapability";
+import { parseSteerCommand } from "../../utils/steerCommand";
 import { Button } from "../ui/Button";
 import glideStyles from "../ui/GlideList.module.css";
 import { Composer, type ComposerHandle } from "./Composer";
@@ -37,6 +38,14 @@ import { TaskInputToolbar } from "./TaskInputToolbar";
 import { ThinkingMaxAura } from "./ThinkingMaxAura";
 
 type SuggestKind = "file" | "slash" | null;
+
+/** PiDesk 输入栏本地命令（docs/design/73）：不进 pi 命令表，斜杠菜单单独成组。 */
+interface LocalSlashCommand {
+  name: string;
+  description: string;
+}
+
+type SlashGroupItem = PiSlashCommand | LocalSlashCommand;
 
 /**
  * 任务输入栏：empty 显示工作区/Git 顶栏；running/idle 为底部停靠精简版。
@@ -67,6 +76,8 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
     reorderFileAttachments,
     pendingQuote,
     consumePendingQuote,
+    pendingInsert,
+    consumePendingInsert,
   } = useComposerStore();
 
   const [staleConfirm, setStaleConfirm] = useState(false);
@@ -127,10 +138,11 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
       fileMentions.length > 0 ||
       imageAttachments.length > 0 ||
       fileAttachments.length > 0) &&
-    !running &&
     !hasBlockingView &&
     !switching &&
     !modeTransitioning;
+  /** 运行中发送等 pi 受理后再清空，失败时草稿原样保留。 */
+  const queueSendingRef = useRef(false);
   const cwd = currentProject?.dir ?? null;
 
   const placeholder = switching
@@ -211,17 +223,30 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
     );
   }, [suggest, slashCommands]);
 
-  /** 按 pi source 分组：命令（extension/prompt）与技能（skill）。 */
+  /** 本地命令（/steer）：查询为空或命中名称/说明时展示，不依赖 pi 命令表加载。 */
+  const localCommands = useMemo<LocalSlashCommand[]>(
+    () => [{ name: "steer", description: t("session.queue.steerDesc") }],
+    [t],
+  );
+
+  /** 本地命令在前（输入栏命令 /steer），随后按 pi source 分组：命令（extension/prompt）与技能（skill）。 */
   const slashGroups = useMemo(() => {
     if (suggest?.kind !== "slash") return [];
+    const q = suggest.query.trim().toLowerCase();
+    const matchQuery = (name: string, description?: string): boolean =>
+      !q || name.toLowerCase().includes(q) || (description ?? "").toLowerCase().includes(q);
+    const groups: Array<{ title: string; items: SlashGroupItem[] }> = [];
+    const local = localCommands.filter((c) => matchQuery(c.name, c.description));
+    if (local.length > 0) {
+      groups.push({ title: t("session.input.group.local"), items: local });
+    }
     const commands = slashFiltered.filter((c) => c.source !== "skill");
     const skills = slashFiltered.filter((c) => c.source === "skill");
-    const groups: Array<{ title: string; items: PiSlashCommand[] }> = [];
     if (commands.length > 0)
       groups.push({ title: t("session.input.group.commands"), items: commands });
     if (skills.length > 0) groups.push({ title: t("session.input.group.skills"), items: skills });
     return groups;
-  }, [suggest, slashFiltered, t]);
+  }, [suggest, slashFiltered, localCommands, t]);
 
   const suggestItems = useMemo((): Array<{
     id: string;
@@ -244,13 +269,15 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
         };
       });
     }
-    // 与 slashGroups 展示顺序一致（命令在前、技能在后），保证 ↑↓ 与视觉行序一一对应
+    // 与 slashGroups 展示顺序一致（本地命令、pi 命令、技能），保证 ↑↓ 与视觉行序一一对应
     return slashGroups
       .flatMap((g) => g.items)
       .map((c) => ({
         id: c.name,
         label: `/${c.name.replace(/^skill:/, "skill:")}`,
-        hint: c.description || (c.source === "skill" ? t("session.input.group.skills") : ""),
+        hint:
+          c.description ||
+          ("source" in c && c.source === "skill" ? t("session.input.group.skills") : ""),
         kind: undefined,
       }));
   }, [suggest, fileHits, slashGroups, t]);
@@ -269,6 +296,13 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
     composerRef.current?.appendQuote(pendingQuote.text);
     consumePendingQuote();
   }, [pendingQuote, consumePendingQuote]);
+
+  // 清空队列 / 停止取回的文本：纯文本追加到编辑器末尾（不是引用块）
+  useEffect(() => {
+    if (!pendingInsert) return;
+    composerRef.current?.appendText(pendingInsert.text);
+    consumePendingInsert();
+  }, [pendingInsert, consumePendingInsert]);
 
   /**
    * 建议列表的进出场（docs/design/51）。面板是父级条件渲染的，收起要演完动画再卸载，
@@ -359,13 +393,10 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
       buddyRef.current?.nudge("angry");
       return;
     }
-    // running 可编辑草稿但禁止发送（docs/design/12 P1-1）：Enter 误触时说明原因
-    if (running) {
-      showToast(t("session.input.sendAfterReply"));
-      buddyRef.current?.nudge("angry");
-      return;
-    }
-    const { text, itemIds, filePaths, fileMentions: orderedFiles } = composer.read();
+    const { text: rawText, itemIds, filePaths, fileMentions: orderedFiles } = composer.read();
+    // `/steer <内容>` 是 PiDesk 输入栏命令（docs/design/73）：命中时只把正文发给 pi
+    const parsed = parseSteerCommand(rawText);
+    const text = parsed.text;
     const ordered = itemIds
       .map((id) => chatElements.find((item) => item.id === id))
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
@@ -376,8 +407,15 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
       filePaths.length === 0 &&
       imageAttachments.length === 0 &&
       fileAttachments.length === 0
-    )
+    ) {
+      if (parsed.steer) showToast(t("session.queue.steerNeedsText"));
       return;
+    }
+    /**
+     * 默认 Enter = 稍后（followUp）；显式 /steer 才插话。空闲时 pi 忽略该字段，
+     * 值仍取 followUp：phase 滞后竞态下（本地以为空闲、pi 实际在流式）默认 Enter 不能打断当前轮。
+     */
+    const intent: QueueIntent = parsed.steer ? "steer" : "followUp";
     // 软门禁：不拦发送；同模型首次附图发送时 toast 一次风险说明
     if (imageAttachments.length > 0) {
       const toastMsg = imageCapabilityToast(imageCapability);
@@ -399,7 +437,7 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
       fileAttachments.map((file) => file.path),
     );
     const images = imageAttachments.map(toPiImageContent);
-    send(finalText, {
+    const contextPayload = {
       ...(ordered.length > 0 ? { items: ordered, consoleErrors: browser.errors } : {}),
       ...(images.length > 0
         ? {
@@ -411,15 +449,34 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
             })),
           }
         : {}),
-    });
-    composer.clear();
-    setStaleConfirm(false);
-    hideSuggestNow();
-    clearFileMentions();
-    clearImageAttachments();
-    clearFileAttachments();
-    browser.clearChatElements();
-    composer.focus();
+    };
+    const clearAfterSend = (): void => {
+      composer.clear();
+      setStaleConfirm(false);
+      hideSuggestNow();
+      clearFileMentions();
+      clearImageAttachments();
+      clearFileAttachments();
+      browser.clearChatElements();
+      composer.focus();
+    };
+
+    // 运行中发送：等 pi 受理（queued/started/handled）后再清空，失败时草稿与附件保留
+    if (running) {
+      if (queueSendingRef.current) return;
+      queueSendingRef.current = true;
+      try {
+        const accepted = await send(finalText, contextPayload, intent);
+        if (accepted === null) return;
+      } finally {
+        queueSendingRef.current = false;
+      }
+      clearAfterSend();
+      return;
+    }
+
+    void send(finalText, contextPayload, intent);
+    clearAfterSend();
   };
 
   const onImages = useCallback(
@@ -684,6 +741,9 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
                 : t("session.input.suggestKeysSlash")}
             </p>
           )}
+          {suggest.kind === "slash" && running && (
+            <p className={styles.suggestFooter}>{t("session.queue.slashHint")}</p>
+          )}
         </div>
       )}
 
@@ -755,6 +815,7 @@ export function TaskInput({ variant }: { variant: "empty" | "session" }) {
             onPlusAction={onPlusAction}
             onAttachImages={onAttachImages}
             onSend={() => void doSend()}
+            onQueueSend={() => void doSend()}
             onStop={stop}
           />
         </div>

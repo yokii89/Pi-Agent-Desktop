@@ -58,6 +58,13 @@ interface ComposerStoreValue {
   pendingQuote: { text: string; seq: number } | null;
   quoteComposer: (text: string) => void;
   consumePendingQuote: () => void;
+  /**
+   * 待追加到编辑器末尾的纯文本（清空队列回填、停止时取回排队消息）。
+   * SessionProvider 只持有状态，真正写入 contenteditable 由 TaskInput 消费。
+   */
+  pendingInsert: { text: string; seq: number } | null;
+  appendToComposer: (text: string) => void;
+  consumePendingInsert: () => void;
 }
 
 const ComposerStoreContext = createContext<ComposerStoreValue | null>(null);
@@ -90,6 +97,8 @@ export function ComposerProvider({ children }: { children: ReactNode }) {
   const fileAttachmentsRef = useRef<ComposerFileAttachment[]>([]);
   const [pendingQuote, setPendingQuote] = useState<{ text: string; seq: number } | null>(null);
   const quoteSeqRef = useRef(0);
+  const [pendingInsert, setPendingInsert] = useState<{ text: string; seq: number } | null>(null);
+  const insertSeqRef = useRef(0);
 
   const setThinkingLevel = useCallback((level: ThinkingLevelId) => {
     setThinkingLevelState(level);
@@ -183,6 +192,14 @@ export function ComposerProvider({ children }: { children: ReactNode }) {
 
   const consumePendingQuote = useCallback(() => setPendingQuote(null), []);
 
+  const appendToComposer = useCallback((text: string) => {
+    if (!text.trim()) return;
+    insertSeqRef.current += 1;
+    setPendingInsert({ text, seq: insertSeqRef.current });
+  }, []);
+
+  const consumePendingInsert = useCallback(() => setPendingInsert(null), []);
+
   const value = useMemo<ComposerStoreValue>(
     () => ({
       thinkingLevel,
@@ -204,6 +221,9 @@ export function ComposerProvider({ children }: { children: ReactNode }) {
       pendingQuote,
       quoteComposer,
       consumePendingQuote,
+      pendingInsert,
+      appendToComposer,
+      consumePendingInsert,
     }),
     [
       thinkingLevel,
@@ -225,6 +245,9 @@ export function ComposerProvider({ children }: { children: ReactNode }) {
       pendingQuote,
       quoteComposer,
       consumePendingQuote,
+      pendingInsert,
+      appendToComposer,
+      consumePendingInsert,
     ],
   );
 

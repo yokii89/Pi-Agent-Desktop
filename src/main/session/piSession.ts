@@ -7,6 +7,9 @@ import { StringDecoder } from "node:string_decoder";
 import type {
   PiAgentEvent,
   PiImageContent,
+  PiQueuedMessages,
+  PromptDisposition,
+  QueueIntent,
   SessionId,
   SessionPushMessage,
   SessionStartRequest,
@@ -38,11 +41,13 @@ import {
   SessionRegistry,
 } from "./sessionRegistry";
 
-/** 转发给渲染层的 pi 事件白名单：其余事件（queue_update 等）渲染层暂不需要。 */
+/** 转发给渲染层的 pi 事件白名单：其余事件渲染层暂不需要。 */
 const FORWARD_EVENT_TYPES = new Set<string>([
   "agent_start",
   "agent_end",
   "agent_settled",
+  /** 插话 / 稍后队列全量快照（排队气泡与交付对账的数据源）。 */
+  "queue_update",
   "message_start",
   "message_update",
   "message_end",
@@ -551,22 +556,59 @@ function request(
   });
 }
 
+export interface PromptSessionOptions {
+  images?: PiImageContent[];
+  /** 运行中排队意图；空闲时 pi 忽略该字段（同时兜住本地运行态滞后的竞态）。 */
+  streamingBehavior?: QueueIntent;
+  /**
+   * 超时未收到 pi 接受响应则 reject（调度器等无人值守路径用它，
+   * 防止挂起的 pi 永久占住派发状态）；用户输入路径不传，保持无限等待。
+   */
+  timeoutMs?: number;
+}
+
+function parseDisposition(data: unknown): PromptDisposition {
+  const value =
+    data && typeof data === "object" ? (data as { disposition?: unknown }).disposition : undefined;
+  // 老 pi 的 prompt 响应没有 disposition：能成功只可能是非流式受理
+  return value === "queued" || value === "handled" ? value : "started";
+}
+
 /**
  * 提交用户输入（RPC prompt；"/" 技能与模板由 pi 自动展开）。
  * `images` 对齐 rpc.md 的 `ImageContent[]`，随 prompt 一并进入 user content。
- * `timeoutMs` 可选：超时未收到 pi 接受响应则 reject（调度器等无人值守路径用它，
- * 防止挂起的 pi 永久占住派发状态）；用户输入路径不传，保持无限等待。
+ * 返回 pi 的受理结果（started / queued / handled），渲染层据此对账乐观消息。
  */
 export function promptSession(
   sessionId: SessionId,
   text: string,
-  images?: PiImageContent[],
-  timeoutMs?: number,
-): Promise<void> {
+  options?: PromptSessionOptions,
+): Promise<PromptDisposition> {
   markRuntimeUsedByUser(sessionId);
-  const fields: { message: string; images?: PiImageContent[] } = { message: text };
-  if (images && images.length > 0) fields.images = images;
-  return request(sessionId, "prompt", fields, timeoutMs).then(() => undefined);
+  const fields: {
+    message: string;
+    images?: PiImageContent[];
+    streamingBehavior?: QueueIntent;
+  } = { message: text };
+  if (options?.images && options.images.length > 0) fields.images = options.images;
+  if (options?.streamingBehavior) fields.streamingBehavior = options.streamingBehavior;
+  return request(sessionId, "prompt", fields, options?.timeoutMs).then(parseDisposition);
+}
+
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+/** 清空 pi 的插话 / 稍后队列并取回文本（RPC clear_queue；仅含文本，不含图片）。 */
+export async function clearSessionQueue(sessionId: SessionId): Promise<PiQueuedMessages> {
+  const data = await request(sessionId, "clear_queue", {}, 5000);
+  const record = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  return {
+    steering: toStringArray(record.steering),
+    followUp: toStringArray(record.followUp),
+  };
 }
 
 /** 中断当前执行（RPC abort；pi 会在空闲后应答）。 */

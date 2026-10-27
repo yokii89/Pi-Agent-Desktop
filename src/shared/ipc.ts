@@ -280,8 +280,10 @@ export type SessionId = string;
 export const SESSION_IPC = {
   /** 启动 pi RPC 子进程（`--mode rpc`）；同 sessionFile 存活实例复用，否则新建实例。 */
   start: "pidesk:session:start",
-  /** 提交用户输入（RPC `prompt`）。 */
+  /** 提交用户输入（RPC `prompt`；可携带运行中排队意图）。 */
   prompt: "pidesk:session:prompt",
+  /** 清空 pi 的插话 / 稍后队列并取回文本（RPC `clear_queue`）。 */
+  clearQueue: "pidesk:session:clearQueue",
   /** 中断当前执行（RPC `abort`）。 */
   stop: "pidesk:session:stop",
   /** 结束指定会话的 pi 进程（历史 JSONL 保留）。 */
@@ -781,10 +783,27 @@ export interface PiImageContent {
   mimeType: string;
 }
 
+/** 运行中发送的排队意图：steer=插话（下一次模型调用前），followUp=稍后（本轮全部结束后）。 */
+export type QueueIntent = "steer" | "followUp";
+
+/** prompt 受理结果：started=开新一轮；queued=已排队；handled=扩展命令/输入处理器消费。 */
+export type PromptDisposition = "started" | "queued" | "handled";
+
+/** pi 队列全量快照（`queue_update` / `clear_queue` 的数据体；只含文本）。 */
+export interface PiQueuedMessages {
+  steering: string[];
+  followUp: string[];
+}
+
 export interface SessionPromptRequest extends SessionProcessRequest {
   text: string;
   /** 可选图片附件（RPC `prompt.images`）；缺省或空表示纯文本。 */
   images?: PiImageContent[];
+  /**
+   * 运行中发送一律带意图（空闲时 pi 忽略该字段）；同时兜住
+   * 「渲染层以为空闲、pi 其实已在流式」的竞态——缺省时 pi 会直接报错。
+   */
+  streamingBehavior?: QueueIntent;
 }
 
 export interface SessionSetThinkingLevelRequest extends SessionProcessRequest {
@@ -881,6 +900,8 @@ export type PiAgentEvent =
   /** willRetry=true 表示还有自动重试/压缩续跑，run 不应视为终态。 */
   | { type: "agent_end"; willRetry?: boolean }
   | { type: "agent_settled" }
+  /** 插话 / 稍后队列变化；两个字段都是当前队列的**全量**快照。 */
+  | { type: "queue_update"; steering: string[]; followUp: string[] }
   | { type: "message_start"; message: PiChatMessage }
   | {
       type: "message_update";

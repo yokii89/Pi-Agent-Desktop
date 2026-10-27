@@ -6,9 +6,11 @@ import type {
   PiInfo,
   PiModelOption,
   PiModelState,
+  PiQueuedMessages,
   PiSessionStats,
   PiShellProbe,
   PiSlashCommand,
+  PromptDisposition,
   SessionExportRequest,
   SessionGetModelsRequest,
   SessionId,
@@ -40,6 +42,7 @@ import { getPiInfo } from "./piInfo";
 import { fetchAvailableModelsOnce } from "./piModelList";
 import {
   applyDefaultModelToSession,
+  clearSessionQueue,
   disposeSession,
   fetchAvailableModels,
   fetchSessionMessages,
@@ -80,6 +83,8 @@ const THINKING_LEVELS = new Set<string>([
 
 /** 输入栏展示的三档（对齐设计图）；pi 其余档位原样透出但 UI 默认只给这三档。 */
 const DISPLAY_THINKING: ThinkingLevelId[] = ["low", "high", "max"];
+
+const QUEUE_INTENTS = new Set<string>(["steer", "followUp"]);
 
 function requireSessionId(raw: unknown): SessionId {
   if (typeof raw === "string" && raw.length > 0) return raw;
@@ -261,11 +266,17 @@ export function registerSessionIpc(): void {
 
   ipcMain.handle(
     SESSION_IPC.prompt,
-    (_event, req: SessionPromptRequest): Promise<IpcResult<null>> =>
+    (_event, req: SessionPromptRequest): Promise<IpcResult<PromptDisposition>> =>
       envelopeAsync(async () => {
         const sessionId = requireSessionId(req?.sessionId);
         assertNoModeTransition(sessionId);
         const text = typeof req?.text === "string" ? req.text : "";
+        const rawBehavior = req?.streamingBehavior;
+        if (rawBehavior !== undefined && !QUEUE_INTENTS.has(String(rawBehavior))) {
+          throw new Error("无效的排队意图");
+        }
+        const streamingBehavior =
+          rawBehavior === "steer" || rawBehavior === "followUp" ? rawBehavior : undefined;
         // 与渲染层 MAX_ATTACH_IMAGES 对齐的纵深防御：坏客户端也灌不进无限图
         const MAX_PROMPT_IMAGES = 8;
         const images = Array.isArray(req?.images)
@@ -287,9 +298,23 @@ export function registerSessionIpc(): void {
         // 直通路径（实例已 ready，未经 ensureSessionReady）单独记命中与延迟（docs/design/44 A4）
         const startedAtMs = Date.now();
         const warm = isRuntimeReady(sessionId);
-        await promptSession(sessionId, text, images.length > 0 ? images : undefined);
+        const disposition = await promptSession(sessionId, text, {
+          ...(images.length > 0 ? { images } : {}),
+          ...(streamingBehavior ? { streamingBehavior } : {}),
+        });
         if (warm) noteWarmPrompt(startedAtMs);
-        return null;
+        return disposition;
+      }),
+  );
+
+  ipcMain.handle(
+    SESSION_IPC.clearQueue,
+    (_event, req: { sessionId?: unknown }): Promise<IpcResult<PiQueuedMessages>> =>
+      envelopeAsync(async () => {
+        const sessionId = requireSessionId(req?.sessionId);
+        assertNoModeTransition(sessionId);
+        if (!hasSession(sessionId)) throw new Error("pi 会话未启动");
+        return clearSessionQueue(sessionId);
       }),
   );
 

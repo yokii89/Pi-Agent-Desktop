@@ -46,8 +46,8 @@ export const sessionMessages = defineMessages({
     "en-US": "Describe a task, type / for skills",
   },
   "session.input.placeholder.runningDraft": {
-    "zh-CN": "pi 正在回复，可继续输入，回复结束后发送",
-    "en-US": "pi is replying — keep typing and send when it finishes",
+    "zh-CN": "回车稍后 · /steer 插话",
+    "en-US": "Enter queues after this run · /steer to interject",
   },
   "session.input.placeholder.switchingMode": {
     "zh-CN": "正在切换访问模式",
@@ -66,6 +66,71 @@ export const sessionMessages = defineMessages({
     "en-US": "Use / to pick a skill",
   },
   "session.input.running": { "zh-CN": "pi 运行中", "en-US": "pi is running" },
+
+  "session.queue.clearFailed": {
+    "zh-CN": "清空队列失败",
+    "en-US": "Couldn't clear the queue",
+  },
+  "session.queue.stopClearFailed": {
+    "zh-CN": "已停止；排队消息可能继续执行",
+    "en-US": "Stopped; queued messages may still run",
+  },
+  "session.queue.steerBadge": {
+    "zh-CN": "排队中 · 插话",
+    "en-US": "Queued · steering",
+  },
+  "session.queue.followUpBadge": {
+    "zh-CN": "排队中 · 稍后",
+    "en-US": "Queued · follow-up",
+  },
+  /* 气泡内徽标只写种类（与正文同行），完整状态挂在 aria-label 上 */
+  "session.queue.steerLabel": { "zh-CN": "插话", "en-US": "Steering" },
+  "session.queue.followUpLabel": { "zh-CN": "稍后", "en-US": "Follow-up" },
+  "session.queue.undo": { "zh-CN": "撤销", "en-US": "Withdraw" },
+  "session.queue.undoHint": {
+    "zh-CN": "撤销这条排队消息：文字回到输入框，其余保持原顺序",
+    "en-US": "Withdraw this queued message; its text goes back to the input, the rest keep order",
+  },
+  "session.queue.edit": { "zh-CN": "编辑", "en-US": "Edit" },
+  "session.queue.editHint": {
+    "zh-CN": "原地修改这条排队消息（顺序不变）",
+    "en-US": "Edit this queued message in place (order stays)",
+  },
+  "session.queue.save": { "zh-CN": "保存", "en-US": "Save" },
+  "session.queue.cancel": { "zh-CN": "取消", "en-US": "Cancel" },
+  "session.queue.withdrawn": {
+    "zh-CN": "已撤销 1 条排队消息，文字回到输入框",
+    "en-US": "Withdrew 1 queued message; its text is back in the input",
+  },
+  "session.queue.editSaved": {
+    "zh-CN": "已更新这条排队消息",
+    "en-US": "Queued message updated",
+  },
+  "session.queue.editFailed": {
+    "zh-CN": "排队消息未能全部排回，剩余文字已回到输入框",
+    "en-US": "Couldn't requeue every message; the leftovers are back in the input",
+  },
+  "session.queue.stale": {
+    "zh-CN": "队列已变化，未改动；文字已回到输入框",
+    "en-US": "The queue changed, nothing was changed; the text is back in the input",
+  },
+  "session.queue.send": { "zh-CN": "排队发送", "en-US": "Queue message" },
+  "session.queue.sendHint": {
+    "zh-CN": "排队发送：本轮结束后处理；/steer 插话",
+    "en-US": "Queue after this run; use /steer to interject",
+  },
+  "session.queue.steerNeedsText": {
+    "zh-CN": "在 /steer 后输入要插话的内容",
+    "en-US": "Type the interjection after /steer",
+  },
+  "session.queue.slashHint": {
+    "zh-CN": "运行中：/steer 内容 = 插话；Enter = 本轮结束后处理",
+    "en-US": "While running: /steer <text> interjects; Enter queues after this run",
+  },
+  "session.queue.steerDesc": {
+    "zh-CN": "运行中插话：在下一次模型调用前注入",
+    "en-US": "While running: interject before the next model call",
+  },
   "session.input.filesTitle": {
     "zh-CN": "文件与文件夹",
     "en-US": "Files and folders",
@@ -270,10 +335,6 @@ export const sessionMessages = defineMessages({
     "zh-CN": "和它打个招呼",
     "en-US": "Say hello to your companion",
   },
-  "session.input.sendAfterReply": {
-    "zh-CN": "回复结束后可发送",
-    "en-US": "You can send after the reply finishes",
-  },
   "session.input.maxImages": {
     "zh-CN": "最多附 {count} 张图片",
     "en-US": "Attach at most {count} images",
@@ -284,6 +345,7 @@ export const sessionMessages = defineMessages({
   },
   "session.input.group.commands": { "zh-CN": "命令", "en-US": "Commands" },
   "session.input.group.skills": { "zh-CN": "技能", "en-US": "Skills" },
+  "session.input.group.local": { "zh-CN": "输入栏命令", "en-US": "Input bar commands" },
   "session.input.selectWorkspaceFirst": {
     "zh-CN": "请先选择工作区",
     "en-US": "Choose a workspace first",

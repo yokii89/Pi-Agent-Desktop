@@ -59,6 +59,8 @@ export interface ComposerHandle {
   insertSlashCommand: (name: string) => boolean;
   /** 把会话流选中文本作为引用块追加到草稿末尾（docs/design/12）：聚焦并把光标移到末尾。 */
   appendQuote: (text: string) => void;
+  /** 追加纯文本（清空队列 / 停止取回的排队消息）：空草稿直接写入，否则空行分段。 */
+  appendText: (text: string) => void;
 }
 
 interface ComposerProps {
@@ -449,6 +451,29 @@ export function Composer({
         onContentChange?.(true);
         onTextChange?.(root.textContent ?? "");
         // 引用落点即反馈：聚焦输入栏，光标移到末尾承接追问
+        root.focus();
+        const selection = window.getSelection();
+        if (!selection) return;
+        const range = document.createRange();
+        range.selectNodeContents(root);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      },
+      appendText: (text) => {
+        const root = rootRef.current;
+        const body = text.trim();
+        if (!root || !body) return;
+        const { text: draft } = readComposerDom(root);
+        const block = draft.trim().length > 0 ? `\n\n${body}` : body;
+        // 与 appendQuote 同一约定：逻辑换行拆成 BR + 文本节点
+        block.split("\n").forEach((part, index) => {
+          if (index > 0) root.appendChild(document.createElement("br"));
+          if (part) root.appendChild(document.createTextNode(part));
+        });
+        setIsEmpty(false);
+        onContentChange?.(true);
+        onTextChange?.(root.textContent ?? "");
         root.focus();
         const selection = window.getSelection();
         if (!selection) return;

@@ -4,6 +4,7 @@ import {
   ClipboardText,
   ListMagnifyingGlass,
   Paperclip,
+  PaperPlaneRight,
   Plus,
   Shield,
   ShieldCheck,
@@ -36,6 +37,8 @@ interface ToolbarProps {
   /** 系统选中的附件文件（docs/design/21 + 25）；上层按图片/文件分流。 */
   onAttachImages: (files: File[]) => void;
   onSend: () => void;
+  /** 运行中排队发送：等价 Enter（默认稍后；输入 /steer 时插话）（docs/design/73）。 */
+  onQueueSend: () => void;
   onStop: () => void;
 }
 
@@ -46,6 +49,7 @@ export function TaskInputToolbar({
   onPlusAction,
   onAttachImages,
   onSend,
+  onQueueSend,
   onStop,
 }: ToolbarProps) {
   const t = useT();
@@ -124,6 +128,17 @@ export function TaskInputToolbar({
       <ModelMenu label={modelLabel} />
       <ThinkingChip level={thinkingLevel} onChange={setThinkingLevel} alive={processAlive} />
 
+      {running && canSend && (
+        <button
+          type="button"
+          className={styles.queueSendBtn}
+          title={t("session.queue.sendHint")}
+          aria-label={t("session.queue.send")}
+          onClick={onQueueSend}
+        >
+          <PaperPlaneRight size={18} weight="regular" />
+        </button>
+      )}
       <SendButton running={running} canSend={canSend} onSend={onSend} onStop={onStop} />
     </div>
   );

@@ -99,12 +99,14 @@ import type {
   PiPackageSetEnabledRequest,
   PiPackageSetResourceEnabledRequest,
   PiPackagesSnapshot,
+  PiQueuedMessages,
   PiSessionStats,
   PiShellProbe,
   PiSlashCommand,
   ProcPushMessage,
   ProcStopAllResult,
   ProcStopResult,
+  PromptDisposition,
   SessionExportRequest,
   SessionGetModelsRequest,
   SessionId,
@@ -230,7 +232,9 @@ export interface PideskGlobalApi {
   };
   session: {
     start(req: SessionStartRequest): Promise<IpcResult<SessionId>>;
-    prompt(req: SessionPromptRequest): Promise<IpcResult<null>>;
+    prompt(req: SessionPromptRequest): Promise<IpcResult<PromptDisposition>>;
+    /** 清空插话 / 稍后队列并取回文本（RPC clear_queue）。 */
+    clearQueue(sessionId: SessionId): Promise<IpcResult<PiQueuedMessages>>;
     stop(sessionId: SessionId): Promise<IpcResult<null>>;
     dispose(sessionId: SessionId): Promise<IpcResult<null>>;
     list(cwd: string): Promise<IpcResult<SessionSummary[]>>;

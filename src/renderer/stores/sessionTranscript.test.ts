@@ -629,3 +629,30 @@ describe("tool row duration (pi durationMs + wall-clock fallback)", () => {
     expect(toolOf(entries).durationMs).toBeNull();
   });
 });
+
+describe("discardOptimisticUser reconciles optimistic sends (docs/design/73)", () => {
+  it("removes only the optimistic entry, keeping a delivered user entry after it", () => {
+    let entries: SessionEntry[] = [];
+    entries = sessionEntriesReducer(entries, { type: "userMessage", text: "first" });
+    entries = sessionEntriesReducer(entries, { type: "event", event: { type: "agent_start" } });
+    entries = sessionEntriesReducer(entries, {
+      type: "userMessage",
+      text: "optimistic",
+      optimistic: true,
+    });
+    // 同一窗口内交付的排队消息（非乐观）排在后面
+    entries = sessionEntriesReducer(entries, { type: "userMessage", text: "delivered" });
+    entries = sessionEntriesReducer(entries, { type: "discardOptimisticUser" });
+    expect(entries.flatMap((entry) => (entry.kind === "user" ? [entry.text] : []))).toEqual([
+      "first",
+      "delivered",
+    ]);
+    expect(entries.some((entry) => entry.kind === "run")).toBe(true);
+  });
+
+  it("is a no-op when no optimistic user entry exists", () => {
+    let entries = sessionEntriesReducer([], { type: "userMessage", text: "loaded" });
+    entries = sessionEntriesReducer(entries, { type: "discardOptimisticUser" });
+    expect(entries).toHaveLength(1);
+  });
+});

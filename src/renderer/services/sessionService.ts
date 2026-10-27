@@ -3,8 +3,11 @@ import type {
   PiImageContent,
   PiModelOption,
   PiModelState,
+  PiQueuedMessages,
   PiSessionStats,
   PiSlashCommand,
+  PromptDisposition,
+  QueueIntent,
   SessionId,
   SessionPushMessage,
   SessionRenameRequest,
@@ -71,19 +74,35 @@ export const sessionService = {
   /**
    * 提交用户输入；必须显式传 sessionId，避免与 setActive 竞态串会话。
    * `images` 为 pi ImageContent（base64 无 data: 前缀），随 prompt 进入模型上下文。
+   * `streamingBehavior` 为运行中排队意图；返回 pi 的受理结果供发送方对账。
    */
-  async prompt(text: string, sessionId?: SessionId, images?: PiImageContent[]): Promise<void> {
+  async prompt(
+    text: string,
+    sessionId?: SessionId,
+    images?: PiImageContent[],
+    streamingBehavior?: QueueIntent,
+  ): Promise<PromptDisposition> {
     const api = pideskApi();
-    if (!api) return;
+    if (!api) return "started";
     const id = sessionId ?? requireCurrentId();
     if (isModeTransitioning(id)) throw new Error("正在切换访问模式");
-    await unwrap(
+    return unwrap(
       api.session.prompt({
         sessionId: id,
         text,
         ...(images && images.length > 0 ? { images } : {}),
+        ...(streamingBehavior ? { streamingBehavior } : {}),
       }),
     );
+  },
+
+  /** 清空 pi 的插话 / 稍后队列并取回文本。 */
+  async clearQueue(sessionId?: SessionId): Promise<PiQueuedMessages> {
+    const api = pideskApi();
+    if (!api) return { steering: [], followUp: [] };
+    const id = sessionId ?? requireCurrentId();
+    if (isModeTransitioning(id)) throw new Error("正在切换访问模式");
+    return unwrap(api.session.clearQueue(id));
   },
 
   /** 中断指定会话（RPC abort）；缺省当前实例。 */

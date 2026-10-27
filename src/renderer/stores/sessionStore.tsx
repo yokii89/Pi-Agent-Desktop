@@ -16,7 +16,10 @@ import type {
   PiContextUsage,
   PiImageContent,
   PiModelInputModality,
+  PiQueuedMessages,
   PiSlashCommand,
+  PromptDisposition,
+  QueueIntent,
   SessionId,
   SessionSummary,
 } from "../../shared/ipc";
@@ -29,7 +32,7 @@ import { readSlashCommandCache, writeSlashCommandCache } from "../services/slash
 import { prefetchService } from "../services/workerService";
 import { piImageFromDisplay, type UserMessageImage } from "../utils/imageAttach";
 import { buildPageContext } from "../utils/pageContext";
-import { getComposerThinkingLevel } from "./composerStore";
+import { getComposerThinkingLevel, useComposerStore } from "./composerStore";
 import { isModeTransitioning } from "./modeTransitionBarrier";
 import { useProjectStore } from "./projectStore";
 import {
@@ -38,8 +41,10 @@ import {
   clearStartPending,
   clearUnread,
   createBucketsState,
+  deliveredQueueTexts,
   deriveRunningFiles,
   dropFileIndex,
+  editQueueItem,
   emptyBucket,
   ensureBucket,
   findCommandBorrowSessionId,
@@ -52,6 +57,7 @@ import {
   patchBucket,
   type SessionBucketsState,
   type SessionPhase,
+  sameQueue,
   setActiveKey,
 } from "./sessionBuckets";
 import { notifySessionRuntimeContext } from "./sessionContextBridge";
@@ -140,6 +146,10 @@ interface SessionMetaValue {
   isFileProcessAlive: (file: string) => boolean;
   /** 该 file 是否正在 running（确认文案用）。 */
   isFileRunning: (file: string) => boolean;
+  /**
+   * 提交用户输入。返回 pi 的受理结果；失败/被门禁拦下返回 null。
+   * 运行中默认作为「稍后」排队；`/steer <内容>` 由输入栏解析为「插话」。
+   */
   send: (
     text: string,
     context?: {
@@ -150,8 +160,9 @@ interface SessionMetaValue {
       /** 气泡/历史展示图。 */
       displayImages?: UserMessageImage[];
     },
-  ) => Promise<void>;
-  /** 停止：仅 abort active 实例。 */
+    intent?: QueueIntent,
+  ) => Promise<PromptDisposition | null>;
+  /** 停止：队列非空时先取回文本（回填输入框），再 abort active 实例。 */
   stop: () => void;
   canRetryLastUser: boolean;
   retryLastUserMessage: () => Promise<void>;
@@ -174,8 +185,37 @@ interface SessionTranscriptValue {
   entries: SessionEntry[];
 }
 
+/**
+ * 会话队列：只在快照真正变化时换引用。
+ * 队列动作是用户触发的突发（撤销 / 编辑会连清带排产生一串 queue_update），
+ * 放进低频 meta 会让每个 meta 消费方跟着重渲染，单开一条 context 只唤 QueueTail。
+ */
+interface SessionQueueValue {
+  /** active 桶的 pi 队列快照（插话 / 稍后）。 */
+  queue: PiQueuedMessages;
+  /**
+   * 单条撤销：全清后取回该条文本到输入框，其余按原序重新排队。
+   * `source` 是发起时该条原文，用于队列已变化时放弃；失败/放弃自行 toast。
+   */
+  withdrawQueuedItem: (kind: QueueIntent, index: number, source: string) => Promise<boolean>;
+  /**
+   * 单条编辑：全清后原位置替换该条文本（队列顺序不变），其余按原序重新排队。
+   * `source` 是发起时该条原文，`text` 是新文本；失败/放弃自行 toast。
+   */
+  editQueuedItem: (
+    kind: QueueIntent,
+    index: number,
+    source: string,
+    text: string,
+  ) => Promise<boolean>;
+}
+
+/** 无队列时的稳定空快照（避免队列 context 每次渲染换引用）。 */
+const EMPTY_QUEUE: PiQueuedMessages = { steering: [], followUp: [] };
+
 const SessionMetaContext = createContext<SessionMetaValue | null>(null);
 const SessionTranscriptContext = createContext<SessionTranscriptValue | null>(null);
+const SessionQueueContext = createContext<SessionQueueValue | null>(null);
 
 type BucketsAction =
   | { type: "replace"; state: SessionBucketsState }
@@ -311,6 +351,8 @@ export function pickClaimedFile(
 export function SessionProvider({ children }: { children: ReactNode }) {
   const { currentProject } = useProjectStore();
   const { page, navigate, showToast } = useUiStore();
+  /** 停止 / 清空队列后把取回的文本交回输入栏（TaskInput 消费并写入编辑器）。 */
+  const { appendToComposer } = useComposerStore();
   const [bucketsState, dispatchBuckets] = useReducer(bucketsReducer, undefined, createBucketsState);
   const [allSessions, setAllSessions] = useState<SessionSummary[]>([]);
   const [pinnedFiles, setPinnedFiles] = useState<string[]>([]);
@@ -335,6 +377,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   activeKeyRef.current = bucketsState.activeKey;
   /** 待用新会话 id（docs/design/44 A2）：点击"新建会话"即对它预热，发送时消费。 */
   const pendingNewChatRef = useRef<{ cwd: string | null; id: SessionId } | null>(null);
+  /** 在途的单条撤销/编辑：stop 等它落定再 abort，避免重排的消息在停止后开新一轮。 */
+  const queueEditInFlightRef = useRef<Promise<boolean> | null>(null);
 
   const activeBucket = getActiveBucket(bucketsState);
   const phase = activeBucket?.phase ?? "empty";
@@ -829,6 +873,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // 队列变化：queue_update 是全量快照；收缩 = 交付（主动 clear_queue 时除外）
+      if (message.type === "event" && message.payload.type === "queue_update") {
+        const { steering, followUp } = message.payload;
+        setState((prev) => {
+          const bucket = prev.buckets.get(sessionId);
+          if (!bucket) return prev;
+          const nextQueue = { steering, followUp };
+          // 同一快照重复推送：不动 state，也就不触发一次全量渲染
+          if (sameQueue(bucket.queue, nextQueue)) return prev;
+          let next = prev;
+          if (!bucket.queueClearing) {
+            // 交付的排队消息落成普通用户气泡；文本取服务端（与写进 JSONL 的展开文本一致）
+            for (const text of deliveredQueueTexts(bucket.queue, nextQueue)) {
+              next = applyEntries(next, sessionId, { type: "userMessage", text });
+            }
+          }
+          return patchBucket(next, sessionId, { queue: nextQueue });
+        });
+        return;
+      }
+
       if (message.type === "event") {
         applySideEffects(sessionId, message.payload.type);
         setState((prev) =>
@@ -855,6 +920,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             processAlive: false,
             phase: phaseOut,
             switching: false,
+            // 进程退出后队列不会再交付
+            queue: { steering: [], followUp: [] },
+            queueClearing: false,
           });
           // 进程退出时收口仍 open 的 run，否则 run 头计时会永远走下去
           next = applyEntries(next, sessionId, { type: "userStop" });
@@ -1282,15 +1350,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         images?: PiImageContent[];
         displayImages?: UserMessageImage[];
       },
-    ): Promise<void> => {
+      intent: QueueIntent = "followUp",
+    ): Promise<PromptDisposition | null> => {
       const trimmed = text.trim();
       const items = context?.items ?? [];
       const images = context?.images ?? [];
       const displayImages = context?.displayImages ?? [];
-      if (!trimmed && items.length === 0 && images.length === 0) return;
+      if (!trimmed && items.length === 0 && images.length === 0) return null;
 
       let targetId = activeKeyRef.current;
-      if (isModeTransitioning(targetId)) return;
+      if (isModeTransitioning(targetId)) return null;
       if (!targetId) {
         // docs/design/44 A2：优先消费"新建会话"预热的待用 id（命中则主进程直接复用实例）
         targetId =
@@ -1303,10 +1372,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         );
       }
       const bucket = bucketsStateRef.current.buckets.get(targetId) ?? null;
+      /**
+       * 运行中发送：不插乐观用户气泡（排队气泡由 queue_update 产生），
+       * 由 streamingBehavior 交 pi 自己判断「开新一轮」还是「排队」，避免 agent_end 竞态。
+       */
+      const queueing = bucket?.processAlive === true && bucket.phase === "running";
       // 同步乐观行（发送瞬间上侧栏，不等 setState 提交）：无 file 桶的 start 恒返回
       // bucketId（无 file 不可能 reuse），先于 start 插入才不会被主进程 start 内的
       // 模型对齐 RPC 拖延；已有真实 JSONL 的会话磁盘行已覆盖，不插 pending。
-      if (!bucket?.sessionFile) {
+      // 排队不参与：侧栏标题已由首条消息决定。
+      if (!queueing && !bucket?.sessionFile) {
         // 仅图无文时侧栏标题不能空白（docs/design/21）
         const pendingTitle =
           trimmed ||
@@ -1334,7 +1409,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
         if (!started) {
           dropPendingSummary(targetId);
-          return;
+          return null;
         }
         targetId = started;
         // 冷启动成功后补应用输入栏思考档位（§3.5）：spawn 参数不带 thinking，
@@ -1351,36 +1426,83 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         items.length > 0
           ? buildPageContext({ text: trimmed, items, consoleErrors: context?.consoleErrors ?? [] })
           : trimmed;
-      setState((prev) => {
-        let next = applyEntries(prev, targetId as SessionId, {
-          type: "userMessage",
-          text: trimmed,
-          items,
-          images: displayImages.length > 0 ? displayImages : undefined,
+      if (!queueing) {
+        setState((prev) => {
+          let next = applyEntries(prev, targetId as SessionId, {
+            type: "userMessage",
+            text: trimmed,
+            items,
+            images: displayImages.length > 0 ? displayImages : undefined,
+            optimistic: true,
+          });
+          next = patchBucket(next, targetId as SessionId, { phase: "running" });
+          // 未落盘：只登记 fileIndex 供 running/点击，sessionFile 仍留给真实 JSONL
+          const b = next.buckets.get(targetId as SessionId);
+          if (b && !b.sessionFile) {
+            next = indexFileOnly(
+              next,
+              targetId as SessionId,
+              pendingFileKey(targetId as SessionId),
+            );
+          }
+          return next;
         });
-        next = patchBucket(next, targetId as SessionId, { phase: "running" });
-        // 未落盘：只登记 fileIndex 供 running/点击，sessionFile 仍留给真实 JSONL
-        const b = next.buckets.get(targetId as SessionId);
-        if (b && !b.sessionFile) {
-          next = indexFileOnly(next, targetId as SessionId, pendingFileKey(targetId as SessionId));
-        }
-        return next;
-      });
+      }
       scheduleClaim(targetId);
+      const sid = targetId as SessionId;
       try {
         sessionService.bindActiveSession(targetId);
-        await sessionService.prompt(promptText, targetId, images.length > 0 ? images : undefined);
+        const disposition = await sessionService.prompt(
+          promptText,
+          targetId,
+          images.length > 0 ? images : undefined,
+          intent,
+        );
+        setState((prev) => {
+          if (!prev.buckets.has(sid)) return prev;
+          if (disposition === "queued" && !queueing) {
+            // 本地以为空闲、pi 实际在流式：撤掉乐观气泡，排队项由 queue_update 接管
+            return applyEntries(prev, sid, { type: "discardOptimisticUser" });
+          }
+          if (disposition === "started" && queueing) {
+            // 本地以为在跑、pi 实际已结束：补插用户气泡（response 先于 agent_start）
+            let next = applyEntries(prev, sid, {
+              type: "userMessage",
+              text: trimmed,
+              items,
+              images: displayImages.length > 0 ? displayImages : undefined,
+            });
+            next = patchBucket(next, sid, { phase: "running" });
+            const still = next.buckets.get(sid);
+            if (still && !still.sessionFile) {
+              next = indexFileOnly(next, sid, pendingFileKey(sid));
+            }
+            return next;
+          }
+          if (disposition === "handled" && !queueing) {
+            // 扩展命令 / 输入处理器消费了输入，不产生用户消息
+            return applyEntries(prev, sid, { type: "discardOptimisticUser" });
+          }
+          return prev;
+        });
+        return disposition;
       } catch (err) {
         const message = err instanceof Error ? err.message : "发送失败";
         showToast(message);
-        setState((prev) =>
-          applyEntries(prev, targetId as SessionId, {
-            type: "processError",
-            message,
-            title: "发送失败",
-          }),
-        );
-        setState((prev) => patchBucket(prev, targetId as SessionId, { phase: "idle" }));
+        // 运行中失败：不动编辑器（TaskInput 据此保留草稿），也不把仍在跑的 run 置 idle
+        if (!queueing) {
+          setState((prev) => {
+            if (!prev.buckets.has(sid)) return prev;
+            let next = applyEntries(prev, sid, {
+              type: "processError",
+              message,
+              title: "发送失败",
+            });
+            next = patchBucket(next, sid, { phase: "idle" });
+            return next;
+          });
+        }
+        return null;
       }
     },
     [
@@ -1405,12 +1527,186 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [setState],
   );
 
+  /**
+   * 清空 pi 队列并取回文本（RPC clear_queue）。
+   * 队列为空或失败返回 null；失败会自行 toast，调用方不必重复提示。
+   */
+  const clearQueue = useCallback(
+    async (targetId?: SessionId): Promise<PiQueuedMessages | null> => {
+      const id = targetId ?? activeKeyRef.current;
+      if (!id) return null;
+      const bucket = bucketsStateRef.current.buckets.get(id);
+      if (!bucket) return null;
+      if (bucket.queue.steering.length + bucket.queue.followUp.length === 0) return null;
+      /** 清空瞬间的快照：响应回来时用它判断 queue_update 是否已处理。 */
+      const snapshot = bucket.queue;
+      setState((prev) =>
+        prev.buckets.has(id) ? patchBucket(prev, id, { queueClearing: true }) : prev,
+      );
+      try {
+        const result = await sessionService.clearQueue(id);
+        setState((prev) => {
+          if (!prev.buckets.has(id)) return prev;
+          const current = prev.buckets.get(id);
+          // queue_update 尚未处理（快照没换过）：直接置空，防止迟到的空快照
+          // 在 queueClearing 复位后被当成"交付"补出用户气泡；
+          // 已处理/有新排队时只复位标志，交给全量快照
+          const unchanged = current?.queue === snapshot;
+          return patchBucket(prev, id, {
+            ...(unchanged ? { queue: { steering: [], followUp: [] } } : {}),
+            queueClearing: false,
+          });
+        });
+        return result;
+      } catch (err) {
+        setState((prev) =>
+          prev.buckets.has(id) ? patchBucket(prev, id, { queueClearing: false }) : prev,
+        );
+        showToast(err instanceof Error ? err.message : t("session.queue.clearFailed"));
+        return null;
+      }
+    },
+    [setState, showToast],
+  );
+
   const stop = useCallback((): void => {
     const id = activeKeyRef.current;
     if (!id) return;
+    const bucket = bucketsStateRef.current.buckets.get(id);
+    const hasQueued = Boolean(
+      bucket && bucket.queue.steering.length + bucket.queue.followUp.length > 0,
+    );
     setState((prev) => applyEntries(prev, id, { type: "userStop" }));
-    sessionService.stop(id);
-  }, [setState]);
+    if (!hasQueued && !queueEditInFlightRef.current) {
+      sessionService.stop(id);
+      return;
+    }
+    // pi 的 abort 不清队列：先取回排队文本（回填输入框），再中止，避免停止后继续跑。
+    // 单条编辑在途时等它落定：编辑会把队列重新排入，先 abort 会让重排的消息在停止后开新一轮。
+    void (async () => {
+      if (queueEditInFlightRef.current) await queueEditInFlightRef.current;
+      const still = bucketsStateRef.current.buckets.get(id);
+      if (still && still.queue.steering.length + still.queue.followUp.length > 0) {
+        const cleared = await clearQueue(id);
+        if (cleared) {
+          const texts = [...cleared.steering, ...cleared.followUp];
+          if (texts.length > 0) appendToComposer(texts.join("\n\n"));
+        } else {
+          const again = bucketsStateRef.current.buckets.get(id);
+          if (again && again.queue.steering.length + again.queue.followUp.length > 0) {
+            showToast(t("session.queue.stopClearFailed"));
+          }
+        }
+      }
+      sessionService.stop(id);
+    })();
+  }, [appendToComposer, clearQueue, setState, showToast]);
+
+  /**
+   * 单条撤销 / 编辑的共同路径（docs/design/73）：pi 只有全量 clear_queue，
+   * 单条动作 = 清空全部 → 客户端重排（`replacement` null 移除 / 字符串替换）→
+   * 按 steering → followUp 顺序逐条重新 `prompt(streamingBehavior)`（与快照展示顺序一致）。
+   * 重新排队期间保持 queueClearing：清空的迟到空快照不会被当成交付；
+   * 入队事件先于 prompt 响应写出（pi 单线程 stdout），循环结束时快照已全部就位。
+   */
+  const applyQueueItemAction = useCallback(
+    async (
+      kind: QueueIntent,
+      index: number,
+      source: string,
+      replacement: string | null,
+    ): Promise<boolean> => {
+      const id = activeKeyRef.current;
+      if (!id) return false;
+      const bucket = bucketsStateRef.current.buckets.get(id);
+      if (!bucket) return false;
+      const list = kind === "steer" ? bucket.queue.steering : bucket.queue.followUp;
+      if (index < 0 || index >= list.length || list[index] !== source) {
+        // 渲染到点击之间队列变了：位置量已经指不准，宁可不做也不改错条目
+        showToast(t("session.queue.stale"));
+        return false;
+      }
+
+      const cleared = await clearQueue(id);
+      if (!cleared) return false;
+      const edited = editQueueItem(cleared, kind, index, source, replacement);
+      if (!edited) {
+        // 清空往返期间该条已交付、下标指到了别人：整队文本回填输入框，一条都不能丢
+        const texts = [...cleared.steering, ...cleared.followUp];
+        if (texts.length > 0) appendToComposer(texts.join("\n\n"));
+        showToast(t("session.queue.stale"));
+        return false;
+      }
+      const toQueue: Array<{ kind: QueueIntent; text: string }> = [
+        ...edited.steering.map((text) => ({ kind: "steer" as const, text })),
+        ...edited.followUp.map((text) => ({ kind: "followUp" as const, text })),
+      ];
+
+      setState((prev) =>
+        prev.buckets.has(id) ? patchBucket(prev, id, { queueClearing: true }) : prev,
+      );
+      try {
+        let failedAt = -1;
+        for (let i = 0; i < toQueue.length; i += 1) {
+          const item = toQueue[i];
+          try {
+            await sessionService.prompt(item.text, id, undefined, item.kind);
+          } catch {
+            failedAt = i;
+            break;
+          }
+        }
+        if (failedAt >= 0) {
+          // 部分失败：尚未排回的文本回填输入框，已排回的留在 pi 队列
+          const rest = toQueue.slice(failedAt).map((item) => item.text);
+          if (rest.length > 0) appendToComposer(rest.join("\n\n"));
+          showToast(t("session.queue.editFailed"));
+          return false;
+        }
+        if (replacement === null) {
+          appendToComposer(edited.removed);
+          showToast(t("session.queue.withdrawn"));
+        } else {
+          showToast(t("session.queue.editSaved"));
+        }
+        return true;
+      } finally {
+        setState((prev) =>
+          prev.buckets.has(id) ? patchBucket(prev, id, { queueClearing: false }) : prev,
+        );
+      }
+    },
+    [appendToComposer, clearQueue, setState, showToast],
+  );
+
+  /** 单条撤销：同一会话内同一时刻只允许一个单条动作（UI 侧另有 busy 拦截）。 */
+  const withdrawQueuedItem = useCallback(
+    (kind: QueueIntent, index: number, source: string): Promise<boolean> => {
+      if (queueEditInFlightRef.current) return Promise.resolve(false);
+      const task = applyQueueItemAction(kind, index, source, null);
+      queueEditInFlightRef.current = task;
+      void task.finally(() => {
+        queueEditInFlightRef.current = null;
+      });
+      return task;
+    },
+    [applyQueueItemAction],
+  );
+
+  const editQueuedItem = useCallback(
+    (kind: QueueIntent, index: number, source: string, text: string): Promise<boolean> => {
+      const next = text.trim();
+      // 空文本没有语义（排队气泡不能是空的），原样保留该条
+      if (!next || next === source || queueEditInFlightRef.current) return Promise.resolve(false);
+      const task = applyQueueItemAction(kind, index, source, next);
+      queueEditInFlightRef.current = task;
+      void task.finally(() => {
+        queueEditInFlightRef.current = null;
+      });
+      return task;
+    },
+    [applyQueueItemAction],
+  );
 
   const entries: SessionEntry[] = activeBucket?.entries ?? [];
 
@@ -1785,11 +2081,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const transcriptValue = useMemo<SessionTranscriptValue>(() => ({ entries }), [entries]);
+  const queueValue = useMemo<SessionQueueValue>(
+    () => ({
+      queue: activeBucket?.queue ?? EMPTY_QUEUE,
+      withdrawQueuedItem,
+      editQueuedItem,
+    }),
+    [activeBucket?.queue, withdrawQueuedItem, editQueuedItem],
+  );
 
   return (
     <SessionMetaContext.Provider value={metaValue}>
       <SessionTranscriptContext.Provider value={transcriptValue}>
-        {children}
+        <SessionQueueContext.Provider value={queueValue}>{children}</SessionQueueContext.Provider>
       </SessionTranscriptContext.Provider>
     </SessionMetaContext.Provider>
   );
@@ -1807,4 +2111,11 @@ export function useSessionEntries(): SessionEntry[] {
   const ctx = useContext(SessionTranscriptContext);
   if (!ctx) throw new Error("useSessionEntries 必须在 SessionProvider 内使用");
   return ctx.entries;
+}
+
+/** 队列快照与单条动作：只在快照变化时换引用（流式 delta 不触发）。 */
+export function useSessionQueue(): SessionQueueValue {
+  const ctx = useContext(SessionQueueContext);
+  if (!ctx) throw new Error("useSessionQueue 必须在 SessionProvider 内使用");
+  return ctx;
 }

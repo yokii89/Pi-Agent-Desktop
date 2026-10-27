@@ -90,6 +90,8 @@ export interface UserEntry {
   items?: BrowserContextItem[];
   /** 随消息发送的图片附件（docs/design/21）；与 text 分槽，不进路径附注。 */
   images?: UserMessageImage[];
+  /** 发送瞬间乐观插入、尚未确认的条目；pi 回 queued/handled 时按此精确撤回。 */
+  optimistic?: true;
 }
 
 export interface ToolAssistantBlock {
@@ -166,7 +168,20 @@ export type SessionEntry =
 
 export type SessionAction =
   | { type: "clear" }
-  | { type: "userMessage"; text: string; items?: BrowserContextItem[]; images?: UserMessageImage[] }
+  | {
+      type: "userMessage";
+      text: string;
+      items?: BrowserContextItem[];
+      images?: UserMessageImage[];
+      /** 发送瞬间的乐观插入（pi 明确返回 queued/handled 时撤回）。 */
+      optimistic?: boolean;
+    }
+  /**
+   * 撤销最近一条乐观用户消息（prompt 实际返回 queued/handled）：
+   * 排队气泡由 queue_update 接管，扩展命令则不产生用户消息。
+   * 只认带 optimistic 标记的条目，避免误删同一窗口内交付的排队消息。
+   */
+  | { type: "discardOptimisticUser" }
   | { type: "snapshot"; image: string; url: string }
   | { type: "event"; event: PiAgentEvent }
   /** 主进程合批后的流式事件：一次 action 顺序应用，只触发一次 setState。 */
@@ -205,8 +220,18 @@ export function sessionEntriesReducer(
           text: action.text,
           items: action.items,
           images: action.images,
+          ...(action.optimistic ? { optimistic: true as const } : {}),
         },
       ];
+    case "discardOptimisticUser": {
+      for (let i = state.length - 1; i >= 0; i -= 1) {
+        const entry = state[i];
+        if (entry.kind === "user" && entry.optimistic === true) {
+          return [...state.slice(0, i), ...state.slice(i + 1)];
+        }
+      }
+      return state;
+    }
     case "snapshot":
       return [
         ...state,

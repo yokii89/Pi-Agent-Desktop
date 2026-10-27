@@ -102,12 +102,14 @@ import type {
   PiPackageSetEnabledRequest,
   PiPackageSetResourceEnabledRequest,
   PiPackagesSnapshot,
+  PiQueuedMessages,
   PiSessionStats,
   PiShellProbe,
   PiSlashCommand,
   ProcPushMessage,
   ProcStopAllResult,
   ProcStopResult,
+  PromptDisposition,
   SessionExportRequest,
   SessionGetModelsRequest,
   SessionId,
@@ -338,9 +340,12 @@ contextBridge.exposeInMainWorld("pidesk", {
      */
     start: (req: SessionStartRequest): Promise<IpcResult<SessionId>> =>
       ipcRenderer.invoke(SESSION_IPC.start, req),
-    /** 提交用户输入（RPC prompt）。 */
-    prompt: (req: SessionPromptRequest): Promise<IpcResult<null>> =>
+    /** 提交用户输入（RPC prompt；返回 pi 的受理结果 started/queued/handled）。 */
+    prompt: (req: SessionPromptRequest): Promise<IpcResult<PromptDisposition>> =>
       ipcRenderer.invoke(SESSION_IPC.prompt, req),
+    /** 清空插话 / 稍后队列并取回文本（RPC clear_queue）。 */
+    clearQueue: (sessionId: SessionId): Promise<IpcResult<PiQueuedMessages>> =>
+      ipcRenderer.invoke(SESSION_IPC.clearQueue, { sessionId }),
     /** 中断指定会话（RPC abort）。 */
     stop: (sessionId: SessionId): Promise<IpcResult<null>> =>
       ipcRenderer.invoke(SESSION_IPC.stop, { sessionId }),

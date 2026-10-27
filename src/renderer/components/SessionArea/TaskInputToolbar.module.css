@@ -5,6 +5,31 @@
   padding: var(--spacing-xs) var(--spacing-xs) var(--spacing-xs);
 }
 
+/* 运行中的独立排队发送键（docs/design/73）：与停止键同尺寸，语义弱于停止的红。 */
+.queueSendBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  margin-left: 2px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.queueSendBtn:hover {
+  background: var(--color-bg-active);
+  border-color: var(--color-accent);
+  color: var(--color-accent-hover);
+}
+
 .iconBtn {
   display: inline-flex;
   align-items: center;

@@ -156,7 +156,7 @@ export function registerMcpIpc(): void {
           void promptSession(sessionId, command).catch(() => {});
         } else {
           // logout / reconnect 立即完成；超时兜底防 pi 无应答
-          await promptSession(sessionId, command, undefined, 20_000);
+          await promptSession(sessionId, command, { timeoutMs: 20_000 });
         }
         return { sessionId };
       }),

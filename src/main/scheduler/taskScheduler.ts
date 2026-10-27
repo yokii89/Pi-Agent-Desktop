@@ -184,7 +184,7 @@ async function dispatchRun(
       } catch {
         // 模型对齐失败不取消本次运行
       }
-      await promptSession(sessionId, task.prompt, undefined, PROMPT_TIMEOUT_MS);
+      await promptSession(sessionId, task.prompt, { timeoutMs: PROMPT_TIMEOUT_MS });
       if (prev?.spawned && hasSession(prev.sessionId)) {
         // 新建会话型任务：回收上一轮的空闲进程，并行会话名额不被定时任务吃满；
         // JSONL 历史保留，用户再打开时按文件重新拉起

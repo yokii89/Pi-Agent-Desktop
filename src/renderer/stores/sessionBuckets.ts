@@ -6,6 +6,8 @@ import type {
   PiChatMessage,
   PiContextBreakdownSlice,
   PiContextUsage,
+  PiQueuedMessages,
+  QueueIntent,
   SessionId,
 } from "../../shared/ipc";
 import { normalizeCwdKey } from "../services/slashCommandCache";
@@ -40,6 +42,10 @@ export interface SessionBucket {
   contextWindow: number | null;
   /** pi 自动压缩开关（get_state）。 */
   autoCompactionEnabled: boolean;
+  /** pi 当前插话 / 稍后队列全量快照（queue_update 权威值）。 */
+  queue: PiQueuedMessages;
+  /** 正在执行 clear_queue：下一次队列收缩是「清空」而不是「交付」。 */
+  queueClearing: boolean;
 }
 
 export interface SessionBucketsState {
@@ -73,7 +79,59 @@ export function emptyBucket(
     contextOtherPercent: patch?.contextOtherPercent ?? null,
     contextWindow: patch?.contextWindow ?? null,
     autoCompactionEnabled: patch?.autoCompactionEnabled ?? false,
+    queue: patch?.queue ?? { steering: [], followUp: [] },
+    queueClearing: patch?.queueClearing ?? false,
   };
+}
+
+/**
+ * queue_update 全量快照的收缩差：被移除的项按 FIFO 交付（pi 从队首取）。
+ * 只做计数差，不做文本匹配——同一文本重复排队时也能逐条对齐。
+ */
+export function deliveredQueueTexts(prev: PiQueuedMessages, next: PiQueuedMessages): string[] {
+  const removed = (before: string[], after: string[]): string[] =>
+    before.slice(0, Math.max(0, before.length - after.length));
+  return [...removed(prev.steering, next.steering), ...removed(prev.followUp, next.followUp)];
+}
+
+/**
+ * 两份全量快照是否逐项相同。
+ * pi 在部分路径上会重复推送同一快照（如 prompt 入队与清空回声），
+ * 相同就跳过 state 更新，省掉一次全量渲染。
+ */
+export function sameQueue(a: PiQueuedMessages, b: PiQueuedMessages): boolean {
+  const sameList = (x: string[], y: string[]): boolean =>
+    x.length === y.length && x.every((text, index) => text === y[index]);
+  return sameList(a.steering, b.steering) && sameList(a.followUp, b.followUp);
+}
+
+/**
+ * 单条撤销 / 编辑的「全清后客户端重排」（docs/design/73）：pi 只有全量 clear_queue，
+ * 单条动作 = 取回全部 → 替换/移除目标条 → 其余按原序重新排队。
+ * `replacement` 为 null 表示移除该条（撤销）；为字符串表示原位置替换（编辑），
+ * 两份队列的顺序均不变（如 [插话A, 插话B, 稍后C] 编辑 A→a 后仍为 [插话a, 插话B, 稍后C]）。
+ * `expected` 是发起动作时该位置的原文：清空往返期间若有消息交付，下标会指向另一条，
+ * 对不上就返回 null 让调用方放弃，绝不改错条目。
+ * 返回目标条的原文与重排结果；下标越界或原文不符返回 null。
+ */
+export function editQueueItem(
+  cleared: PiQueuedMessages,
+  kind: QueueIntent,
+  index: number,
+  expected: string,
+  replacement: string | null,
+): { removed: string; steering: string[]; followUp: string[] } | null {
+  const key = kind === "steer" ? "steering" : "followUp";
+  const list = cleared[key];
+  if (index < 0 || index >= list.length) return null;
+  if (list[index] !== expected) return null;
+  const removed = list[index];
+  const steering = [...cleared.steering];
+  const followUp = [...cleared.followUp];
+  const target = key === "steering" ? steering : followUp;
+  if (replacement === null) target.splice(index, 1);
+  else target[index] = replacement;
+  return { removed, steering, followUp };
 }
 
 export function createBucketsState(): SessionBucketsState {

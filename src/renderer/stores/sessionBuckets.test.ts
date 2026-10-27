@@ -6,8 +6,10 @@ import {
   clearStartPending,
   clearUnread,
   createBucketsState,
+  deliveredQueueTexts,
   deriveRunningFiles,
   dropFileIndex,
+  editQueueItem,
   emptyBucket,
   ensureBucket,
   findCommandBorrowSessionId,
@@ -16,6 +18,7 @@ import {
   loadMessagesIntoBucket,
   markUnread,
   patchBucket,
+  sameQueue,
   setActiveKey,
 } from "./sessionBuckets";
 
@@ -78,6 +81,102 @@ describe("sessionBuckets dual index", () => {
     const b = emptyBucket("s1");
     expect(b.processAlive).toBe(false);
     expect(b.phase).toBe("empty");
+    expect(b.queue).toEqual({ steering: [], followUp: [] });
+    expect(b.queueClearing).toBe(false);
+  });
+});
+
+describe("queue delivery diff (docs/design/73)", () => {
+  it("takes delivered items from the head FIFO per kind", () => {
+    expect(
+      deliveredQueueTexts(
+        { steering: ["a", "b"], followUp: ["c"] },
+        { steering: ["b"], followUp: [] },
+      ),
+    ).toEqual(["a", "c"]);
+  });
+
+  it("returns nothing on growth or unchanged snapshots", () => {
+    expect(
+      deliveredQueueTexts({ steering: [], followUp: [] }, { steering: ["a"], followUp: [] }),
+    ).toEqual([]);
+    expect(
+      deliveredQueueTexts({ steering: ["a"], followUp: [] }, { steering: ["a"], followUp: [] }),
+    ).toEqual([]);
+  });
+
+  it("aligns duplicate texts by count instead of matching text", () => {
+    expect(
+      deliveredQueueTexts(
+        { steering: ["same", "same", "x"], followUp: [] },
+        { steering: ["same"], followUp: [] },
+      ),
+    ).toEqual(["same", "same"]);
+  });
+
+  it("edits a queued item in place and keeps the order of both queues", () => {
+    expect(editQueueItem({ steering: ["A", "B"], followUp: ["C"] }, "steer", 0, "A", "a")).toEqual({
+      removed: "A",
+      steering: ["a", "B"],
+      followUp: ["C"],
+    });
+    expect(
+      editQueueItem({ steering: ["A", "B"], followUp: ["C"] }, "followUp", 0, "C", "c"),
+    ).toEqual({
+      removed: "C",
+      steering: ["A", "B"],
+      followUp: ["c"],
+    });
+  });
+
+  it("withdraws an item without reordering the rest", () => {
+    expect(editQueueItem({ steering: ["A", "B"], followUp: ["C"] }, "steer", 1, "B", null)).toEqual(
+      {
+        removed: "B",
+        steering: ["A"],
+        followUp: ["C"],
+      },
+    );
+    expect(
+      editQueueItem({ steering: ["A"], followUp: ["C", "D"] }, "followUp", 0, "C", null),
+    ).toEqual({
+      removed: "C",
+      steering: ["A"],
+      followUp: ["D"],
+    });
+  });
+
+  it("rejects out-of-range indexes", () => {
+    expect(editQueueItem({ steering: ["A"], followUp: [] }, "steer", 1, "x", "y")).toBeNull();
+    expect(editQueueItem({ steering: [], followUp: [] }, "followUp", 0, "x", null)).toBeNull();
+  });
+
+  it("rejects a stale index whose text no longer matches (delivery raced the clear)", () => {
+    expect(editQueueItem({ steering: ["B"], followUp: [] }, "steer", 0, "A", null)).toBeNull();
+    expect(editQueueItem({ steering: ["A"], followUp: [] }, "steer", 0, "A", "A2")).toEqual({
+      removed: "A",
+      steering: ["A2"],
+      followUp: [],
+    });
+  });
+
+  it("treats byte-identical snapshots as unchanged (skip redundant renders)", () => {
+    expect(
+      sameQueue(
+        { steering: ["a", "b"], followUp: ["c"] },
+        { steering: ["a", "b"], followUp: ["c"] },
+      ),
+    ).toBe(true);
+    expect(sameQueue({ steering: [], followUp: [] }, { steering: [], followUp: [] })).toBe(true);
+    expect(sameQueue({ steering: ["a"], followUp: [] }, { steering: ["b"], followUp: [] })).toBe(
+      false,
+    );
+    expect(sameQueue({ steering: ["a"], followUp: [] }, { steering: ["a"], followUp: ["b"] })).toBe(
+      false,
+    );
+    expect(sameQueue({ steering: ["a"], followUp: [] }, { steering: [], followUp: [] })).toBe(
+      false,
+    );
   });
 });
 

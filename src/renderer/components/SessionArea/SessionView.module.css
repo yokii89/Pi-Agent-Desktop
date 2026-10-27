@@ -33,6 +33,8 @@
 .inner {
   max-width: min(100%, var(--session-stream-column));
   width: 100%;
+  /* 内容不足一屏时给排队组留出 margin-top:auto 的空间（docs/design/73） */
+  min-height: 100%;
   margin: 0 auto;
   padding: var(--spacing-lg) var(--spacing-xl) var(--session-input-clearance);
   display: flex;
