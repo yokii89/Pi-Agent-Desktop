@@ -98,6 +98,14 @@ export const sessionMessages = defineMessages({
   },
   "session.queue.save": { "zh-CN": "保存", "en-US": "Save" },
   "session.queue.cancel": { "zh-CN": "取消", "en-US": "Cancel" },
+  "session.queue.editPlaceholder": {
+    "zh-CN": "编辑这条排队消息，Enter 保存",
+    "en-US": "Edit this queued message, Enter to save",
+  },
+  "session.queue.editNoAttach": {
+    "zh-CN": "排队消息只保存文本，编辑不支持附件",
+    "en-US": "Queued messages are text-only; attachments aren't supported in edit",
+  },
   "session.queue.withdrawn": {
     "zh-CN": "已撤销 1 条排队消息，文字回到输入框",
     "en-US": "Withdrew 1 queued message; its text is back in the input",

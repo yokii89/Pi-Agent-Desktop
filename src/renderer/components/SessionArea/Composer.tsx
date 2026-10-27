@@ -85,6 +85,8 @@ interface ComposerProps {
   onEnterIntercept?: () => boolean;
   /** 建议列表方向键 / Esc；返回 true 表示已处理（应 preventDefault）。 */
   onSuggestKey?: (key: "ArrowUp" | "ArrowDown" | "Escape") => boolean;
+  /** 建议列表未消费的 Esc（面板已收或未打开）落到这里；队列编辑用它取消。 */
+  onEscape?: () => void;
   placeholder?: string;
   disabled?: boolean;
   /** 外部（浏览器拾取 Enter）要求聚焦时递增；0 表示尚未发生。 */
@@ -138,6 +140,7 @@ export function Composer({
   insertTrigger,
   onEnterIntercept,
   onSuggestKey,
+  onEscape,
   placeholder = "",
   disabled = false,
   focusSeq = 0,
@@ -517,6 +520,11 @@ export function Composer({
         // 建议面板消费了 Esc：阻断冒泡，避免同时触发全局「Esc 停止」
         // （焦点分层，docs/design/13 P1-7：先收面板，再次 Esc 才停止）
         if (event.key === "Escape") event.stopPropagation();
+        return;
+      }
+      if (event.key === "Escape") {
+        onEscape?.();
+        return;
       }
       return;
     }

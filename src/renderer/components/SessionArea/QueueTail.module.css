@@ -51,79 +51,19 @@
   color: var(--color-text);
 }
 
-/* 原位置编辑：气泡铺满列宽（减去左侧动作槽），多行文本才有可打字的面 */
+/* 原位置编辑：输入卡与中央输入栏同宽同对齐（宽度同一 clamp 公式，88% 按各自包含块求值——
+   这里包含块是滚动列内容区，与 SessionArea 的 .inputStack 同源同宽；
+   基础 .row 的 max-width:78% 是气泡的约束，编辑卡必须重置；
+   .wrap 默认 flex-end 右对齐气泡，编辑行单独居中，与底部停靠输入栏一致） */
 .row[data-editing] {
-  width: 100%;
+  width: min(100%, var(--session-input-column));
+  max-width: none;
+  align-self: center;
 }
 
-.row[data-editing] .bubble {
+.editCard {
   flex: 1 1 auto;
-}
-
-.editor {
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 62px;
-  max-height: 220px;
-  margin-top: 6px;
-  padding: 6px 9px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-  color: var(--color-text-strong);
-  font: inherit;
-  line-height: 1.62;
-  resize: vertical;
-}
-
-.editor:focus {
-  outline: none;
-  border-color: var(--color-accent);
-}
-
-.editBar {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.editBtn {
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-elevated);
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-}
-
-.editBtn:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-strong);
-}
-
-.editBtnPrimary {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-}
-
-.editBtnPrimary:hover {
-  color: var(--color-accent-hover);
-}
-
-.editBtn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* 提交/取消期间两个按钮一起禁用 */
-.editBar:has(button:disabled) {
-  pointer-events: none;
+  min-width: 0;
 }
 
 /* 撤销 / 编辑：在气泡左侧的空槽里常驻占位，悬停或键盘聚焦时揭示。
@@ -139,15 +79,11 @@
   transition: opacity 0.15s ease;
 }
 
+/* 编辑态动作槽卸载：进出编辑随输入卡替换，不保留占位 */
 .row:hover .actions,
 .row:focus-within .actions {
   opacity: 1;
   pointer-events: auto;
-}
-
-/* 编辑态由保存/取消条承担动作：藏起按钮但保留占位，进出编辑不横向跳动 */
-.row[data-editing] .actions {
-  visibility: hidden;
 }
 
 .actBtn {
