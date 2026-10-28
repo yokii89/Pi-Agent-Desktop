@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import fs from "node:fs";
 
 export interface PiCommand {
@@ -77,16 +77,72 @@ export function resolvePiCommand(configuredPath: string | null | undefined): PiC
   return wrapCommand(located, []);
 }
 
-/** 运行 `pi --version`（用于设置页校验 / 关于展示）。失败返回 null。 */
-export function runPiVersion(command: PiCommand): string | null {
+/** 版本缓存 TTL；手动校验传 refresh 绕过。pi 原地升级不会改 shim 的 mtime。 */
+const PI_VERSION_CACHE_TTL_MS = 30_000;
+
+interface PiVersionCacheEntry {
+  key: string;
+  version: string;
+  at: number;
+}
+
+let piVersionCache: PiVersionCacheEntry | null = null;
+let piVersionInflight: { key: string; promise: Promise<string | null> } | null = null;
+
+/** 缓存键带文件指纹：换路径 / 换二进制（mtime、size 变化）立即失效。 */
+function piVersionCacheKey(command: PiCommand): string {
   try {
-    const out = execFileSync(command.file, [...command.args, "--version"], {
-      encoding: "utf8",
-      timeout: 8000,
-      windowsHide: true,
-    });
-    return out.trim().split(/\r?\n/)[0] || null;
+    const stat = fs.statSync(command.piPath);
+    return `${command.piPath}|${stat.mtimeMs}|${stat.size}`;
   } catch {
-    return null;
+    return command.piPath;
   }
+}
+
+function execPiVersion(command: PiCommand): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      command.file,
+      [...command.args, "--version"],
+      { encoding: "utf8", timeout: 8000, windowsHide: true },
+      (error, stdout) => {
+        if (error) reject(error);
+        else resolve(stdout);
+      },
+    );
+  });
+}
+
+/**
+ * 异步读取 `pi --version`。Windows 下 pi 多是 .cmd shim，实际经 cmd 再拉一个
+ * Node 进程，冷/热都要 1.5s 量级；同步运行会占满主进程事件循环，把同时到达的
+ * 其它 IPC（含开屏读取设置）一起压后。因此缓存 30s（键含路径与文件指纹）、
+ * 并发只保留一个探测；`refresh` 供设置页手动校验绕过缓存。
+ */
+export function readPiVersion(
+  command: PiCommand,
+  options: { refresh?: boolean } = {},
+): Promise<string | null> {
+  const key = piVersionCacheKey(command);
+  if (
+    !options.refresh &&
+    piVersionCache?.key === key &&
+    Date.now() - piVersionCache.at < PI_VERSION_CACHE_TTL_MS
+  ) {
+    return Promise.resolve(piVersionCache.version);
+  }
+  if (piVersionInflight?.key === key) return piVersionInflight.promise;
+
+  const promise = execPiVersion(command)
+    .then((out) => {
+      const version = out.trim().split(/\r?\n/)[0] || null;
+      if (version !== null) piVersionCache = { key, version, at: Date.now() };
+      return version;
+    })
+    .catch(() => null)
+    .finally(() => {
+      if (piVersionInflight?.key === key) piVersionInflight = null;
+    });
+  piVersionInflight = { key, promise };
+  return promise;
 }

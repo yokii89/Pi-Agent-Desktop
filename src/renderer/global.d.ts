@@ -185,7 +185,7 @@ export interface PideskGlobalApi {
     pick(defaultPath?: string | null): Promise<IpcResult<string | null>>;
   };
   pi: {
-    info(path?: string | null): Promise<IpcResult<PiInfo>>;
+    info(path?: string | null, options?: { refresh?: boolean }): Promise<IpcResult<PiInfo>>;
     shell: {
       get(): Promise<IpcResult<PiShellProbe>>;
       set(path: string | null): Promise<IpcResult<PiShellProbe>>;

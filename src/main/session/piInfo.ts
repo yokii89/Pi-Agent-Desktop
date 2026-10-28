@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { PiInfo } from "../../shared/ipc";
-import { resolvePiCommand, runPiVersion } from "./piLauncher";
+import { type PiCommand, readPiVersion, resolvePiCommand } from "./piLauncher";
 
 /** pi 的 agent 配置目录：PI_CODING_AGENT_DIR 环境变量优先，否则 ~/.pi/agent。 */
 export function getPiAgentDir(): string {
@@ -34,20 +34,48 @@ function readPiModelConfig(): Pick<PiInfo, "provider" | "model" | "thinkingLevel
   }
 }
 
-/** 读取 pi 信息（版本 + 默认模型配置），供模型展示与设置页关于区。 */
-export function getPiInfo(configuredPath: string | null): PiInfo {
-  let version: string | null = null;
-  let executablePath: string | null = configuredPath;
+/** 除版本号外的 pi 配置；会话模型回退标签只需要这些，不应触发子进程探测。 */
+export interface PiConfigInfo {
+  provider: string | null;
+  model: string | null;
+  thinkingLevel: string | null;
+  executablePath: string | null;
+}
+
+interface ResolvedPiConfig {
+  info: PiConfigInfo;
+  command: PiCommand | null;
+}
+
+function resolvePiConfig(configuredPath: string | null): ResolvedPiConfig {
+  let command: PiCommand | null = null;
+  let executablePath = configuredPath;
   try {
-    const command = resolvePiCommand(configuredPath);
+    command = resolvePiCommand(configuredPath);
     executablePath = command.piPath;
-    version = runPiVersion(command);
   } catch {
     // 未找到 pi：版本为 null，渲染层展示"未接入"
   }
   return {
-    version,
-    ...readPiModelConfig(),
-    executablePath,
+    command,
+    info: {
+      ...readPiModelConfig(),
+      executablePath,
+    },
   };
+}
+
+/** 读取 pi 配置（不含版本探测），供会话模型回退标签等热路径使用。 */
+export function getPiConfigInfo(configuredPath: string | null): PiConfigInfo {
+  return resolvePiConfig(configuredPath).info;
+}
+
+/** 读取 pi 信息（版本 + 默认模型配置）；版本探测异步且带缓存，不阻塞主进程。 */
+export async function getPiInfo(
+  configuredPath: string | null,
+  options: { refresh?: boolean } = {},
+): Promise<PiInfo> {
+  const { info, command } = resolvePiConfig(configuredPath);
+  const version = command ? await readPiVersion(command, options) : null;
+  return { version, ...info };
 }

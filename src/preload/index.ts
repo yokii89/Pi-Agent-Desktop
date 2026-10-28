@@ -263,9 +263,9 @@ contextBridge.exposeInMainWorld("pidesk", {
   },
 
   pi: {
-    /** 读取 pi 版本与默认模型配置；path 用于设置页校验候选路径。 */
-    info: (path?: string | null): Promise<IpcResult<PiInfo>> =>
-      ipcRenderer.invoke(PI_IPC.info, { path: path ?? null }),
+    /** 读取 pi 版本与默认模型配置；path 用于设置页校验候选路径，refresh 绕过版本缓存。 */
+    info: (path?: string | null, options?: { refresh?: boolean }): Promise<IpcResult<PiInfo>> =>
+      ipcRenderer.invoke(PI_IPC.info, { path: path ?? null, refresh: options?.refresh === true }),
     shell: {
       /** 探测 pi 将使用的 bash（按 pi 查找顺序）。 */
       get: (): Promise<IpcResult<PiShellProbe>> => ipcRenderer.invoke(PI_IPC.shellGet),

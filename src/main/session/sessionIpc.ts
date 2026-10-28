@@ -38,7 +38,7 @@ import {
   syncPreferredModelForActive,
   upsertCredential,
 } from "./piCredentials";
-import { getPiInfo } from "./piInfo";
+import { getPiConfigInfo, getPiInfo } from "./piInfo";
 import { fetchAvailableModelsOnce } from "./piModelList";
 import {
   applyDefaultModelToSession,
@@ -243,7 +243,7 @@ function extractSessionModelProvider(state: unknown): string | null {
   return null;
 }
 
-function piInfoFallbackLabel(info: PiInfo): string | null {
+function piInfoFallbackLabel(info: Pick<PiInfo, "provider" | "model">): string | null {
   if (info.model == null) return null;
   return info.provider != null ? `${info.provider}/${info.model}` : info.model;
 }
@@ -456,7 +456,8 @@ export function registerSessionIpc(): void {
     (_event, req: { sessionId?: unknown }): Promise<IpcResult<PiModelState>> =>
       envelopeAsync(async () => {
         const sessionId = requireSessionId(req?.sessionId);
-        const info = getPiInfo(getSettings().piExecutablePath);
+        // 只取默认模型/思考档，不跑 `pi --version`：会话切换每次都会刷新，同步探测会占满主进程
+        const info = getPiConfigInfo(getSettings().piExecutablePath);
         const fallback = piInfoFallbackLabel(info);
         if (!hasSession(sessionId)) {
           // 目标未启动：回退 pi 配置，不得误读其它存活实例（A5）
@@ -653,8 +654,13 @@ export function registerSessionIpc(): void {
 
   ipcMain.handle(
     PI_IPC.info,
-    (_event, req: { path?: string | null }): IpcResult<PiInfo> =>
-      envelope(() => getPiInfo(req?.path ?? getSettings().piExecutablePath)),
+    (_event, req: { path?: unknown; refresh?: unknown }): Promise<IpcResult<PiInfo>> =>
+      envelopeAsync(async () => {
+        const requested = req?.path;
+        // 显式字符串 = 设置页校验候选路径；其余（含 preload 的 null）沿用当前设置
+        const path = typeof requested === "string" ? requested : getSettings().piExecutablePath;
+        return getPiInfo(path, { refresh: req?.refresh === true });
+      }),
   );
 
   ipcMain.handle(

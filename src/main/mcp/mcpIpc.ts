@@ -9,7 +9,7 @@ import type {
 } from "../../shared/ipc";
 import { MCP_IPC } from "../../shared/ipc";
 import { envelope, envelopeAsync } from "../ipc/envelope";
-import { resolvePiCommand, runPiVersion } from "../session/piLauncher";
+import { readPiVersion, resolvePiCommand } from "../session/piLauncher";
 import {
   fetchSlashCommands,
   hasSession,
@@ -58,7 +58,7 @@ async function getMcpPiSupport(): Promise<McpPiSupport> {
     return { version: null, status: "unknown" };
   }
   if (piSupportCache?.key === command.piPath) return piSupportCache.support;
-  const version = runPiVersion(command);
+  const version = await readPiVersion(command);
   const verdict = supportsBuiltinMcp(version);
   const support: McpPiSupport = {
     version,

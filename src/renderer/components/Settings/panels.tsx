@@ -210,7 +210,7 @@ export function ConfigPanel({ onNavigateSection }: ConfigPanelProps) {
     const file = await fsService.pickFile();
     if (!file) return;
     setValidating(true);
-    const info = await piService.info(file);
+    const info = await piService.info(file, { refresh: true });
     setValidating(false);
     if (!info?.version) {
       showToast(t("settings.config.piPath.invalid"));

@@ -4,10 +4,10 @@ import { pideskApi } from "./pideskApi";
 
 /** pi 信息（版本 + 配置的默认模型），只读。 */
 export const piService = {
-  /** path 为空时按当前设置解析；用于设置页校验候选路径。 */
-  info(path?: string | null): Promise<PiInfo | null> {
+  /** path 为空时按当前设置解析；refresh 跳过版本缓存（设置页手动校验用）。 */
+  info(path?: string | null, options?: { refresh?: boolean }): Promise<PiInfo | null> {
     const api = pideskApi();
-    return api ? unwrap(api.pi.info(path)).catch(() => null) : Promise.resolve(null);
+    return api ? unwrap(api.pi.info(path, options)).catch(() => null) : Promise.resolve(null);
   },
   shell: {
     /** 探测 pi 将使用的 bash；失败返回 null。 */
