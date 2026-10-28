@@ -214,6 +214,26 @@
   padding: 0 var(--spacing-sm) var(--spacing-md);
 }
 
+/* 单行围栏紧凑态（docs/design/85）：不渲染头部行，代码与复制按钮同一行、垂直居中。
+   行盒按代码字号算（16px × 1.4 = 14px × 1.6），否则会被正文 1.7 的 strut 多撑 5px。 */
+.fenceCompact {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) var(--spacing-md);
+}
+
+.fenceCompact pre {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  line-height: 1.4;
+}
+
+.fenceCompact .fenceCopy {
+  flex: 0 0 auto;
+}
+
 /* Markdown 里解析成功的本地图片 */
 .mdImg {
   display: block;

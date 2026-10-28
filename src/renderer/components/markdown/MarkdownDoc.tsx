@@ -77,6 +77,8 @@ function flattenText(node: ReactNode): string {
 
 /**
  * 块级围栏统一外壳（docs/design/13 P1-5）：语言标签 + 可选「复制」按钮 + 可选 shiki 高亮。
+ * - 单行走紧凑态（docs/design/85）：不出头部行，代码与复制按钮同一行、垂直居中，
+ *   语言标签与高亮都不出现，无语言 / 有语言的单行长得完全一样；
  * - 有语言且未超护栏 → CodeHighlight（shiki，双主题）；
  * - 无语言 / 超护栏 / 未开高亮 → 纯 <pre>；
  * - 复制按钮随 codeCopy 开关（会话区开），语言标签有语言即显示。
@@ -100,33 +102,38 @@ function FenceShell({
   const lang = match ? normalizeFenceLang(match[1]) : null;
   const knownLang = lang !== null && lang !== "plaintext";
   const code = flattenText(child?.children).replace(/\n$/, "");
+  // 空围栏仍走原路径：紧凑态是给「一行内容」用的，空块没有可居中的东西
+  const singleLine = code.length > 0 && countCodeLines(code) <= 1;
   const highlightable =
+    !singleLine &&
     codeHighlight &&
     knownLang &&
     code.length <= MAX_HIGHLIGHT_CHARS &&
     countCodeLines(code) <= MAX_HIGHLIGHT_LINES;
-  const showHeader = knownLang || codeCopy;
+  const copyButton = codeCopy ? (
+    <button
+      type="button"
+      className={styles.fenceCopy}
+      title={t("common.copyCode")}
+      aria-label={t("common.copyCode")}
+      onClick={() => {
+        void navigator.clipboard
+          .writeText(code)
+          .then(() => showToast(t("common.copied")))
+          .catch(() => showToast(t("common.copyFailed")));
+      }}
+    >
+      <Copy size={14} weight="regular" />
+    </button>
+  ) : null;
   return (
-    <div className={styles.fence}>
-      {showHeader && (
+    <div
+      className={[styles.fence, singleLine ? styles.fenceCompact : ""].filter(Boolean).join(" ")}
+    >
+      {!singleLine && (knownLang || codeCopy) && (
         <div className={styles.fenceHeader}>
           <span className={styles.fenceLang}>{knownLang ? lang : ""}</span>
-          {codeCopy && (
-            <button
-              type="button"
-              className={styles.fenceCopy}
-              title={t("common.copyCode")}
-              aria-label={t("common.copyCode")}
-              onClick={() => {
-                void navigator.clipboard
-                  .writeText(code)
-                  .then(() => showToast(t("common.copied")))
-                  .catch(() => showToast(t("common.copyFailed")));
-              }}
-            >
-              <Copy size={14} weight="regular" />
-            </button>
-          )}
+          {copyButton}
         </div>
       )}
       {highlightable ? (
@@ -134,6 +141,7 @@ function FenceShell({
       ) : (
         <pre>{children}</pre>
       )}
+      {singleLine && copyButton}
     </div>
   );
 }
