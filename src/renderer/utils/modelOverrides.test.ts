@@ -30,16 +30,37 @@ describe("buildModelOverrideRows", () => {
     expect(rows[1].hasOverride).toBe(false);
   });
 
-  it("带上当前生效值（含覆盖后的窗口、输出上限与模态）", () => {
+  it("带上当前生效值（含覆盖后的窗口、输出上限、模态与思考档位）", () => {
     const rows = buildModelOverrideRows(
-      [model("x", { contextWindow: 262144, maxTokens: 32768, input: ["text", "image"] })],
+      [
+        model("x", {
+          contextWindow: 262144,
+          maxTokens: 32768,
+          input: ["text", "image"],
+          availableThinkingLevels: ["off", "low", "high", "max"],
+        }),
+      ],
       {},
       null,
     );
     expect(rows[0].effectiveWindow).toBe(262144);
     expect(rows[0].effectiveMaxTokens).toBe(32768);
     expect(rows[0].effectiveInput).toEqual(["text", "image"]);
+    expect(rows[0].effectiveThinkingLevels).toEqual(["off", "low", "high", "max"]);
+    expect(rows[0].overrideThinking).toBe(false);
     expect(rows[0].hasOverride).toBe(false);
+  });
+
+  it("思考覆盖来自 reasoning / thinkingLevelMap，只影响 overrideThinking", () => {
+    const rows = buildModelOverrideRows(
+      [model("a", { availableThinkingLevels: ["off", "low", "high"] })],
+      { newapi: { a: { thinkingLevelMap: { xhigh: null, max: null } } } },
+      null,
+    );
+    expect(rows[0].hasOverride).toBe(true);
+    expect(rows[0].overrideThinking).toBe(true);
+    expect(rows[0].overrideWindow).toBeUndefined();
+    expect(rows[0].effectiveThinkingLevels).toEqual(["off", "low", "high"]);
   });
 });
 
@@ -158,5 +179,25 @@ describe("reuseModelOverrideRows", () => {
       first,
     );
     expect(changedDefault[0]).not.toBe(first[0]);
+  });
+
+  it("思考档位数组按内容比较", () => {
+    const levels = ["off", "low", "high"] as const;
+    const first = buildModelOverrideRows(
+      [model("a", { availableThinkingLevels: [...levels] })],
+      {},
+      null,
+    );
+    const sameContent = reuseModelOverrideRows(
+      buildModelOverrideRows([model("a", { availableThinkingLevels: [...levels] })], {}, null),
+      first,
+    );
+    expect(sameContent[0]).toBe(first[0]);
+
+    const changed = reuseModelOverrideRows(
+      buildModelOverrideRows([model("a", { availableThinkingLevels: ["off", "low"] })], {}, null),
+      first,
+    );
+    expect(changed[0]).not.toBe(first[0]);
   });
 });

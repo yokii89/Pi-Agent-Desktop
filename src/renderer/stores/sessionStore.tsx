@@ -24,6 +24,7 @@ import type {
   SessionId,
   SessionSummary,
 } from "../../shared/ipc";
+import { isThinkingLevelId } from "../../shared/ipc";
 import type { BrowserConsoleError, BrowserContextItem } from "../services/browserService";
 import { piService } from "../services/piService";
 import { procService } from "../services/procService";
@@ -356,7 +357,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const { currentProject } = useProjectStore();
   const { page, navigate, showToast } = useUiStore();
   /** 停止 / 清空队列后把取回的文本交回输入栏（TaskInput 消费并写入编辑器）。 */
-  const { appendToComposer } = useComposerStore();
+  const { appendToComposer, syncThinkingState } = useComposerStore();
   const [bucketsState, dispatchBuckets] = useReducer(bucketsReducer, undefined, createBucketsState);
   const [allSessions, setAllSessions] = useState<SessionSummary[]>([]);
   const [pinnedFiles, setPinnedFiles] = useState<string[]>([]);
@@ -634,11 +635,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [claimSessionFile, rematerializeSidebar],
   );
 
+  /** 模型状态请求序号：冷启动「补发档位 → 再刷新」与切会话并发时只认最后一次。 */
+  const modelStateSeqRef = useRef(0);
+
   const refreshModelState = useCallback(async (): Promise<void> => {
+    const seq = ++modelStateSeqRef.current;
     const id = activeKeyRef.current;
     const state = id
       ? await sessionService.getModelState(id)
       : await sessionService.getModelState();
+    if (seq !== modelStateSeqRef.current) return;
     if (state?.modelLabel) {
       setModelLabel(state.modelLabel);
       setModelInput(state.modelInput ?? null);
@@ -650,17 +656,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           }),
         );
       }
+      // 只在拿到真实能力时回填档位：空数组 = 无存活会话 / 旧版 pi，保留本地偏好
+      if (state.availableThinkingLevels.length > 0) {
+        syncThinkingState(state.thinkingLevel, state.availableThinkingLevels);
+      }
       return;
     }
     const info = await piService.info();
-    if (!info) return;
+    if (seq !== modelStateSeqRef.current || !info) return;
     setPiReady(info.version !== null);
     if (info.model) {
       const prefix = info.provider ? `${info.provider}/` : "";
       const suffix = info.thinkingLevel ? `:${info.thinkingLevel}` : "";
       setModelLabel(`${prefix}${info.model}${suffix}`);
     }
-  }, [setState]);
+  }, [setState, syncThinkingState]);
 
   /** 上下文用量：只在 agent_settled / compaction_end / set_model / 手动点击时拉取，不挂 message_update。 */
   const refreshContextUsage = useCallback(
@@ -889,6 +899,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // 档位变化（扩展调用 / 切模型被 pi clamp / 本应用设置回执）：
+      // 只认 active 会话；切回其它会话时由 refreshModelState 拉真值
+      if (message.type === "event" && message.payload.type === "thinking_level_changed") {
+        if (sessionId === activeKeyRef.current && isThinkingLevelId(message.payload.level)) {
+          syncThinkingState(message.payload.level, []);
+        }
+      }
+
       // 队列变化：queue_update 是全量快照；收缩 = 交付（主动 clear_queue 时除外）
       if (message.type === "event" && message.payload.type === "queue_update") {
         const { steering, followUp } = message.payload;
@@ -978,6 +996,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     rematerializeSidebar,
     setState,
     refreshContextUsage,
+    syncThinkingState,
   ]);
 
   // 回到会话页且 active 的 file 有待读标记 → 清除该条（不误清其它文件）
@@ -1370,6 +1389,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const images = context?.images ?? [];
       const displayImages = context?.displayImages ?? [];
       if (!trimmed && items.length === 0 && images.length === 0) return null;
+      // 冷启动补发要的是「用户此刻选的档位」：start 内的 refreshModelState 可能在
+      // 补发前就把 composer 同步成 pi 当前档位，必须提前快照
+      const thinkingLevelAtSend = getComposerThinkingLevel();
 
       let targetId = activeKeyRef.current;
       if (isModeTransitioning(targetId)) return null;
@@ -1427,9 +1449,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         targetId = started;
         // 冷启动成功后补应用输入栏思考档位（§3.5）：spawn 参数不带 thinking，
         // 冷态改档位只写了本地 composerStore；不补发则实际跑 pi 默认档位。
-        // 先于 prompt 发起即可保序，不阻塞发送；失败静默（不 toast、不回滚）。
+        // 先于 prompt 发起即可保序，不阻塞发送；pi 可能按模型能力 clamp，回执后拉一次真值。
         void sessionService
-          .setThinkingLevel(getComposerThinkingLevel(), targetId)
+          .setThinkingLevel(thinkingLevelAtSend, targetId)
+          .then(() => refreshModelState())
           .catch(() => undefined);
       } else {
         bindActive(targetId);
@@ -1521,6 +1544,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [
       bindActive,
       dropPendingSummary,
+      refreshModelState,
       scheduleClaim,
       setState,
       showToast,

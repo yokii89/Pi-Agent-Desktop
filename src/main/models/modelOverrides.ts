@@ -6,10 +6,13 @@
  */
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type {
-  PiModelInputModality,
-  PiModelOverridePatch,
-  PiModelOverridesSnapshot,
+import {
+  isThinkingLevelId,
+  type PiModelInputModality,
+  type PiModelOverridePatch,
+  type PiModelOverridesSnapshot,
+  type PiThinkingLevelMap,
+  THINKING_LEVELS,
 } from "../../shared/ipc";
 import { resolvePiAgentDir } from "../mcp/mcpConfig";
 
@@ -49,7 +52,7 @@ function writeRawConfig(config: Record<string, unknown>, file: string): void {
   renameSync(tmp, file);
 }
 
-/** 覆盖快照投影：只暴露本 UI 管理的三个字段，未知/非法值按"未设置"处理。 */
+/** 覆盖快照投影：只暴露本 UI 管理的字段，未知/非法值按"未设置"处理。 */
 export function readModelOverrides(
   file: string = getUserModelsConfigPath(),
 ): PiModelOverridesSnapshot {
@@ -79,6 +82,15 @@ export function readModelOverrides(
       if (Array.isArray(entry.input)) {
         const modalities = entry.input.filter(isModality);
         if (modalities.length > 0) projected.input = modalities;
+      }
+      if (typeof entry.reasoning === "boolean") projected.reasoning = entry.reasoning;
+      if (isRecord(entry.thinkingLevelMap)) {
+        const map: PiThinkingLevelMap = {};
+        for (const level of THINKING_LEVELS) {
+          const value = entry.thinkingLevelMap[level];
+          if (typeof value === "string" || value === null) map[level] = value;
+        }
+        if (Object.keys(map).length > 0) projected.thinkingLevelMap = map;
       }
       if (Object.keys(projected).length > 0) models[modelId] = projected;
     }
@@ -134,10 +146,23 @@ export function applyModelOverridePatch(
   ) {
     throw new Error('input 只接受 ["text", "image"] 的非空子集');
   }
+  if (patch.thinkingLevels !== undefined && patch.thinkingLevels !== null) {
+    if (
+      !Array.isArray(patch.thinkingLevels) ||
+      patch.thinkingLevels.length === 0 ||
+      !patch.thinkingLevels.every(isThinkingLevelId)
+    ) {
+      throw new Error("思考档位必须是非空的已知档位数组");
+    }
+    if (new Set(patch.thinkingLevels).size !== patch.thinkingLevels.length) {
+      throw new Error("思考档位不能重复");
+    }
+  }
   if (
     patch.contextWindow === undefined &&
     patch.maxTokens === undefined &&
-    patch.input === undefined
+    patch.input === undefined &&
+    patch.thinkingLevels === undefined
   ) {
     throw new Error("补丁为空");
   }
@@ -155,6 +180,36 @@ export function applyModelOverridePatch(
   else if (patch.maxTokens !== undefined) entry.maxTokens = patch.maxTokens;
   if (patch.input === null) delete entry.input;
   else if (patch.input !== undefined) entry.input = patch.input;
+  if (patch.thinkingLevels === null) {
+    // 回到模型目录的默认能力，两个键一起删，避免 reasoning/map 半残留
+    delete entry.reasoning;
+    delete entry.thinkingLevelMap;
+  } else if (patch.thinkingLevels !== undefined) {
+    const selected = new Set(patch.thinkingLevels);
+    if (selected.size === 1 && selected.has("off")) {
+      entry.reasoning = false;
+      delete entry.thinkingLevelMap;
+    } else {
+      entry.reasoning = true;
+      // 保留已有的 provider 映射值：UI 只改"哪些档可用"，不改档位到线上参数的映射。
+      // 选中的 off..high 若原值为 null 则删键（恢复 provider 默认），否则保留；
+      // 选中的 xhigh/max 必须有值才算可用，缺失或 null 时写成档位名。
+      const existingMap = isRecord(entry.thinkingLevelMap) ? entry.thinkingLevelMap : {};
+      const nextMap: Record<string, unknown> = { ...existingMap };
+      for (const level of THINKING_LEVELS) {
+        const existing = existingMap[level];
+        if (!selected.has(level)) {
+          nextMap[level] = null;
+        } else if (level === "xhigh" || level === "max") {
+          if (typeof existing !== "string") nextMap[level] = level;
+        } else if (existing === null) {
+          delete nextMap[level];
+        }
+      }
+      if (Object.keys(nextMap).length === 0) delete entry.thinkingLevelMap;
+      else entry.thinkingLevelMap = nextMap;
+    }
+  }
 
   if (Object.keys(entry).length === 0) delete overrides[modelId];
   else overrides[modelId] = entry;

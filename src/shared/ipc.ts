@@ -363,14 +363,74 @@ export interface PiSlashCommand {
   source: "extension" | "prompt" | "skill";
 }
 
-/** 输入栏思考档位（对齐设计图「低 / 高 / 最高」）。 */
-export type ThinkingLevelId = "low" | "high" | "max";
+/** 思考档位：与 pi 的 ThinkingLevel 一一对应（低 → 高）。 */
+export type ThinkingLevelId = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+
+/** pi 的思考档位顺序（`packages/ai/src/models.ts` 的 EXTENDED_THINKING_LEVELS）。 */
+export const THINKING_LEVELS: readonly ThinkingLevelId[] = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+];
+
+export function isThinkingLevelId(value: unknown): value is ThinkingLevelId {
+  return typeof value === "string" && (THINKING_LEVELS as readonly string[]).includes(value);
+}
+
+/** pi `Model.thinkingLevelMap`（string = 映射到 provider 的参数，null = 该档不支持）。 */
+export type PiThinkingLevelMap = Partial<Record<ThinkingLevelId, string | null>>;
+
+/**
+ * 从 pi 的 `reasoning` + `thinkingLevelMap` 派生可用档位（与 pi-ai 的
+ * `getSupportedThinkingLevels` 同口径）：非推理模型只有 off；xhigh/max 仅在
+ * map 中显式出现时可用，其余档位只要没被显式置 null 就可用。
+ */
+export function deriveAvailableThinkingLevels(
+  reasoning: boolean,
+  map?: unknown,
+): ThinkingLevelId[] {
+  if (!reasoning) return ["off"];
+  const record =
+    map && typeof map === "object" && !Array.isArray(map) ? (map as Record<string, unknown>) : {};
+  return THINKING_LEVELS.filter((level) => {
+    const mapped = record[level];
+    if (mapped === null) return false;
+    if (level === "xhigh" || level === "max") return mapped !== undefined;
+    return true;
+  });
+}
+
+/** 把当前档位夹到可用集合（偏好更高档，其次更低档；与 pi 的 clamp 同向）。 */
+export function clampThinkingLevel(
+  level: ThinkingLevelId,
+  available: ThinkingLevelId[],
+): ThinkingLevelId {
+  if (available.includes(level)) return level;
+  const start = THINKING_LEVELS.indexOf(level);
+  for (let i = start; i < THINKING_LEVELS.length; i += 1) {
+    const candidate = THINKING_LEVELS[i];
+    if (available.includes(candidate)) return candidate;
+  }
+  for (let i = start - 1; i >= 0; i -= 1) {
+    const candidate = THINKING_LEVELS[i];
+    if (available.includes(candidate)) return candidate;
+  }
+  return available[0] ?? "off";
+}
 
 export interface PiModelState {
   /** 当前模型展示名，如 `anthropic/claude-sonnet-4`；未启动时为 null。 */
   modelLabel: string | null;
+  /** 会话当前实际档位（pi `get_state.thinkingLevel`，不再归一化）。 */
   thinkingLevel: ThinkingLevelId;
-  /** 该模型实际支持的档位（pi 返回）；空数组表示沿用默认三档。 */
+  /**
+   * 该模型实际支持的档位（pi `get_available_thinking_levels`，原样顺序）。
+   * 空数组 = 未知（无存活会话 / 旧版 pi 不认该命令），渲染层回退设计稿五档。
+   */
   availableThinkingLevels: ThinkingLevelId[];
   /** 当前模型输入模态（`Model.input`）；null/缺失 = 未知，不拦附图。 */
   modelInput?: PiModelInputModality[] | null;
@@ -428,6 +488,11 @@ export interface PiModelOption {
   contextWindow?: number;
   /** 单次回复输出上限（tokens，含思考）；含 modelOverrides 生效后的值，未知时缺失。 */
   maxTokens?: number;
+  /**
+   * 该模型实际可用的思考档位（含 modelOverrides 生效后的值）；
+   * 缺失表示能力未知（旧版 pi 未返回 reasoning）。
+   */
+  availableThinkingLevels?: ThinkingLevelId[];
   /** 是否已应用到存活会话；仅落盘默认模型或无会话时为 false。 */
   sessionApplied?: boolean;
 }
@@ -437,7 +502,7 @@ export interface PiModelOption {
 // ---------------------------------------------------------------------------
 
 export const MODEL_OVERRIDES_IPC = {
-  /** 读取覆盖快照（provider → modelId → 本 UI 管理的三个字段）。 */
+  /** 读取覆盖快照（provider → modelId → 本 UI 管理的字段）。 */
   get: "pidesk:modelOverrides:get",
   /** 写入一条覆盖补丁并重载存活会话（null 表示删除该键，回到默认）。 */
   set: "pidesk:modelOverrides:set",
@@ -448,12 +513,29 @@ export interface PiModelOverridePatch {
   contextWindow?: number | null;
   maxTokens?: number | null;
   input?: PiModelInputModality[] | null;
+  /**
+   * 该模型支持的思考档位；null = 删除 reasoning / thinkingLevelMap 覆盖。
+   * 主进程会据此写 pi 的 reasoning + thinkingLevelMap（只写非默认档位），
+   * 渲染层不需要了解 provider 级映射值。
+   */
+  thinkingLevels?: ThinkingLevelId[] | null;
 }
 
 /** 覆盖快照投影：provider → modelId → 覆盖字段（只含本 UI 管理的键）。 */
 export type PiModelOverridesSnapshot = Record<
   string,
-  Record<string, { contextWindow?: number; maxTokens?: number; input?: PiModelInputModality[] }>
+  Record<
+    string,
+    {
+      contextWindow?: number;
+      maxTokens?: number;
+      input?: PiModelInputModality[];
+      /** 原始覆盖的 reasoning 键（存在即表示思考档位被用户改过）。 */
+      reasoning?: boolean;
+      /** 原始覆盖的档位映射（仅保留已知档位键）。 */
+      thinkingLevelMap?: PiThinkingLevelMap;
+    }
+  >
 >;
 
 export interface PiModelOverrideSetRequest {
@@ -824,7 +906,7 @@ export interface SessionPromptRequest extends SessionProcessRequest {
 }
 
 export interface SessionSetThinkingLevelRequest extends SessionProcessRequest {
-  level: string;
+  level: ThinkingLevelId;
 }
 
 export interface SessionSetModelRequest extends SessionProcessRequest {
@@ -925,6 +1007,11 @@ export type PiAgentEvent =
   | { type: "agent_settled"; aborted?: boolean }
   /** 插话 / 稍后队列变化；两个字段都是当前队列的**全量**快照。 */
   | { type: "queue_update"; steering: string[]; followUp: string[] }
+  /**
+   * 会话档位变化（扩展调用 setThinkingLevel、切模型被 pi clamp 等）：
+   * PiDesk 自己发起的设置也走这里，渲染层据此对账芯片。
+   */
+  | { type: "thinking_level_changed"; level: ThinkingLevelId }
   | { type: "message_start"; message: PiChatMessage }
   | {
       type: "message_update";

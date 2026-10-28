@@ -1,7 +1,11 @@
 import { ArrowCounterClockwise } from "@phosphor-icons/react";
 import { memo, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { TranslateFn } from "../../../shared/i18n";
-import type { PiModelOverridePatch } from "../../../shared/ipc";
+import {
+  type PiModelOverridePatch,
+  THINKING_LEVELS,
+  type ThinkingLevelId,
+} from "../../../shared/ipc";
 import { useGlidePill } from "../../hooks/useGlidePill";
 import { useT } from "../../hooks/useT";
 import type { ModelOverrideRow } from "../../utils/modelOverrides";
@@ -15,10 +19,12 @@ import {
   WINDOW_PRESETS,
 } from "../../utils/modelOverrides";
 import { AiModelIcon } from "../AiIcons/AiModelIcon";
+import { Button } from "../ui/Button";
 import { GlideChevron } from "../ui/GlideChevron";
 import glideStyles from "../ui/GlideList.module.css";
 import { Popover } from "../ui/Popover";
 import { Segmented } from "../ui/Segmented";
+import { ThinkingLevelSlider } from "../ui/ThinkingLevelSlider";
 import styles from "./Settings.module.css";
 
 /** 覆盖列表默认展示行数（其余折叠）。 */
@@ -33,11 +39,11 @@ interface ModelOverridesSectionProps {
 }
 
 /**
- * 设置 →「模型能力」（docs/design/50）：四列表格 + 值即控件。
+ * 设置 →「模型能力」（docs/design/50）：五列表格 + 值即控件。
  *
- * 行上不放常驻下拉：常态只有「模型 / 窗口 / 输出上限 / 多模态」四个值，点值才弹 popover 改。
- * 来源靠字段自身着色（蓝 = 已修改，灰 = 沿用默认），而不是行级的一列文字——
- * 同一行可能窗口是用户设的、多模态仍是目录猜的。
+ * 行上不放常驻下拉：常态只有「模型 / 窗口 / 输出上限 / 多模态 / 思考档位」五个值，
+ * 点值才弹 popover 改。来源靠字段自身着色（蓝 = 已修改，灰 = 沿用默认），
+ * 而不是行级的一列文字——同一行可能窗口是用户设的、多模态仍是目录猜的。
  */
 export const ModelOverridesSection = memo(function ModelOverridesSection({
   rows,
@@ -113,6 +119,7 @@ export const ModelOverridesSection = memo(function ModelOverridesSection({
             <span>{t("settings.models.overrides.windowField")}</span>
             <span>{t("settings.models.overrides.maxTokensField")}</span>
             <span>{t("settings.models.overrides.inputField")}</span>
+            <span>{t("settings.models.overrides.thinkingField")}</span>
           </div>
           {shown.map((row) => (
             <OverrideRow
@@ -149,10 +156,10 @@ export const ModelOverridesSection = memo(function ModelOverridesSection({
 });
 
 /**
- * 单行：模型名 + 三个「值即控件」单元格（+ 已修改时的行尾恢复按钮）。
+ * 单行：模型名 + 四个「值即控件」单元格（+ 已修改时的恢复按钮）。
  *
  * memo 是必需的：保存一条覆盖会把 savingKey 置上再清掉，父级因此提交两次；
- * 展开后 112 行 × 3 个 Popover 全量重渲染约 50ms/次（实测，doc 70 调优）。
+ * 展开后 112 行 × 4 个 Popover 全量重渲染约 50ms/次（实测，doc 70 调优）。
  */
 const OverrideRow = memo(function OverrideRow({
   row,
@@ -305,9 +312,59 @@ const OverrideRow = memo(function OverrideRow({
           </button>
         )}
       </span>
+
+      <span className={styles.ovCell}>
+        <Popover
+          direction="bottom"
+          trigger={({ onClick }) => (
+            <button
+              type="button"
+              className={[styles.ovVal, row.overrideThinking ? styles.ovValOn : ""].join(" ")}
+              disabled={saving}
+              aria-label={t("settings.models.overrides.thinkingLabel", { model: row.modelId })}
+              onClick={onClick}
+            >
+              {formatThinkingLevels(row.effectiveThinkingLevels, t)}
+              <GlideChevron size={16} className={styles.ovValCaret} />
+            </button>
+          )}
+        >
+          {(close) => (
+            <ThinkingEditor
+              row={row}
+              saving={saving}
+              t={t}
+              onSubmit={async (patch) => {
+                await onSave(row, patch);
+                close();
+              }}
+            />
+          )}
+        </Popover>
+        {row.overrideThinking && (
+          <button
+            type="button"
+            className={styles.ovReset}
+            disabled={saving}
+            aria-label={t("settings.models.overrides.resetThinkingAria", { model: row.modelId })}
+            onClick={() => void onSave(row, { thinkingLevels: null })}
+          >
+            <ArrowCounterClockwise size={16} weight="regular" />
+          </button>
+        )}
+      </span>
     </div>
   );
 });
+
+/** 行内/脚注展示：未知给占位符；只有 off 说「不支持」，其余给档位数。 */
+function formatThinkingLevels(levels: ThinkingLevelId[] | undefined, t: TranslateFn): string {
+  if (!levels || levels.length === 0) return "—";
+  if (levels.length === 1 && levels[0] === "off") {
+    return t("settings.models.overrides.thinkingOff");
+  }
+  return t("settings.models.overrides.thinkingCount", { count: levels.length });
+}
 
 /**
  * 弹层胶囊组的「高亮药丸」（docs/design/51）：同一套 cubic-bezier 曲线 + 定帧时间轴（封顶
@@ -533,6 +590,64 @@ function MaxTokensEditor({
         t={t}
         onUseDefault={() => void onSubmit({ maxTokens: null })}
       />
+    </div>
+  );
+}
+
+/**
+ * 思考档位：输入栏同款滑杆，保存后才写盘。
+ *
+ * 滑杆选择「到哪一档」，落地为从 off 起的连续档位集合（如拉到「低」= off/minimal/low）。
+ * 主进程把它转换成 pi 的 reasoning + thinkingLevelMap（见 modelOverrides.ts）；
+ * 已有的非连续档位集合无法用单指滑杆表达，保存时会改成连续档位并给出提示。
+ */
+function ThinkingEditor({
+  row,
+  saving,
+  t,
+  onSubmit,
+}: {
+  row: ModelOverrideRow;
+  saving: boolean;
+  t: TranslateFn;
+  onSubmit: (patch: PiModelOverridePatch) => Promise<void>;
+}) {
+  const effective = row.effectiveThinkingLevels;
+  const initialTop = effective && effective.length > 0 ? effective[effective.length - 1] : "high";
+  const [top, setTop] = useState<ThinkingLevelId>(initialTop);
+  const topIndex = Math.max(0, THINKING_LEVELS.indexOf(top));
+  const count = topIndex + 1;
+  const contiguous =
+    !effective || effective.every((level, index) => THINKING_LEVELS[index] === level);
+  const valueLabel =
+    top === "off"
+      ? t("session.thinking.off")
+      : t("settings.models.overrides.thinkingCount", { count });
+
+  return (
+    <div className={styles.ovPop}>
+      <ThinkingLevelSlider
+        levels={THINKING_LEVELS}
+        value={top}
+        onChange={setTop}
+        title={t("settings.models.overrides.thinkingField")}
+        valueLabel={valueLabel}
+        hint={t(
+          contiguous
+            ? "settings.models.overrides.thinkingHint"
+            : "settings.models.overrides.thinkingNonPrefix",
+        )}
+        disabled={saving}
+      />
+      <div className={styles.ovPopActions}>
+        <Button
+          variant="primary"
+          disabled={saving}
+          onClick={() => void onSubmit({ thinkingLevels: THINKING_LEVELS.slice(0, count) })}
+        >
+          {t("common.save")}
+        </Button>
+      </div>
     </div>
   );
 }

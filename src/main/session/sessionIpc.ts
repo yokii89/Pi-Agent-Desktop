@@ -24,7 +24,13 @@ import type {
   SessionTranscriptPayload,
   ThinkingLevelId,
 } from "../../shared/ipc";
-import { AUTH_IPC, PI_IPC, SESSION_IPC } from "../../shared/ipc";
+import {
+  AUTH_IPC,
+  deriveAvailableThinkingLevels,
+  isThinkingLevelId,
+  PI_IPC,
+  SESSION_IPC,
+} from "../../shared/ipc";
 import { envelope, envelopeAsync } from "../ipc/envelope";
 import { getSettings } from "../settings/settings";
 import { buildContextBreakdown } from "./contextBreakdown";
@@ -45,6 +51,7 @@ import {
   clearSessionQueue,
   disposeSession,
   fetchAvailableModels,
+  fetchAvailableThinkingLevels,
   fetchSessionMessages,
   fetchSessionState,
   fetchSessionStats,
@@ -71,18 +78,8 @@ import { normalizeSessionName } from "./sessionMeta";
 import { appendSessionName } from "./sessionName";
 import { readSessionTranscript } from "./sessionTranscriptRead";
 
-const THINKING_LEVELS = new Set<string>([
-  "off",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-]);
-
-/** 输入栏展示的三档（对齐设计图）；pi 其余档位原样透出但 UI 默认只给这三档。 */
-const DISPLAY_THINKING: ThinkingLevelId[] = ["low", "high", "max"];
+/** 拿不到 pi 档位时的回退：pi 的 DEFAULT_THINKING_LEVEL（medium）。 */
+const DEFAULT_THINKING_LEVEL: ThinkingLevelId = "medium";
 
 const QUEUE_INTENTS = new Set<string>(["steer", "followUp"]);
 
@@ -91,11 +88,31 @@ function requireSessionId(raw: unknown): SessionId {
   throw new Error("缺少 sessionId");
 }
 
-function normalizeThinkingLevel(raw: unknown): ThinkingLevelId {
-  if (raw === "low" || raw === "high" || raw === "max") return raw;
-  if (raw === "minimal" || raw === "off") return "low";
-  if (raw === "medium" || raw === "xhigh") return "high";
-  return "high";
+/** `get_available_thinking_levels` 的 `{ levels }` → 已知档位（保持 pi 返回顺序）。 */
+function mapAvailableThinkingLevels(data: unknown): ThinkingLevelId[] {
+  const raw = data && typeof data === "object" ? (data as { levels?: unknown }).levels : undefined;
+  if (!Array.isArray(raw)) return [];
+  const out: ThinkingLevelId[] = [];
+  for (const item of raw) {
+    if (isThinkingLevelId(item) && !out.includes(item)) out.push(item);
+  }
+  return out;
+}
+
+/**
+ * 一次拿齐当前模型状态与可用档位。
+ * 可用档位单独失败（旧版 pi 不认该命令）时按「未知」返回空数组，不影响模型状态。
+ */
+async function readSessionModelState(
+  sessionId: SessionId,
+): Promise<{ state: unknown; available: ThinkingLevelId[] }> {
+  const [state, available] = await Promise.all([
+    fetchSessionState(sessionId),
+    fetchAvailableThinkingLevels(sessionId)
+      .then(mapAvailableThinkingLevels)
+      .catch(() => [] as ThinkingLevelId[]),
+  ]);
+  return { state, available };
 }
 
 function mapSlashCommands(data: unknown): PiSlashCommand[] {
@@ -145,6 +162,8 @@ function mapModels(data: unknown): PiModelOption[] {
       input?: unknown;
       contextWindow?: unknown;
       maxTokens?: unknown;
+      reasoning?: unknown;
+      thinkingLevelMap?: unknown;
     };
     if (typeof record.provider !== "string" || typeof record.id !== "string") continue;
     const label =
@@ -164,6 +183,11 @@ function mapModels(data: unknown): PiModelOption[] {
       record.maxTokens > 0
         ? record.maxTokens
         : undefined;
+    // 可用档位来自 pi 组合后的模型（含 modelOverrides）；缺 reasoning 表示旧版 pi，未知
+    const availableThinkingLevels =
+      typeof record.reasoning === "boolean"
+        ? deriveAvailableThinkingLevels(record.reasoning, record.thinkingLevelMap)
+        : undefined;
     out.push({
       provider: record.provider,
       modelId: record.id,
@@ -171,12 +195,17 @@ function mapModels(data: unknown): PiModelOption[] {
       ...(input ? { input } : {}),
       ...(contextWindow !== undefined ? { contextWindow } : {}),
       ...(maxTokens !== undefined ? { maxTokens } : {}),
+      ...(availableThinkingLevels ? { availableThinkingLevels } : {}),
     });
   }
   return out;
 }
 
-function mapModelState(state: unknown, fallbackLabel: string | null): PiModelState {
+function mapModelState(
+  state: unknown,
+  fallbackLabel: string | null,
+  availableThinkingLevels: ThinkingLevelId[],
+): PiModelState {
   const record =
     state && typeof state === "object"
       ? (state as {
@@ -207,8 +236,10 @@ function mapModelState(state: unknown, fallbackLabel: string | null): PiModelSta
   }
   return {
     modelLabel,
-    thinkingLevel: normalizeThinkingLevel(record.thinkingLevel),
-    availableThinkingLevels: DISPLAY_THINKING,
+    thinkingLevel: isThinkingLevelId(record.thinkingLevel)
+      ? record.thinkingLevel
+      : DEFAULT_THINKING_LEVEL,
+    availableThinkingLevels,
     modelInput,
     contextWindow,
     autoCompactionEnabled: record.autoCompactionEnabled === true,
@@ -442,7 +473,7 @@ export function registerSessionIpc(): void {
       envelopeAsync(async () => {
         const sessionId = requireSessionId(req?.sessionId);
         const level = req?.level;
-        if (typeof level !== "string" || !THINKING_LEVELS.has(level)) {
+        if (!isThinkingLevelId(level)) {
           throw new Error("无效的思考档位");
         }
         if (!hasSession(sessionId)) throw new Error("会话未启动");
@@ -460,26 +491,30 @@ export function registerSessionIpc(): void {
         const info = getPiConfigInfo(getSettings().piExecutablePath);
         const fallback = piInfoFallbackLabel(info);
         if (!hasSession(sessionId)) {
-          // 目标未启动：回退 pi 配置，不得误读其它存活实例（A5）
+          // 目标未启动：回退 pi 配置，不得误读其它存活实例（A5）；
+          // 无进程可问能力，可用档位留空由渲染层回退设计稿五档
           return {
             modelLabel: fallback,
-            thinkingLevel: normalizeThinkingLevel(info.thinkingLevel),
-            availableThinkingLevels: DISPLAY_THINKING,
+            thinkingLevel: isThinkingLevelId(info.thinkingLevel)
+              ? info.thinkingLevel
+              : DEFAULT_THINKING_LEVEL,
+            availableThinkingLevels: [],
             modelInput: null,
             contextWindow: null,
             autoCompactionEnabled: false,
           };
         }
-        const state = await fetchSessionState(sessionId);
+        const { state, available } = await readSessionModelState(sessionId);
         const sessionProvider = extractSessionModelProvider(state);
         const { provider: defaultProvider } = readDefaultModel();
         // 自愈：会话仍挂在旧凭据 provider（切换竞态 / --session 恢复写回）时重新对齐
         if (defaultProvider && sessionProvider && sessionProvider !== defaultProvider) {
           await applyDefaultModelToSession(sessionId, { retries: 2, delayMs: 200 });
           reassertActiveCredential();
-          return mapModelState(await fetchSessionState(sessionId), fallback);
+          const retried = await readSessionModelState(sessionId);
+          return mapModelState(retried.state, fallback, retried.available);
         }
-        return mapModelState(state, fallback);
+        return mapModelState(state, fallback, available);
       }),
   );
 

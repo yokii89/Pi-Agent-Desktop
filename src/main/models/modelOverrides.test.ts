@@ -91,6 +91,97 @@ describe("applyModelOverridePatch", () => {
     const removed = applyModelOverridePatch(supported, update({ input: null }));
     expect(removed).toEqual({});
   });
+
+  it("thinkingLevels：只选关闭 = reasoning false；5 档写 xhigh/max null", () => {
+    const off = applyModelOverridePatch({}, update({ thinkingLevels: ["off"] }));
+    expect(entryOf(off)).toEqual({ reasoning: false });
+
+    const five = applyModelOverridePatch(
+      {},
+      update({ thinkingLevels: ["off", "minimal", "low", "medium", "high"] }),
+    );
+    expect(entryOf(five)).toEqual({
+      reasoning: true,
+      thinkingLevelMap: { xhigh: null, max: null },
+    });
+  });
+
+  it("thinkingLevels：任意子集只写非默认档位与 xhigh/max 的带值映射", () => {
+    const next = applyModelOverridePatch({}, update({ thinkingLevels: ["low", "high", "max"] }));
+    expect(entryOf(next)).toEqual({
+      reasoning: true,
+      thinkingLevelMap: {
+        off: null,
+        minimal: null,
+        medium: null,
+        xhigh: null,
+        max: "max",
+      },
+    });
+  });
+
+  it("thinkingLevels：保留已有 provider 映射值与未知键，未选中档位置 null", () => {
+    const raw: Record<string, unknown> = {
+      providers: {
+        newapi: {
+          modelOverrides: {
+            "gpt-6.1-sol": {
+              reasoning: true,
+              thinkingLevelMap: {
+                off: "none",
+                minimal: null,
+                low: "low-custom",
+                high: "high-custom",
+                max: "max-custom",
+              },
+              compat: { supportsReasoningEffort: false },
+            },
+          },
+        },
+      },
+    };
+    const next = applyModelOverridePatch(raw, update({ thinkingLevels: ["off", "low", "high"] }));
+    expect(entryOf(next)).toEqual({
+      reasoning: true,
+      thinkingLevelMap: {
+        off: "none",
+        minimal: null,
+        low: "low-custom",
+        medium: null,
+        high: "high-custom",
+        xhigh: null,
+        max: null,
+      },
+      compat: { supportsReasoningEffort: false },
+    });
+  });
+
+  it("thinkingLevels：null 删两键并保留其他字段；非法集合拒绝", () => {
+    const raw: Record<string, unknown> = {
+      providers: {
+        newapi: {
+          modelOverrides: {
+            "gpt-6.1-sol": {
+              reasoning: true,
+              thinkingLevelMap: { max: "max" },
+              contextWindow: 128000,
+              compat: { x: 1 },
+            },
+          },
+        },
+      },
+    };
+    const reset = applyModelOverridePatch(raw, update({ thinkingLevels: null }));
+    expect(entryOf(reset)).toEqual({ contextWindow: 128000, compat: { x: 1 } });
+
+    expect(() => applyModelOverridePatch({}, update({ thinkingLevels: [] }))).toThrow(/思考档位/);
+    expect(() => applyModelOverridePatch({}, update({ thinkingLevels: ["off", "off"] }))).toThrow(
+      /重复/,
+    );
+    expect(() =>
+      applyModelOverridePatch({}, update({ thinkingLevels: ["ultra" as unknown as "max"] })),
+    ).toThrow(/思考档位/);
+  });
 });
 
 describe("setModelOverride / readModelOverrides（真实文件往返）", () => {
@@ -134,7 +225,7 @@ describe("setModelOverride / readModelOverrides（真实文件往返）", () => 
     });
   });
 
-  it("快照投影只暴露三个管理字段；非法值按未设置处理", () => {
+  it("快照投影暴露管理字段（含思考）；非法值按未设置处理", () => {
     const file = makeFile({
       providers: {
         newapi: {
@@ -142,12 +233,19 @@ describe("setModelOverride / readModelOverrides（真实文件往返）", () => 
             a: { contextWindow: 131072, maxTokens: 32768, input: ["text", "image"] },
             b: { contextWindow: -5, maxTokens: 0, input: ["junk"] },
             c: { compat: { x: 1 } },
+            d: { reasoning: false },
+            e: { thinkingLevelMap: { off: null, max: "max", junk: 1 } },
+            f: { reasoning: "yes", thinkingLevelMap: { max: 42 } },
           },
         },
       },
     });
     expect(readModelOverrides(file)).toEqual({
-      newapi: { a: { contextWindow: 131072, maxTokens: 32768, input: ["text", "image"] } },
+      newapi: {
+        a: { contextWindow: 131072, maxTokens: 32768, input: ["text", "image"] },
+        d: { reasoning: false },
+        e: { thinkingLevelMap: { off: null, max: "max" } },
+      },
     });
   });
 

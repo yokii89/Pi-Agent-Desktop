@@ -30,7 +30,14 @@ export interface FileMention {
 
 interface ComposerStoreValue {
   thinkingLevel: ThinkingLevelId;
+  /** 当前模型可用档位；无存活会话（能力未知）时回退设计稿五档。 */
+  thinkingLevels: ThinkingLevelId[];
   setThinkingLevel: (level: ThinkingLevelId) => void;
+  /**
+   * pi 真值回填（会话启动 / 切换 / 切模型 / thinking_level_changed）：
+   * available 为空表示能力未知，只更新当前档位、保留现有档位集合。
+   */
+  syncThinkingState: (level: ThinkingLevelId, available: ThinkingLevelId[]) => void;
   /** 已选 @ 文件（空态/会话态共用；发送后清空）。 */
   fileMentions: FileMention[];
   addFileMention: (item: FileMention) => void;
@@ -69,8 +76,25 @@ interface ComposerStoreValue {
 
 const ComposerStoreContext = createContext<ComposerStoreValue | null>(null);
 
+/** pi 默认档位（DEFAULT_THINKING_LEVEL=medium）；五档里正好是中间位，不会默认落在顶档。 */
+const DEFAULT_THINKING_LEVEL: ThinkingLevelId = "medium";
+
+/** 无存活会话时不知道模型能力：回退设计稿的五档（低/中/高/极高/最高）。 */
+export const THINKING_FALLBACK_LEVELS: ThinkingLevelId[] = [
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+];
+
+/** 同一顺序的档位集合才复用旧引用，避免每次刷新都让整棵输入栏重渲染。 */
+function sameLevels(a: ThinkingLevelId[], b: ThinkingLevelId[]): boolean {
+  return a.length === b.length && a.every((level, i) => level === b[i]);
+}
+
 /** ComposerProvider 每轮渲染同步的最新思考档位，供组件外读取。 */
-let currentThinkingLevel: ThinkingLevelId = "high";
+let currentThinkingLevel: ThinkingLevelId = DEFAULT_THINKING_LEVEL;
 
 /**
  * 组件外读取当前思考档位。
@@ -85,10 +109,21 @@ export function getComposerThinkingLevel(): ThinkingLevelId {
  * 输入栏偏好（思考档位 / @ 文件）。
  * 放在 SessionArea 之上的 Provider：空态↔会话态切换会卸载 TaskInput，
  * 偏好不应因此重置。
+ *
+ * `nested`：队列编辑卡会再挂一个 ComposerProvider（草稿/附件与主输入栏隔离），
+ * 它的档位只是编辑卡的本地状态，不能覆盖组件外读取的模块级镜像。
  */
-export function ComposerProvider({ children }: { children: ReactNode }) {
-  const [thinkingLevel, setThinkingLevelState] = useState<ThinkingLevelId>("high");
-  currentThinkingLevel = thinkingLevel;
+export function ComposerProvider({
+  children,
+  nested = false,
+}: {
+  children: ReactNode;
+  nested?: boolean;
+}) {
+  const [thinkingLevel, setThinkingLevelState] = useState<ThinkingLevelId>(DEFAULT_THINKING_LEVEL);
+  const [thinkingLevels, setThinkingLevelsState] =
+    useState<ThinkingLevelId[]>(THINKING_FALLBACK_LEVELS);
+  if (!nested) currentThinkingLevel = thinkingLevel;
   const [fileMentions, setFileMentions] = useState<FileMention[]>([]);
   const [imageAttachments, setImageAttachments] = useState<ComposerImageAttachment[]>([]);
   // 同步镜像：add 要在同一调用栈内返回是否超限，不能依赖 setState 更新器
@@ -100,9 +135,25 @@ export function ComposerProvider({ children }: { children: ReactNode }) {
   const [pendingInsert, setPendingInsert] = useState<{ text: string; seq: number } | null>(null);
   const insertSeqRef = useRef(0);
 
-  const setThinkingLevel = useCallback((level: ThinkingLevelId) => {
-    setThinkingLevelState(level);
-  }, []);
+  const setThinkingLevel = useCallback(
+    (level: ThinkingLevelId) => {
+      // 发送链路在组件外读模块级镜像；状态更新是异步的，这里先落镜像
+      if (!nested) currentThinkingLevel = level;
+      setThinkingLevelState(level);
+    },
+    [nested],
+  );
+
+  const syncThinkingState = useCallback(
+    (level: ThinkingLevelId, available: ThinkingLevelId[]) => {
+      if (!nested) currentThinkingLevel = level;
+      setThinkingLevelState(level);
+      if (available.length > 0) {
+        setThinkingLevelsState((prev) => (sameLevels(prev, available) ? prev : available));
+      }
+    },
+    [nested],
+  );
 
   const addFileMention = useCallback((item: FileMention) => {
     setFileMentions((prev) => {
@@ -203,7 +254,9 @@ export function ComposerProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ComposerStoreValue>(
     () => ({
       thinkingLevel,
+      thinkingLevels,
       setThinkingLevel,
+      syncThinkingState,
       fileMentions,
       addFileMention,
       removeFileMention,
@@ -227,7 +280,9 @@ export function ComposerProvider({ children }: { children: ReactNode }) {
     }),
     [
       thinkingLevel,
+      thinkingLevels,
       setThinkingLevel,
+      syncThinkingState,
       fileMentions,
       addFileMention,
       removeFileMention,
@@ -260,9 +315,13 @@ export function useComposerStore(): ComposerStoreValue {
   return ctx;
 }
 
-/** 思考档位展示文案 key（对齐设计图）；组件经 useT 解析。 */
+/** 思考档位展示文案 key（与 pi 七档一一对应）；组件经 useT 解析。 */
 export const THINKING_LABEL_KEY: Record<ThinkingLevelId, string> = {
+  off: "session.thinking.off",
+  minimal: "session.thinking.minimal",
   low: "session.thinking.low",
+  medium: "session.thinking.medium",
   high: "session.thinking.high",
+  xhigh: "session.thinking.xhigh",
   max: "session.thinking.max",
 };

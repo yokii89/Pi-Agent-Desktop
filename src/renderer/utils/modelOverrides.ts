@@ -7,6 +7,7 @@ import type {
   PiModelInputModality,
   PiModelOption,
   PiModelOverridesSnapshot,
+  ThinkingLevelId,
 } from "../../shared/ipc";
 
 export interface ModelOverrideRow {
@@ -19,16 +20,26 @@ export interface ModelOverrideRow {
   effectiveWindow?: number;
   /** 当前生效（含覆盖）的单次输出上限；undefined = 未知。 */
   effectiveMaxTokens?: number;
+  /** 当前生效（含覆盖）的思考档位；undefined = 能力未知。 */
+  effectiveThinkingLevels?: ThinkingLevelId[];
   /** 覆盖值：undefined 键 = 默认（不显示在 selects 的覆盖态上）。 */
   overrideWindow?: number;
   overrideMaxTokens?: number;
   overrideInput?: PiModelInputModality[];
+  /** 思考档位是否被用户覆盖（原始 reasoning / thinkingLevelMap 任一存在）。 */
+  overrideThinking: boolean;
   hasOverride: boolean;
   /** 当前默认模型：行上打「当前」标记，回答"改这个会不会影响正在跑的会话"。 */
   isDefault: boolean;
 }
 
 function sameModalities(a?: PiModelInputModality[], b?: PiModelInputModality[]): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
+function sameThinkingLevels(a?: ThinkingLevelId[], b?: ThinkingLevelId[]): boolean {
   if (a === b) return true;
   if (!a || !b || a.length !== b.length) return false;
   return a.every((value, index) => value === b[index]);
@@ -43,10 +54,12 @@ function sameRow(a: ModelOverrideRow, b: ModelOverrideRow): boolean {
     a.effectiveMaxTokens === b.effectiveMaxTokens &&
     a.overrideWindow === b.overrideWindow &&
     a.overrideMaxTokens === b.overrideMaxTokens &&
+    a.overrideThinking === b.overrideThinking &&
     a.hasOverride === b.hasOverride &&
     a.isDefault === b.isDefault &&
     sameModalities(a.effectiveInput, b.effectiveInput) &&
-    sameModalities(a.overrideInput, b.overrideInput)
+    sameModalities(a.overrideInput, b.overrideInput) &&
+    sameThinkingLevels(a.effectiveThinkingLevels, b.effectiveThinkingLevels)
   );
 }
 
@@ -85,9 +98,12 @@ export function buildModelOverrideRows(
         effectiveInput: model.input,
         effectiveWindow: model.contextWindow,
         effectiveMaxTokens: model.maxTokens,
+        effectiveThinkingLevels: model.availableThinkingLevels,
         overrideWindow: override?.contextWindow,
         overrideMaxTokens: override?.maxTokens,
         overrideInput: override?.input,
+        overrideThinking:
+          override?.reasoning !== undefined || override?.thinkingLevelMap !== undefined,
         hasOverride: Boolean(override),
         isDefault: defaultModelKey === `${model.provider}/${model.modelId}`,
       } satisfies ModelOverrideRow,

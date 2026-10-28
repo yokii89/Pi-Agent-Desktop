@@ -199,14 +199,22 @@ export const sessionMessages = defineMessages({
     "zh-CN": "上下文分类占比",
     "en-US": "Context breakdown",
   },
+  "session.thinking.off": { "zh-CN": "关闭", "en-US": "Off" },
+  "session.thinking.minimal": { "zh-CN": "极低", "en-US": "Minimal" },
   "session.thinking.low": { "zh-CN": "低", "en-US": "Low" },
+  "session.thinking.medium": { "zh-CN": "中", "en-US": "Medium" },
   "session.thinking.high": { "zh-CN": "高", "en-US": "High" },
+  "session.thinking.xhigh": { "zh-CN": "极高", "en-US": "X-High" },
   "session.thinking.max": { "zh-CN": "最高", "en-US": "Max" },
   "session.thinking.faster": { "zh-CN": "更快", "en-US": "Faster" },
   "session.thinking.smarter": { "zh-CN": "更准", "en-US": "Smarter" },
   "session.thinking.help": {
     "zh-CN": "思考等级越高，回答前思考得越久",
     "en-US": "Higher levels think longer before answering",
+  },
+  "session.thinking.unavailable": {
+    "zh-CN": "当前模型不支持思考",
+    "en-US": "This model does not support thinking",
   },
   "session.image.hint": {
     "zh-CN": "模型目录未声明支持图片",

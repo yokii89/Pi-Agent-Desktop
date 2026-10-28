@@ -81,6 +81,7 @@ export function TaskInput({
   const { currentProject } = useProjectStore();
   const {
     thinkingLevel,
+    thinkingLevels,
     fileMentions,
     addFileMention,
     removeFileMention,
@@ -135,6 +136,9 @@ export function TaskInput({
   const composerRef = useRef<ComposerHandle | null>(null);
   const searchSeqRef = useRef(0);
   const running = phase === "running";
+  /** 顶档 = 当前模型可用档位的最高档；单档（模型不支持思考）不算顶档。 */
+  const thinkingAtTop =
+    thinkingLevels.length > 1 && thinkingLevel === thinkingLevels[thinkingLevels.length - 1];
   // P0：modal / floating widget 打开期间禁用任务输入发送，避免与工具 Promise 双写
   // （docs/design/08 §12.1；floating widget 与 modal 同属阻断交互）
   const { hasBlockingViewFor, modeTransitioning, sendBlockedReason } = useExtensionViewStore();
@@ -799,7 +803,7 @@ export function TaskInput({
 
       <div
         className={[styles.inputBox, variant === "session" ? styles.inputSession : ""].join(" ")}
-        data-max={thinkingLevel === "max" ? "" : undefined}
+        data-max={thinkingAtTop ? "" : undefined}
       >
         {/* 动物伙伴：骑在输入卡右上沿，纯装饰；姿态只跟随会话状态（设置 → 个性化）。
             队列编辑不渲染：伙伴是会话输入卡的专属装饰。 */}
@@ -814,8 +818,8 @@ export function TaskInput({
           />
         )}
 
-        {/* 思考等级顶档特效：左下角起辉走 .inputBox[data-max]::before，粒子在这里 */}
-        {thinkingLevel === "max" && !isQueueEdit && <ThinkingMaxAura />}
+        {/* 思考等级顶档特效：顶档 = 当前模型可用档位的最高档（左下起辉走 .inputBox[data-max]::before） */}
+        {thinkingAtTop && !isQueueEdit && <ThinkingMaxAura />}
 
         {variant === "empty" && <TaskInputContextBar />}
 

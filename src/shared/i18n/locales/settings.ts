@@ -1200,6 +1200,35 @@ export const settingsMessages = defineMessages({
     "zh-CN": "纯文本",
     "en-US": "Text only",
   },
+  "settings.models.overrides.thinkingField": {
+    "zh-CN": "思考档位",
+    "en-US": "Thinking levels",
+  },
+  "settings.models.overrides.thinkingHint": {
+    "zh-CN": "拖动选择该模型支持的档位数；输入栏会显示对应档位。",
+    "en-US": "Drag to choose how many levels this model supports; the composer shows them.",
+  },
+  "settings.models.overrides.thinkingNonPrefix": {
+    "zh-CN": "当前档位不连续，保存后会改为从「关闭」起的连续档位。",
+    "en-US":
+      "The current levels are non-contiguous; saving changes them to a contiguous range starting at Off.",
+  },
+  "settings.models.overrides.thinkingCount": {
+    "zh-CN": "{count} 档",
+    "en-US": "{count} levels",
+  },
+  "settings.models.overrides.thinkingOff": {
+    "zh-CN": "不支持",
+    "en-US": "Not supported",
+  },
+  "settings.models.overrides.thinkingLabel": {
+    "zh-CN": "{model} 的思考档位",
+    "en-US": "Thinking levels for {model}",
+  },
+  "settings.models.overrides.resetThinkingAria": {
+    "zh-CN": "恢复 {model} 的思考档位默认值",
+    "en-US": "Reset thinking levels for {model}",
+  },
   "settings.models.overrides.usingDefault": {
     "zh-CN": "未修改，沿用默认 {value}",
     "en-US": "Using default {value}",

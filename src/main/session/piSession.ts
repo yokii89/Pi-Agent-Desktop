@@ -48,6 +48,8 @@ const FORWARD_EVENT_TYPES = new Set<string>([
   "agent_settled",
   /** 插话 / 稍后队列全量快照（排队气泡与交付对账的数据源）。 */
   "queue_update",
+  /** 档位变化（本应用设置 / 扩展设置 / 切模型被 clamp）；芯片据此对账。 */
+  "thinking_level_changed",
   "message_start",
   "message_update",
   "message_end",
@@ -640,9 +642,17 @@ export function fetchSlashCommands(sessionId: SessionId): Promise<unknown> {
   return request(sessionId, "get_commands");
 }
 
-/** 设置思考档位（RPC set_thinking_level）。 */
+/** 设置思考档位（RPC set_thinking_level；pi 会按当前模型能力 clamp）。 */
 export function setThinkingLevel(sessionId: SessionId, level: string): Promise<void> {
   return request(sessionId, "set_thinking_level", { level }).then(() => undefined);
+}
+
+/**
+ * 读取当前模型支持的思考档位（RPC get_available_thinking_levels）。
+ * pi < 0.81 不认该命令会回 error；5 秒超时兜住不答的旧实现，调用方按「未知」回退。
+ */
+export function fetchAvailableThinkingLevels(sessionId: SessionId): Promise<unknown> {
+  return request(sessionId, "get_available_thinking_levels", {}, 5000);
 }
 
 /** 设置会话名（RPC set_session_name；非空名字由 pi 追加 session_info）。 */

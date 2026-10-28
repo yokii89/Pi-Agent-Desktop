@@ -27,10 +27,10 @@ import { GlideChevron } from "../ui/GlideChevron";
 import { Menu, type MenuItem } from "../ui/Menu";
 import { OptionList, type OptionRow } from "../ui/OptionList";
 import { Popover } from "../ui/Popover";
+import { ThinkingLevelSlider } from "../ui/ThinkingLevelSlider";
 import { ContextUsageChip } from "./ContextUsageChip";
 import { SendButton } from "./SendButton";
 import styles from "./TaskInputToolbar.module.css";
-import { ThinkingLevelSlider } from "./ThinkingLevelSlider";
 
 interface ToolbarProps {
   running: boolean;
@@ -64,8 +64,8 @@ export function TaskInputToolbar({
   attachEnabled = true,
 }: ToolbarProps) {
   const t = useT();
-  const { thinkingLevel, setThinkingLevel } = useComposerStore();
-  const { modelLabel, processAlive } = useSessionMeta();
+  const { thinkingLevel, thinkingLevels, setThinkingLevel } = useComposerStore();
+  const { modelLabel, processAlive, refreshModelState } = useSessionMeta();
   const attachInputRef = useRef<HTMLInputElement | null>(null);
   const flowRunning = sendRunning ?? running;
 
@@ -142,7 +142,13 @@ export function TaskInputToolbar({
 
       <ContextUsageChip />
       <ModelMenu label={modelLabel} />
-      <ThinkingChip level={thinkingLevel} onChange={setThinkingLevel} alive={processAlive} />
+      <ThinkingChip
+        level={thinkingLevel}
+        levels={thinkingLevels}
+        onChange={setThinkingLevel}
+        onOpen={() => void refreshModelState()}
+        alive={processAlive}
+      />
 
       {flowRunning && canSend && (
         <button
@@ -357,16 +363,21 @@ function AccessModeChip({ running }: { running: boolean }) {
 
 function ThinkingChip({
   level,
+  levels,
   onChange,
+  onOpen,
   alive,
 }: {
   level: ThinkingLevelId;
+  levels: ThinkingLevelId[];
   onChange: (level: ThinkingLevelId) => void;
+  /** 打开浮层时拉一次真值：预热会话 / 扩展改档后芯片不必等下一次切会话才更新。 */
+  onOpen: () => void;
   alive: boolean;
 }) {
   const t = useT();
-  const levels: ThinkingLevelId[] = ["low", "high", "max"];
-  const maxed = level === levels[levels.length - 1];
+  // 顶档 = 该模型可用档位的最高档（与滑轨 fill/thumb 的 data-max 同口径）
+  const maxed = levels.length > 1 && level === levels[levels.length - 1];
 
   const apply = (next: ThinkingLevelId): void => {
     onChange(next);
@@ -377,12 +388,15 @@ function ThinkingChip({
     <Popover
       direction="top"
       align="right"
-      trigger={({ onClick }) => (
+      trigger={({ onClick, open }) => (
         <button
           type="button"
           className={[styles.thinkingChip, maxed ? styles.thinkingChipMax : ""].join(" ")}
           title={t("session.input.thinkingLevel")}
-          onClick={onClick}
+          onClick={() => {
+            if (!open) onOpen();
+            onClick();
+          }}
         >
           <Sparkle size={14} weight="regular" />
           {t(THINKING_LABEL_KEY[level])}
@@ -390,7 +404,13 @@ function ThinkingChip({
         </button>
       )}
     >
-      <ThinkingLevelSlider levels={levels} value={level} onChange={apply} />
+      <ThinkingLevelSlider
+        levels={levels}
+        value={level}
+        onChange={apply}
+        title={t("session.input.thinkingLevel")}
+        valueLabel={t(THINKING_LABEL_KEY[level])}
+      />
     </Popover>
   );
 }

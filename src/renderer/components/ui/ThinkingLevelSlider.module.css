@@ -100,3 +100,23 @@
 .panel[data-max] .thumb {
   background: var(--color-spark);
 }
+
+/* 单档（pi 返回 ["off"]，模型不支持思考）：只展示状态，不提供拖动 */
+.panel[data-single] .track {
+  cursor: default;
+}
+
+.panel[data-single] .fill,
+.panel[data-single] .thumb {
+  display: none;
+}
+
+.panel[data-single] .dot {
+  background: color-mix(in srgb, var(--color-text) 22%, transparent);
+}
+
+.note {
+  margin: 0 var(--spacing-sm) var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}

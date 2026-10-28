@@ -146,9 +146,10 @@ export const QueueTail = memo(function QueueTail() {
               </div>
             )}
             {editingThis ? (
-              /* 输入卡独立 ComposerProvider：与中央输入栏的草稿/附件互不串扰 */
+              /* 输入卡独立 ComposerProvider：与中央输入栏的草稿/附件互不串扰；
+                 档位只是编辑卡本地状态，不能覆盖主输入栏的模块级镜像 */
               <div className={styles.editCard}>
-                <ComposerProvider>
+                <ComposerProvider nested>
                   <TaskInput
                     variant="session"
                     mode="queueEdit"

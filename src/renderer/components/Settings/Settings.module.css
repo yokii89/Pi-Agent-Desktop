@@ -899,7 +899,7 @@
 
 .ovRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 132px 132px 132px;
+  grid-template-columns: minmax(0, 1fr) 100px 100px 100px 100px;
   align-items: center;
   gap: 12px;
   min-height: 38px;
@@ -1073,6 +1073,12 @@
   display: flex;
   flex-direction: column;
   min-width: 216px;
+}
+
+.ovPopActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 9px;
 }
 
 .ovPopTitle {

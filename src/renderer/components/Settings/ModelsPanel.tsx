@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  PiApiKeyProviderOption,
-  PiAuthProviderStatus,
-  PiAuthSnapshot,
-  PiModelOption,
-  PiModelOverridePatch,
-  PiModelOverridesSnapshot,
+import {
+  clampThinkingLevel,
+  type PiApiKeyProviderOption,
+  type PiAuthProviderStatus,
+  type PiAuthSnapshot,
+  type PiModelOption,
+  type PiModelOverridePatch,
+  type PiModelOverridesSnapshot,
 } from "../../../shared/ipc";
 import { useT } from "../../hooks/useT";
 import { authService } from "../../services/authService";
 import { fsService } from "../../services/fsService";
 import { modelOverridesService } from "../../services/modelOverridesService";
 import { sessionService } from "../../services/sessionService";
+import { getComposerThinkingLevel, useComposerStore } from "../../stores/composerStore";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
 import {
@@ -37,6 +39,7 @@ import styles from "./Settings.module.css";
 export function ModelsPanel() {
   const t = useT();
   const { modelLabel, processAlive, refreshModelState } = useSessionMeta();
+  const { syncThinkingState } = useComposerStore();
   const { showToast } = useUiStore();
   const [auth, setAuth] = useState<PiAuthSnapshot | null>(null);
   const [apiKeyProviders, setApiKeyProviders] = useState<PiApiKeyProviderOption[]>([]);
@@ -291,14 +294,32 @@ export function ModelsPanel() {
         if (result.reloaded > 0) showToast(t("settings.models.overrides.savedLive"));
         else if (result.failed > 0) showToast(t("settings.models.overrides.savedBusy"));
         else showToast(t("settings.models.overrides.savedIdle"));
-        // 生效值来自 pi（主进程已重载存活会话）；存活路径极快，后台静默刷新
-        void sessionService.getModels().then((list) => {
-          if (list.length > 0) {
-            setModels(
-              activeProviderId ? list.filter((m) => m.provider === activeProviderId) : list,
-            );
-          }
-        });
+        // 生效值来自 pi（主进程已重载存活会话）；存活路径极快，后台静默刷新。
+        // 不能 await：无存活会话时 getModels 会短连 pi（实测 ~1s），会拖到浮层关闭之后。
+        void sessionService
+          .getModels()
+          .then((list) => {
+            if (list.length === 0) return;
+            const filtered = activeProviderId
+              ? list.filter((m) => m.provider === activeProviderId)
+              : list;
+            setModels(filtered);
+            // 只有改思考档位时才动输入栏；空态/冷会话没有存活实例可问，直接同步
+            if (row.isDefault && patch.thinkingLevels !== undefined) {
+              const updated = filtered.find(
+                (m) => m.provider === row.provider && m.modelId === row.modelId,
+              );
+              const levels = updated?.availableThinkingLevels;
+              if (levels && levels.length > 0) {
+                syncThinkingState(clampThinkingLevel(getComposerThinkingLevel(), levels), levels);
+              }
+            }
+          })
+          .catch(() => {
+            // 模型清单刷新失败不影响写盘结果；保留旧列表
+          });
+        // 存活会话以 pi 的 get_state 为准（可能 clamp 当前档位）
+        void refreshModelState();
       } catch (error) {
         showToast(
           error instanceof Error && error.message
@@ -309,7 +330,7 @@ export function ModelsPanel() {
         setSavingOverrideKey(null);
       }
     },
-    [t, activeProviderId, showToast],
+    [t, activeProviderId, showToast, syncThinkingState, refreshModelState],
   );
 
   const modelTriggerLabel = selectedKey || modelLabel || t("settings.models.selectModel");
