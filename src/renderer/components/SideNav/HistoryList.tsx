@@ -1,7 +1,9 @@
 import { type RefObject, useState } from "react";
 import type { SessionSummary } from "../../../shared/ipc";
 import { useT } from "../../hooks/useT";
+import { useBlockingSessionIds } from "../../stores/extensionViewStore";
 import { useProjectStore } from "../../stores/projectStore";
+import type { SessionAttentionKind } from "../../stores/sessionBuckets";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { findOwningProject } from "../../utils/sessionGroups";
 import { HistoryItem } from "./HistoryItem";
@@ -9,8 +11,11 @@ import styles from "./SideNav.module.css";
 import { TreeGuideLines } from "./TreeGuideLines";
 import { useOpenHistory } from "./useOpenHistory";
 
-/** 单条历史记录的运行状态：AI 输出中（旋转指示）或完成未读（绿点）。 */
-export type HistoryItemStatus = "running" | "unread" | null;
+/**
+ * 单条历史记录的状态槽（docs/design/82）：
+ * 运行点阵 / 等待你回答 / AI 完成 / 未正常结束 / 手动未读。
+ */
+export type HistoryItemStatus = "running" | "awaiting" | SessionAttentionKind | null;
 
 /** 默认展示的会话条数，超出部分折叠进"显示更多"。 */
 const VISIBLE_LIMIT = 5;
@@ -50,7 +55,14 @@ export function HistoryList({
   const t = useT();
   const [showAll, setShowAll] = useState(false);
   const { open, openingFile } = useOpenHistory();
-  const { activeSessionFile, unreadFiles, isFileProcessAlive, isFileRunning } = useSessionMeta();
+  const {
+    activeSessionFile,
+    attentionFiles,
+    isFileProcessAlive,
+    isFileRunning,
+    getSessionIdForFile,
+  } = useSessionMeta();
+  const blockingSessionIds = useBlockingSessionIds();
   const { projects } = useProjectStore();
 
   const visible = showAll ? sessions : sessions.slice(0, VISIBLE_LIMIT);
@@ -61,11 +73,14 @@ export function HistoryList({
     return findOwningProject(session.cwd, projects)?.name ?? null;
   };
 
-  // 运行中优先于完成未读（多会话：按 file 独立判定，不依赖 active）
+  // 运行态优先：等待回答（扩展表单阻塞）优先于点阵；其余看收口写入的待读标记
   const statusOf = (file: string): HistoryItemStatus => {
-    if (isFileRunning(file)) return "running";
-    if (unreadFiles.has(file)) return "unread";
-    return null;
+    if (isFileRunning(file)) {
+      const sessionId = getSessionIdForFile(file);
+      if (sessionId && blockingSessionIds.has(sessionId)) return "awaiting";
+      return "running";
+    }
+    return attentionFiles.get(file) ?? null;
   };
 
   const rows = (

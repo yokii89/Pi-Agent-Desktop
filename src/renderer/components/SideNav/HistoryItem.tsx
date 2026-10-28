@@ -1,4 +1,4 @@
-import { Prohibit, PushPin } from "@phosphor-icons/react";
+import { Prohibit } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SessionSummary } from "../../../shared/ipc";
 import { useT } from "../../hooks/useT";
@@ -10,6 +10,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ExtensionReloadNotice } from "./ExtensionReloadNotice";
 import { HistoryHoverCard } from "./HistoryHoverCard";
 import type { HistoryItemStatus } from "./HistoryList";
+import { HistoryStatusSlot } from "./HistoryStatusSlot";
 import {
   archiveItem,
   copyTaskIdItem,
@@ -22,7 +23,6 @@ import {
   RowMenu,
   renameItem,
 } from "./RowMenu";
-import { RunningDots } from "./RunningDots";
 import styles from "./SideNav.module.css";
 import { TreeGuideLines } from "./TreeGuideLines";
 
@@ -36,7 +36,10 @@ interface HistoryItemProps {
   disabled: boolean;
   /** 正在打开该会话（磁盘/进程路径进行中）；条目仍可点，后一次点击覆盖前一次。 */
   opening?: boolean;
-  /** 运行状态：AI 输出中（旋转指示）或完成未读（绿点）。 */
+  /**
+   * 状态槽：运行点阵 / 等待你回答 / AI 完成 / 未正常结束 / 手动未读。
+   * 后三种是「待读」语义：行获得焦点（active 且在会话页）时不显示。
+   */
   status?: HistoryItemStatus;
   /** 会话所属空间（项目）名；不属于任何项目时为 null。 */
   spaceName: string | null;
@@ -55,8 +58,11 @@ interface HistoryItemProps {
  * 侧栏历史会话条目（单行）：标题 + 右缘状态槽 + 悬浮操作（仅 ⋯，docs/design/45）。
  * 状态槽（与 ⋯ 互斥，悬浮/聚焦时让位）：
  * - AI 输出中 → 3×3 点阵呼吸动画；打开会话进行中同款；
- * - 完成未读 → 蓝点；
+ * - 扩展表单在等用户作答（ask_user_question 等）→ 黄色问号；
+ * - 收口后未读 → 绿色对勾（完成）/ 红色警告（未正常结束）/ 蓝色未读点（手动标记）；
  * - 置顶（全局或工作区）→ 图钉。
+ *
+ * 三种收口图标只在会话没有焦点时显示；获得焦点即消失（用户已读，docs/design/82）。
  *
  * 标题不再"悬浮滚动"，改为单行截断 + 悬浮（或键盘聚焦）后弹出详情卡展示全文与元信息，
  * 见 HistoryHoverCard。悬浮时整行轻微右移，作为"这条可点"的触觉提示。
@@ -82,7 +88,7 @@ export function HistoryItem({
     renameSession,
     pinnedFiles,
     globalPinnedFiles,
-    unreadFiles,
+    attentionFiles,
     togglePin,
     toggleGlobalPin,
     markSessionUnread,
@@ -94,8 +100,12 @@ export function HistoryItem({
   const title = sessionTitle(session, t("sidenav.session.untitled"));
   const pinned = pinnedFiles.includes(session.file);
   const globalPinned = globalPinnedFiles.includes(session.file);
-  const unread = unreadFiles.has(session.file);
+  const attention = attentionFiles.get(session.file) ?? null;
   const busy = status === "running" || opening;
+  // 「在当前对话的焦点里」= 该会话 active 且用户正停在会话页；此时三种收口图标视为已读
+  const focused = active && page === "session";
+  const showAwaiting = status === "awaiting" && !focused;
+  const showAttention = attention !== null && !focused;
   const [renaming, setRenaming] = useState(false);
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
   /** 打开结束确认时拉到的后台进程数（0 = 不出现「保留」双选）。 */
@@ -156,6 +166,21 @@ export function HistoryItem({
     setCardAnchor(null);
   }, []);
 
+  // 状态槽的读屏/悬浮提示：只描述当前可见的那个状态
+  const statusTitle = busy
+    ? opening
+      ? t("sidenav.session.opening")
+      : t("sidenav.session.aiResponding")
+    : showAwaiting
+      ? t("sidenav.session.awaitingInput")
+      : showAttention
+        ? attention === "done"
+          ? t("sidenav.session.aiDone")
+          : attention === "error"
+            ? t("sidenav.session.aiNotFinished")
+            : t("sidenav.session.unread")
+        : t("sidenav.session.pinned");
+
   return (
     <div
       ref={rowRef}
@@ -195,28 +220,13 @@ export function HistoryItem({
       )}
       <div className={styles.historyDots}>
         {/* 状态槽与 ⋯ 同位叠加：悬浮/聚焦/菜单常驻时状态让位（设计图 1/3/4，见 CSS） */}
-        {busy || unread || pinned || globalPinned ? (
-          <span
-            className={styles.statusLayer}
-            title={
-              busy
-                ? opening
-                  ? t("sidenav.session.opening")
-                  : t("sidenav.session.aiResponding")
-                : unread
-                  ? t("sidenav.session.aiDone")
-                  : t("sidenav.session.pinned")
-            }
-          >
-            {busy ? (
-              <RunningDots />
-            ) : unread ? (
-              <span className={styles.doneDot} />
-            ) : (
-              <PushPin size={16} weight="fill" />
-            )}
-          </span>
-        ) : null}
+        <HistoryStatusSlot
+          busy={busy}
+          awaiting={showAwaiting}
+          attention={showAttention ? attention : null}
+          pinned={pinned || globalPinned}
+          title={statusTitle}
+        />
         <RowMenu
           label={t("sidenav.row.moreActionsFor", { name: title })}
           // 菜单打开即收起详情卡：卡片会压住菜单（设计图 2 的菜单更高，重叠更明显）
@@ -262,11 +272,11 @@ export function HistoryItem({
                   },
                 }
               : null,
-            // 已未读的条目不必再标；正在浏览的会话标记后会被清除副作用立刻消化，禁用并提示
-            unread
+            // 已有待读标记（完成 / 出错 / 未读）的条目不必再标；正在浏览的会话会被清除副作用立刻消化，禁用并提示
+            attention !== null
               ? null
               : markUnreadItem({
-                  disabled: active && page === "session",
+                  disabled: focused,
                   onSelect: () => markSessionUnread(session.file),
                 }),
             // 归档（分隔线之下，危险色；pending 行返回 null）：收进设置 → 已归档对话，可随时恢复

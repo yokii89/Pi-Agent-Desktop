@@ -304,6 +304,16 @@ function upsertSlotted(
 
 const ExtensionViewStoreContext = createContext<ExtensionViewStoreValue | null>(null);
 
+const EMPTY_SESSION_IDS: ReadonlySet<string> = new Set();
+
+/**
+ * 挂着 blocking 视图（modal / floating widget）的会话运行时 id，
+ * 供侧栏「等待你回答」状态派生（docs/design/82）。
+ * 单开一条 context 是为了让内容不变的集合在表单按键时不换引用：
+ * ExtensionViewStore 的值每次 change 都会换，侧栏列表不该跟着重渲染。
+ */
+const BlockingSessionContext = createContext<ReadonlySet<string>>(EMPTY_SESSION_IDS);
+
 /** change 防抖（50ms，docs/design/08 §12.2）。 */
 const CHANGE_DEBOUNCE_MS = 50;
 
@@ -340,6 +350,21 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
   >([]);
   /** widget 槽列表：按会话并存，切换 active 只过滤展示，不互相覆盖。 */
   const [widgetSlots, setWidgetSlots] = useState<WidgetSlot[]>([]);
+  /** blocking 会话集合：只认已绑定会话，未绑定的全局视图无法归属到某一行。 */
+  const blockingSessionIdsRef = useRef<ReadonlySet<string>>(EMPTY_SESSION_IDS);
+  const blockingSessionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const entry of modals) {
+      if (entry.sessionId) ids.add(entry.sessionId);
+    }
+    for (const slot of widgetSlots) {
+      if (slot.floating && slot.entry.sessionId) ids.add(slot.entry.sessionId);
+    }
+    const prev = blockingSessionIdsRef.current;
+    if (ids.size === prev.size && [...ids].every((id) => prev.has(id))) return prev;
+    blockingSessionIdsRef.current = ids;
+    return ids;
+  }, [modals, widgetSlots]);
   /** SessionProvider 同步的 active 运行时 SessionId。 */
   const [activeViewSessionId, setActiveViewSessionId] = useState<string | null>(null);
   const { openSidebarTab, hiddenSidebarPanelIds } = useUiStore();
@@ -998,7 +1023,9 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
 
   return (
     <ExtensionViewStoreContext.Provider value={value}>
-      {children}
+      <BlockingSessionContext.Provider value={blockingSessionIds}>
+        {children}
+      </BlockingSessionContext.Provider>
     </ExtensionViewStoreContext.Provider>
   );
 }
@@ -1007,6 +1034,11 @@ export function useExtensionViewStore(): ExtensionViewStoreValue {
   const ctx = useContext(ExtensionViewStoreContext);
   if (!ctx) throw new Error("useExtensionViewStore 必须在 ExtensionViewProvider 内使用");
   return ctx;
+}
+
+/** 挂着 blocking 视图的会话集合（运行时 SessionId）；侧栏行状态用。 */
+export function useBlockingSessionIds(): ReadonlySet<string> {
+  return useContext(BlockingSessionContext);
 }
 
 /** 右栏扩展面板 tab id：`ext:<panelId>`。 */

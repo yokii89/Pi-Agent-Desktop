@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { PiChatMessage } from "../../shared/ipc";
 import {
   applyEntries,
+  attentionKindForStopReason,
   claimFile,
+  clearAttention,
   clearStartPending,
-  clearUnread,
   createBucketsState,
   deliveredQueueTexts,
   deriveRunningFiles,
@@ -16,10 +17,10 @@ import {
   isFileProcessAlive,
   isFileRunning,
   loadMessagesIntoBucket,
-  markUnread,
   patchBucket,
   sameQueue,
   setActiveKey,
+  setAttention,
 } from "./sessionBuckets";
 
 function userMessage(text: string): PiChatMessage {
@@ -67,14 +68,25 @@ describe("sessionBuckets dual index", () => {
     expect(state.buckets.get("s1")).toBeTruthy();
   });
 
-  it("unreadFiles can hold multiple green dots", () => {
+  it("attentionFiles can hold multiple markers of different kinds", () => {
     let state = createBucketsState();
-    state = markUnread(state, "a.jsonl");
-    state = markUnread(state, "b.jsonl");
-    expect(state.unreadFiles.size).toBe(2);
-    state = clearUnread(state, "a.jsonl");
-    expect(state.unreadFiles.has("a.jsonl")).toBe(false);
-    expect(state.unreadFiles.has("b.jsonl")).toBe(true);
+    state = setAttention(state, "a.jsonl", "done");
+    state = setAttention(state, "b.jsonl", "error");
+    state = setAttention(state, "c.jsonl", "unread");
+    expect(state.attentionFiles.size).toBe(3);
+    expect(state.attentionFiles.get("a.jsonl")).toBe("done");
+    expect(state.attentionFiles.get("b.jsonl")).toBe("error");
+    state = clearAttention(state, "a.jsonl");
+    expect(state.attentionFiles.has("a.jsonl")).toBe(false);
+    expect(state.attentionFiles.has("b.jsonl")).toBe(true);
+  });
+
+  it("attentionKindForStopReason treats error and length as abnormal", () => {
+    expect(attentionKindForStopReason("error")).toBe("error");
+    expect(attentionKindForStopReason("length")).toBe("error");
+    expect(attentionKindForStopReason("stop")).toBe("done");
+    expect(attentionKindForStopReason("toolUse")).toBe("done");
+    expect(attentionKindForStopReason(null)).toBe("done");
   });
 
   it("emptyBucket defaults processAlive false", () => {

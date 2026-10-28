@@ -342,7 +342,7 @@
   color: var(--color-text);
 }
 
-/* 完成未读蓝点（设计图 3）：AI 输出完成且用户不在该会话时的提示 */
+/* 手动标记未读的蓝点（docs/design/82：完成态改用绿色对勾，蓝点只留手动标记） */
 .doneDot {
   width: 10px;
   height: 10px;
@@ -350,13 +350,29 @@
   background: var(--color-accent);
 }
 
+/* 收口状态图标（docs/design/82）：颜色是唯一语义，尺寸在组件里定为状态槽内 18px。
+   完成 = 绿勾、未正常结束 = 红警告、等待你回答 = 黄问号。 */
+.statusIconDone {
+  color: var(--color-success);
+}
+
+.statusIconError {
+  color: var(--color-danger);
+}
+
+.statusIconAwaiting {
+  color: var(--color-warning);
+}
+
 /* 运行中点阵（设计图 4）：3×3 方点，透明度按对角线相位呼吸；
-   相位差用 nth-child 写死（行列序号和 × 0.12s），减动效时静止为常量点阵 */
+   相位差用 nth-child 写死（行列序号和 × 0.12s），减动效时静止为常量点阵。
+   颜色跟主题色走（`--color-accent` 会被设置 → 主题色改写），不再随状态槽的文字色。 */
 .runningDots {
   display: grid;
   grid-template-columns: repeat(3, 3px);
   grid-auto-rows: 3px;
   gap: 2px;
+  color: var(--color-accent);
 }
 
 .runningDot {
@@ -427,7 +443,7 @@
   transform: translateY(-50%);
 }
 
-/* 状态槽：AI 输出中（点阵）/ 完成未读（蓝点）/ 置顶（图钉），与 ⋯ 交叉淡出。
+/* 状态槽：运行点阵 / 等待回答 / 完成 / 出错 / 未读 / 置顶，与 ⋯ 交叉淡出。
    pointer-events 关闭：右缘槽位本身不是点击目标，点击应穿透到整行按钮（打开会话）。 */
 .statusLayer {
   position: absolute;

@@ -38,9 +38,10 @@ import { isModeTransitioning } from "./modeTransitionBarrier";
 import { useProjectStore } from "./projectStore";
 import {
   applyEntries,
+  attentionKindForStopReason,
   claimFile,
+  clearAttention,
   clearStartPending,
-  clearUnread,
   createBucketsState,
   deliveredQueueTexts,
   deriveRunningFiles,
@@ -54,12 +55,13 @@ import {
   isFileProcessAlive,
   isFileRunning,
   loadMessagesIntoBucket,
-  markUnread,
   patchBucket,
+  type SessionAttentionKind,
   type SessionBucketsState,
   type SessionPhase,
   sameQueue,
   setActiveKey,
+  setAttention,
 } from "./sessionBuckets";
 import { notifySessionRuntimeContext } from "./sessionContextBridge";
 import type { SessionEntry } from "./sessionTranscript";
@@ -75,10 +77,11 @@ interface SessionMetaValue {
   allSessions: SessionSummary[];
   /** 活动会话对应的 JSONL 文件（恢复历史会话时非空）。 */
   activeSessionFile: string | null;
-  /** 完成未读的 JSONL 文件集合（侧边栏多绿点）。 */
-  unreadFiles: ReadonlySet<string>;
-  /** 兼容旧调用：仅当恰好只有一个未读时为该文件，否则 null。 */
-  unreadDoneFile: string | null;
+  /**
+   * 会话文件 → 待读标记（侧栏状态图标；docs/design/82）。
+   * done / error 由 run 收口写入，unread 由行菜单写入；获得焦点即清。
+   */
+  attentionFiles: ReadonlyMap<string, SessionAttentionKind>;
   /** 运行中的会话 JSONL 集合（侧栏多旋转）。 */
   runningFiles: ReadonlySet<string>;
   /** 在工作区内置顶的会话文件（数组顺序即置顶顺序）；条目固定在其所属列表最前。 */
@@ -368,6 +371,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   bucketsStateRef.current = bucketsState;
   const pageRef = useRef<PageId>("session");
   pageRef.current = page;
+  /** 本 run 最近一次 assistant stopReason（agent_settled 据此区分完成/失败）。 */
+  const lastStopReasonsRef = useRef(new Map<SessionId, string>());
   const allSessionsRef = useRef<SessionSummary[]>([]);
   /** 未落盘会话的名字（pending key → name）；认领真实文件后随 pi JSONL 走。 */
   const pendingNamesRef = useRef<Map<string, string | null>>(new Map());
@@ -397,14 +402,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         ? (activeBucket.sessionFile ?? pendingFileKey(activeBucket.sessionId))
         : null;
   const sessionWorkingDir = activeBucket?.cwd ?? currentProject?.dir ?? null;
-
-  const unreadDoneFile = useMemo(() => {
-    if (bucketsState.unreadFiles.size === 1) {
-      const [only] = [...bucketsState.unreadFiles];
-      return only ?? null;
-    }
-    return null;
-  }, [bucketsState.unreadFiles]);
 
   /**
    * 生成中的文件集合只随 agent_start / agent_settled 这类阶段边界变化，
@@ -821,6 +818,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     const applySideEffects = (sessionId: SessionId, event: PiAgentEvent): void => {
       const { type } = event;
+      if (
+        type === "message_end" &&
+        event.message.role === "assistant" &&
+        event.message.stopReason
+      ) {
+        lastStopReasonsRef.current.set(sessionId, event.message.stopReason);
+      }
       setState((prev) => {
         let next = ensureBucket(prev, sessionId);
         const bucket = next.buckets.get(sessionId);
@@ -838,21 +842,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return next;
       });
       if (type === "agent_start") {
+        // 新一轮开始：上一轮的待读标记作废（侧栏改回运行点阵）
+        lastStopReasonsRef.current.delete(sessionId);
+        const file = bucketsStateRef.current.buckets.get(sessionId)?.sessionFile;
+        if (file) setState((prev) => clearAttention(prev, file));
         void claimSessionFile(sessionId);
         scheduleClaim(sessionId);
       } else if (type === "agent_settled") {
-        // 认领 JSONL、侧栏重排、未读、上下文用量都跟着收口点走
+        // 认领 JSONL、侧栏重排、待读标记、上下文用量都跟着收口点走
+        const stopReason = lastStopReasonsRef.current.get(sessionId) ?? null;
+        lastStopReasonsRef.current.delete(sessionId);
         const aborted = event.aborted === true;
         void claimSessionFile(sessionId).then((file) => {
           rematerializeSidebar();
           if (!file) return;
-          // 用户主动中断的一轮不算「有新结果待读」，不标未读
-          if (aborted) return;
           const st = bucketsStateRef.current;
-          const isActive = st.activeKey === sessionId && pageRef.current === "session";
-          if (!isActive) {
-            setState((prev) => markUnread(prev, file));
-          }
+          const focused = st.activeKey === sessionId && pageRef.current === "session";
+          // 用户主动中断的一轮不算「有新结果待读」；正在看的会话直接算已读
+          if (aborted || focused) return;
+          setState((prev) => setAttention(prev, file, attentionKindForStopReason(stopReason)));
         });
         void refreshContextUsage(sessionId);
       } else if (type === "compaction_end") {
@@ -919,6 +927,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (message.type === "exit") {
+        // 运行中进程消失 = 崩溃：侧栏按「未正常结束」标记（idle 后手动结束不打扰）
+        const crashed = bucketsStateRef.current.buckets.get(sessionId)?.phase === "running";
+        lastStopReasonsRef.current.delete(sessionId);
         setState((prev) => {
           let next = ensureBucket(prev, sessionId);
           const bucket = next.buckets.get(sessionId);
@@ -937,6 +948,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           // fileIndex 保留：侧栏状态展示仍要用；进程死透后同 file 冷启动由 start 重写索引
           return next;
         });
+        if (crashed) {
+          const st = bucketsStateRef.current;
+          const file = st.buckets.get(sessionId)?.sessionFile;
+          const focused = st.activeKey === sessionId && pageRef.current === "session";
+          if (file && !focused) setState((prev) => setAttention(prev, file, "error"));
+        }
         notifySessionRuntimeContext(sessionId, { processAlive: false });
         if (sessionId === activeKeyRef.current) {
           // 仅 active 的 exit 影响输入栏就绪态（processAlive 已 false）
@@ -963,12 +980,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     refreshContextUsage,
   ]);
 
-  // 回到会话页且 active 的 file 未读 → 清除该条（不误清其它 unread）
+  // 回到会话页且 active 的 file 有待读标记 → 清除该条（不误清其它文件）
   useEffect(() => {
     if (page !== "session" || !activeSessionFile) return;
-    if (!bucketsState.unreadFiles.has(activeSessionFile)) return;
-    setState((prev) => clearUnread(prev, activeSessionFile));
-  }, [page, activeSessionFile, bucketsState.unreadFiles, setState]);
+    if (!bucketsState.attentionFiles.has(activeSessionFile)) return;
+    setState((prev) => clearAttention(prev, activeSessionFile));
+  }, [page, activeSessionFile, bucketsState.attentionFiles, setState]);
 
   useEffect(() => {
     const id = bucketsState.activeKey;
@@ -1104,7 +1121,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /** 手动标记未读（侧栏行菜单）；当前正在浏览的会话由清除副作用立即消化。 */
   const markSessionUnread = useCallback(
     (file: string): void => {
-      setState((prev) => markUnread(prev, file));
+      setState((prev) => setAttention(prev, file, "unread"));
     },
     [setState],
   );
@@ -1140,11 +1157,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       commitArchived({ ...archivedFiles, [file]: Date.now() });
       setState((prev) => {
         let next = dropFileIndex(prev, file);
-        if (next.unreadFiles.has(file)) {
-          const unread = new Set(next.unreadFiles);
-          unread.delete(file);
-          next = { ...next, unreadFiles: unread };
-        }
+        next = clearAttention(next, file);
         if (id) {
           const buckets = new Map(next.buckets);
           buckets.delete(id);
@@ -1312,15 +1325,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       setState((prev) => {
         let next = dropFileIndex(prev, file);
-        next = {
-          ...next,
-          unreadFiles: (() => {
-            if (!next.unreadFiles.has(file)) return next.unreadFiles;
-            const u = new Set(next.unreadFiles);
-            u.delete(file);
-            return u;
-          })(),
-        };
+        next = clearAttention(next, file);
         if (id) {
           const buckets = new Map(next.buckets);
           buckets.delete(id);
@@ -1810,7 +1815,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             sessionFile: file,
             cwd: cwd ?? next.buckets.get(existingId)?.cwd ?? null,
           });
-          next = clearUnread(next, file);
+          next = clearAttention(next, file);
           return next;
         });
         bindActive(existingId);
@@ -1866,7 +1871,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             phase: "idle",
           });
           next = setActiveKey(next, openId);
-          next = clearUnread(next, file);
+          next = clearAttention(next, file);
           return next;
         });
         bindActive(openId);
@@ -1908,7 +1913,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
         next = applyEntries(next, openId, { type: "clear" });
         next = setActiveKey(next, openId);
-        next = clearUnread(next, file);
+        next = clearAttention(next, file);
         return next;
       });
       bindActive(openId);
@@ -1988,8 +1993,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       activeSessionId: bucketsState.activeKey,
       allSessions,
       activeSessionFile,
-      unreadFiles: bucketsState.unreadFiles,
-      unreadDoneFile,
+      attentionFiles: bucketsState.attentionFiles,
       runningFiles,
       pinnedFiles,
       globalPinnedFiles,
@@ -2040,8 +2044,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       bucketsState.activeKey,
       allSessions,
       activeSessionFile,
-      bucketsState.unreadFiles,
-      unreadDoneFile,
+      bucketsState.attentionFiles,
       runningFiles,
       pinnedFiles,
       globalPinnedFiles,

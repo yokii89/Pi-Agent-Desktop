@@ -140,6 +140,15 @@ export const sidenavMessages = defineMessages({
   "sidenav.session.opening": { "zh-CN": "正在打开", "en-US": "Opening" },
   "sidenav.session.aiResponding": { "zh-CN": "AI 正在输出", "en-US": "AI is responding" },
   "sidenav.session.aiDone": { "zh-CN": "AI 输出完成", "en-US": "AI finished responding" },
+  "sidenav.session.aiNotFinished": {
+    "zh-CN": "本轮未正常结束",
+    "en-US": "This turn did not finish cleanly",
+  },
+  "sidenav.session.awaitingInput": {
+    "zh-CN": "等待你回答",
+    "en-US": "Waiting for your answer",
+  },
+  "sidenav.session.unread": { "zh-CN": "未读", "en-US": "Unread" },
   "sidenav.session.pinned": { "zh-CN": "已置顶", "en-US": "Pinned" },
   "sidenav.session.endConfirm.running": {
     "zh-CN": "AI 仍在输出，结束后将中断当前任务。历史记录会保留。",

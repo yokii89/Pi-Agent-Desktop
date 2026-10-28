@@ -15,6 +15,26 @@ import { type SessionEntry, sessionEntriesReducer } from "./sessionTranscript";
 
 export type SessionPhase = "empty" | "running" | "idle";
 
+/**
+ * 侧栏状态槽的「待读」标记（docs/design/82）：
+ * - done：AI 输出完成且用户不在该会话；
+ * - error：本轮未正常结束（模型失败 / 输出截断 / 进程崩溃）；
+ * - unread：行菜单手动标记。
+ * 获得焦点即清除。「运行中」「等待你回答」是派生状态，不在此登记。
+ */
+export type SessionAttentionKind = "done" | "error" | "unread";
+
+/**
+ * 收口原因 → 待读标记：error / length 都算「未正常结束」，
+ * 其余（stop / toolUse / 旧 pi 缺字段）按完成。
+ * aborted 由调用方先行剔除——用户自己按的停止不算有待读结果。
+ */
+export function attentionKindForStopReason(
+  stopReason: string | null | undefined,
+): SessionAttentionKind {
+  return stopReason === "error" || stopReason === "length" ? "error" : "done";
+}
+
 export interface SessionBucket {
   sessionId: SessionId;
   phase: SessionPhase;
@@ -55,8 +75,8 @@ export interface SessionBucketsState {
   fileIndex: Map<string, SessionId>;
   /** 中央区当前桶；null = 空态（无进程的新建）。 */
   activeKey: SessionId | null;
-  /** 完成未读的 JSONL 路径集合（多会话可并存多个绿点）。 */
-  unreadFiles: ReadonlySet<string>;
+  /** 会话文件 → 待读标记（多会话可并存；获得焦点即清）。 */
+  attentionFiles: ReadonlyMap<string, SessionAttentionKind>;
 }
 
 export function emptyBucket(
@@ -139,7 +159,7 @@ export function createBucketsState(): SessionBucketsState {
     buckets: new Map(),
     fileIndex: new Map(),
     activeKey: null,
-    unreadFiles: new Set(),
+    attentionFiles: new Map(),
   };
 }
 
@@ -230,18 +250,22 @@ export function setActiveKey(
   return { ...state, activeKey };
 }
 
-export function markUnread(state: SessionBucketsState, file: string): SessionBucketsState {
-  if (state.unreadFiles.has(file)) return state;
-  const unreadFiles = new Set(state.unreadFiles);
-  unreadFiles.add(file);
-  return { ...state, unreadFiles };
+export function setAttention(
+  state: SessionBucketsState,
+  file: string,
+  kind: SessionAttentionKind,
+): SessionBucketsState {
+  if (state.attentionFiles.get(file) === kind) return state;
+  const attentionFiles = new Map(state.attentionFiles);
+  attentionFiles.set(file, kind);
+  return { ...state, attentionFiles };
 }
 
-export function clearUnread(state: SessionBucketsState, file: string): SessionBucketsState {
-  if (!state.unreadFiles.has(file)) return state;
-  const unreadFiles = new Set(state.unreadFiles);
-  unreadFiles.delete(file);
-  return { ...state, unreadFiles };
+export function clearAttention(state: SessionBucketsState, file: string): SessionBucketsState {
+  if (!state.attentionFiles.has(file)) return state;
+  const attentionFiles = new Map(state.attentionFiles);
+  attentionFiles.delete(file);
+  return { ...state, attentionFiles };
 }
 
 /** 侧栏 running 集合：fileIndex → bucket.processAlive && phase==="running"。 */
