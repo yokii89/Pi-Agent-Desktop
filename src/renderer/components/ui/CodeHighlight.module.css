@@ -37,7 +37,7 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  background: var(--color-bg-elevated);
+  background: var(--code-gutter-bg, var(--color-bg-elevated));
 }
 
 .host {
@@ -66,6 +66,18 @@
   min-height: 1.5em;
 }
 
+/*
+ * 围栏代码的 shiki 输出会多包一层 <code>：Markdown 的行内 code 规则
+ * （markdown.module.css 的 `.md code` 0.875em + `.md pre code` line-height 1.6）
+ * 会落到这层上，把代码从 12px/18px 压成 10.5px/16.8px。于是每行盒子只有
+ * 16.8px 而行距仍是 18px，行号槽背景被切成带 1.2px 缝的色块。
+ * 这里让 <code> 回到 .shiki 自己的字号/行高，行高与行距对齐、槽才能连续。
+ */
+.host :global(.shiki code) {
+  font-size: inherit;
+  line-height: inherit;
+}
+
 /* 行号槽：CSS counter，宽度随总行数位数变化（--gutter-w） */
 .host :global(.shiki .line::before) {
   counter-increment: line;
@@ -82,7 +94,9 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  background: var(--color-bg-elevated);
+  /* 与所在代码卡同色（--code-gutter-bg 由卡片提供，缺省回退 elevated）：
+     槽不能看起来像贴在卡上的一排色块 */
+  background: var(--code-gutter-bg, var(--color-bg-elevated));
 }
 
 /*

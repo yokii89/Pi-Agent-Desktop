@@ -159,6 +159,8 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  /* 行号槽底色跟随代码卡，否则会透出一排 elevated 色块（CodeHighlight 侧读取） */
+  --code-gutter-bg: var(--color-code-bg);
 }
 
 /* 围栏外壳头部（docs/design/13 P1-5）：语言标签 + 复制按钮；
