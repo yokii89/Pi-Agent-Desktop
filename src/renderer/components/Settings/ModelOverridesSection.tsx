@@ -8,6 +8,7 @@ import {
 } from "../../../shared/ipc";
 import { useGlidePill } from "../../hooks/useGlidePill";
 import { useT } from "../../hooks/useT";
+import { THINKING_LABEL_KEY } from "../../stores/composerStore";
 import type { ModelOverrideRow } from "../../utils/modelOverrides";
 import {
   filterModelOverrideRows,
@@ -357,13 +358,12 @@ const OverrideRow = memo(function OverrideRow({
   );
 });
 
-/** 行内/脚注展示：未知给占位符；只有 off 说「不支持」，其余给档位数。 */
+/** 行内/脚注展示：未知给占位符；只有 off 说「不支持」，其余给支持的最高档名。 */
 function formatThinkingLevels(levels: ThinkingLevelId[] | undefined, t: TranslateFn): string {
   if (!levels || levels.length === 0) return "—";
-  if (levels.length === 1 && levels[0] === "off") {
-    return t("settings.models.overrides.thinkingOff");
-  }
-  return t("settings.models.overrides.thinkingCount", { count: levels.length });
+  const top = levels[levels.length - 1];
+  if (!top || top === "off") return t("settings.models.overrides.thinkingOff");
+  return t(THINKING_LABEL_KEY[top]);
 }
 
 /**
@@ -616,13 +616,11 @@ function ThinkingEditor({
   const initialTop = effective && effective.length > 0 ? effective[effective.length - 1] : "high";
   const [top, setTop] = useState<ThinkingLevelId>(initialTop);
   const topIndex = Math.max(0, THINKING_LEVELS.indexOf(top));
+  // 保存写盘的是从 off 起的连续集合
   const count = topIndex + 1;
   const contiguous =
     !effective || effective.every((level, index) => THINKING_LEVELS[index] === level);
-  const valueLabel =
-    top === "off"
-      ? t("session.thinking.off")
-      : t("settings.models.overrides.thinkingCount", { count });
+  const valueLabel = t(THINKING_LABEL_KEY[top]);
 
   return (
     <div className={styles.ovPop}>

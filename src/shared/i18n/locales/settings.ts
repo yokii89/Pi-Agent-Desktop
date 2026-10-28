@@ -1205,17 +1205,14 @@ export const settingsMessages = defineMessages({
     "en-US": "Thinking levels",
   },
   "settings.models.overrides.thinkingHint": {
-    "zh-CN": "拖动选择该模型支持的档位数；输入栏会显示对应档位。",
-    "en-US": "Drag to choose how many levels this model supports; the composer shows them.",
+    "zh-CN": "拖动选择该模型最高支持到哪一档；输入栏会显示对应档位。",
+    "en-US":
+      "Drag to choose the highest thinking level this model supports; the composer shows the matching level.",
   },
   "settings.models.overrides.thinkingNonPrefix": {
     "zh-CN": "当前档位不连续，保存后会改为从「关闭」起的连续档位。",
     "en-US":
       "The current levels are non-contiguous; saving changes them to a contiguous range starting at Off.",
-  },
-  "settings.models.overrides.thinkingCount": {
-    "zh-CN": "{count} 档",
-    "en-US": "{count} levels",
   },
   "settings.models.overrides.thinkingOff": {
     "zh-CN": "不支持",
