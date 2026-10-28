@@ -1,10 +1,14 @@
 # @pidesk/view-sdk
 
-## Unreleased (0.6.0)
+## 0.5.1 — 2026-10-28
 
 **Access-mode contribution helper + public manifest subset** (PiDesk
 `docs/design/80`). Additive public API; no wire, Host capability or protocol
-change.
+change. No breaking change for 0.5.0 consumers.
+
+```bash
+npm install @pidesk/view-sdk@0.5.1
+```
 
 - **`defineAccessMode(entry)`** — pass the same object as
   `pidesk.contributes.accessModes[]` (import your `package.json`) and use the
@@ -32,8 +36,7 @@ change.
 tests (54 files), 389 renderer tests (38 files), `check:view-types` (both
 generated files), typecheck (SDK / main / renderer), `biome check .` (742 files),
 production build, and the packed-consumer check (62 public exports). No Electron
-acceptance: this is a pure SDK helper with no UI surface. `package.json` is still
-0.5.0 — bump to 0.6.0 when releasing.
+acceptance: this is a pure SDK helper with no UI surface.
 
 ## 0.5.0 — 2026-10-28
 
