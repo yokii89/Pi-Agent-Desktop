@@ -2,7 +2,9 @@ import { PuzzlePiece, X } from "@phosphor-icons/react";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef } from "react";
 import { useT } from "../../hooks/useT";
 import type { RightSidebarTab } from "../../stores/uiStore";
+import { sidebarBadgeLabel } from "./badgeSemantics";
 import styles from "./ContextSidebar.module.css";
+import { SidebarBadge } from "./SidebarBadge";
 import type { SidebarFeature } from "./sidebarFeatures";
 
 /**
@@ -63,6 +65,10 @@ export function SidebarTabBar({
         const IconComponent = feature?.icon ?? PuzzlePiece;
         const active = tab === activeTab;
         const closeLabel = t("ui.view.closeTitled", { title });
+        // 徽章只在面板不在前台时提示（docs/06 R7）；前台时面板正文自己会说。
+        const badge = active ? undefined : feature?.badge;
+        // 徽章语义进页签的可访问名称：圆点/颜色不能是唯一信号（docs/06 R7）
+        const accessibleName = badge ? sidebarBadgeLabel(t, title, badge) : undefined;
         return (
           <div
             key={tab}
@@ -77,6 +83,7 @@ export function SidebarTabBar({
               type="button"
               role="tab"
               aria-selected={active}
+              aria-label={accessibleName}
               tabIndex={active ? 0 : -1}
               title={title}
               className={styles.tabButton}
@@ -96,6 +103,7 @@ export function SidebarTabBar({
                 <IconComponent size={16} weight="regular" />
               </span>
               <span className={styles.tabLabel}>{title}</span>
+              {badge ? <SidebarBadge badge={badge} /> : null}
             </button>
             <button
               type="button"

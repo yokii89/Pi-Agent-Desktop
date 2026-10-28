@@ -12,6 +12,7 @@ import {
   supportsOptionPreview,
   supportsPanelLauncher,
   supportsPatch,
+  supportsReadonlyList,
   supportsTable,
   tableView,
   tableViewFallback,
@@ -179,6 +180,7 @@ describe("capability probes and the table fallback fork", () => {
     expect(supportsPatch(null)).toBe(false);
     expect(supportsPanelLauncher(null)).toBe(false);
     expect(supportsOptionPreview(null)).toBe(false);
+    expect(supportsReadonlyList(null)).toBe(false);
   });
 
   it("reads capabilities straight off hello", () => {
@@ -187,12 +189,16 @@ describe("capability probes and the table fallback fork", () => {
     expect(supportsTable(withCaps)).toBe(false);
     expect(supportsPanelLauncher(withCaps)).toBe(false);
     expect(supportsOptionPreview(withCaps)).toBe(false);
+    expect(supportsReadonlyList(withCaps)).toBe(false);
 
     const launched = helloWith({ capabilities: ["panel-launcher"] });
     expect(supportsPanelLauncher(launched)).toBe(true);
 
     const preview = helloWith({ capabilities: ["view-option-preview"] });
     expect(supportsOptionPreview(preview)).toBe(true);
+
+    const readonly = helloWith({ capabilities: ["view-readonly-list"] });
+    expect(supportsReadonlyList(readonly)).toBe(true);
   });
 
   it("falls back to compile-time limits when an old Host sends no limits", () => {
@@ -232,6 +238,93 @@ describe("capability probes and the table fallback fork", () => {
       { type: "text", content: "车道", variant: "caption" },
       { type: "text", content: "内容", variant: "caption" },
     ]);
+  });
+
+  it("keeps every data cell in the degraded rows (docs/06 R3)", () => {
+    const node = tableViewFallback({
+      id: "queue",
+      columns: [
+        { key: "lane", label: "车道" },
+        { key: "summary", label: "摘要" },
+      ],
+      rows: [
+        { id: "r1", cells: { lane: "控", summary: "把 README 翻成英文" } },
+        { id: "r2", cells: { lane: "默", summary: "跑测试" } },
+      ],
+    });
+    if (node.type !== "column") throw new Error("expected column");
+    const rows = node.children.filter((child) => child.type === "row").slice(1);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toEqual({
+      type: "row",
+      children: [
+        { type: "text", content: "控", variant: "body" },
+        { type: "text", content: "把 README 翻成英文", variant: "caption" },
+      ],
+    });
+    expect(rows[1]).toEqual({
+      type: "row",
+      children: [
+        { type: "text", content: "默", variant: "body" },
+        { type: "text", content: "跑测试", variant: "caption" },
+      ],
+    });
+  });
+
+  it("labelKey leads the row instead of filtering the other columns", () => {
+    const node = tableViewFallback({
+      id: "threads",
+      columns: [
+        { key: "state", label: "状态" },
+        { key: "title", label: "线程" },
+      ],
+      rows: [{ id: "r1", cells: { state: "active", title: "build" } }],
+      labelKey: "title",
+    });
+    if (node.type !== "column") throw new Error("expected column");
+    const row = node.children[1];
+    if (row.type !== "row") throw new Error("expected row");
+    expect(row.children).toEqual([
+      { type: "text", content: "build", variant: "body" },
+      { type: "text", content: "active", variant: "caption" },
+    ]);
+  });
+
+  it("pays one extra node per non-lead cell, still far under maxNodes", () => {
+    // 2 列 × 2 行：column + header row + 2 header texts + 2 data rows + 4 data texts
+    const node = tableViewFallback({
+      id: "queue",
+      columns: [
+        { key: "lane", label: "车道" },
+        { key: "summary", label: "摘要" },
+      ],
+      rows: [
+        { id: "r1", cells: { lane: "控", summary: "a" } },
+        { id: "r2", cells: { lane: "默", summary: "b" } },
+      ],
+    });
+    const budget = measureViewTree(node, VIEW_LIMITS);
+    expect(budget.nodes).toBe(10);
+    expect(budget.hitNodeBudget).toBe(false);
+  });
+
+  it("compact opts back into a single-cell line for narrow rails", () => {
+    const node = tableViewFallback({
+      id: "queue",
+      columns: [
+        { key: "lane", label: "车道" },
+        { key: "summary", label: "摘要" },
+      ],
+      rows: [{ id: "r1", cells: { lane: "控", summary: "跑测试" } }],
+      compact: true,
+    });
+    if (node.type !== "column") throw new Error("expected column");
+    const header = node.children[0];
+    if (header.type !== "row") throw new Error("expected header row");
+    expect(header.children).toEqual([{ type: "text", content: "车道", variant: "caption" }]);
+    const row = node.children[1];
+    if (row.type !== "row") throw new Error("expected row");
+    expect(row.children).toEqual([{ type: "text", content: "控", variant: "body" }]);
   });
 
   it("renders an empty state instead of a header-only husk", () => {

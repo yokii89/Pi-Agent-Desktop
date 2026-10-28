@@ -20,6 +20,32 @@ export const panelMessages = defineMessages({
   },
   "panels.context.widen": { "zh-CN": "加宽侧栏", "en-US": "Widen sidebar" },
 
+  /* 面板徽章（docs/06 R7）：语义必须进可访问名称，不能只靠颜色/圆点。 */
+  "panels.context.badgeAttention": {
+    "zh-CN": "{title}，{count} 项需要处理",
+    "en-US": "{title}, {count} need attention",
+  },
+  "panels.context.badgeAttentionHint": {
+    "zh-CN": "{title}，有需要处理的事项",
+    "en-US": "{title}, needs attention",
+  },
+  "panels.context.badgeSuccess": {
+    "zh-CN": "{title}，{count} 项已完成",
+    "en-US": "{title}, {count} completed",
+  },
+  "panels.context.badgeSuccessHint": {
+    "zh-CN": "{title}，有新完成的事项",
+    "en-US": "{title}, has new completions",
+  },
+  "panels.context.badgeMuted": {
+    "zh-CN": "{title}，{count} 项更新",
+    "en-US": "{title}, {count} updates",
+  },
+  "panels.context.badgeMutedHint": {
+    "zh-CN": "{title}，有更新",
+    "en-US": "{title}, updated",
+  },
+
   "panels.files.searchPlaceholder": {
     "zh-CN": "搜索文件…",
     "en-US": "Search files…",

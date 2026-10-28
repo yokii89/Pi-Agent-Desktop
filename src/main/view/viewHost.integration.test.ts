@@ -70,7 +70,7 @@ import {
 } from "../../../packages/view-sdk/src/index";
 import type { ViewNode } from "../../../packages/view-sdk/src/types";
 import { VIEW_LIMITS } from "../../shared/view";
-import { disposeViewHost, ensureViewHost, sendViewEvent } from "./viewHost";
+import { disposeViewHost, ensureViewHost, reportViewLayout, sendViewEvent } from "./viewHost";
 
 /** docs/design/19 §4.1 的 Telegram 面板骨架：连接卡 + 队列卡（table）。 */
 function panelTree(rowCount: number): ViewNode {
@@ -180,6 +180,10 @@ describe("viewHost ↔ view-sdk over the real transport", () => {
     expect(hello?.placements).toContain("panel");
     expect(client.hasCapability("view-table")).toBe(true);
     expect(client.hasCapability("system-toast")).toBe(true);
+    expect(client.hasCapability("view-readonly-list")).toBe(true);
+    expect(client.hasCapability("view-layout")).toBe(true);
+    expect(client.hasCapability("panel-tab-badge")).toBe(true);
+    expect(client.hasCapability("panel-header")).toBe(true);
   });
 
   it("notify without toast pushes sound only; with toast also calls toastService once", async () => {
@@ -323,6 +327,66 @@ describe("viewHost ↔ view-sdk over the real transport", () => {
     expect(table.rows).toHaveLength(VIEW_LIMITS.maxTableRows);
     // maxRows 缺省时不写进 payload，扩展侧的「显示 N / 共 M」才是可信截断口径
     expect(table.maxRows).toBeUndefined();
+
+    session.close();
+    await session.closed;
+  });
+
+  it("pipes panel content sizes to the extension as layout events (docs/06 R5)", async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const session = await openTab({
+      panelId: "telegram-layout",
+      root: panelTree(1),
+      onEvent: (event) => events.push(event as unknown as Record<string, unknown>),
+    });
+
+    reportViewLayout(session.id, 291.4, 640.6);
+    await waitFor(() => events.some((event) => event.type === "layout"), "layout 抵达扩展");
+    expect(events.find((event) => event.type === "layout")).toEqual({
+      type: "layout",
+      width: 291,
+      height: 641,
+    });
+
+    // 关闭后渲染层去抖里的最后一帧可能晚到：Host 必须静默丢弃
+    session.close();
+    await session.closed;
+    const seen = events.length;
+    reportViewLayout(session.id, 300, 700);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(events).toHaveLength(seen);
+  });
+
+  it("sanitizes panel badge and fixed header hints and clears the badge (docs/06 R7/R9)", async () => {
+    const session = await openTab({ panelId: "telegram-hints", root: panelTree(1) });
+    bag.pushes.length = 0;
+
+    session.update({
+      placementHint: {
+        panelId: "telegram-hints",
+        panelBadge: { tone: "attention", count: 2, label: "失败" },
+        panelHeader: [
+          { type: "text", content: "🟢 已连接" },
+          // 固定头部只收轻节点：交互控件整条消失，不降级成 unknown 占位
+          { type: "button", id: "open", label: "点我" },
+          { type: "row", children: [{ type: "text", content: "队列 3" }] },
+        ],
+      },
+    });
+    await waitFor(() => pushesOfType("update").length === 1, "update push（badge/header）");
+    expect(lastPush("update").placementHint).toEqual({
+      panelId: "telegram-hints",
+      panelBadge: { tone: "attention", count: 2, label: "失败" },
+      panelHeader: [
+        { type: "text", content: "🟢 已连接", variant: "body" },
+        { type: "row", children: [{ type: "text", content: "队列 3", variant: "body" }] },
+      ],
+    });
+
+    // placementHint 整体替换：带上 panelId、不带 panelBadge 即清除
+    session.update({ placementHint: { panelId: "telegram-hints" } });
+    await waitFor(() => pushesOfType("update").length === 2, "update push（clear）");
+    expect(lastPush("update").placementHint).toEqual({ panelId: "telegram-hints" });
 
     session.close();
     await session.closed;

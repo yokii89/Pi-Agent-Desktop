@@ -132,6 +132,10 @@ await desktop.open(spec, {
 | `readContributionKeysEnv()` / `parseContributionKeyMap(raw)` | Lower-level env read + validated parse |
 | `registerAccessMode(client, options)` | One-shot composer mode registration; soft `null` on old hosts |
 | `tryRegisterAccessMode(client, options)` | Same as above with explicit failure reason (for supervisors) |
+| `defineAccessMode(input)` | Derive a frozen access-mode registration descriptor from its manifest entry; throws on empty `id`/`title` or a non-`onAccessMode` activation |
+| `accessModeManifestEntry(mode)` | Project a descriptor back to `pidesk.contributes.accessModes[]` (drift tests) |
+| `ACCESS_MODE_ICON_NAMES` | Icons the composer access-mode chip renders (`shield` / `shield-check` / `clipboard`) |
+| `ManifestContributionItem` / `ContributionPlacement` / `ContributionActivation` / `ContributionAccent` / `ContributionIconName` / `AccessModeIconName` / `CONTRIBUTION_ICON_NAMES` / `CONTRIBUTION_ICONS` / `CONTRIBUTION_LIMITS` | Public contribution manifest subset; Catalog/runtime internals stay Host-only |
 | `superviseAccessMode(options)` | **Resident** access-mode slot with lifecycle + in-process lease |
 | `superviseSlot(options)` | Generic registration-slot supervisor (leaseKey, rebind, reprobe) |
 | `playNotification(client, options)` | System notification sound host service (`hello.capabilities` includes `notification`); optional `toast` needs `system-toast` |
@@ -345,6 +349,73 @@ extension's own `openPanel()`.
 }
 ```
 
+### Panel chrome: layout, tab status, badges, fixed header
+
+Four additive panel capabilities. All of them degrade silently on older Hosts —
+no error, no disconnect, just less chrome.
+
+**Layout reports** — `view-layout`. After the panel mounts and after debounced
+resizes (150 ms), the Host sends the content-box size to the same `onEvent`
+stream, so one handler covers events and layout:
+
+```ts
+await openPanel(desktop, {
+  panelId: "telegram",
+  root,
+  onEvent: (event, session) => {
+    if (event.type === "layout") {
+      // width is the usable content width (scrollbar already deducted)
+      session.update(renderState(state, event.width));
+    }
+  },
+});
+```
+
+Old Hosts never emit `layout`; keep copy that fits the narrowest sidebar. A
+`layout` event never enters `values` and does not change the tree by itself.
+
+**Tab status `none`** — `ViewTab.status` already accepted `answered` / `attention`,
+and omitting it draws a hollow dot whose protocol meaning is “unanswered”. For
+information streams that is a lie, so `status: "none"` draws no dot at all. Old
+Hosts fall back to the hollow dot (acceptable visual degradation, no capability).
+
+**Tab / launcher badge** — `panel-tab-badge`:
+
+```ts
+session.update({
+  placementHint: {
+    panelId: "telegram",             // keep the slot id
+    panelBadge: { tone: "attention", count: 2, label: "失败" },
+  },
+});
+```
+
+`tone` is `attention | success | muted`, `count` is 1–99 (larger values render as
+`99+`), `label` is a short optional detail. The badge appears on the sidebar tab,
+the launcher card and the add menu, with its meaning in the accessible name.
+`placementHint` is replaced wholesale: send `panelId` **without** `panelBadge` to
+clear it. A user-closed tab is never reopened because of a badge.
+
+**Fixed panel header** — `panel-header`:
+
+```ts
+session.update({
+  placementHint: {
+    panelId: "telegram",
+    panelHeader: [
+      { type: "text", content: "🟢 已连接 · 轮询活跃", variant: "caption" },
+      { type: "progress", value: 0.4, label: "同步中" },
+    ],
+  },
+});
+```
+
+`panelHeader` renders above the panel's scroll container, so a status row stays
+visible while a long queue tab scrolls. Only light nodes are accepted — `text`,
+`row`, `column`, `card`, `progress`, `divider`; buttons, inputs, lists, tabs and
+tables are dropped instead of becoming diagnostic placeholders. The whole array
+is capped (8 top-level items / 32 nodes).
+
 ### Table nodes
 
 `table` renders multi-row / multi-column read-only state (queues, follower lists,
@@ -380,6 +451,36 @@ const hello = await client.ensureConnected();
 const tableCapable = hello?.capabilities?.includes("view-table") === true;
 // tableCapable === false → compose the same rows from `row` / `text` instead
 ```
+
+`tableView(client, …)` already owns that fork. On hosts without `view-table` it
+returns a `column`/`row` tree that keeps **all** cells of every row (the leading
+cell is `body`, the rest `caption`); `labelKey` only decides which column leads
+and no longer drops the other columns. If a genuinely narrow rail only has room
+for one cell per row, pass `compact: true` instead of relying on `labelKey`.
+
+### Read-only list (`list.readonly`)
+
+A `list` is a form control: clicking a row writes `values[nodeId]` and paints the
+active bar. Status lists (threads, event streams) need the same wrapping/scroll
+behaviour without pretending to be answerable. Set `readonly: true`:
+
+```ts
+{
+  type: "list",
+  id: "tg-threads",
+  readonly: true,
+  items: threads.map((t) => ({ value: t.id, label: t.title, description: t.detail })),
+}
+```
+
+- No `values` write, no `change` event, no active bar; `multiple` is ignored.
+- Rows are `listitem`s inside a `list` — not `option`s, and they are not tab stops.
+  Screen readers read label + description; the list still wraps and scrolls
+  internally (`max-height: 280px`).
+- `id` is still required, but only as render identity.
+- **Capability-gated**: older Hosts drop the field in `sanitize`, and the rows go
+  back to clickable-but-inert. Probe with `supportsReadonlyList(client)` and only
+  send the field when it is true.
 
 ### Option preview (`list`)
 
@@ -455,6 +556,49 @@ flows back as `mode:activate` / `mode:deactivate` action events. The extension
 stays the source of truth — apply the real behavior (e.g. `setActiveTools`
 gates) and report state with `setActive`, which also keeps the chip in sync
 when the mode changes from the TUI side (shortcuts, commands, session resume).
+
+#### One declaration for the Catalog and the live row
+
+`package.json` → `pidesk.contributes.accessModes[]` is what the Host scans for the
+cold entry; the live registration used to repeat the same metadata. Pass the
+manifest entry to `defineAccessMode()` and use the returned descriptor, so there
+is only one copy (PiDesk `docs/design/80`):
+
+```ts
+import pkg from "./package.json" with { type: "json" };
+import { defineAccessMode, superviseAccessMode } from "@pidesk/view-sdk";
+
+const PLAN_MODE = defineAccessMode(pkg.pidesk.contributes.accessModes[0]);
+// { id, title, description?, icon?, accent? } — frozen; activation is dropped.
+
+const desktopMode = superviseAccessMode({ registration: PLAN_MODE, /* … */ });
+```
+
+If your loader cannot import JSON with attributes (or TypeScript
+`resolveJsonModule` is off), pass the same shape as a literal and keep one drift
+test:
+
+```ts
+expect(pkg.pidesk.contributes.accessModes).toContainEqual(
+  accessModeManifestEntry(PLAN_MODE),
+);
+```
+
+The projection includes `activation: "onAccessMode"`, so keep that field explicit
+in the manifest entry (the Host would default it, but the drift test compares the
+full shape).
+
+`defineAccessMode()` trims `id` / `title`, throws `TypeError` for an empty
+identity or a non-`onAccessMode` activation, and never touches the Host. The id
+remains the lookup key for the Host-injected key:
+`contributionKey: resolveContributionKey(PLAN_MODE.id)`. The composer chip
+renders only `ACCESS_MODE_ICON_NAMES` (`shield`, `shield-check`, `clipboard`);
+other valid contribution icons fall back to the default chip icon.
+The rest of the public manifest subset — `ManifestContributionItem`,
+`ContributionPlacement`, `ContributionActivation`, `ContributionAccent`,
+`ContributionIconName`, `CONTRIBUTION_ICON_NAMES`, `CONTRIBUTION_LIMITS` — is
+exported from the same entry; Catalog entries, activation transactions and
+runtime/worker state remain Host-internal.
 
 **Resident chips must use the supervisor** — do not hand-roll re-registration:
 
@@ -635,6 +779,7 @@ Client                          Host (PiDesk main)
   |-- open(spec) -------------->|
   |<-------- opened ------------|  final placement (optional on old hosts)
   |<-------- event -------------|  change / action / dismiss
+  |<-------- layout ------------|  content box size (view-layout, docs/06 R5)
   |-- update(tree) ------------>|
   |-- close(result) ----------->|  (Host does not reply)
   |<-------- closed ------------|  user / session / replaced / timeout / …

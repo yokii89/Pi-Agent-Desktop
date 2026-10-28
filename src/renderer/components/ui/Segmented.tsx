@@ -5,6 +5,7 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
 } from "react";
 import { prefersReducedMotion } from "../../utils/animation";
 import { type GlideCancel, glide, glideSpring, mix } from "../../utils/glideMotion";
@@ -175,6 +176,11 @@ export function Segmented<T extends string = string>({
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLSpanElement>(null);
+  /**
+   * 横向滚动条被隐藏后，鼠标用户看不出还有下一项（docs/06 R8）：
+   * 两端有内容时用遮罩渐隐把「还能滚」画出来。只在 scrollable 档生效。
+   */
+  const [overflowHint, setOverflowHint] = useState({ start: false, end: false });
 
   const edgeL = useRef<Edge>({ v: 0, vel: 0, cancel: noop });
   const edgeR = useRef<Edge>({ v: 0, vel: 0, cancel: noop });
@@ -323,6 +329,34 @@ export function Segmented<T extends string = string>({
     else if (right > viewEnd) viewport.scrollLeft = right - viewport.clientWidth;
   }, []);
 
+  const measureOverflow = useCallback((): void => {
+    const viewport = viewportRef.current;
+    if (!viewport || !scrollable) return;
+    // 挂载首帧 / 面板隐藏时宽高为 0：此时算出来的「还能滚」是假溢出
+    if (viewport.clientWidth === 0) return;
+    const max = viewport.scrollWidth - viewport.clientWidth;
+    const next = {
+      start: viewport.scrollLeft > 1,
+      end: max > 1 && viewport.scrollLeft < max - 1,
+    };
+    setOverflowHint((prev) => (prev.start === next.start && prev.end === next.end ? prev : next));
+  }, [scrollable]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !scrollable) return;
+    measureOverflow();
+    const observer = new ResizeObserver(measureOverflow);
+    observer.observe(viewport);
+    // 轨道宽度变化（新增/删减项、字体回退）不会改变视口尺寸，必须一起观察
+    if (trackRef.current) observer.observe(trackRef.current);
+    viewport.addEventListener("scroll", measureOverflow, { passive: true });
+    return () => {
+      observer.disconnect();
+      viewport.removeEventListener("scroll", measureOverflow);
+    };
+  }, [measureOverflow, scrollable]);
+
   useLayoutEffect(() => {
     measure();
     const track = trackRef.current;
@@ -439,7 +473,22 @@ export function Segmented<T extends string = string>({
       <div
         ref={viewportRef}
         data-seg-viewport=""
-        className={scrollable ? `${styles.viewport} ${styles.scroll}` : styles.viewport}
+        data-seg-overflow={
+          scrollable && (overflowHint.start || overflowHint.end)
+            ? overflowHint.start && overflowHint.end
+              ? "both"
+              : overflowHint.start
+                ? "start"
+                : "end"
+            : undefined
+        }
+        className={[
+          scrollable ? `${styles.viewport} ${styles.scroll}` : styles.viewport,
+          scrollable && overflowHint.start ? styles.fadeStart : null,
+          scrollable && overflowHint.end ? styles.fadeEnd : null,
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
         <div ref={trackRef} className={styles.track}>
           {items.map((item, index) => (

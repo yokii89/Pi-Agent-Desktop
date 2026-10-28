@@ -1,14 +1,17 @@
 /**
- * Sync PiDesk host protocol types into `packages/view-sdk/src/types.ts`.
+ * Sync PiDesk host contract types into `packages/view-sdk/src/`.
  *
- * Source of truth: `pidesk/src/shared/view.ts` between the
- * `// #begin view-sdk-protocol` / `// #end view-sdk-protocol` markers.
- * The SDK copy stays self-contained so extensions can depend on
- * `@pidesk/view-sdk` without pulling Electron / renderer code — but it must
+ * Two mirrored regions, one source of truth each:
+ * - `src/shared/view.ts` → `packages/view-sdk/src/types.ts` (view/v1 wire)
+ * - `src/shared/contribution.ts` → `packages/view-sdk/src/contributionTypes.ts`
+ *   (public manifest subset; Catalog/runtime internals stay Host-only)
+ *
+ * The SDK copies stay self-contained so extensions can depend on
+ * `@pidesk/view-sdk` without pulling Electron / renderer code — but they must
  * not be hand-edited.
  *
  * Usage:
- *   node scripts/sync-view-sdk-types.mjs          # write types.ts
+ *   node scripts/sync-view-sdk-types.mjs          # write both files
  *   node scripts/sync-view-sdk-types.mjs --check  # fail on drift (CI / pre-test)
  */
 
@@ -17,17 +20,30 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
-const sharedPath = join(root, "..", "src", "shared", "view.ts");
-const sdkTypesPath = join(root, "..", "packages", "view-sdk", "src", "types.ts");
 
-const BEGIN = "// #begin view-sdk-protocol";
-const END = "// #end view-sdk-protocol";
+const VIEW = {
+  sourcePath: join(root, "..", "src", "shared", "view.ts"),
+  sdkPath: join(root, "..", "packages", "view-sdk", "src", "types.ts"),
+  begin: "// #begin view-sdk-protocol",
+  end: "// #end view-sdk-protocol",
+  label: "view-sdk types.ts",
+  sourceLabel: "src/shared/view.ts",
+};
 
-const HEADER = `/**
+const CONTRIBUTION = {
+  sourcePath: join(root, "..", "src", "shared", "contribution.ts"),
+  sdkPath: join(root, "..", "packages", "view-sdk", "src", "contributionTypes.ts"),
+  begin: "// #begin view-sdk-contribution",
+  end: "// #end view-sdk-contribution",
+  label: "view-sdk contributionTypes.ts",
+  sourceLabel: "src/shared/contribution.ts",
+};
+
+const VIEW_HEADER = `/**
  * Protocol types for view/v1.
  *
  * GENERATED FILE — do not edit by hand.
- * Source of truth: PiDesk \`src/shared/view.ts\` (${BEGIN.trim()} … ${END.trim()}).
+ * Source of truth: PiDesk \`src/shared/view.ts\` (${VIEW.begin.trim()} … ${VIEW.end.trim()}).
  * Regenerate: \`node scripts/sync-view-sdk-types.mjs\`
  * Verify:      \`node scripts/sync-view-sdk-types.mjs --check\`
  *
@@ -37,11 +53,25 @@ const HEADER = `/**
 
 `;
 
-function extractProtocolRegion(source) {
-  const begin = source.indexOf(BEGIN);
-  const end = source.indexOf(END);
+const CONTRIBUTION_HEADER = `/**
+ * Public contribution manifest types.
+ *
+ * GENERATED FILE — do not edit by hand.
+ * Source of truth: PiDesk \`src/shared/contribution.ts\` (${CONTRIBUTION.begin.trim()} … ${CONTRIBUTION.end.trim()}).
+ * Regenerate: \`node scripts/sync-view-sdk-types.mjs\`
+ * Verify:      \`node scripts/sync-view-sdk-types.mjs --check\`
+ *
+ * Only the manifest subset is mirrored; Catalog entries, activation
+ * transactions and runtime/worker state stay Host-internal (准则 §7.1).
+ */
+
+`;
+
+function extractRegion(source, spec) {
+  const begin = source.indexOf(spec.begin);
+  const end = source.indexOf(spec.end);
   if (begin === -1 || end === -1 || end <= begin) {
-    throw new Error(`Missing ${BEGIN} / ${END} markers in ${sharedPath}`);
+    throw new Error(`Missing ${spec.begin} / ${spec.end} markers in ${spec.sourcePath}`);
   }
   const start = source.indexOf("\n", begin);
   if (start === -1) throw new Error("Malformed begin marker");
@@ -50,10 +80,6 @@ function extractProtocolRegion(source) {
     .replace(/^\n+/, "")
     .replace(/\s+$/, "");
   return `${region}\n`;
-}
-
-function renderTypesTs(sharedSource) {
-  return HEADER + extractProtocolRegion(sharedSource);
 }
 
 /**
@@ -75,47 +101,91 @@ const REQUIRED_PROTOCOL_VALUES = [
   "VIEW_OPTION_PREVIEW_MAX_CHARS",
 ];
 
-function assertProtocolValues(rendered) {
-  const missing = REQUIRED_PROTOCOL_VALUES.filter(
+const REQUIRED_CONTRIBUTION_VALUES = [
+  "CONTRIBUTION_ICON_NAMES",
+  "ACCESS_MODE_ICON_NAMES",
+  "CONTRIBUTION_ICONS",
+  "CONTRIBUTION_LIMITS",
+];
+
+const REQUIRED_CONTRIBUTION_TYPES = [
+  "ContributionPlacement",
+  "ContributionActivation",
+  "ContributionAccent",
+  "ContributionIconName",
+  "AccessModeIconName",
+  "ManifestContributionItem",
+];
+
+function assertExports(rendered, spec, values, types = []) {
+  const missingValues = values.filter(
     (name) => !new RegExp(`^export const ${name}\\b`, "m").test(rendered),
   );
+  const missingTypes = types.filter(
+    (name) => !new RegExp(`^export (?:interface|type) ${name}\\b`, "m").test(rendered),
+  );
+  const missing = [...missingValues, ...missingTypes];
   if (missing.length > 0) {
     throw new Error(
-      `Protocol region is missing exported constants: ${missing.join(", ")}.\n` +
-        `They must stay between the ${BEGIN} / ${END} markers in ${sharedPath}.`,
+      `${spec.label} is missing required exports: ${missing.join(", ")}.\n` +
+        `They must stay between the ${spec.begin} / ${spec.end} markers in ${spec.sourcePath}.`,
     );
   }
 }
 
+function renderFor(spec, header, values, types) {
+  const source = readFileSync(spec.sourcePath, "utf8");
+  const rendered = header + extractRegion(source, spec);
+  assertExports(rendered, spec, values, types);
+  return rendered;
+}
+
 function main() {
   const check = process.argv.includes("--check");
-  const sharedSource = readFileSync(sharedPath, "utf8");
-  const next = renderTypesTs(sharedSource);
-  assertProtocolValues(next);
+  const outputs = [
+    {
+      spec: VIEW,
+      content: renderFor(VIEW, VIEW_HEADER, REQUIRED_PROTOCOL_VALUES, []),
+    },
+    {
+      spec: CONTRIBUTION,
+      content: renderFor(
+        CONTRIBUTION,
+        CONTRIBUTION_HEADER,
+        REQUIRED_CONTRIBUTION_VALUES,
+        REQUIRED_CONTRIBUTION_TYPES,
+      ),
+    },
+  ];
 
   if (check) {
-    let current = "";
-    try {
-      current = readFileSync(sdkTypesPath, "utf8");
-    } catch {
-      console.error(`Missing generated file: ${sdkTypesPath}`);
-      process.exit(1);
-    }
-    if (current !== next) {
-      console.error(
-        `view-sdk types.ts is out of lockstep with src/shared/view.ts.\n` +
-          `Run: node scripts/sync-view-sdk-types.mjs`,
-      );
-      process.exit(1);
+    for (const { spec, content } of outputs) {
+      let current = "";
+      try {
+        current = readFileSync(spec.sdkPath, "utf8");
+      } catch {
+        console.error(`Missing generated file: ${spec.sdkPath}`);
+        process.exit(1);
+      }
+      if (current !== content) {
+        console.error(
+          `${spec.label} is out of lockstep with ${spec.sourceLabel}.\n` +
+            `Run: node scripts/sync-view-sdk-types.mjs`,
+        );
+        process.exit(1);
+      }
     }
     console.log(
-      `view-sdk types.ts is in lockstep with src/shared/view.ts (${REQUIRED_PROTOCOL_VALUES.length} protocol constants mirrored)`,
+      `view-sdk types.ts + contributionTypes.ts are in lockstep with src/shared/{view,contribution}.ts ` +
+        `(${REQUIRED_PROTOCOL_VALUES.length} protocol constants + ${REQUIRED_CONTRIBUTION_VALUES.length} contribution values mirrored)`,
     );
     return;
   }
 
-  writeFileSync(sdkTypesPath, next, "utf8");
-  console.log(`Wrote ${sdkTypesPath}`);
+  for (const { spec, content } of outputs) {
+    writeFileSync(spec.sdkPath, content, "utf8");
+    console.log(`Wrote ${spec.sdkPath}`);
+  }
 }
 
 main();

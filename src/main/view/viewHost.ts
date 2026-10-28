@@ -32,6 +32,7 @@ import type {
   ViewErrorCode,
   ViewEvent,
   ViewHelloPayload,
+  ViewLayoutPayload,
   ViewModeDescriptor,
   ViewNode,
   ViewNotifiedPayload,
@@ -60,6 +61,8 @@ import {
   resolvePanelId,
   resolvePlacement,
   sanitizeActions,
+  sanitizePanelBadge,
+  sanitizePanelHeader,
   sanitizeTree,
   slotKey,
   truncateString,
@@ -387,6 +390,8 @@ function sanitizePlacementHint(raw: unknown): ViewPlacementHint | undefined {
     floating?: unknown;
     panelId?: unknown;
     headerSide?: unknown;
+    panelBadge?: unknown;
+    panelHeader?: unknown;
     mode?: unknown;
   };
   const hint: ViewPlacementHint = {};
@@ -403,6 +408,10 @@ function sanitizePlacementHint(raw: unknown): ViewPlacementHint | undefined {
   ) {
     hint.headerSide = record.headerSide;
   }
+  const panelBadge = sanitizePanelBadge(record.panelBadge);
+  if (panelBadge) hint.panelBadge = panelBadge;
+  const panelHeader = sanitizePanelHeader(record.panelHeader);
+  if (panelHeader) hint.panelHeader = panelHeader;
   if (record.mode && typeof record.mode === "object") {
     const mode = sanitizeModeDescriptor(record.mode);
     if (mode) hint.mode = mode;
@@ -808,8 +817,14 @@ function handleEnvelope(conn: ViewConnection, line: string): void {
       handleNotify(conn, id, envelope.payload);
       return;
     default:
-      // event/hello/opened/notified 为 Host→Client；其余未知类型不断开整条 pipe
-      if (type !== "event" && type !== "hello" && type !== "opened" && type !== "notified") {
+      // event/hello/opened/notified/layout 为 Host→Client；其余未知类型不断开整条 pipe
+      if (
+        type !== "event" &&
+        type !== "hello" &&
+        type !== "opened" &&
+        type !== "notified" &&
+        type !== "layout"
+      ) {
         sendError(conn, id, `未知消息类型 ${String(type)}`, "protocol");
       }
   }
@@ -977,6 +992,26 @@ export function ensureViewHost(): Promise<ViewHostEnv> {
       throw err instanceof Error ? err : new Error("View Host 启动失败");
     });
   return starting;
+}
+
+/**
+ * 渲染层回传面板内容盒尺寸（docs/06 R5）→ `layout` envelope。
+ * 只对打开中的视图发：去抖窗口里的最后一帧可能晚于关闭到达，静默丢弃。
+ * 数值在 IPC 与这里各校验一次——渲染层报告不是可信输入。
+ */
+export function reportViewLayout(viewId: string, width: unknown, height?: unknown): void {
+  const view = views.get(viewId);
+  if (!view) return;
+  const conn = connections.get(view.connectionId);
+  if (!conn?.authenticated) return;
+  const bodyWidth = typeof width === "number" ? Math.round(width) : Number.NaN;
+  if (!Number.isFinite(bodyWidth) || bodyWidth <= 0 || bodyWidth > 10000) return;
+  const payload: ViewLayoutPayload = { viewId, bodyWidth };
+  if (typeof height === "number" && Number.isFinite(height)) {
+    const bodyHeight = Math.round(height);
+    if (bodyHeight > 0 && bodyHeight <= 10000) payload.bodyHeight = bodyHeight;
+  }
+  sendEnvelope(conn, { id: viewId, type: "layout", payload });
 }
 
 /** 渲染层用户事件 → 对应连接上的 Client；dismiss 会同步销毁视图。 */

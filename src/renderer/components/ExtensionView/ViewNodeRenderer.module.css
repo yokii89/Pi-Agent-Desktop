@@ -212,6 +212,24 @@
   color: var(--color-text-strong);
 }
 
+/* 只读列表行（docs/06 R1）：行是 listitem 而不是可点行，所以没有药丸、选中条
+   与 pointer 反馈；排版与 .listItem 保持一致，长描述照常折行。 */
+.readonlyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list .readonlyItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  color: var(--color-text);
+  white-space: normal;
+  min-width: 0;
+}
+
 .listText {
   display: flex;
   flex-direction: column;
@@ -370,6 +388,30 @@
   flex-direction: column;
   gap: var(--spacing-sm);
   min-width: 0;
+}
+
+/* 页签条吸顶（docs/06 R2）：队列页 3 屏时切页不必先滚回顶部。
+   只挂在带 [data-panel-scroll] 的 panel / sidebar / modal 上；widget 高度短，
+   吸顶会把仅有的内容区吃掉。::before 向左右各探出面板 padding，滚过去的正文
+   不会从两端漏出来；负 z-index 只在本层的堆叠上下文里生效，不会钻到面板背景后面。 */
+.tabBarSticky {
+  align-self: stretch;
+}
+
+[data-panel-scroll] .tabBarSticky {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+[data-panel-scroll] .tabBarSticky::before {
+  content: "";
+  position: absolute;
+  inset: 0 calc(-1 * var(--spacing-sm));
+  z-index: -1;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
 
 /* 页签条：ui/Segmented 的落点皮肤。每枚 chip 自己那圈 1px 描边画不出来——滑块是被 clip-path

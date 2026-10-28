@@ -15,6 +15,7 @@ import type {
   ViewEvent,
   ViewHelloPayload,
   ViewHostCapability,
+  ViewLayoutPayload,
   ViewLimits,
   ViewNode,
   ViewNotifiedPayload,
@@ -152,7 +153,13 @@ export type ViewSessionEvent =
       placement: ViewOpenedPayload["placement"];
       panelId?: string;
       headerSide?: ViewOpenedPayload["headerSide"];
-    };
+    }
+  /**
+   * Panel content box size, after mount and after debounced resizes
+   * (Host capability `view-layout`, docs/06 R5). Old Hosts never emit it;
+   * extensions must keep their narrowest-width copy as the fallback.
+   */
+  | { type: "layout"; width: number; height?: number };
 
 /**
  * Host refused the open (placement/limit/protocol) or closed with a fatal reason.
@@ -659,6 +666,22 @@ export class DesktopViewClient {
       case "event": {
         const payload = env.payload as ViewEvent | undefined;
         if (payload && typeof payload.type === "string") this.#emit(view, payload);
+        return;
+      }
+      case "layout": {
+        const payload = env.payload as ViewLayoutPayload | undefined;
+        if (
+          payload &&
+          typeof payload.bodyWidth === "number" &&
+          Number.isFinite(payload.bodyWidth)
+        ) {
+          const height = payload.bodyHeight;
+          this.#emit(view, {
+            type: "layout",
+            width: payload.bodyWidth,
+            ...(typeof height === "number" && Number.isFinite(height) ? { height } : {}),
+          });
+        }
         return;
       }
       case "closed": {

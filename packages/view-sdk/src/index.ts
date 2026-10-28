@@ -28,10 +28,17 @@
  */
 
 export {
+  type AccessModeContribution,
+  type AccessModeContributionInput,
+  accessModeManifestEntry,
+  defineAccessMode,
+} from "./accessMode.js";
+export {
   supportsCapability,
   supportsOptionPreview,
   supportsPanelLauncher,
   supportsPatch,
+  supportsReadonlyList,
   supportsTable,
   type TableViewOptions,
   tableView,
@@ -55,6 +62,18 @@ export {
   readContributionKeysEnv,
   resolveContributionKey,
 } from "./contribution.js";
+export {
+  ACCESS_MODE_ICON_NAMES,
+  type AccessModeIconName,
+  CONTRIBUTION_ICON_NAMES,
+  CONTRIBUTION_ICONS,
+  CONTRIBUTION_LIMITS,
+  type ContributionAccent,
+  type ContributionActivation,
+  type ContributionIconName,
+  type ContributionPlacement,
+  type ManifestContributionItem,
+} from "./contributionTypes.js";
 export {
   describeBudgetViolations,
   frameBudgetViolations,
@@ -120,6 +139,7 @@ export {
   type ViewEvent,
   type ViewHelloPayload,
   type ViewHostCapability,
+  type ViewLayoutPayload,
   type ViewLimits,
   type ViewListOption,
   type ViewModeAccent,
@@ -133,6 +153,7 @@ export {
   type ViewOpenedPayload,
   type ViewOpenPayload,
   type ViewOption,
+  type ViewPanelBadge,
   type ViewPatchOp,
   type ViewPatchPayload,
   type ViewPlacement,

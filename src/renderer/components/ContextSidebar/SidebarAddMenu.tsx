@@ -6,6 +6,8 @@ import { useBrowserStore } from "../../stores/browserStore";
 import { prepareOverlayFreeze, releaseOverlayFreeze } from "../../utils/overlayFreeze";
 import { IconButton } from "../ui/IconButton";
 import { Menu, type MenuItem } from "../ui/Menu";
+import { sidebarBadgeLabel } from "./badgeSemantics";
+import { SidebarBadge } from "./SidebarBadge";
 import type { SidebarFeature } from "./sidebarFeatures";
 
 /** 原生浏览器视图的抑制来源（与 BrowserMoreMenu 的 reason 各自独立）。 */
@@ -65,11 +67,15 @@ export function SidebarAddMenu({
   let previousSource: SidebarFeature["source"] | null = null;
   for (const feature of features) {
     const IconComponent = feature.icon;
+    const badge = feature.badge;
     items.push({
       key: feature.id,
       label: feature.title,
       icon: <IconComponent size={16} weight="regular" />,
       hint: feature.shortcut,
+      badge: badge ? <SidebarBadge badge={badge} /> : undefined,
+      // 徽章只有颜色/圆点时读屏拿不到语义，名称里补一句结论
+      ariaLabel: badge ? sidebarBadgeLabel(t, feature.title, badge) : undefined,
       dividerBefore: previousSource === "builtin" && feature.source === "extension",
       onSelect: () => onSelect(feature),
     });

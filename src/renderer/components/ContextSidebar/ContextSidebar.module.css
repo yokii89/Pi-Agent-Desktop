@@ -154,6 +154,61 @@
   text-overflow: ellipsis;
 }
 
+/* 面板徽章（docs/06 R7）：计数或短标签；只有 tone 时退化为圆点。
+   颜色走 token，亮/暗主题自动跟随；语义由父级 aria-label 承担。 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge[data-dot="true"] {
+  min-width: 6px;
+  width: 6px;
+  height: 6px;
+  padding: 0;
+}
+
+.badge[data-tone="attention"] {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.badge[data-tone="attention"][data-dot="true"] {
+  background: var(--color-warning);
+}
+
+.badge[data-tone="success"] {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.badge[data-tone="success"][data-dot="true"] {
+  background: var(--color-success);
+}
+
+.badge[data-tone="muted"] {
+  background: var(--color-muted-soft);
+  color: var(--color-text-muted);
+}
+
+.badge[data-tone="muted"][data-dot="true"] {
+  background: var(--color-text-muted);
+}
+
+.launcherBadge {
+  margin-left: auto;
+}
+
 /* 关闭按钮：常驻 DOM 以便键盘可达；非激活页签只在 hover / 聚焦时显形 */
 .tabClose {
   display: inline-flex;

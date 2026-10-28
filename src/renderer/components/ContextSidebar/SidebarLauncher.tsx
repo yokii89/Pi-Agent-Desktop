@@ -1,5 +1,7 @@
 import { useT } from "../../hooks/useT";
+import { sidebarBadgeLabel } from "./badgeSemantics";
 import styles from "./ContextSidebar.module.css";
+import { SidebarBadge } from "./SidebarBadge";
 import type { SidebarFeature } from "./sidebarFeatures";
 
 /**
@@ -25,6 +27,7 @@ export function SidebarLauncher({
         {features.map((feature) => {
           const IconComponent = feature.icon;
           const hint = feature.shortcut ?? feature.description;
+          const badge = feature.badge;
           return (
             <li key={feature.id}>
               <button
@@ -32,6 +35,7 @@ export function SidebarLauncher({
                 className={styles.launcherCard}
                 data-sidebar-feature={feature.id}
                 aria-busy={feature.catalog?.state === "activating" || undefined}
+                aria-label={badge ? sidebarBadgeLabel(t, feature.title, badge) : undefined}
                 onClick={() => onOpenFeature(feature)}
               >
                 <span className={styles.launcherIcon}>
@@ -41,6 +45,7 @@ export function SidebarLauncher({
                   <span className={styles.launcherTitle}>{feature.title}</span>
                   {hint && <span className={styles.launcherHint}>{hint}</span>}
                 </span>
+                {badge ? <SidebarBadge badge={badge} className={styles.launcherBadge} /> : null}
               </button>
             </li>
           );

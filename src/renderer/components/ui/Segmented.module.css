@@ -88,6 +88,35 @@
   display: none;
 }
 
+/* 溢出提示（docs/06 R8）：滚动条隐身后，用两端渐隐告诉鼠标用户「这一侧还有」。
+   遮罩只裁视口本身，滑块与真标签同时变淡，不额外增加可点元素。 */
+.scroll.fadeStart {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 18px);
+  mask-image: linear-gradient(to right, transparent 0, #000 18px);
+}
+
+.scroll.fadeEnd {
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 18px);
+  mask-image: linear-gradient(to left, transparent 0, #000 18px);
+}
+
+.scroll.fadeStart.fadeEnd {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 18px,
+    #000 calc(100% - 18px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 18px,
+    #000 calc(100% - 18px),
+    transparent 100%
+  );
+}
+
 /* 轨道与滑块共用一套列定义：两者列宽必须逐列相同，副本才会严丝合缝地压在真标签上。
    width: max-content + min-width: 100% 让轨道既能横向溢出滚动，又能在撑满时等分。 */
 .track,

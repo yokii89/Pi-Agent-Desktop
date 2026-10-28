@@ -24,6 +24,8 @@ export interface OptionRow {
   className?: string;
   disabled?: boolean;
   title?: string;
+  /** 覆盖行的可访问名称（行内只有徽章/图标时用）。 */
+  ariaLabel?: string;
   /** 当前值所在行：aria-selected，并作为打开时药丸的瞬移落点。 */
   selected?: boolean;
   /** typeahead 匹配用文本；缺省取行内容。 */
@@ -221,6 +223,7 @@ export function OptionList({
             onMouseDown={preventFocusOnPointer ? (event) => event.preventDefault() : undefined}
             disabled={row.disabled}
             title={row.title}
+            aria-label={row.ariaLabel}
             onKeyDown={onKeyDown}
             data-glide-index={index}
             data-glide-label={row.text}

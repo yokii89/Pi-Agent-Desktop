@@ -12,6 +12,7 @@ import {
   Spinner,
 } from "@phosphor-icons/react";
 import { memo, useCallback, useMemo, useRef, useState } from "react";
+import type { AccessModeIconName } from "../../../shared/contribution";
 import type { PiModelOption, ThinkingLevelId } from "../../../shared/ipc";
 import { ACCESS_MODE_ACTIONS } from "../../../shared/view";
 import { useT } from "../../hooks/useT";
@@ -170,14 +171,17 @@ export function TaskInputToolbar({
 }
 
 /** 扩展可引用的宿主内置模式图标（placementHint.mode.icon，docs/design/14）。 */
-const ACCESS_MODE_ICONS: Record<string, React.ReactNode> = {
+const ACCESS_MODE_ICONS: Record<AccessModeIconName, React.ReactNode> = {
   shield: <Shield size={18} weight="regular" />,
   "shield-check": <ShieldCheck size={18} weight="regular" />,
   clipboard: <ClipboardText size={18} weight="regular" />,
 };
 
 function accessModeIcon(name: string | undefined, fallback: React.ReactNode): React.ReactNode {
-  return (name && ACCESS_MODE_ICONS[name]) || fallback;
+  if (name && Object.hasOwn(ACCESS_MODE_ICONS, name)) {
+    return ACCESS_MODE_ICONS[name as AccessModeIconName];
+  }
+  return fallback;
 }
 
 interface AccessModeRow {

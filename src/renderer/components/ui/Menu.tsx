@@ -24,6 +24,10 @@ export interface MenuItem {
   disabled?: boolean;
   /** 项尾的辅助说明（如快捷键、禁用原因）。 */
   hint?: string;
+  /** 标签旁的视觉徽章；语义请同时写进 ariaLabel。 */
+  badge?: ReactNode;
+  /** 覆盖条目的可访问名称（徽章/图标无法自述时用）。 */
+  ariaLabel?: string;
   /** 危险操作（删除类）：文字与图标用危险色。 */
   tone?: "danger";
   /** 在该条目之前渲染一条分隔线（把危险/收尾动作与常规动作分组）。 */
@@ -95,6 +99,7 @@ export function MenuList({
       disabled: item.disabled,
       selected: item.selected,
       text: item.label,
+      ariaLabel: item.ariaLabel,
       className: item.tone === "danger" ? styles.itemDanger : undefined,
       hasPopup: item.submenu ? "menu" : undefined,
       expanded: submenu?.key === item.key,
@@ -102,6 +107,7 @@ export function MenuList({
         <>
           {item.icon && <span className={styles.itemIcon}>{item.icon}</span>}
           <span>{item.label}</span>
+          {item.badge}
           {item.hint && <span className={styles.hint}>{item.hint}</span>}
           {item.submenu ? (
             <span className={styles.submenuChevron} aria-hidden="true">

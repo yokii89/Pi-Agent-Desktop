@@ -98,7 +98,7 @@ try {
   writeFileSync(
     loader,
     `import * as sdk from "@pidesk/view-sdk";
-const needed = ["connectDesktopView","DesktopViewClient","createViewFrameScheduler","VIEW_LIMITS","supportsTable","openPanelResult","tableView","measureViewTree","playNotification","superviseSlot"];
+const needed = ["connectDesktopView","DesktopViewClient","createViewFrameScheduler","VIEW_LIMITS","supportsTable","openPanelResult","tableView","measureViewTree","playNotification","superviseSlot","defineAccessMode","ACCESS_MODE_ICON_NAMES"];
 const missing = needed.filter(n => !(n in sdk));
 if (missing.length) { console.error("MISSING:" + missing.join(",")); process.exit(1); }
 const leaked = Object.keys(sdk).filter(n => n.includes("ForTests"));
@@ -127,10 +127,11 @@ console.log("OK " + Object.keys(sdk).length + " exports");
   const consumerTs = join(work, "use.ts");
   writeFileSync(
     consumerTs,
-    `import { VIEW_LIMITS, measureViewTree, supportsTable, type ViewNode } from "@pidesk/view-sdk";\n` +
+    `import { defineAccessMode, VIEW_LIMITS, measureViewTree, supportsTable, type ViewNode } from "@pidesk/view-sdk";\n` +
       `const root: ViewNode = { type: "text", content: "hi" };\n` +
       `export const nodes = measureViewTree(root, VIEW_LIMITS).nodes;\n` +
-      `export const table = supportsTable(null);\n`,
+      `export const table = supportsTable(null);\n` +
+      `export const mode = defineAccessMode({ id: "plan", title: "Plan", icon: "clipboard" });\n`,
   );
   const types = run(
     process.execPath,

@@ -46,6 +46,9 @@ export function collectFormValues(root: ViewNode, previous?: FormValues): FormVa
         return;
       }
       case "list": {
+        // 只读列表只作展示（docs/06 R1）：id 是渲染身份，不属于表单值，
+        // 否则 action 的 values 里会混进一份从未被用户确认过的快照。
+        if (node.readonly === true) return;
         take(node.id, () => {
           if (node.value !== undefined) {
             if (node.multiple) {

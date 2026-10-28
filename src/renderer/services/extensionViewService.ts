@@ -28,4 +28,13 @@ export const extensionViewService = {
     if (!api) return Promise.resolve();
     return unwrap(api.view.sendEvent({ id, event })).then(() => undefined);
   },
+  /**
+   * 面板内容盒尺寸回传（docs/06 R5）。失败只说明视图已关闭或连接断开，
+   * 下一次观察会重试，不向 UI 冒错。
+   */
+  reportLayout(id: string, width: number, height?: number): void {
+    const api = pideskApi();
+    if (!api) return;
+    void unwrap(api.view.reportLayout({ id, width, height })).catch(() => {});
+  },
 };

@@ -9,6 +9,7 @@ import type {
   ViewListOption,
   ViewNode,
   ViewOpenedPayload,
+  ViewPanelBadge,
   ViewPatchOp,
   ViewPlacement,
   ViewTab,
@@ -178,6 +179,79 @@ export function sanitizeActions(raw: unknown): ViewAction[] {
     });
   }
   return out;
+}
+
+/** 徽章 label 的字符上限：它是视觉补充，不是正文（docs/06 R7）。 */
+const PANEL_BADGE_LABEL_MAX_CHARS = 12;
+
+/**
+ * 面板徽章（docs/06 R7）。`tone` 是进入渲染的唯一开关；未知 tone 整条丢弃，
+ * 不猜「大概想显示警示」。count 取正整数；超过 99 由渲染层显示 `99+`。
+ */
+export function sanitizePanelBadge(raw: unknown): ViewPanelBadge | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const record = raw as { tone?: unknown; count?: unknown; label?: unknown };
+  if (record.tone !== "attention" && record.tone !== "success" && record.tone !== "muted") {
+    return undefined;
+  }
+  const badge: ViewPanelBadge = { tone: record.tone };
+  if (typeof record.count === "number" && Number.isFinite(record.count)) {
+    const count = Math.floor(record.count);
+    if (count > 0) badge.count = Math.min(count, 999);
+  }
+  if (typeof record.label === "string" && record.label.trim().length > 0) {
+    badge.label = record.label.slice(0, PANEL_BADGE_LABEL_MAX_CHARS);
+  }
+  return badge;
+}
+
+/** 头部槽只收这些类型（docs/06 R9）：能表达一行状态，又不会长成第二个面板。 */
+const PANEL_HEADER_MAX_ITEMS = 8;
+const PANEL_HEADER_MAX_NODES = 32;
+
+function keepLightHeaderNode(node: ViewNode, budget: { nodes: number }): ViewNode | null {
+  budget.nodes += 1;
+  if (budget.nodes > PANEL_HEADER_MAX_NODES) return null;
+  switch (node.type) {
+    case "text":
+    case "divider":
+    case "progress":
+      return node;
+    case "row":
+    case "column": {
+      const children = node.children
+        .map((child) => keepLightHeaderNode(child, budget))
+        .filter((child): child is ViewNode => child !== null);
+      if (children.length === 0) return null;
+      return { ...node, children };
+    }
+    case "card": {
+      const children = node.children
+        .map((child) => keepLightHeaderNode(child, budget))
+        .filter((child): child is ViewNode => child !== null);
+      if (children.length === 0) return null;
+      return { type: "card", title: node.title, children };
+    }
+    default:
+      // 表单控件 / table / tabs 会把「固定头部」变成第二个滚动区，整条丢弃。
+      return null;
+  }
+}
+
+/**
+ * 面板固定头部槽（docs/06 R9）。复用整树 sanitize 的预算与截断规则，
+ * 再按轻节点白名单过滤：名单外的 top-level 条目整条消失，容器里则逐子过滤。
+ * 全部被过滤掉时返回 undefined（Host 不渲染空槽）。
+ */
+export function sanitizePanelHeader(raw: unknown): ViewNode[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const tree = sanitizeTree({ type: "column", children: raw.slice(0, PANEL_HEADER_MAX_ITEMS) });
+  if ("error" in tree || tree.root.type !== "column") return undefined;
+  const budget = { nodes: 0 };
+  const nodes = tree.root.children
+    .map((node) => keepLightHeaderNode(node, budget))
+    .filter((node): node is ViewNode => node !== null);
+  return nodes.length > 0 ? nodes : undefined;
 }
 
 /** 列 key 必须唯一，否则 `cells` 索引歧义。 */
@@ -380,6 +454,9 @@ export function sanitizeTree(raw: unknown): { root: ViewNode } | { error: string
           items: sanitizeOptions(record.items, true),
           value,
           multiple: record.multiple === true,
+          // 只读态（docs/06 R1）：字段缺失/非 true 时回落到表单控件；
+          // 旧 Host 不认识该字段，扩展必须先探测 capability。
+          ...(record.readonly === true ? { readonly: true } : {}),
         };
       }
       case "progress": {
@@ -411,7 +488,9 @@ export function sanitizeTree(raw: unknown): { root: ViewNode } | { error: string
           const tab = item as Record<string, unknown>;
           if (typeof tab.id !== "string" || typeof tab.label !== "string") continue;
           const status =
-            tab.status === "answered" || tab.status === "attention" ? tab.status : undefined;
+            tab.status === "answered" || tab.status === "attention" || tab.status === "none"
+              ? tab.status
+              : undefined;
           tabs.push({
             id: truncateString(tab.id),
             label: truncateString(tab.label),

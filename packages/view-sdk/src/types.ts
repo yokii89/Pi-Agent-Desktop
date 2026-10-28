@@ -57,8 +57,15 @@ export type ViewTextTone = "muted" | "success" | "warning" | "danger";
 export interface ViewTab {
   id: string;
   label: string;
-  /** chip 角标：answered=✓（成功色）/ attention=!（警示色）；缺省=未作答（空心点）。 */
-  status?: "answered" | "attention";
+  /**
+   * chip 角标：answered=✓（成功色）/ attention=!（警示色）/ none=不画点；
+   * 缺省=未作答（空心点）。
+   *
+   * `none` 服务信息流类页签（docs/06 R6）：空心点的协议语义是「待回答」，
+   * 事件列表不表达这句话。旧 Host 只认前两个值，`none` 落回缺省的空心点，
+   * 属于可接受的视觉退化，不进 capability。
+   */
+  status?: "answered" | "attention" | "none";
   children: ViewNode[];
 }
 
@@ -119,6 +126,16 @@ export type ViewNode =
       items: ViewListOption[];
       value?: string | string[];
       multiple?: boolean;
+      /**
+       * 只读展示（docs/06 R1）。`true` 时：不写 `values`、不发 `change`、
+       * 不画选中强调条；行是 `listitem` 而不是 `option`，Tab 不进入行；
+       * `id` 仍必填，但只作渲染身份；`multiple` 被忽略。
+       *
+       * 需 Host 广告 `view-readonly-list`。旧 Host 在 sanitize 里丢弃该字段，
+       * 退化为可点选（视觉退化、不报错），扩展只应在探测到能力后发送。
+       * 缺省 `false` 保持表单控件语义。
+       */
+      readonly?: boolean;
     }
   | { type: "progress"; value?: number; label?: string }
   /**
@@ -169,6 +186,20 @@ export interface ViewAction {
   disabled?: boolean;
 }
 
+/**
+ * 侧栏页签 / 启动页 / 加号菜单上的面板徽章（docs/06 R7）。
+ * 只表达「面板关着或在别的页签时也值得看一眼」；不抢焦点、不自动重开页签。
+ * 需 Host 广告 `panel-tab-badge`，旧 Host 忽略该字段。
+ */
+export interface ViewPanelBadge {
+  /** attention=需要处理 / success=有新完成 / muted=中性更新。 */
+  tone: "attention" | "success" | "muted";
+  /** 1–99；超出显示 `99+`。缺省时按圆点呈现。 */
+  count?: number;
+  /** 计数之外的短标签（≤ 12 字符，如「失败」）；仅作视觉补充，可省略。 */
+  label?: string;
+}
+
 export interface ViewPlacementHint {
   /** stream：插到该条目之后；缺省追加到会话流末尾 */
   afterEntryId?: string;
@@ -187,6 +218,18 @@ export interface ViewPlacementHint {
   panelId?: string;
   /** header：嵌入顶栏左侧（缺省）/ 中央 / 右侧动作区，与正文三栏对齐。 */
   headerSide?: HeaderSide;
+  /**
+   * panel：页签条、启动页与加号菜单上的徽章（docs/06 R7）。
+   * 随 `placementHint` **整体替换**：更新时不带此字段即清除。
+   */
+  panelBadge?: ViewPanelBadge;
+  /**
+   * panel：固定在滚动容器之上的头部槽（docs/06 R9）。
+   * Host 只接受轻节点（text / row / column / card / progress / divider），
+   * 交互控件会被整条丢弃；需广告 `panel-header`，旧 Host 忽略。
+   * 状态行放这里后不会被长页签内容滚走。
+   */
+  panelHeader?: ViewNode[];
   /**
    * access-mode：模式注册元数据（docs/design/14）。
    * update 时整体替换；扩展为 `active` 的真值源。
@@ -261,7 +304,8 @@ export interface ViewEnvelope {
     | "closed"
     | "error"
     | "notify"
-    | "notified";
+    | "notified"
+    | "layout";
   payload: unknown;
 }
 
@@ -271,6 +315,22 @@ export interface ViewOpenedPayload {
   panelId?: string;
   /** placement 为 header 时：最终落点侧别（非法/缺省已归一为 left）。 */
   headerSide?: HeaderSide;
+}
+
+/**
+ * 面板内容盒尺寸回传（Host → Client，docs/06 R5）。挂在视图会话上：
+ * 挂载后发第一帧，尺寸变化去抖后重发，视图关闭即停止。
+ *
+ * 只回传两个数字，不发树、不触发更新；扩展自行决定是否重投影。
+ * 需 Host 广告 `view-layout`；旧 Client 收到未知 envelope type 必须忽略。
+ */
+export interface ViewLayoutPayload {
+  /** 与 envelope.id 相同；显式带上便于日志与诊断。 */
+  viewId: string;
+  /** 内容盒客户宽（px，含 padding、不含纵向滚动条）。 */
+  bodyWidth: number;
+  /** 内容盒客户高（px）；可选。 */
+  bodyHeight?: number;
 }
 
 /** hello payload（Host → Client）：capability 广告（docs/design/08 §12.7）。 */
@@ -302,6 +362,18 @@ export interface ViewHelloPayload {
  * `view-option-preview`：`list` 支持 `ViewListOption.preview` 并排预览（docs/design/79）。
  * 旧 Host 会在 `sanitizeOptions` 里静默丢弃该字段，扩展必须先探测再决定是否
  * 保留自己的回退树。
+ *
+ * `view-readonly-list`：`list.readonly` 被 Host 保留并渲染为不可选的列表
+ * （docs/06 R1）。旧 Host 丢弃该字段，行回到可点选但不产生行为的状态。
+ *
+ * `view-layout`：Host 会在面板挂载 / 尺寸变化后回传 `layout` 消息
+ * （docs/06 R5）。没广告就没有事件，扩展继续用按最窄档写死的文案。
+ *
+ * `panel-tab-badge`：`placementHint.panelBadge` 会渲染到侧栏页签与启动页
+ * （docs/06 R7）。旧 Host 忽略字段，页签条不变。
+ *
+ * `panel-header`：`placementHint.panelHeader` 会渲染在面板滚动容器之上
+ * （docs/06 R9）。旧 Host 忽略字段，状态行继续随正文滚动。
  */
 export type ViewHostCapability =
   | "contribution-binding"
@@ -310,7 +382,11 @@ export type ViewHostCapability =
   | "view-table"
   | "view-patch"
   | "panel-launcher"
-  | "view-option-preview";
+  | "view-option-preview"
+  | "view-readonly-list"
+  | "view-layout"
+  | "panel-tab-badge"
+  | "panel-header";
 
 /**
  * 本 Host 实际实现的能力集，`hello.capabilities` 的唯一来源。
@@ -325,6 +401,10 @@ export const VIEW_HOST_CAPABILITIES: readonly ViewHostCapability[] = [
   "view-patch",
   "panel-launcher",
   "view-option-preview",
+  "view-readonly-list",
+  "view-layout",
+  "panel-tab-badge",
+  "panel-header",
 ];
 
 /**

@@ -750,6 +750,9 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 回写用户事件（change / action / dismiss）到对应 Client。 */
     sendEvent: (req: { id: string; event: ViewEvent }): Promise<IpcResult<null>> =>
       ipcRenderer.invoke(VIEW_IPC.sendEvent, req),
+    /** 回传面板内容盒尺寸；主进程转成 `layout` envelope 发给扩展。 */
+    reportLayout: (req: { id: string; width: number; height?: number }): Promise<IpcResult<null>> =>
+      ipcRenderer.invoke(VIEW_IPC.layout, req),
     /** 原子激活 Catalog Contribution（冷态入口 → live → 确认）。 */
     activateContribution: (
       req: ActivateContributionRequest,

@@ -58,6 +58,16 @@ export function supportsOptionPreview(client: DesktopViewClient | null | undefin
 }
 
 /**
+ * `list.readonly` renders a non-selectable list on hosts with
+ * `view-readonly-list` (docs/06 R1). Older hosts drop the field, which turns
+ * the rows back into clickable options that write `values` and draw an active
+ * bar without any consumer — probe this before sending the field.
+ */
+export function supportsReadonlyList(client: DesktopViewClient | null | undefined): boolean {
+  return supportsCapability(client, "view-readonly-list");
+}
+
+/**
  * The Host renders panel contributions as launcher features + closable tabs
  * (docs/design/66).
  *
@@ -85,8 +95,18 @@ export interface TableViewOptions {
   emptyText?: string;
   /** Max rendered rows before the Host truncates and shows the overflow count. */
   maxRows?: number;
-  /** Row label to lead each degraded line with; defaults to the first cell. */
+  /**
+   * Column that leads each degraded row. The leading cell is rendered as `body`
+   * and comes first; the remaining columns follow in their declared order as
+   * `caption`. It no longer filters the other cells out (docs/06 R3).
+   */
   labelKey?: string;
+  /**
+   * Legacy narrow list: one line per row, only the lead column. Use this when a
+   * rail is too narrow for key/value pairs instead of relying on the old
+   * `labelKey`-filters-everything accident.
+   */
+  compact?: boolean;
 }
 
 function cellText(row: ViewTableRow, key: string): string {
@@ -95,16 +115,32 @@ function cellText(row: ViewTableRow, key: string): string {
   return String(value);
 }
 
+function cellOrder(columns: ViewTableColumn[], labelKey: string | undefined): number[] {
+  const all = columns.map((_, index) => index);
+  if (labelKey === undefined) return all;
+  const lead = columns.findIndex((column) => column.key === labelKey);
+  return lead > 0 ? [lead, ...all.filter((index) => index !== lead)] : all;
+}
+
 /**
  * Equivalent `column`-of-`row`s tree for hosts without `view-table`.
  * Exported because extensions sometimes need the fallback unconditionally (e.g.
  * a narrow sidebar where a table would be unreadable anyway).
+ *
+ * Every data row keeps **all** cells (docs/06 R3): the header promises N
+ * columns, so a degraded row that carries one cell silently drops data. The
+ * lead cell is `body`, the rest `caption`; `compact` opts back into the old
+ * single-cell line for genuinely narrow rails.
  */
 export function tableViewFallback(options: TableViewOptions): ViewNode {
   const columns = options.columns;
+  const order = cellOrder(columns, options.labelKey);
+  const lead = order.length > 0 ? columns[order[0]] : undefined;
+  // compact 是一行一单元格的窄列表：表头也只列领读列，别让表头承诺不存在的列
+  const headerColumns = options.compact ? (lead ? [lead] : []) : columns;
   const header: ViewNode = {
     type: "row",
-    children: columns.map((column) => ({
+    children: headerColumns.map((column) => ({
       type: "text",
       content: column.label,
       variant: "caption" as const,
@@ -113,11 +149,17 @@ export function tableViewFallback(options: TableViewOptions): ViewNode {
   const lines: ViewNode[] = [header];
   const limit = options.maxRows ?? Number.POSITIVE_INFINITY;
   for (const row of options.rows.slice(0, limit)) {
-    const key = options.labelKey ?? columns[0]?.key;
-    const cells = key === undefined ? [] : [cellText(row, key)];
+    const keys = options.compact ? order.slice(0, 1) : order;
     lines.push({
       type: "row",
-      children: cells.map((content) => ({ type: "text", content })),
+      children: keys.map((columnIndex, position) => {
+        const column = columns[columnIndex];
+        return {
+          type: "text" as const,
+          content: column ? cellText(row, column.key) : "",
+          variant: position === 0 ? ("body" as const) : ("caption" as const),
+        };
+      }),
     });
   }
   if (options.rows.length === 0) {

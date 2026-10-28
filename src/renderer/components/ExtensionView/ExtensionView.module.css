@@ -172,6 +172,15 @@
   min-height: 0;
 }
 
+/* 固定头部槽（docs/06 R9）：状态行放在滚动容器之外，长页签滚到第 2 屏也能看到。 */
+.panelHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-sm) 0;
+  flex-shrink: 0;
+}
+
 .panelBody {
   flex: 1;
   min-height: 0;

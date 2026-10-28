@@ -79,4 +79,21 @@ describe("collectFormValues", () => {
     };
     expect(collectFormValues(root)).toEqual({ in: "v" });
   });
+
+  it("keeps readonly lists out of the form snapshot (docs/06 R1)", () => {
+    const root: ViewNode = {
+      type: "column",
+      children: [
+        {
+          type: "list",
+          id: "threads",
+          readonly: true,
+          value: "a",
+          items: [{ value: "a", label: "A" }],
+        },
+        { type: "list", id: "choice", value: "a", items: [{ value: "a", label: "A" }] },
+      ],
+    };
+    expect(collectFormValues(root)).toEqual({ choice: "a" });
+  });
 });

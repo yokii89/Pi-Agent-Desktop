@@ -11,6 +11,7 @@ export type { SessionId };
 // Contribution Catalog
 // ---------------------------------------------------------------------------
 
+// #begin view-sdk-contribution
 /** Catalog 条目的挂载位置。仅这些 placement 进入静态目录。 */
 export type ContributionPlacement =
   | "access-mode"
@@ -26,11 +27,9 @@ export type ContributionActivation = "onAccessMode" | "onSettingsView" | "onSess
 export type ContributionAccent = "default" | "warning" | "success" | "danger";
 
 /**
- * 宿主允许的 Phosphor 图标映射名（manifest.icon / mode.icon 只能取自这里）。
- *
- * 右侧栏启动页与页签需要区分不同面板，因此除通用状态图标外还开放了一组
- * 领域图标；新增名字必须同时在 `components/ExtensionView/contributionIcons.tsx`
- * 补映射（该映射以 `Record<ContributionIconName, Icon>` 声明，漏一个会编译失败）。
+ * 宿主允许的图标映射名（manifest.icon / mode.icon 只能取自这里）。
+ * 未知名字回落到通用 puzzle-piece；access-mode 芯片只渲染
+ * `ACCESS_MODE_ICON_NAMES` 子集。
  */
 export const CONTRIBUTION_ICON_NAMES = [
   "shield",
@@ -60,6 +59,11 @@ export const CONTRIBUTION_ICON_NAMES = [
 
 export type ContributionIconName = (typeof CONTRIBUTION_ICON_NAMES)[number];
 
+/** access-mode 芯片实际渲染的图标子集（其余合法名字回落到默认图标）。 */
+export const ACCESS_MODE_ICON_NAMES = ["shield", "shield-check", "clipboard"] as const;
+
+export type AccessModeIconName = (typeof ACCESS_MODE_ICON_NAMES)[number];
+
 export const CONTRIBUTION_ICONS: ReadonlySet<string> = new Set(CONTRIBUTION_ICON_NAMES);
 
 /** 单包贡献数量上限；超出项跳过并记诊断。 */
@@ -70,6 +74,20 @@ export const CONTRIBUTION_LIMITS = {
   maxIdLength: 64,
   maxIconLength: 40,
 } as const;
+
+/**
+ * `package.json` → `pidesk.contributes.*[]` 的条目形状（docs/design/16 §5）。
+ * 只放静态可发现信息；`active` / `detail` 等运行时真值由 live 注册提供。
+ */
+export interface ManifestContributionItem {
+  id: string;
+  title: string;
+  description?: string;
+  icon?: string;
+  accent?: ContributionAccent;
+  activation?: ContributionActivation;
+}
+// #end view-sdk-contribution
 
 /**
  * 静态能力目录条目。

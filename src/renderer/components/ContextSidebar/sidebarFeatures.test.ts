@@ -100,4 +100,31 @@ describe("buildSidebarFeatures", () => {
     );
     expect(addableFeatures(features).map((feature) => feature.id)).toEqual(["browser"]);
   });
+
+  it("live 面板的 placementHint.panelBadge 透传为页签/启动页徽章（docs/06 R7）", () => {
+    const badge = { tone: "attention" as const, count: 1, label: "失败" };
+    const features = buildSidebarFeatures(
+      input({
+        tabs: ["ext:telegram-bridge"],
+        visiblePanels: [
+          {
+            id: "view-1",
+            panelId: "telegram-bridge",
+            title: "Telegram",
+            placementHint: { panelBadge: badge },
+          },
+        ],
+        allPanels: [
+          {
+            id: "view-1",
+            panelId: "telegram-bridge",
+            title: "Telegram",
+            placementHint: { panelBadge: badge },
+          },
+        ],
+      }),
+    );
+    expect(features.find((feature) => feature.id === "ext:telegram-bridge")?.badge).toEqual(badge);
+    expect(features.find((feature) => feature.id === "files")?.badge).toBeUndefined();
+  });
 });

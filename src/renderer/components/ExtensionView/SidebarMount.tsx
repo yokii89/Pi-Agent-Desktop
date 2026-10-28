@@ -33,7 +33,7 @@ export function SidebarMount({ entry }: { entry: ExtensionViewEntry }) {
           <X size={14} weight="regular" />
         </IconButton>
       </div>
-      <div className={styles.sidebarBody}>
+      <div className={styles.sidebarBody} data-panel-scroll="">
         <ViewNodeRenderer node={entry.root} bridge={bridge} />
       </div>
       {entry.actions.length > 0 ? (

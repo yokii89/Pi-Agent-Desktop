@@ -11,6 +11,7 @@ import type {
   ContributionDiagnostic,
   ContributionPlacement,
   ExtensionContribution,
+  ManifestContributionItem,
 } from "../../shared/contribution";
 import { CONTRIBUTION_ICONS, CONTRIBUTION_LIMITS } from "../../shared/contribution";
 
@@ -20,15 +21,6 @@ export interface ParsedPideskManifest {
   settingsViews: ManifestContributionItem[];
   panels: ManifestContributionItem[];
   workerSafe: boolean;
-}
-
-export interface ManifestContributionItem {
-  id: string;
-  title: string;
-  description?: string;
-  icon?: string;
-  accent?: ContributionAccent;
-  activation?: ContributionActivation;
 }
 
 export interface PackageManifestInput {

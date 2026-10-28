@@ -1,5 +1,85 @@
 # @pidesk/view-sdk
 
+## Unreleased (0.6.0)
+
+**Access-mode contribution helper + public manifest subset** (PiDesk
+`docs/design/80`). Additive public API; no wire, Host capability or protocol
+change.
+
+- **`defineAccessMode(entry)`** — pass the same object as
+  `pidesk.contributes.accessModes[]` (import your `package.json`) and use the
+  frozen result as the `registration` for `superviseAccessMode()` /
+  `registerAccessMode()`. `id` / `title` are trimmed; an empty identity or a
+  non-`onAccessMode` activation throws `TypeError`. `activation` is dropped from
+  the runtime descriptor. This replaces the hand-written id constant + descriptor
+  + manifest entry with one source.
+- **`accessModeManifestEntry(mode)`** — the reverse projection, for a one-line
+  drift test when the manifest stays hand-written.
+- **Public contribution manifest subset** — `ManifestContributionItem`,
+  `ContributionPlacement`, `ContributionActivation`, `ContributionAccent`,
+  `ContributionIconName`, `CONTRIBUTION_ICON_NAMES`, `CONTRIBUTION_ICONS`,
+  `CONTRIBUTION_LIMITS`, plus `ACCESS_MODE_ICON_NAMES` / `AccessModeIconName`
+  for the three icons the composer chip actually renders. Generated from
+  `src/shared/contribution.ts` (second `view-sdk-contribution` region);
+  `pnpm check:view-types` verifies both generated files.
+- **Host lockstep** — `ManifestContributionItem` now lives in
+  `src/shared/contribution.ts` (the manifest parser imports it), and the
+  access-mode icon map is `Record<AccessModeIconName, …>`, so adding a chip icon
+  to the shared list fails to compile until it is rendered.
+- No new dependencies.
+
+**Verification**: 187 SDK tests (17 files; +9 for this batch), 470 main-process
+tests (54 files), 389 renderer tests (38 files), `check:view-types` (both
+generated files), typecheck (SDK / main / renderer), `biome check .` (742 files),
+production build, and the packed-consumer check (62 public exports). No Electron
+acceptance: this is a pure SDK helper with no UI surface. `package.json` is still
+0.5.0 — bump to 0.6.0 when releasing.
+
+## 0.5.0 — 2026-10-28
+
+Implements PiDesk `Docs/06-Telegram侧栏改版·View SDK 能力缺口与需求.md`
+(R1–R9). All wire additions are additive inside view/v1; no existing field
+changes meaning and no API is removed.
+
+```bash
+npm install @pidesk/view-sdk@0.5.0
+```
+
+**Panel-facing capabilities**
+
+- **`list.readonly`** (+ capability `view-readonly-list`,
+  `supportsReadonlyList(client)`) — a non-selectable list: no `values` write, no
+  `change`, no active bar, rows are `listitem`s outside the tab order. Older Hosts
+  drop the field, so probe before sending it.
+- **`layout` events** (+ capability `view-layout`) — the Host reports the panel
+  content-box size after mount and after debounced resizes as
+  `ViewSessionEvent { type: "layout", width, height? }` on the normal `onEvent`
+  stream. Old Hosts simply never emit it; keep narrow-width copy as fallback.
+- **`ViewTab.status: "none"`** — draws no status dot for information streams.
+  Old Hosts fall back to the hollow “unanswered” dot (accepted degradation).
+- **`placementHint.panelBadge`** (+ capability `panel-tab-badge`) — tone
+  (`attention` / `success` / `muted`), optional count (1–99, `99+` overflow) and
+  short label on the sidebar tab, launcher card and add menu. The badge meaning
+  is part of the accessible name; a badge never reopens a user-closed tab.
+  `placementHint` is replaced wholesale: resend `panelId` without `panelBadge`
+  to clear.
+- **`placementHint.panelHeader`** (+ capability `panel-header`) — a fixed slot
+  above the panel's scroll container for one status row. Only light nodes are
+  accepted (`text` / `row` / `column` / `card` / `progress` / `divider`); other
+  types are dropped rather than rendered as placeholders.
+
+**SDK fix**
+
+- **`tableViewFallback` keeps every column.** It used to emit one cell per row
+  (`labelKey ?? columns[0]`) while the header still listed all columns, so data
+  silently disappeared on Hosts without `view-table`. Rows now carry all cells
+  (lead cell `body`, rest `caption`); `labelKey` only chooses the lead column.
+  New `compact: true` restores the one-cell line for genuinely narrow rails.
+
+**Verification**: 178 SDK tests (16 files), 470 main-process tests (54 files),
+389 renderer tests (38 files), typecheck (SDK / main / renderer+shared), and the
+packed-consumer check. No new dependencies.
+
 ## 0.4.0 — 2026-10-28
 
 **Includes 0.3.0** (listed below; 0.3.0 was never published on its own, so this is

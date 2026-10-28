@@ -1,6 +1,7 @@
 import { FolderOpen, GitPullRequest, Globe, type Icon, PuzzlePiece } from "@phosphor-icons/react";
 import type { TranslateFn } from "../../../shared/i18n";
 import type { ShortcutsMap } from "../../../shared/shortcuts";
+import type { ViewPanelBadge, ViewPlacementHint } from "../../../shared/view";
 import type { PanelCatalogRow } from "../../stores/panelCatalog";
 import { extensionPanelIdOf, type RightSidebarTab } from "../../stores/sidebarTabs";
 import { contributionIconComponent } from "../ExtensionView/contributionIcons";
@@ -15,6 +16,8 @@ export interface SidebarLivePanel {
   panelId?: string;
   title?: string;
   contributionKey?: string;
+  /** 面板徽章来自 placementHint（docs/06 R7）；旧 Host 不保留该字段。 */
+  placementHint?: ViewPlacementHint;
 }
 
 export interface SidebarFeature {
@@ -33,6 +36,8 @@ export interface SidebarFeature {
   /** 当前会话已有 live 面板；Catalog 冷态为 false。 */
   live: boolean;
   catalog?: SidebarCatalogPanel;
+  /** 面板页签/启动页/加号菜单徽章（docs/06 R7）；不参与开合判定。 */
+  badge?: ViewPanelBadge;
 }
 
 export interface SidebarFeatureInput {
@@ -120,6 +125,7 @@ export function buildSidebarFeatures(input: SidebarFeatureInput): SidebarFeature
       open: isOpen(id),
       live: row.state === "live" || livePanel !== undefined,
       catalog: row,
+      badge: livePanel?.placementHint?.panelBadge,
     });
   }
 
@@ -137,6 +143,7 @@ export function buildSidebarFeatures(input: SidebarFeatureInput): SidebarFeature
       source: "extension",
       open: isOpen(id),
       live: true,
+      badge: panel.placementHint?.panelBadge,
     });
   }
 
@@ -154,6 +161,7 @@ export function buildSidebarFeatures(input: SidebarFeatureInput): SidebarFeature
       source: "extension",
       open: true,
       live: false,
+      badge: panel?.placementHint?.panelBadge,
     });
   }
 

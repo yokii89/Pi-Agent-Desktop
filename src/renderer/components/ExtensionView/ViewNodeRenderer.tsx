@@ -223,6 +223,7 @@ type ListViewNode = Extract<ViewNode, { type: "list" }>;
 function ListField({ node, bridge }: { node: ListViewNode; bridge: ViewFormBridge }) {
   const t = useT();
   const raw = bridge.values[node.id];
+  const readonly = node.readonly === true;
   const selected = new Set(
     Array.isArray(raw)
       ? raw.filter((v): v is string => typeof v === "string")
@@ -244,7 +245,7 @@ function ListField({ node, bridge }: { node: ListViewNode; bridge: ViewFormBridg
         : null;
   const activeItem =
     (activeValue !== null ? node.items.find((item) => item.value === activeValue) : undefined) ??
-    (selectedValue !== null
+    (!readonly && selectedValue !== null
       ? node.items.find((item) => item.value === selectedValue)
       : undefined) ??
     node.items.find((item) => item.preview) ??
@@ -277,7 +278,29 @@ function ListField({ node, bridge }: { node: ListViewNode; bridge: ViewFormBridg
     };
   });
 
-  const list = (
+  // 只读态（docs/06 R1）：不写 values、不画选中条、行不是 option 也不进 Tab 序。
+  // 不用 OptionList 是因为它的行天生是 button/listbox option，拦截点击只能得到
+  // 「看起来能点但没反应」；这里换成真正的 list/listitem 语义。
+  const list = readonly ? (
+    <div className={styles.list}>
+      <ul className={[styles.listRows, styles.readonlyList].join(" ")}>
+        {node.items.map((item) => (
+          <li
+            key={item.value}
+            className={styles.readonlyItem}
+            onMouseEnter={() => setActiveValue(item.value)}
+          >
+            <span className={styles.listText}>
+              <span className={styles.listLabel}>{item.label}</span>
+              {item.description ? (
+                <span className={styles.listDesc}>{item.description}</span>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ) : (
     <div className={styles.list}>
       <OptionList
         rows={rows}
@@ -386,6 +409,15 @@ function TabsView({ node, bridge }: { node: TabsViewNode; bridge: ViewFormBridge
     firstFocusableIn(activePanelOf(rootRef.current))?.focus();
   });
 
+  // 切页从顶部开始（docs/06 R2）：页签条 sticky 后切页仍要回到结论行，
+  // 而不是停在上一页的滚动位置。滚动不移动焦点，被点击的 chip 仍握着焦点。
+  const activeId = tabState.activeId;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeId 是「该复位了」的信号，effect 体只读祖先 DOM
+  useLayoutEffect(() => {
+    const scroller = rootRef.current?.closest<HTMLElement>("[data-panel-scroll]");
+    scroller?.scrollTo({ top: 0 });
+  }, [activeId]);
+
   const switchTo = (tabId: string): void => {
     setTabState((prev) => (prev.activeId === tabId ? prev : { ...prev, activeId: tabId }));
   };
@@ -455,43 +487,47 @@ function TabsView({ node, bridge }: { node: TabsViewNode; bridge: ViewFormBridge
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: 这层只归一 chip/面板冒泡上来的按键，不是控件，不挂 role
     <div ref={rootRef} className={styles.tabs} onKeyDown={handleKeyDown}>
-      <Segmented
-        className={styles.tabBar}
-        semantics="tab"
-        size="sm"
-        equal={false}
-        scrollable
-        value={tabState.activeId}
-        items={tabs.map((tab, index) => {
-          const statusName =
-            tab.status === "answered"
-              ? t("ui.view.tabAnswered", { label: tab.label })
-              : tab.status === "attention"
-                ? t("ui.view.tabAttention", { label: tab.label })
-                : null;
-          const dotClass =
-            tab.status === "answered"
-              ? styles.tabDotAnswered
-              : tab.status === "attention"
-                ? styles.tabDotAttention
-                : styles.tabDotOpen;
-          return {
-            value: tab.id,
-            title: tab.label,
-            ariaLabel: statusName ?? undefined,
-            ariaControls: `${baseId}-panel-${index}`,
-            label: (
-              <>
-                <span aria-hidden className={[styles.tabDot, dotClass].join(" ")}>
-                  {tab.status === "answered" ? "✓" : tab.status === "attention" ? "!" : ""}
-                </span>
-                <span className={styles.tabLabel}>{tab.label}</span>
-              </>
-            ),
-          };
-        })}
-        onChange={switchTo}
-      />
+      <div className={styles.tabBarSticky}>
+        <Segmented
+          className={styles.tabBar}
+          semantics="tab"
+          size="sm"
+          equal={false}
+          scrollable
+          value={tabState.activeId}
+          items={tabs.map((tab, index) => {
+            const statusName =
+              tab.status === "answered"
+                ? t("ui.view.tabAnswered", { label: tab.label })
+                : tab.status === "attention"
+                  ? t("ui.view.tabAttention", { label: tab.label })
+                  : null;
+            const dotClass =
+              tab.status === "answered"
+                ? styles.tabDotAnswered
+                : tab.status === "attention"
+                  ? styles.tabDotAttention
+                  : styles.tabDotOpen;
+            return {
+              value: tab.id,
+              title: tab.label,
+              ariaLabel: statusName ?? undefined,
+              ariaControls: `${baseId}-panel-${index}`,
+              label: (
+                <>
+                  {tab.status === "none" ? null : (
+                    <span aria-hidden className={[styles.tabDot, dotClass].join(" ")}>
+                      {tab.status === "answered" ? "✓" : tab.status === "attention" ? "!" : ""}
+                    </span>
+                  )}
+                  <span className={styles.tabLabel}>{tab.label}</span>
+                </>
+              ),
+            };
+          })}
+          onChange={switchTo}
+        />
+      </div>
       {tabs.map((tab, index) => (
         <div
           key={tab.id}
@@ -545,7 +581,12 @@ function TableView({ node }: { node: TableViewNode }) {
           <thead>
             <tr>
               {node.columns.map((column) => (
-                <th key={column.key} scope="col" className={alignClass(resolveAlign(column))}>
+                <th
+                  key={column.key}
+                  scope="col"
+                  className={alignClass(resolveAlign(column))}
+                  title={column.label}
+                >
                   {column.label}
                 </th>
               ))}

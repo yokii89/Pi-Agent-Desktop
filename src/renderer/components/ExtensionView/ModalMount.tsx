@@ -40,7 +40,7 @@ export function ModalMount({ entry }: { entry: ExtensionViewEntry }) {
           <X size={18} weight="regular" />
         </IconButton>
       </div>
-      <div className={styles.modalBody}>
+      <div className={styles.modalBody} data-panel-scroll="">
         <ViewNodeRenderer node={entry.root} bridge={bridge} />
       </div>
       {entry.actions.length > 0 ? (

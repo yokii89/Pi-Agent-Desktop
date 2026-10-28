@@ -11,6 +11,8 @@ import {
   resolveHeaderSide,
   resolvePanelId,
   resolvePlacement,
+  sanitizePanelBadge,
+  sanitizePanelHeader,
   sanitizeTree,
   slotKey,
 } from "./viewHostProtocol";
@@ -154,6 +156,8 @@ type TableLike = {
   children?: TableLike[];
   content?: string;
   tone?: string;
+  readonly?: boolean;
+  tabs?: Array<{ id: string; label: string; status?: string; children: TableLike[] }>;
   items?: Array<{ value: string; label: string; description?: string; preview?: string }>;
   options?: Array<{ value: string; label: string; description?: string; preview?: string }>;
 };
@@ -497,5 +501,147 @@ describe("sanitizeTree — list preview and text tone (docs/design/79)", () => {
 
   it("advertises view-option-preview to clients", () => {
     expect(VIEW_HOST_CAPABILITIES).toContain("view-option-preview");
+  });
+});
+
+describe("sanitizeTree — readonly list (docs/06 R1)", () => {
+  const listParts = (over: Record<string, unknown> = {}) => ({
+    type: "list",
+    id: "threads",
+    items: [{ value: "a", label: "A" }],
+    ...over,
+  });
+
+  it("keeps an explicit readonly: true", () => {
+    expect(sanitized(listParts({ readonly: true })).readonly).toBe(true);
+  });
+
+  it("drops non-true readonly values and keeps the field off the wire", () => {
+    expect(sanitized(listParts({ readonly: false })).readonly).toBeUndefined();
+    expect(sanitized(listParts({ readonly: "yes" })).readonly).toBeUndefined();
+    expect(sanitized(listParts()).readonly).toBeUndefined();
+  });
+
+  it("keeps items and preview while readonly", () => {
+    const root = sanitized(
+      listParts({ readonly: true, items: [{ value: "a", label: "A", preview: "## p" }] }),
+    );
+    expect(root.readonly).toBe(true);
+    expect(root.items?.[0]?.preview).toBe("## p");
+  });
+});
+
+describe("sanitizeTree — tab status none (docs/06 R6)", () => {
+  const tabsParts = (status: unknown) => ({
+    type: "tabs",
+    id: "t",
+    tabs: [{ id: "overview", label: "概览", status, children: [] }],
+  });
+
+  it("keeps answered / attention / none", () => {
+    for (const status of ["answered", "attention", "none"]) {
+      expect(sanitized(tabsParts(status)).tabs?.[0]?.status).toBe(status);
+    }
+  });
+
+  it("drops unknown statuses so old Hosts keep the hollow-dot fallback", () => {
+    expect(sanitized(tabsParts("done")).tabs?.[0]?.status).toBeUndefined();
+    expect(sanitized(tabsParts(undefined)).tabs?.[0]?.status).toBeUndefined();
+  });
+});
+
+describe("sanitizePanelBadge (docs/06 R7)", () => {
+  it("keeps tone, count and a short label", () => {
+    expect(sanitizePanelBadge({ tone: "attention", count: 3, label: "失败" })).toEqual({
+      tone: "attention",
+      count: 3,
+      label: "失败",
+    });
+  });
+
+  it("drops unknown tones instead of guessing an urgency", () => {
+    expect(sanitizePanelBadge({ tone: "danger", count: 1 })).toBeUndefined();
+    expect(sanitizePanelBadge({ count: 1 })).toBeUndefined();
+    expect(sanitizePanelBadge(null)).toBeUndefined();
+  });
+
+  it("ignores non-positive counts but keeps the dot", () => {
+    expect(sanitizePanelBadge({ tone: "success", count: 0 })).toEqual({ tone: "success" });
+    expect(sanitizePanelBadge({ tone: "success", count: -2 })).toEqual({ tone: "success" });
+    expect(sanitizePanelBadge({ tone: "success", count: Number.NaN })).toEqual({
+      tone: "success",
+    });
+  });
+
+  it("caps huge counts so the renderer can print 99+", () => {
+    expect(sanitizePanelBadge({ tone: "attention", count: 150 })?.count).toBe(150);
+    expect(sanitizePanelBadge({ tone: "attention", count: 5000 })?.count).toBe(999);
+  });
+
+  it("truncates long labels and drops blank ones", () => {
+    const long = "x".repeat(30);
+    expect(sanitizePanelBadge({ tone: "muted", label: long })?.label).toHaveLength(12);
+    expect(sanitizePanelBadge({ tone: "muted", label: "   " })?.label).toBeUndefined();
+  });
+});
+
+describe("sanitizePanelHeader (docs/06 R9)", () => {
+  it("keeps light nodes and strips containers to their light children", () => {
+    const nodes = sanitizePanelHeader([
+      { type: "text", content: "🟢 已连接", variant: "caption" },
+      { type: "progress", value: 0.5, label: "同步" },
+      {
+        type: "row",
+        children: [
+          { type: "text", content: "队列 3" },
+          { type: "button", id: "b", label: "点我" },
+        ],
+      },
+    ]);
+    expect(nodes).toEqual([
+      { type: "text", content: "🟢 已连接", variant: "caption", tone: undefined },
+      { type: "progress", value: 0.5, label: "同步" },
+      {
+        type: "row",
+        children: [{ type: "text", content: "队列 3", variant: "body", tone: undefined }],
+      },
+    ]);
+  });
+
+  it("drops interactive and scrolling nodes entirely", () => {
+    expect(
+      sanitizePanelHeader([
+        { type: "button", id: "b", label: "点我" },
+        { type: "list", id: "l", items: [] },
+        { type: "tabs", id: "t", tabs: [] },
+        { type: "table", id: "tb", columns: [{ key: "a", label: "A" }], rows: [] },
+      ]),
+    ).toBeUndefined();
+  });
+
+  it("returns undefined for empty / non-array input", () => {
+    expect(sanitizePanelHeader(undefined)).toBeUndefined();
+    expect(sanitizePanelHeader([])).toBeUndefined();
+    expect(sanitizePanelHeader({ type: "text", content: "x" })).toBeUndefined();
+  });
+
+  it("caps the number of top-level header items", () => {
+    const nodes = sanitizePanelHeader(
+      Array.from({ length: 12 }, (_, index) => ({ type: "text", content: `line ${index}` })),
+    );
+    expect(nodes).toHaveLength(8);
+  });
+});
+
+describe("capability advertisement for docs/06", () => {
+  it("advertises the four additive capabilities", () => {
+    for (const capability of [
+      "view-readonly-list",
+      "view-layout",
+      "panel-tab-badge",
+      "panel-header",
+    ] as const) {
+      expect(VIEW_HOST_CAPABILITIES).toContain(capability);
+    }
   });
 });

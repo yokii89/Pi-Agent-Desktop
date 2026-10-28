@@ -414,6 +414,7 @@ export interface PideskGlobalApi {
   view: {
     onOutput(callback: (message: ExtensionViewPush) => void): () => void;
     sendEvent(req: { id: string; event: ViewEvent }): Promise<IpcResult<null>>;
+    reportLayout(req: { id: string; width: number; height?: number }): Promise<IpcResult<null>>;
     activateContribution(
       req: ActivateContributionRequest,
     ): Promise<IpcResult<ActivateContributionResult>>;
