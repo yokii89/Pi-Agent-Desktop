@@ -1,0 +1,36 @@
+/* 划选工具条（docs/design/81）：外壳沿用浮层配方，横向两个动作。
+   进出场是 useGlideOverlay 逐帧写内联样式，这里只描述静息态；
+   left/top 与 transform-origin 由组件按选区矩形写入。
+   .panel 自身不写 display：hidden 靠 UA 的 display:none 生效（子层才摆 flex）。 */
+.panel {
+  composes: shell from "../ui/overlayShell.module.css";
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 0;
+  border-radius: var(--radius-overlay-item);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  background: var(--color-bg-active);
+}
+
+.action:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+}

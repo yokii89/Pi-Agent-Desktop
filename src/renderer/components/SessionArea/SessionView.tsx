@@ -1,12 +1,5 @@
 import { Camera } from "@phosphor-icons/react";
-import {
-  memo,
-  type MouseEvent as ReactMouseEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useStickToBottom } from "../../hooks/useStickToBottom";
 import { useT } from "../../hooks/useT";
 import { useComposerStore } from "../../stores/composerStore";
@@ -30,7 +23,7 @@ import { FirstTokenWaiter } from "./FirstTokenWaiter";
 import { QuestionRail } from "./QuestionRail";
 import { QueueTail } from "./QueueTail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
-import { SelectionContextMenu } from "./SelectionContextMenu";
+import { SelectionToolbar } from "./SelectionToolbar";
 import styles from "./SessionView.module.css";
 import { StreamErrorCard } from "./StreamErrorCard";
 import { UserMessage } from "./UserMessage";
@@ -44,7 +37,7 @@ const UNREAD_LINE_PX = 24;
 /**
  * 自研会话视图（docs/design/03 §3.3 + docs/design/13）：
  * 用户气泡 + AI 文档流 + run 边界。滚动跟随走 useStickToBottom 状态机
- * （用户上滚/拖选 → free，滚回底部 → follow）；划选右键呼出浮窗（docs/design/12）。
+ * （用户上滚/拖选 → free，滚回底部 → follow）；划选即出工具条（docs/design/81）。
  */
 export function SessionView() {
   const t = useT();
@@ -56,11 +49,6 @@ export function SessionView() {
   const { showToast, settingsOpen } = useUiStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [selectionMenu, setSelectionMenu] = useState<{
-    x: number;
-    y: number;
-    text: string;
-  } | null>(null);
   const { mode, unreadPx, jumpToLatest, jumpToOffset, reset } = useStickToBottom(
     scrollRef,
     contentRef,
@@ -119,7 +107,7 @@ export function SessionView() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [jumpToLatest]);
 
-  // Esc 停止（docs/design/13 P1-7）：焦点分层——建议面板 / 右键浮窗 / 弹窗各自消费 Esc
+  // Esc 停止（docs/design/13 P1-7）：焦点分层——建议面板 / 划选工具条 / 弹窗各自消费 Esc
   // （stopPropagation），这里只接未被消费的 Esc；焦点在输入类元素（重命名、终端）时不抢。
   const running = phase === "running";
   useEffect(() => {
@@ -134,13 +122,13 @@ export function SessionView() {
       ) {
         return;
       }
-      if (selectionMenu || settingsOpen || hasBlockingView || !processAlive) return;
+      if (settingsOpen || hasBlockingView || !processAlive) return;
       event.preventDefault();
       stop();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [running, stop, selectionMenu, settingsOpen, hasBlockingView, processAlive]);
+  }, [running, stop, settingsOpen, hasBlockingView, processAlive]);
 
   // 读屏播报（docs/design/10 §3.11 G1）：视觉隐藏 live region，只在状态边界更新，
   // 不随流式 delta 刷屏；失败时错误卡的 role="alert" 已有播报。
@@ -152,24 +140,6 @@ export function SessionView() {
     if (!was && running) setAnnouncement(t("session.a11y.assistantReplying"));
     else if (was && !running) setAnnouncement(t("session.a11y.replyEnded"));
   }, [running, t]);
-
-  const closeSelectionMenu = useCallback(() => setSelectionMenu(null), []);
-
-  // 右键浮窗入口（docs/design/12 §4.1）：无条件抑制浏览器默认菜单；有有效选区才浮窗
-  const openSelectionMenu = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const container = scrollRef.current;
-    const selection = window.getSelection();
-    if (!container || !selection || selection.rangeCount === 0 || selection.isCollapsed) return;
-    const text = selection.toString();
-    if (!text.trim()) return;
-    // 选区两端都在会话流内（从输入框等处拖出的选区不误判）
-    const range = selection.getRangeAt(0);
-    if (!container.contains(range.startContainer) || !container.contains(range.endContainer)) {
-      return;
-    }
-    setSelectionMenu({ x: event.clientX, y: event.clientY, text });
-  }, []);
 
   const handleCopySelection = useCallback(
     (text: string) => {
@@ -188,19 +158,6 @@ export function SessionView() {
     },
     [quoteComposer],
   );
-
-  // 浮窗打开期间会话流滚动 / 窗口缩放会让菜单与选区错位，立即关闭
-  useEffect(() => {
-    if (!selectionMenu) return;
-    const el = scrollRef.current;
-    const close = (): void => setSelectionMenu(null);
-    el?.addEventListener("scroll", close);
-    window.addEventListener("resize", close);
-    return () => {
-      el?.removeEventListener("scroll", close);
-      window.removeEventListener("resize", close);
-    };
-  }, [selectionMenu]);
 
   // stream 卡片：afterEntryId 命中则插在该条目后，未命中/缺省 → 追加流末尾（§5.3.2）
   // 多会话：按 active 过滤；id 错位时 filterViewsForSession 会兜底，避免 stream 整页消失
@@ -262,11 +219,11 @@ export function SessionView() {
   return (
     <div className={styles.view}>
       {showRestoreHint && <div className={styles.restoreHint}>{t("session.restoring")}</div>}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: 会话流是只读阅读面，右键只做划选浮窗入口，不伪装成交互 role */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: 会话流是只读阅读面，右键只用来抑制浏览器默认菜单，不伪装成交互 role */}
       <div
         className={`${styles.scroll} ${mode === "free" ? styles.scrollFree : ""}`}
         ref={scrollRef}
-        onContextMenu={openSelectionMenu}
+        onContextMenu={(event) => event.preventDefault()}
       >
         <div className={styles.inner} ref={contentRef}>
           {showSkeleton ? (
@@ -311,17 +268,14 @@ export function SessionView() {
       {mode === "free" && !showSkeleton && (
         <ScrollToBottomButton onClick={jumpToLatest} label={unreadLabel} />
       )}
-      {selectionMenu && (
-        <SelectionContextMenu
-          position={{ x: selectionMenu.x, y: selectionMenu.y }}
-          text={selectionMenu.text}
-          quoteDisabled={quoteDisabled}
-          quoteDisabledHint={quoteDisabledHint}
-          onCopy={handleCopySelection}
-          onQuote={handleQuoteSelection}
-          onClose={closeSelectionMenu}
-        />
-      )}
+      {/* 常驻挂载：自身按 selectionchange 命令式显隐，不参与会话流的渲染 */}
+      <SelectionToolbar
+        containerRef={scrollRef}
+        quoteDisabled={quoteDisabled}
+        quoteDisabledHint={quoteDisabledHint}
+        onCopy={handleCopySelection}
+        onQuote={handleQuoteSelection}
+      />
     </div>
   );
 }

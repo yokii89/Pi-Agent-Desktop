@@ -10,7 +10,7 @@ import { isToolOnlyGroup, ToolCallGroup } from "./tools/ToolCallGroup";
  * AI 回复：文档流渲染（Markdown 全宽排版），禁止气泡。
  * 连续工具成组：≥2 条收成摘要头；思考默认折叠成一行。
  * 历史块经 BlockView memo 在 text_delta 时跳过重渲染。
- * 不提供尾部 hover 操作条：整条取用走划选浮窗（docs/design/12）。
+ * 不提供尾部 hover 操作条：整条取用走划选工具条（docs/design/81）。
  */
 export function AssistantMessage({ blocks }: { blocks: AssistantBlock[] }) {
   const groups = useMemo(() => groupBlocks(blocks), [blocks]);

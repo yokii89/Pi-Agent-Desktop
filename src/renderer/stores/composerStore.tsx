@@ -53,7 +53,7 @@ interface ComposerStoreValue {
   reorderFileAttachments: (fromId: string, toId: string) => void;
   /**
    * 会话流「添加到对话栏」的待消费引用（docs/design/12）：
-   * SessionView（右键浮窗）与 TaskInput（持有 ComposerHandle）是兄弟组件，经此桥接；
+   * SessionView（划选工具条）与 TaskInput（持有 ComposerHandle）是兄弟组件，经此桥接；
    * seq 去重保证单次消费。 */
   pendingQuote: { text: string; seq: number } | null;
   quoteComposer: (text: string) => void;

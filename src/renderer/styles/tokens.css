@@ -31,6 +31,10 @@
   --color-accent-hover: #6aa3ff;
   --color-accent-text: #0b1a2b;
   --color-accent-soft: rgba(74, 140, 255, 0.16);
+  /* 划选高亮（中间栏对话流，docs/design/81）：比 accent-soft 实一档——0.16 在深底上
+     只剩"有一片字被涂了色"，选区本身恰恰是要看清边界的东西。
+     从 accent 推导而不是写死 rgba，且不进 applyAccentColor 的覆盖表，否则换主题色会被屏蔽。 */
+  --color-selection: color-mix(in oklab, var(--color-accent) 34%, transparent);
   /* 顶档特效色（思考等级「最高」的起辉 / 粒子 / 滑轨强调）：从主题色推导而不是直取，
      因为运行态描边用的就是 accent，同屏时必须比它亮一档才分得出「顶档」与「在跑」。
      只在 tokens 里声明、不进 applyAccentColor 的内联覆盖表，否则推导链会被屏蔽。 */
@@ -295,6 +299,8 @@
   --color-accent-hover: #1f5ecb;
   --color-accent-text: #ffffff;
   --color-accent-soft: rgba(47, 111, 224, 0.12);
+  /* 划选高亮：与暗色档同一推导（34% 在浅底上会压住正文，浅底本身对比高，26% 已足够看清边界） */
+  --color-selection: color-mix(in oklab, var(--color-accent) 26%, transparent);
   /* 顶档特效色：浅底上往黑里压一档，同时与 accent 描边拉开（暗色主题往白里提，同一个配比） */
   --color-spark: color-mix(in oklab, var(--color-accent) 72%, black);
   --color-code-bg: #e2e2e6;

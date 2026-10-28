@@ -96,7 +96,7 @@
 }
 
 .inner ::selection {
-  background: var(--color-accent-soft);
+  background: var(--color-selection);
 }
 
 /* 长会话：视口外条目跳过布局/绘制（Chromium 支持良好） */
