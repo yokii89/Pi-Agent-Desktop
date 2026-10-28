@@ -1,0 +1,140 @@
+/* 启动动画：黑幕一幕。z-index 压过应用所有浮层；WebContentsView 由
+   browserService.setOverlaySuppressed 另行让位（原生层不认 DOM z-index）。 */
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--splash-bg);
+  color: var(--splash-text);
+  font-family: var(--splash-font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+  cursor: default;
+  user-select: none;
+  contain: layout paint style;
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity calc(560ms * var(--splash-dur)) ease,
+    transform calc(560ms * var(--splash-dur)) ease;
+}
+
+.innerIn {
+  opacity: 1;
+  transform: none;
+}
+
+.logoMark,
+.logoImg {
+  display: block;
+  width: var(--splash-logo-size);
+  height: var(--splash-logo-size);
+  margin-bottom: 18px;
+}
+
+.logoImg {
+  object-fit: contain;
+}
+
+.zh {
+  font-family: inherit;
+  font-size: 33px;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
+  text-align: center;
+  color: var(--splash-text);
+}
+
+.en {
+  max-width: min(92vw, 1100px);
+  margin-top: 9px;
+  font-family: inherit;
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: 0.62em;
+  text-indent: 0.62em;
+  text-align: center;
+  color: var(--splash-text);
+  transition: letter-spacing calc(1300ms * var(--splash-dur)) cubic-bezier(0.16, 0.84, 0.24, 1);
+}
+
+.enTighten {
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+}
+
+.sub {
+  max-width: min(92vw, 1100px);
+  margin-top: 12px;
+  font-family: var(--splash-mono);
+  font-size: 10px;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+  text-align: center;
+  color: var(--splash-text-muted);
+  white-space: pre-wrap;
+}
+
+.sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    var(--splash-sweep-soft) 42%,
+    var(--splash-sweep-strong) 50%,
+    var(--splash-sweep-soft) 58%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.sweepGo {
+  animation: splash-sweep calc(1150ms * var(--splash-dur)) cubic-bezier(0.32, 0, 0.2, 1) forwards;
+  will-change: transform;
+}
+
+/* 补间 transform 而不是 left：left 每帧触发布局，transform 走合成层。
+   位移按自身宽度计，42% 宽的条带换算到 root 坐标即原 -50% → 118% 的同一条轨迹。 */
+@keyframes splash-sweep {
+  from {
+    transform: translateX(-119.048%);
+  }
+  to {
+    transform: translateX(280.952%);
+  }
+}
+
+.rootHandoff {
+  transform: scale(1.035);
+  filter: blur(5px);
+  opacity: 0;
+  transition:
+    opacity calc(780ms * var(--splash-dur)) cubic-bezier(0.4, 0, 0.2, 1),
+    transform calc(780ms * var(--splash-dur)) cubic-bezier(0.4, 0, 0.2, 1),
+    filter calc(780ms * var(--splash-dur)) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root .inner,
+  .root .en,
+  .root .sweep,
+  .root.rootHandoff {
+    animation: none;
+    transition: none;
+  }
+}

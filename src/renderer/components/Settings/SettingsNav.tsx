@@ -8,6 +8,7 @@ import {
   MagnifyingGlass,
   Palette,
   PuzzlePiece,
+  Rocket,
   Sparkle,
   Stack,
   TerminalWindow,
@@ -30,6 +31,7 @@ export type SettingsSectionId =
   | "config"
   | "models"
   | "personalization"
+  | "startup"
   | "shortcuts"
   | "notifications"
   | "environment"
@@ -109,6 +111,12 @@ const NAV_GROUPS: NavGroup[] = [
           "rail",
           "navigator",
         ],
+      },
+      {
+        id: "startup",
+        labelKey: "settings.section.startup",
+        icon: <Rocket size={18} weight="regular" />,
+        keywords: ["启动", "开屏", "开机", "splash", "startup", "logo", "标识", "字体"],
       },
       {
         id: "shortcuts",

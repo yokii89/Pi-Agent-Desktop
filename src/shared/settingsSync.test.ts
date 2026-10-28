@@ -44,6 +44,14 @@ function fakeSettings(): PideskSettings {
     questionRailStyle: "line",
     inputBuddy: "dog",
     shortcuts: {},
+    splashEnabled: true,
+    splashLogoImage: "data:image/png;base64,AAAA",
+    splashLogoSize: 140,
+    splashFontPreset: "cascadia",
+    splashTextZh: "求知 · 探索",
+    splashTextEn: "Slow down and enjoy life.",
+    splashTextSub: "Pi HARNESS",
+    splashSpeed: 1,
   } as PideskSettings;
 }
 
@@ -53,6 +61,9 @@ describe("settingsSync whitelist", () => {
     expect(Object.keys(picked).sort()).toEqual([...SYNCABLE_SETTINGS_KEYS].sort());
     expect(picked).not.toHaveProperty("projects");
     expect(picked).not.toHaveProperty("piExecutablePath");
+    // 标识图片是本机资产，不进 Gist；其余开屏偏好可同步
+    expect(picked).not.toHaveProperty("splashLogoImage");
+    expect(picked.splashTextZh).toBe("求知 · 探索");
     expect(picked.theme).toBe("dark");
     expect(picked.welcomeRecentsEnabled).toBe(true);
   });

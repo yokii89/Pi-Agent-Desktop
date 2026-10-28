@@ -399,3 +399,16 @@
   --buddy-capy-bubble: #d8f3fa;
   --buddy-capy-sweat: #7ec8e3;
 }
+
+/* 启动动画（开屏）：跨主题固定黑底白字 + pi 官方品牌色。
+   单独开一个 :root 块，避免被两套主题的变量表误读成主题色。 */
+:root {
+  --splash-bg: #000000;
+  --splash-text: #ffffff;
+  --splash-text-muted: rgba(255, 255, 255, 0.5);
+  --splash-sweep-soft: rgba(255, 255, 255, 0.055);
+  --splash-sweep-strong: rgba(255, 255, 255, 0.12);
+  --splash-pi-coral: #f09082;
+  --splash-pi-blue: #4d9abf;
+  --splash-pi-yellow: #f1be58;
+}

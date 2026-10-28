@@ -19,6 +19,14 @@ export const SYNCABLE_SETTINGS_KEYS = [
   "questionRailStyle",
   "inputBuddy",
   "shortcuts",
+  // 启动动画偏好可跨端同步；splashLogoImage 是本机资产（data URL），不进 Gist
+  "splashEnabled",
+  "splashLogoSize",
+  "splashFontPreset",
+  "splashTextZh",
+  "splashTextEn",
+  "splashTextSub",
+  "splashSpeed",
 ] as const satisfies readonly (keyof PideskSettings)[];
 
 export type SyncableSettingsKey = (typeof SYNCABLE_SETTINGS_KEYS)[number];
@@ -54,6 +62,13 @@ export function pickSyncableSettings(settings: PideskSettings): SyncableSettings
     questionRailStyle: settings.questionRailStyle,
     inputBuddy: settings.inputBuddy,
     shortcuts: settings.shortcuts,
+    splashEnabled: settings.splashEnabled,
+    splashLogoSize: settings.splashLogoSize,
+    splashFontPreset: settings.splashFontPreset,
+    splashTextZh: settings.splashTextZh,
+    splashTextEn: settings.splashTextEn,
+    splashTextSub: settings.splashTextSub,
+    splashSpeed: settings.splashSpeed,
   };
 }
 

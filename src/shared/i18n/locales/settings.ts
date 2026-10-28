@@ -1320,4 +1320,80 @@ export const settingsMessages = defineMessages({
     "zh-CN": " · Worker",
     "en-US": " · Worker",
   },
+
+  "settings.section.startup": { "zh-CN": "启动动画", "en-US": "Startup animation" },
+  "settings.startup.group.play": { "zh-CN": "播放", "en-US": "Playback" },
+  "settings.startup.enabled": { "zh-CN": "启动动画", "en-US": "Startup animation" },
+  "settings.startup.enabled.description": {
+    "zh-CN": "关闭后启动直接进入主界面。",
+    "en-US": "When off, the app opens straight into the main window.",
+  },
+  "settings.startup.speed": { "zh-CN": "速度", "en-US": "Speed" },
+  "settings.startup.speed.description": {
+    "zh-CN": "整段动画的快慢；1× 约 4 秒。",
+    "en-US": "Pace of the whole sequence; about 4 seconds at 1×.",
+  },
+  "settings.startup.group.logo": { "zh-CN": "标识", "en-US": "Logo" },
+  "settings.startup.logo": { "zh-CN": "标识图片", "en-US": "Logo image" },
+  "settings.startup.logo.description": {
+    "zh-CN":
+      "支持 SVG / PNG / JPG / WebP，≤ 128 KB；留空使用内置 pi 标志。深色背景下建议用白色或透明底图标。",
+    "en-US":
+      "SVG / PNG / JPG / WebP up to 128 KB. Leave empty for the built-in pi mark; white or transparent artwork works best on black.",
+  },
+  "settings.startup.logo.choose": { "zh-CN": "选择图片", "en-US": "Choose image" },
+  "settings.startup.logo.reset": { "zh-CN": "恢复内置", "en-US": "Use built-in" },
+  "settings.startup.logoSize": { "zh-CN": "标识大小", "en-US": "Logo size" },
+  "settings.startup.logoSize.description": {
+    "zh-CN": "64 – 240 px；内置标志与自定义图片共用。",
+    "en-US": "64 – 240 px, shared by the built-in mark and custom images.",
+  },
+  "settings.startup.logo.invalidType": {
+    "zh-CN": "只支持 SVG / PNG / JPG / WebP 图片。",
+    "en-US": "Only SVG / PNG / JPG / WebP images are supported.",
+  },
+  "settings.startup.logo.tooLarge": {
+    "zh-CN": "图片不能超过 128 KB。",
+    "en-US": "The image must be 128 KB or smaller.",
+  },
+  "settings.startup.logo.readFailed": {
+    "zh-CN": "图片读取失败。",
+    "en-US": "Could not read the image.",
+  },
+  "settings.startup.group.text": { "zh-CN": "开屏文案", "en-US": "Splash text" },
+  "settings.startup.text": { "zh-CN": "三行文案", "en-US": "Three lines" },
+  "settings.startup.text.description": {
+    "zh-CN": "留空则不显示该行。",
+    "en-US": "Clear a line to hide it.",
+  },
+  "settings.startup.textZh": { "zh-CN": "中文", "en-US": "Chinese" },
+  "settings.startup.textEn": { "zh-CN": "英文", "en-US": "English" },
+  "settings.startup.textSub": { "zh-CN": "小字", "en-US": "Caption" },
+  "settings.startup.group.font": { "zh-CN": "字体", "en-US": "Font" },
+  "settings.startup.fontPreset": { "zh-CN": "开屏字体", "en-US": "Splash font" },
+  "settings.startup.fontPreset.description": {
+    "zh-CN": "中文名与英文大字使用的字体；小字固定等宽。",
+    "en-US": "Font for the Chinese and English lines; the caption stays monospace.",
+  },
+  "settings.startup.fontPreset.segoe": { "zh-CN": "Segoe UI", "en-US": "Segoe UI" },
+  "settings.startup.fontPreset.yahei": { "zh-CN": "微软雅黑", "en-US": "Microsoft YaHei" },
+  "settings.startup.fontPreset.dengxian": { "zh-CN": "等线", "en-US": "DengXian" },
+  "settings.startup.fontPreset.simsun": { "zh-CN": "宋体", "en-US": "SimSun" },
+  "settings.startup.fontPreset.arial": { "zh-CN": "Arial", "en-US": "Arial" },
+  "settings.startup.fontPreset.cascadia": {
+    "zh-CN": "Cascadia Mono",
+    "en-US": "Cascadia Mono",
+  },
+  "settings.startup.save": { "zh-CN": "保存", "en-US": "Save" },
+  "settings.startup.saving": { "zh-CN": "保存中…", "en-US": "Saving…" },
+  "settings.startup.preview": { "zh-CN": "立即预览", "en-US": "Preview" },
+  "settings.startup.reset": { "zh-CN": "恢复默认", "en-US": "Reset" },
+  "settings.startup.saved": {
+    "zh-CN": "启动动画设置已保存。",
+    "en-US": "Startup animation settings saved.",
+  },
+  "settings.startup.saveFailed": {
+    "zh-CN": "启动动画设置保存失败。",
+    "en-US": "Could not save startup animation settings.",
+  },
 });

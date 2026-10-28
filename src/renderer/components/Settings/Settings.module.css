@@ -1178,6 +1178,93 @@
   }
 }
 
+/* ---------- 启动动画 ---------- */
+
+.splashLogoRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.splashLogoBox {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  /* 与开屏一致的黑底，预览白色 / 透明底标识才准 */
+  background: var(--splash-bg);
+}
+
+.splashLogoBox img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.splashLogoBox svg {
+  width: 40px;
+  height: 40px;
+}
+
+.splashLogoActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.hiddenFile {
+  display: none;
+}
+
+.splashSizeControl {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.splashSizeRange {
+  width: 180px;
+}
+
+.splashTextFields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.splashTextField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.splashTextFieldLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.splashTextInput {
+  composes: authInput;
+  width: 100%;
+}
+
+.splashActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-sm);
+}
+
 /* ---------- 窄窗口 ---------- */
 
 @media (max-width: 820px) {

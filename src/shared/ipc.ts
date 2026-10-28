@@ -10,6 +10,7 @@ import type { InputBuddyKind } from "./inputBuddy";
 import type { NotificationSettings } from "./notification";
 import type { RailStyle } from "./railStyles";
 import type { ShortcutsMap } from "./shortcuts";
+import type { SplashFontPreset } from "./splash";
 
 /** 请求-响应类 IPC 的统一返回信封。 */
 export interface IpcResult<T> {
@@ -183,6 +184,20 @@ export interface PideskSettings {
   inputBuddy: InputBuddyKind;
   /** 渲染层全局快捷键映射（设置 → 键盘快捷键）；见 shared/shortcuts。 */
   shortcuts: ShortcutsMap;
+  /** 启动动画总开关（设置 → 启动动画）；每次启动播放一次。 */
+  splashEnabled: boolean;
+  /** 自定义标识 data URL；空字符串 = 内置 pi 标志。 */
+  splashLogoImage: string;
+  /** 标识边长（px）；同时作用于内置标志与自定义图片。 */
+  splashLogoSize: number;
+  /** 开屏字体预设 id；见 shared/splash。 */
+  splashFontPreset: SplashFontPreset;
+  /** 黑幕三行文案；空字符串 = 不显示该行。 */
+  splashTextZh: string;
+  splashTextEn: string;
+  splashTextSub: string;
+  /** 整段动画速度倍率（0.35 – 3）。 */
+  splashSpeed: number;
 }
 
 /** LLM 对话流正文字号默认值（px），与 tokens.css 的 `--session-stream-font-md` 一致。 */

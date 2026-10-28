@@ -10,6 +10,16 @@ import { normalizeNotificationSettings } from "../../shared/notification";
 import { normalizeRailStyle } from "../../shared/railStyles";
 import { sanitizeShortcutsRecord } from "../../shared/shortcuts";
 import {
+  clampSplashLogoSize,
+  clampSplashSpeed,
+  DEFAULT_SPLASH_TEXT_EN,
+  DEFAULT_SPLASH_TEXT_SUB,
+  DEFAULT_SPLASH_TEXT_ZH,
+  normalizeSplashFontPreset,
+  normalizeSplashLogoImage,
+  normalizeSplashText,
+} from "../../shared/splash";
+import {
   clampSessionStreamFontPx,
   DEFAULT_SETTINGS,
   SETTINGS_FILENAME,
@@ -125,6 +135,15 @@ export function getSettings(): PideskSettings {
     inputBuddy: normalizeInputBuddy(loaded.inputBuddy),
     // 快捷键只做结构校验：合法清单由渲染层注册表归一（hydrate 必经，兜底等价前移）
     shortcuts: sanitizeShortcutsRecord(loaded.shortcuts),
+    // 启动动画：手改设置文件时也把标识 / 字号 / 速度 / 字体归一
+    splashEnabled: typeof loaded.splashEnabled === "boolean" ? loaded.splashEnabled : true,
+    splashLogoImage: normalizeSplashLogoImage(loaded.splashLogoImage),
+    splashLogoSize: clampSplashLogoSize(loaded.splashLogoSize),
+    splashFontPreset: normalizeSplashFontPreset(loaded.splashFontPreset),
+    splashTextZh: normalizeSplashText(loaded.splashTextZh, DEFAULT_SPLASH_TEXT_ZH),
+    splashTextEn: normalizeSplashText(loaded.splashTextEn, DEFAULT_SPLASH_TEXT_EN),
+    splashTextSub: normalizeSplashText(loaded.splashTextSub, DEFAULT_SPLASH_TEXT_SUB),
+    splashSpeed: clampSplashSpeed(loaded.splashSpeed),
   };
   setI18nLocale(resolveLocale(cache.locale, app.getLocale()));
   return cache;
@@ -140,6 +159,14 @@ export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   next.inputBuddy = normalizeInputBuddy(next.inputBuddy);
   next.accentColor = normalizeAccentColor(next.accentColor);
   next.shortcuts = sanitizeShortcutsRecord(next.shortcuts);
+  next.splashEnabled = next.splashEnabled !== false;
+  next.splashLogoImage = normalizeSplashLogoImage(next.splashLogoImage);
+  next.splashLogoSize = clampSplashLogoSize(next.splashLogoSize);
+  next.splashFontPreset = normalizeSplashFontPreset(next.splashFontPreset);
+  next.splashTextZh = normalizeSplashText(next.splashTextZh, DEFAULT_SPLASH_TEXT_ZH);
+  next.splashTextEn = normalizeSplashText(next.splashTextEn, DEFAULT_SPLASH_TEXT_EN);
+  next.splashTextSub = normalizeSplashText(next.splashTextSub, DEFAULT_SPLASH_TEXT_SUB);
+  next.splashSpeed = clampSplashSpeed(next.splashSpeed);
   cache = next;
   setI18nLocale(resolveLocale(next.locale, app.getLocale()));
   const file = settingsFilePath();

@@ -1,0 +1,11 @@
+.coral {
+  fill: var(--splash-pi-coral);
+}
+
+.blue {
+  fill: var(--splash-pi-blue);
+}
+
+.yellow {
+  fill: var(--splash-pi-yellow);
+}

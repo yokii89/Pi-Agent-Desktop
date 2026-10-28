@@ -12,6 +12,7 @@ import { ScheduledTasksPage } from "./components/ScheduledTasks/ScheduledTasksPa
 import { SessionArea } from "./components/SessionArea/SessionArea";
 import { SettingsDialog } from "./components/Settings/SettingsDialog";
 import { SideNav } from "./components/SideNav/SideNav";
+import { SplashGate } from "./components/Splash/SplashGate";
 import { TerminalPanel } from "./components/TerminalPanel/TerminalPanel";
 import { TitleBar } from "./components/TitleBar/TitleBar";
 import { Toast } from "./components/ui/Toast";
@@ -187,37 +188,41 @@ function AppLayout() {
 /** 应用根组件：Provider 组合 + 三栏布局骨架（左导航 → 中央会话 → 右侧上下文）。 */
 export function App() {
   return (
-    <UiProvider>
-      <ProjectProvider>
-        <ComposerProvider>
-          {/* 边界放在 ExtensionViewProvider 外：Provider 自身崩溃时输入区仍可恢复 */}
-          <AppErrorBoundary>
-            <ExtensionViewProvider>
-              <SessionProvider>
-                <ExtensionViewSessionBridge />
-                <NotificationSoundsBridge />
-                <SchedulerProvider>
-                  <SchedulerSessionBridge />
-                  <ReviewProvider>
-                    <RollbackPromptHost />
-                    <TerminalProvider>
-                      <BrowserProvider>
-                        <InspectorProvider>
-                          <StyleEditProvider>
-                            <UpdateStatusBridge />
-                            <ProcStreamBridge />
-                            <AppLayout />
-                          </StyleEditProvider>
-                        </InspectorProvider>
-                      </BrowserProvider>
-                    </TerminalProvider>
-                  </ReviewProvider>
-                </SchedulerProvider>
-              </SessionProvider>
-            </ExtensionViewProvider>
-          </AppErrorBoundary>
-        </ComposerProvider>
-      </ProjectProvider>
-    </UiProvider>
+    <>
+      {/* 启动动画在 Provider 之外挂载：不依赖任何 store，首帧就能接管黑幕 */}
+      <SplashGate />
+      <UiProvider>
+        <ProjectProvider>
+          <ComposerProvider>
+            {/* 边界放在 ExtensionViewProvider 外：Provider 自身崩溃时输入区仍可恢复 */}
+            <AppErrorBoundary>
+              <ExtensionViewProvider>
+                <SessionProvider>
+                  <ExtensionViewSessionBridge />
+                  <NotificationSoundsBridge />
+                  <SchedulerProvider>
+                    <SchedulerSessionBridge />
+                    <ReviewProvider>
+                      <RollbackPromptHost />
+                      <TerminalProvider>
+                        <BrowserProvider>
+                          <InspectorProvider>
+                            <StyleEditProvider>
+                              <UpdateStatusBridge />
+                              <ProcStreamBridge />
+                              <AppLayout />
+                            </StyleEditProvider>
+                          </InspectorProvider>
+                        </BrowserProvider>
+                      </TerminalProvider>
+                    </ReviewProvider>
+                  </SchedulerProvider>
+                </SessionProvider>
+              </ExtensionViewProvider>
+            </AppErrorBoundary>
+          </ComposerProvider>
+        </ProjectProvider>
+      </UiProvider>
+    </>
   );
 }

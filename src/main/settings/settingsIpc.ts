@@ -23,6 +23,12 @@ import {
 } from "../../shared/notification";
 import { isRailStyle } from "../../shared/railStyles";
 import { sanitizeShortcutsRecord } from "../../shared/shortcuts";
+import {
+  clampSplashLogoSize,
+  clampSplashSpeed,
+  isSplashFontPreset,
+  isSplashLogoDataUrl,
+} from "../../shared/splash";
 import { envelope } from "../ipc/envelope";
 import { onPrefetchSettingChanged } from "../session/speculativePrefetch";
 import { applyTrayEnabled } from "../window/tray";
@@ -211,6 +217,32 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         }
         break;
       }
+      case "splashEnabled":
+        if (typeof value === "boolean") clean.splashEnabled = value;
+        break;
+      case "splashLogoImage":
+        // 空串是合法的"恢复内置"；非法/超长值整项丢弃，不误清用户已有标识
+        if (value === "") clean.splashLogoImage = "";
+        else if (isSplashLogoDataUrl(value)) clean.splashLogoImage = value;
+        break;
+      case "splashLogoSize":
+        if (typeof value === "number" && Number.isFinite(value)) {
+          clean.splashLogoSize = clampSplashLogoSize(value);
+        }
+        break;
+      case "splashFontPreset":
+        if (isSplashFontPreset(value)) clean.splashFontPreset = value;
+        break;
+      case "splashTextZh":
+      case "splashTextEn":
+      case "splashTextSub":
+        if (typeof value === "string") clean[key] = value.slice(0, 64);
+        break;
+      case "splashSpeed":
+        if (typeof value === "number" && Number.isFinite(value)) {
+          clean.splashSpeed = clampSplashSpeed(value);
+        }
+        break;
       default: {
         // 兜底是编译期的：SETTABLE_KEYS 新增键若忘了写分支，key 收窄不为 never 直接报错，
         // 而不是像 locale 那样被静默丢弃（渲染层回写带该键却永远进不了 settings.json）

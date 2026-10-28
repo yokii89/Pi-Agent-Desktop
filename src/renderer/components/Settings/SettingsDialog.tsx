@@ -23,6 +23,7 @@ import { ScheduledSettingsPanel } from "./ScheduledSettingsPanel";
 import styles from "./Settings.module.css";
 import { SettingsNav, type SettingsSectionId } from "./SettingsNav";
 import { ShortcutsPanel } from "./ShortcutsPanel";
+import { StartupPanel } from "./StartupPanel";
 import { UsagePanel } from "./UsagePanel";
 
 const SECTION_TITLE_KEYS: Record<SettingsSectionId, string> = {
@@ -33,6 +34,7 @@ const SECTION_TITLE_KEYS: Record<SettingsSectionId, string> = {
   config: "settings.section.config",
   models: "settings.section.models",
   personalization: "settings.section.personalization",
+  startup: "settings.section.startup",
   shortcuts: "settings.section.shortcuts",
   notifications: "settings.section.notifications",
   environment: "settings.section.environment",
@@ -104,6 +106,8 @@ export function SettingsDialog() {
         return <UsagePanel />;
       case "personalization":
         return <PersonalizationPanel />;
+      case "startup":
+        return <StartupPanel />;
       case "archived":
         return <ArchivedSessionsPanel />;
       default:

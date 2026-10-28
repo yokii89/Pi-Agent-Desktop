@@ -74,7 +74,7 @@ PiDesk doesn't invent an ecosystem, it hosts one.
 
 ### Desktop integration
 
-zh-CN / en-US interfaces, light and dark themes, custom title bar, system tray, Windows toasts with per-scenario sounds, optional GitHub sign-in for settings sync, and in-app auto-update from GitHub Releases — an **Update** button appears beside *Settings* when there is something new.
+zh-CN / en-US interfaces, light and dark themes, custom title bar, system tray, a one-shot startup animation with a replaceable logo, splash copy and font, Windows toasts with per-scenario sounds, optional GitHub sign-in for settings sync, and in-app auto-update from GitHub Releases — an **Update** button appears beside *Settings* when there is something new.
 
 ## Six things we deliberately didn't build
 

@@ -11,6 +11,14 @@ import {
 } from "../../shared/notification";
 import { DEFAULT_RAIL_STYLE } from "../../shared/railStyles";
 import type { ShortcutsMap } from "../../shared/shortcuts";
+import {
+  DEFAULT_SPLASH_FONT_PRESET,
+  DEFAULT_SPLASH_LOGO_SIZE,
+  DEFAULT_SPLASH_SPEED,
+  DEFAULT_SPLASH_TEXT_EN,
+  DEFAULT_SPLASH_TEXT_SUB,
+  DEFAULT_SPLASH_TEXT_ZH,
+} from "../../shared/splash";
 
 /** 设置 schema 当前版本；未来字段迁移时递增并编写迁移逻辑。 */
 export const SETTINGS_VERSION = 1;
@@ -59,6 +67,15 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   // 渲染层全局快捷键（设置 → 键盘快捷键）；默认映射由渲染层动作注册表提供，
   // 主进程只持有结构校验后的透传值（hydrate 时归一）
   shortcuts: {} as ShortcutsMap,
+  // 启动动画（设置 → 启动动画）：默认开启，标识留空 = 内置 pi 标志
+  splashEnabled: true,
+  splashLogoImage: "",
+  splashLogoSize: DEFAULT_SPLASH_LOGO_SIZE,
+  splashFontPreset: DEFAULT_SPLASH_FONT_PRESET,
+  splashTextZh: DEFAULT_SPLASH_TEXT_ZH,
+  splashTextEn: DEFAULT_SPLASH_TEXT_EN,
+  splashTextSub: DEFAULT_SPLASH_TEXT_SUB,
+  splashSpeed: DEFAULT_SPLASH_SPEED,
 };
 
 /** 设置文件名（userData 下）。 */
@@ -113,4 +130,12 @@ export const SETTABLE_KEYS = [
   "questionRailStyle",
   "inputBuddy",
   "shortcuts",
+  "splashEnabled",
+  "splashLogoImage",
+  "splashLogoSize",
+  "splashFontPreset",
+  "splashTextZh",
+  "splashTextEn",
+  "splashTextSub",
+  "splashSpeed",
 ] as const satisfies readonly (keyof PideskSettings)[];

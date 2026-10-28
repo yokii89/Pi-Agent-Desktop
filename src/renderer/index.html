@@ -8,8 +8,27 @@
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PiDesk</title>
+    <style>
+      /* 启动动画接管前的首帧黑幕：避免 React 挂载前闪出主界面。
+         SplashGate 挂载后立即移除；9 秒后无论脚本是否跑起来都自动淡出，绝不锁黑屏。
+         此处早于 tokens.css 加载，只能用字面量黑色。 */
+      #boot-curtain {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        background: #000;
+        animation: pidesk-boot-failsafe 1ms linear 9s forwards;
+      }
+      @keyframes pidesk-boot-failsafe {
+        to {
+          opacity: 0;
+          visibility: hidden;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-curtain" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
   </body>
