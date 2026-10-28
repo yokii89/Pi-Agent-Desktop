@@ -92,6 +92,9 @@
   bottom: 0;
   left: 0;
   width: 42%;
+  /* 静息位与 keyframes from 同一点：扫光开始前（含减少动效）条带必须停在画面外，
+     否则浅色档会在左缘显出一道灰色斜带。F3 换 transform 时漏了参考实现的 left:-50%。 */
+  transform: translateX(-119.048%);
   background: linear-gradient(
     100deg,
     transparent 0%,

@@ -1203,7 +1203,7 @@
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  /* 与开屏一致的黑底，预览白色 / 透明底标识才准 */
+  /* 与开屏一致的底色（跟随主题），预览白色 / 透明底标识才准 */
   background: var(--splash-bg);
 }
 

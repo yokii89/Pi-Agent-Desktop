@@ -400,8 +400,9 @@
   --buddy-capy-sweat: #7ec8e3;
 }
 
-/* 启动动画（开屏）：跨主题固定黑底白字 + pi 官方品牌色。
-   单独开一个 :root 块，避免被两套主题的变量表误读成主题色。 */
+/* 启动动画（开屏）：跟随主题——深色档黑底白字，浅色档白底黑字；
+   pi 官方品牌色两档同值。单独开一个块，避免被两套主题的变量表误读成主题色。
+   未标记主题时按深色档兜底（index.tsx 在首帧前写 data-theme="dark"）。 */
 :root {
   --splash-bg: #000000;
   --splash-text: #ffffff;
@@ -411,4 +412,14 @@
   --splash-pi-coral: #f09082;
   --splash-pi-blue: #4d9abf;
   --splash-pi-yellow: #f1be58;
+}
+
+/* 浅色档：底色比应用浅色背景（#f5f5f7）再亮一档，镜像深色档纯黑压过 #111113；
+   文字取纯黑；扫光由白转黑、alpha 与深色档同值，亮度差保持一致。 */
+:root[data-theme="light"] {
+  --splash-bg: #ffffff;
+  --splash-text: #000000;
+  --splash-text-muted: rgba(0, 0, 0, 0.5);
+  --splash-sweep-soft: rgba(0, 0, 0, 0.055);
+  --splash-sweep-strong: rgba(0, 0, 0, 0.12);
 }
