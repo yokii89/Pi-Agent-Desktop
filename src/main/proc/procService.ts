@@ -1,5 +1,6 @@
 import type {
   ManagedProcess,
+  ProcDetail,
   ProcPushMessage,
   ProcStopAllResult,
   ProcStopResult,
@@ -7,6 +8,7 @@ import type {
 } from "../../shared/ipc";
 import { PROC_IPC } from "../../shared/ipc";
 import { getMainWindow } from "../window/createMainWindow";
+import { readProcessDetail } from "./processDetail";
 import {
   enumerateProcesses,
   killManagedProcess,
@@ -124,6 +126,13 @@ class ProcService {
 
   ignore(id: string): ManagedProcess | null {
     return this.registry.setStatus(id, "ignored");
+  }
+
+  /** 进程详情（子树 / 端口 / 内存）；只接受属于该 session 的登记 id。 */
+  async detail(sessionId: SessionId, id: string): Promise<ProcDetail> {
+    const proc = this.registry.get(id);
+    if (!proc || proc.sessionId !== sessionId) throw new Error("进程登记项不存在");
+    return readProcessDetail(proc);
   }
 
   async stopAll(sessionId: SessionId): Promise<ProcStopAllResult> {

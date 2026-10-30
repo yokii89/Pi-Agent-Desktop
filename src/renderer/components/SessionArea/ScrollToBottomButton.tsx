@@ -13,6 +13,7 @@ export function ScrollToBottomButton({ onClick, label }: { onClick: () => void; 
     <button
       type="button"
       className={styles.jump}
+      data-panel-geo="monitor-jump"
       title={t("session.scrollToBottom.title")}
       aria-label={t("session.scrollToBottom.aria", { suffix: ariaSuffix })}
       onClick={onClick}

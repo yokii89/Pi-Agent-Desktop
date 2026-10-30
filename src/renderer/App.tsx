@@ -171,8 +171,8 @@ function AppLayout() {
       ]
         .filter(Boolean)
         .join(" ")}
-      // 用拖拽后的宽度覆盖 --context-sidebar-width，三栏网格与侧栏自身宽度一并生效；
-      // 收展补间也写这个变量，不补间时由本值兜底
+      // 侧栏宽度的静态真值（CSS 默认 + 首帧兜底）；收展补间/拖拽经 utils/panelGeometry
+      // 直写网格轨道与各消费元素，不逐帧改这个继承型变量（见该文件头）
       style={{ "--context-sidebar-width": `${rightSidebarWidth}px` } as CSSProperties}
     >
       <TitleBar />
@@ -183,7 +183,7 @@ function AppLayout() {
             <CentralPage />
           </div>
           {monitorMounted ? (
-            <div className={styles.monitorDock}>
+            <div className={styles.monitorDock} data-panel-geo="monitor-dock">
               <SessionMonitor active={monitorVisible} />
             </div>
           ) : null}

@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import type {
   IpcResult,
   ManagedProcess,
+  ProcDetail,
   ProcStopAllResult,
   ProcStopResult,
   SessionId,
@@ -39,6 +40,13 @@ export function registerProcIpc(): void {
     PROC_IPC.ignore,
     (_e, req: { id?: unknown }): IpcResult<ManagedProcess | null> =>
       envelope(() => procService.ignore(requireId(req?.id))),
+  );
+
+  /** 详情页签：子树 / 端口 / 内存（只读查询，不改登记状态）。 */
+  ipcMain.handle(
+    PROC_IPC.detail,
+    (_e, req: { sessionId?: unknown; id?: unknown }): Promise<IpcResult<ProcDetail>> =>
+      envelopeAsync(() => procService.detail(requireSessionId(req?.sessionId), requireId(req?.id))),
   );
 
   ipcMain.handle(

@@ -1143,6 +1143,53 @@ export interface ProcStopResult {
   message?: string;
 }
 
+/** 进程详情里的子孙进程行（Win32_Process 子集，不含根）。 */
+export interface ProcDetailRow {
+  pid: number;
+  ppid: number;
+  name: string;
+  commandLine: string;
+  startedAt: number;
+}
+
+/** 进程详情里的 TCP 端点（Get-NetTCPConnection 子集）。 */
+export interface ProcEndpoint {
+  /** 归属进程（根或子孙）。 */
+  pid: number;
+  localAddress: string;
+  localPort: number;
+  remoteAddress: string | null;
+  remotePort: number | null;
+  /** Listen / Established / TimeWait…（系统原文）。 */
+  state: string;
+}
+
+export interface ProcDetailRequest {
+  sessionId: SessionId;
+  id: string;
+}
+
+/**
+ * 进程内部信息（详情页签用）：子树 + TCP 端点 + 内存。
+ * 只是查询瞬间的快照；实时 stdout 无法读取（docs/design/37 §1.3）。
+ */
+export interface ProcDetail {
+  /** 查询时刻（Unix ms）。 */
+  at: number;
+  /** 根进程仍存活，且命令行/启动时间与登记值一致（防 PID 复用）。 */
+  alive: boolean;
+  /** 子孙进程（不含根；上限由主进程截断）。 */
+  descendants: ProcDetailRow[];
+  /** 根 + 子孙拥有的 TCP 端点（监听优先，上限由主进程截断）。 */
+  ports: ProcEndpoint[];
+  /** 端口查询是否成功；false 时 ports 为空不代表「没有端点」。 */
+  portsReadable: boolean;
+  /** 根 + 子孙工作集合计（字节）；读不到为 0。 */
+  memoryBytes: number;
+  /** 根 + 子孙的进程数。 */
+  processCount: number;
+}
+
 export const PROC_IPC = {
   /** 列出该会话登记项（含 status；主进程先 lazy 复核存活）。 */
   list: "pidesk:proc:list",
@@ -1152,6 +1199,8 @@ export const PROC_IPC = {
   ignore: "pidesk:proc:ignore",
   /** 批量停止（dispose 确认后的「一并结束」）。 */
   stopAll: "pidesk:proc:stopAll",
+  /** 进程详情（子树 / 端口 / 内存）；详情页签可见时轮询。 */
+  detail: "pidesk:proc:detail",
   /** 主进程推送：登记/状态变化合批（约 200ms）。 */
   changed: "pidesk:proc:changed",
   /** 上次非正常退出的残留提示（§5.4 P0）；消费一次即 false。 */

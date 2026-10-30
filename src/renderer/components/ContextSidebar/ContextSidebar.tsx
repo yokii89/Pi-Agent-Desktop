@@ -18,11 +18,13 @@ import {
 import { prefersReducedMotion } from "../../utils/animation";
 import { type GlideCancel, glide, mix } from "../../utils/glideMotion";
 import { NAV_MOTION } from "../../utils/motionTokens";
+import { panelGeometry, writePanelGeometry } from "../../utils/panelGeometry";
 import { PanelMount } from "../ExtensionView/PanelMount";
 import { ReviewPanel } from "../ReviewWindow/ReviewPanel";
 import styles from "./ContextSidebar.module.css";
 import { BrowserPanel } from "./panels/BrowserPanel";
 import { FilePanel } from "./panels/FilePanel";
+import { ProcPanel } from "./panels/ProcPanel";
 import { SidebarActions } from "./SidebarActions";
 import { SidebarLauncher } from "./SidebarLauncher";
 import { SidebarTabBar } from "./SidebarTabBar";
@@ -111,6 +113,9 @@ export function ContextSidebar() {
   const resizeRef = useRef<ResizeSession | null>(null);
   const widthTweenRef = useRef<GlideCancel | null>(null);
   const lastWidthRef = useRef<number>(RIGHT_SIDEBAR_DEFAULT_WIDTH);
+  const openRef = useRef(rightSidebarOpen);
+  openRef.current = rightSidebarOpen;
+  const prevWidthRef = useRef(rightSidebarWidth);
   // 拖拽中的宽度直接写网格根元素的 CSS 变量（不经 React 渲染），松手时一次性提交 store，
   // 避免拖拽帧反复重渲染全局（与终端面板高度拖拽同一策略）
   const [dragging, setDragging] = useState(false);
@@ -281,7 +286,7 @@ export function ContextSidebar() {
       session.maxWidth,
     );
     session.lastWidth = next;
-    grid.style.setProperty("--context-sidebar-width", `${next}px`);
+    writePanelGeometry(grid, { sidebar: next });
   };
 
   // 可用空间变小后把宽度夹回合法区间：窗口变窄、或左导航从折叠态展开（中央区被让出 192px）
@@ -294,6 +299,8 @@ export function ContextSidebar() {
       const nextMax = computeMaxWidth(grid);
       setMaxWidth((prev) => (prev === nextMax ? prev : nextMax));
       if (rightSidebarWidth > nextMax) {
+        // 宽度是内联写在轨道与侧栏上的，夹取也必须落到 DOM，不能只改 store
+        writePanelGeometry(grid, { sidebar: nextMax });
         dispatch({ type: "setRightSidebarWidth", width: nextMax });
       }
     };
@@ -323,6 +330,21 @@ export function ContextSidebar() {
       widthTweenRef.current = null;
     }
   }, [rightSidebarOpen]);
+
+  /**
+   * store 宽度变化（如浏览器检查器的「加宽」）也要落到 DOM：宽度已由
+   * panelGeometry 内联写在网格轨道与 aside 上，只改 CSS 变量不会生效。
+   * 只认宽度变化、不认开合切换——收展动画仍由 useContextSidebarCollapse 独占，
+   * 否则展开的第一帧会被这里直接写满宽。
+   */
+  useLayoutEffect(() => {
+    const previous = prevWidthRef.current;
+    prevWidthRef.current = rightSidebarWidth;
+    if (previous === rightSidebarWidth) return;
+    if (!openRef.current || resizeRef.current || widthTweenRef.current) return;
+    const grid = rootRef.current?.parentElement;
+    if (grid) writePanelGeometry(grid, { sidebar: rightSidebarWidth });
+  }, [rightSidebarWidth]);
   useEffect(
     () => () => {
       widthTweenRef.current?.();
@@ -337,10 +359,10 @@ export function ContextSidebar() {
     widthTweenRef.current?.();
     widthTweenRef.current = null;
     // 中途被打断（连点放大）时从当前视觉值接管，不能退回 store 里的旧宽度
-    const visual = Number.parseFloat(grid.style.getPropertyValue("--context-sidebar-width"));
+    const visual = panelGeometry().sidebar;
     const start = Number.isFinite(visual) ? visual : from;
     if (prefersReducedMotion()) {
-      grid.style.setProperty("--context-sidebar-width", `${to}px`);
+      writePanelGeometry(grid, { sidebar: to });
       done();
       return;
     }
@@ -348,14 +370,11 @@ export function ContextSidebar() {
       // 与侧栏收展同一条下拉曲线 / 同一档时长（docs/design/53）
       duration: NAV_MOTION.collapseEnter,
       onUpdate: (progress) => {
-        grid.style.setProperty(
-          "--context-sidebar-width",
-          `${Math.round(mix(start, to, progress))}px`,
-        );
+        writePanelGeometry(grid, { sidebar: Math.round(mix(start, to, progress)) });
       },
       onComplete: () => {
         widthTweenRef.current = null;
-        grid.style.setProperty("--context-sidebar-width", `${to}px`);
+        writePanelGeometry(grid, { sidebar: to });
         done();
       },
     });
@@ -378,7 +397,12 @@ export function ContextSidebar() {
   }, [animateWidth, dispatch, maxWidth, maximized, rightSidebarWidth]);
 
   return (
-    <aside ref={rootRef} className={styles.sidebar} aria-label={t("panels.context.sidebarLabel")}>
+    <aside
+      ref={rootRef}
+      className={styles.sidebar}
+      aria-label={t("panels.context.sidebarLabel")}
+      data-panel-geo="sidebar"
+    >
       <div
         className={[styles.resizeHandle, dragging ? styles.resizeHandleDragging : ""].join(" ")}
         title={t("panels.context.resizeWidth")}
@@ -421,6 +445,7 @@ export function ContextSidebar() {
             )}
             {activeTab === "review" && reviewMode === "docked" && <ReviewPanel />}
             {activeTab === "browser" && browserEnabled && <BrowserPanel />}
+            {activeTab === "procs" && <ProcPanel />}
             {activePanel && <PanelMount entry={activePanel} />}
             {!activePanel && activeCatalogPanel && (
               <CatalogPanelBody

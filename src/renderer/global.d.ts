@@ -103,6 +103,8 @@ import type {
   PiSessionStats,
   PiShellProbe,
   PiSlashCommand,
+  ProcDetail,
+  ProcDetailRequest,
   ProcPushMessage,
   ProcStopAllResult,
   ProcStopResult,
@@ -263,6 +265,7 @@ export interface PideskGlobalApi {
     list(sessionId: SessionId): Promise<IpcResult<ManagedProcess[]>>;
     stop(id: string): Promise<IpcResult<ProcStopResult>>;
     ignore(id: string): Promise<IpcResult<ManagedProcess | null>>;
+    detail(req: ProcDetailRequest): Promise<IpcResult<ProcDetail>>;
     stopAll(sessionId: SessionId): Promise<IpcResult<ProcStopAllResult>>;
     onChanged(callback: (message: ProcPushMessage) => void): () => void;
     residualNotice(): Promise<IpcResult<boolean>>;

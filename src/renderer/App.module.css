@@ -12,12 +12,13 @@
      且面板永不溢出（无法滚动）。 */
   grid-template-rows: var(--titlebar-height) minmax(0, 1fr);
   /* 左栏轨道宽：收起/展开瞬时切换（不做补间，避免 grid 轨道动画弹跳）。
-     拖拽调右栏宽由 ContextSidebar 直接写 --context-sidebar-width。 */
+     拖拽调右栏宽由 ContextSidebar 经 utils/panelGeometry 直写本行轨道与侧栏宽度。 */
   --nav-track: var(--nav-width);
   grid-template-columns: var(--nav-track) 1fr var(--context-sidebar-width);
   /* chrome（窗控+开关）绝对定位宽度，顶栏中/右段内容避让用 */
   --titlebar-chrome-width: 200px;
-  /* 会话监控卡停靠层宽度（右侧栏收起时由 useSessionMonitorDock 补间，见 docs/design/96）；
+  /* 会话监控卡停靠层宽度的**静态兜底**（首帧 / 无补间时）：补间与拖拽由
+     utils/panelGeometry 直写内联宽度，不逐帧改这个继承型变量（docs/design/103）；
      与 --context-sidebar-width 互补，正文内容区靠它让位，两者同值故列宽不跳 */
   --session-monitor-width: 0px;
   /* 背景保持纯平色，不铺任何径向渐变/环境光——否则四角会透出彩色光斑。
@@ -60,8 +61,8 @@
   min-height: 0;
 }
 
-/* 会话监控卡的停靠层：宽度 = --session-monitor-width（与侧栏宽度同值，
-   由 hooks/useSessionMonitorDock 补间），卡片贴右、右侧让出 16px（其中 8px 是滚动条槽）。
+/* 会话监控卡的停靠层：宽度 = --session-monitor-width 的兜底值（与侧栏宽度同值），
+   补间期间由 utils/panelGeometry 直写内联宽度；卡片贴右、右侧让出 16px（其中 8px 是滚动条槽）。
 
    为什么是绝对定位而不是并列的 flex 列：滚动条只能长在滚动盒的边框内缘，
    若把停靠层做成 "页面 + 卡" 的两个 flex 列，滚动盒右缘就被挤到卡左边，

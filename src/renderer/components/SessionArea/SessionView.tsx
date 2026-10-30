@@ -222,6 +222,7 @@ export function SessionView() {
       <div
         className={`${styles.scroll} ${mode === "free" ? styles.scrollFree : ""}`}
         ref={scrollRef}
+        data-panel-geo="monitor-scroll"
         onContextMenu={(event) => event.preventDefault()}
       >
         <div className={styles.inner} ref={contentRef}>

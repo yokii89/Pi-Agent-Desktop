@@ -49,6 +49,15 @@ export const contextMessages = defineMessages({
     "zh-CN": "查看 Git 变更、提交与历史图谱",
     "en-US": "Review Git changes, commits and history",
   },
+  "panels.context.procs": { "zh-CN": "后台进程", "en-US": "Processes" },
+  "panels.context.openProcs": {
+    "zh-CN": "打开后台进程",
+    "en-US": "Open background processes",
+  },
+  "panels.context.openProcsHint": {
+    "zh-CN": "查看运行中服务的命令、输出与端口",
+    "en-US": "Commands, output and ports of running services",
+  },
   "panels.context.extensionHint": {
     "zh-CN": "由扩展提供",
     "en-US": "Provided by an extension",

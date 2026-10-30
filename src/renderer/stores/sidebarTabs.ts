@@ -3,7 +3,7 @@
  *
  * 页签身份统一为 `ext:<panelId>`；关闭扩展页签只隐藏 live View，不发送 dismiss。
  */
-export type RightSidebarTab = "review" | "files" | "browser" | `ext:${string}`;
+export type RightSidebarTab = "review" | "files" | "browser" | "procs" | `ext:${string}`;
 
 export interface SidebarTabsState {
   rightSidebarOpen: boolean;

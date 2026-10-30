@@ -11,6 +11,7 @@ import {
   Sparkle,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
+import { useOpenProcPanel } from "../../hooks/useOpenProcPanel";
 import { useT } from "../../hooks/useT";
 import { fsService } from "../../services/fsService";
 import { useBrowserStore } from "../../stores/browserStore";
@@ -58,9 +59,10 @@ export function SessionMonitor({ active }: SessionMonitorProps) {
     refreshIfStale,
     setFilterMode,
   } = useReviewStore();
-  const { openReviewDocked, showToast } = useUiStore();
+  const { openReviewDocked, openSidebarTab, showToast } = useUiStore();
   const browser = useBrowserStore();
   const procs = useProcActions(meta.activeSessionId);
+  const openProcPanel = useOpenProcPanel();
   const [commitOpen, setCommitOpen] = useState(false);
   const [envReloadTick, setEnvReloadTick] = useState(0);
 
@@ -202,9 +204,13 @@ export function SessionMonitor({ active }: SessionMonitorProps) {
             ) : null}
           </MonitorSection>
 
-          {procs.alive.length > 0 ? (
+          {procs.all.length > 0 ? (
             <MonitorSection title={t("monitor.section.procs")}>
-              <MonitorProcs procs={procs} />
+              <MonitorProcs
+                procs={procs}
+                onOpen={openProcPanel}
+                onOpenAll={() => openSidebarTab("procs")}
+              />
             </MonitorSection>
           ) : null}
 

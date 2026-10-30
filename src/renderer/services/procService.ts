@@ -1,5 +1,7 @@
 import type {
   ManagedProcess,
+  ProcDetail,
+  ProcDetailRequest,
   ProcPushMessage,
   ProcStopAllResult,
   ProcStopResult,
@@ -27,6 +29,10 @@ export const procService = {
   },
   ignore(id: string): Promise<ManagedProcess | null> {
     return unwrap(requireProc().ignore(id));
+  },
+  /** 进程详情（子树 / 端口 / 内存）；详情页签可见时轮询。 */
+  detail(req: ProcDetailRequest): Promise<ProcDetail> {
+    return unwrap(requireProc().detail(req));
   },
   stopAll(sessionId: SessionId): Promise<ProcStopAllResult> {
     return unwrap(requireProc().stopAll(sessionId));

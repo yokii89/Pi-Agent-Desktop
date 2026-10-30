@@ -169,7 +169,7 @@ interface UiState {
    * 新的 live 注册不会自动重开这些页签，直到用户从加号菜单/启动页再次打开。
    */
   hiddenSidebarPanelIds: string[];
-  /** 右侧上下文侧栏宽度（px），拖拽左缘把手调整；经 .app 根元素覆盖 --context-sidebar-width。 */
+  /** 右侧上下文侧栏宽度（px），拖拽左缘把手调整；经 utils/panelGeometry 直写轨道与侧栏宽度。 */
   rightSidebarWidth: number;
   /** 底部终端面板是否展开。仅控制可见性，终端进程生命周期独立（隐藏 ≠ kill）。 */
   terminalPanelVisible: boolean;

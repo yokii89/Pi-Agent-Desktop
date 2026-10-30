@@ -106,6 +106,8 @@ import type {
   PiSessionStats,
   PiShellProbe,
   PiSlashCommand,
+  ProcDetail,
+  ProcDetailRequest,
   ProcPushMessage,
   ProcStopAllResult,
   ProcStopResult,
@@ -411,6 +413,9 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 标记忽略，本 session 不再展示。 */
     ignore: (id: string): Promise<IpcResult<ManagedProcess | null>> =>
       ipcRenderer.invoke(PROC_IPC.ignore, { id }),
+    /** 进程详情（子树 / 端口 / 内存）。 */
+    detail: (req: ProcDetailRequest): Promise<IpcResult<ProcDetail>> =>
+      ipcRenderer.invoke(PROC_IPC.detail, req),
     /** 批量停止该会话全部存活登记项。 */
     stopAll: (sessionId: SessionId): Promise<IpcResult<ProcStopAllResult>> =>
       ipcRenderer.invoke(PROC_IPC.stopAll, { sessionId }),

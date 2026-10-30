@@ -52,7 +52,9 @@
 .dockedInput {
   position: absolute;
   left: 0;
-  right: calc(var(--scrollbar-size) + var(--session-monitor-width));
+  /* 基准与停靠宽分开：补间期间 geometry 写入方只追加停靠宽（utils/panelGeometry.ts） */
+  --panel-base-right: var(--scrollbar-size);
+  right: calc(var(--panel-base-right) + var(--session-monitor-width));
   bottom: var(--session-input-offset);
   display: flex;
   justify-content: center;

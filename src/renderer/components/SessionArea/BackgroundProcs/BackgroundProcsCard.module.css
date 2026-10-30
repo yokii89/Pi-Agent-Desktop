@@ -5,7 +5,9 @@
 .card {
   position: absolute;
   top: var(--spacing-md);
-  right: calc(var(--spacing-lg) + var(--session-monitor-width));
+  /* 基准与停靠宽分开：补间期间 geometry 写入方只追加停靠宽（utils/panelGeometry.ts） */
+  --panel-base-right: var(--spacing-lg);
+  right: calc(var(--panel-base-right) + var(--session-monitor-width));
   z-index: calc(var(--z-input-overlay) - 1);
   display: flex;
   flex-direction: column;
@@ -78,6 +80,19 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* button 重置：行主体可点开右侧栏详情（停止钮独立，不触发） */
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowBody:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 .rowTitle {

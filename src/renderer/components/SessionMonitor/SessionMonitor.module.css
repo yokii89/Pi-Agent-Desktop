@@ -5,17 +5,17 @@
  * 「会话区往右多出来的一栏」，而不是又一块浮在正文上的面板；只有顶部
  * 「本轮概述」块浮起一档（--color-bg-surface），把摘要与下面的分区列表分开。
  *
- * 宽度 = 停靠层宽度（--session-monitor-width，与侧栏同值）减右侧 16px——
- * 其中 8px 是滚动条槽、8px 是呼吸间距，于是对话流的滚动条落在卡片右侧，
- * 卡片也不会压住它。色值/间距/字号一律走 tokens。
+ * 宽度 = 停靠层宽度减右侧 16px——其中 8px 是滚动条槽、8px 是呼吸间距，
+ * 于是对话流的滚动条落在卡片右侧，卡片也不会压住它。停靠层宽由
+ * utils/panelGeometry 直写内联值，卡片跟它的百分比走（不再读自定义属性，
+ * 否则补间期间停靠层在动、卡片却停在静态变量上）。色值/间距/字号一律走 tokens。
  */
 .card {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  /* max()：收起补间结尾时 "停靠层宽 − 16px" 会短暂为负（负 width 在计算值时失效、
-     退化成 auto），夹到 0 才能让宽度随补间单调收敛 */
-  width: max(0px, calc(var(--session-monitor-width) - var(--spacing-md)));
+  /* 收起补间结尾时 "停靠层宽 − 16px" 会短暂为负，width 的负使用值按 0 处理 */
+  width: calc(100% - var(--spacing-md));
   max-height: calc(100% - var(--spacing-md) * 2);
   margin: var(--spacing-md) var(--spacing-md) var(--spacing-md) 0;
   border: 1px solid var(--glass-border);
@@ -226,6 +226,28 @@
   color: var(--color-danger);
 }
 
+/* 后台进程行：图标 + 命令是「打开详情」按钮，右缘停止仍独立 */
+.procOpen {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.procOpen:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 .dot {
   width: 6px;
   height: 6px;
@@ -235,6 +257,33 @@
 
 .running {
   color: var(--color-text-muted);
+}
+
+.endedIcon {
+  color: var(--color-danger);
+}
+
+.ended {
+  color: var(--color-text-muted);
+}
+
+/* 超出上限时的「查看全部」：与进程行同一出血宽度，只做文字入口 */
+.viewAll {
+  width: 100%;
+  padding: 3px calc(var(--spacing-xs) + 2px);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.viewAll:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
 }
 
 /* 停止按钮的可见性交给 CSS（:hover / :focus-within），animation 中断也不会

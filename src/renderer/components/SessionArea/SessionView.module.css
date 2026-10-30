@@ -20,8 +20,11 @@
      所以滚动条停在窗口右缘、卡片右侧；让位量就是卡片宽度（与侧栏同值）。
      pad+"让开卡" 而不是缩小滚动盒，是为了不让滚动条跑回屏幕中间。
      左右横向内边距与 .dockedInput 对称，两边的包含块同宽，文档流列宽才能与输入栏
-     边界严格对齐（列宽共用 --session-input-column）。 */
-  padding: 0 calc(var(--spacing-xl) + var(--session-monitor-width)) 0 var(--spacing-xl);
+     边界严格对齐（列宽共用 --session-input-column）。
+     --panel-base-right 是补间期间的基准偏移：geometry 写入方只追加停靠宽，
+     见 utils/panelGeometry.ts。 */
+  --panel-base-right: var(--spacing-xl);
+  padding: 0 calc(var(--panel-base-right) + var(--session-monitor-width)) 0 var(--spacing-xl);
   /* follow 期贴底由 useStickToBottom 负责，不与 Chromium 原生滚动锚定叠加（docs/design/10 C5） */
   overflow-anchor: none;
 }

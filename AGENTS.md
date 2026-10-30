@@ -239,9 +239,11 @@ import { Play } from "@phosphor-icons/react";
 （曲线即浮层默认缓动 `GLIDE_MOTION.easeOut`，时长用 `NAV_MOTION.collapseEnter/collapseExit`），
 禁止退回瞬时显隐：
 
-- **侧栏补间的是 `--context-sidebar-width` 变量**（`hooks/useContextSidebarCollapse.ts`）：
-  网格 aside 轨道与侧栏宽度吃同一个变量，直写根元素内联值（与拖拽把手同路）；
-  aside 与 `sidebarClosed` 类**滞后到补间落定**才卸载/生效，半途反向切换从内联变量的当前视觉值接管。
+- **侧栏补间的是面板几何**（`hooks/useContextSidebarCollapse.ts` → `utils/panelGeometry.ts`）：
+  网格 aside 轨道与侧栏自身宽度一起直写（与拖拽把手同路）；**不要**退回在 `.app` 上逐帧改
+  `--context-sidebar-width`——继承型自定义属性会让整棵文档树样式失效（80 条消息的会话实测
+  ~5ms/帧，docs/design/103）。aside 与 `sidebarClosed` 类**滞后到补间落定**才卸载/生效，
+  半途反向切换从 `panelGeometry()` 的当前视觉值接管。
 - **终端栏补间的是面板高度**（`TerminalPanel` 内 `animHeight`）：收起演完才 `display:none`
   （pty 全程存活）；拖拽把手真正开始拖动时取消补间、从当前视觉值重新起算。
 - 两者都遵守：首次挂载不播动画、`prefers-reduced-motion` 直接落终态（`glide()` 内建）、
@@ -251,15 +253,22 @@ import { Play } from "@phosphor-icons/react";
 
 右侧上下文侧栏收起后，中央区右缘出现「会话监控卡」（`components/SessionMonitor/`）。硬约束：
 
-- **宽度与侧栏互补**：`--session-monitor-width` 与 `--context-sidebar-width` 在 `glide()` 同一条
-  定帧时间轴上互补补间（`hooks/useSessionMonitorDock.ts`，出现取 `collapseExit`、让位取 `collapseEnter`，
-  即侧栏那一侧的对称值），两个变量**同值**，所以文档流的内容区宽在开/关侧栏之间**不跳**——
+- **宽度与侧栏互补**：停靠层宽与侧栏宽在 `glide()` 同一条定帧时间轴上互补补间
+  （`hooks/useSessionMonitorDock.ts`，出现取 `collapseExit`、让位取 `collapseEnter`，
+  即侧栏那一侧的对称值），两边**同值**，所以文档流的内容区宽在开/关侧栏之间**不跳**——
   这是断言项，改宽度/时长先复测。也不要给卡片单独设窗口宽度下限：它和「开侧栏」是同一个挤压程度。
-- **停靠层绝对定位，但正文必须按同一变量让位**：`.monitorDock` 是 `position:absolute` 覆盖层
+- **几何由 `utils/panelGeometry.ts` 直写消费元素**（docs/design/103）：`--session-monitor-width` /
+  `--context-sidebar-width` 只是静态兜底（首帧、无补间时），补间与拖拽一律走
+  `writePanelGeometry()` 写 aside / 停靠层 / 正文 `padding-right` / 输入栏与浮钮的 `right`；
+  消费元素靠 `data-panel-geo` 标记。**不要**为了"一处写、多处跟"退回在 `.app` 上逐帧写这两个
+  继承型变量——每帧会让整棵树失效（实测 ~5ms/帧，doc 103）。
+- **停靠层绝对定位，但正文必须按同一宽度让位**：`.monitorDock` 是 `position:absolute` 覆盖层
   （`pointer-events:none`，卡片自己接管指针），正文靠 `SessionView .scroll` 的
-  `padding-right: var(--session-monitor-width)` 让位，悬浮输入栏 / 跳到底部按钮的右偏置也加这一项。
+  `padding-right` 让位（基准偏移走 `--panel-base-right`，由 panelGeometry 只追加停靠宽），
+  悬浮输入栏 / 跳到底部按钮的右偏置也加这一项。
   **不要**改回「页面列 + 并列摆卡」的 flex 布局：滚动盒右缘会被挤到卡片左边，对话流的滚动条就出现在
-  屏幕中间（用户确认过要它贴着窗口右缘、卡片右侧）。卡片宽度 = 停靠层宽 − 16px（8px 滚动条槽 + 8px 呼吸）。
+  屏幕中间（用户确认过要它贴着窗口右缘、卡片右侧）。卡片宽度 = 停靠层宽 − 16px（8px 滚动条槽 + 8px 呼吸，
+  卡片写 `calc(100% - 16px)` 跟随停靠层，不单独读变量）。
 - **卡片底色 = 会话区底色**（`--color-bg`，不用玻璃）：它要读成「会话区往右多出来的一栏」，
   整张卡只有顶部「本轮概述」（`hero`）浮起一档用 `--color-bg-surface`。
 - **显隐只认** `page === "session" && phase !== "empty" && !rightSidebarOpen`；切页 / 回到空态不播动画，
@@ -274,6 +283,12 @@ import { Play } from "@phosphor-icons/react";
   别改成 `openReview()`，那会按用户当前形态开到浮窗、不进右侧栏。
 - **后台进程只有一份实现**：`SessionArea/BackgroundProcs/useProcActions` 被中央浮卡与监控卡共用；
   侧栏收起时中央浮卡让位（`SessionArea` 按 `rightSidebarOpen` 条件渲染），避免两块卡同时挂同一份登记表。
+  存活对账（5s）与停止 pending/error 收在 `procStore` 的引用计数里，**不要**在每处 UI 各起一条轮询。
+- **后台进程行是详情入口**（docs/design/101）：点击打开右侧栏内置页签 `procs`（上列表 + 下详情，
+  含来源 bash 调用、子进程树、TCP 端点、内存）。列表按登记状态展示运行中 / 已停止 / 已退出
+  （忽略项不展示）；**孤儿进程没有退出码，不要伪造「失败」状态**。**实时 stdout 读不到**
+  （doc 37 §1.3），来源调用只展示启动阶段捕获的输出；端口用 `netstat`（~60ms）而不是
+  `Get-NetTCPConnection`（~2.6s），进程快照复用 5s 对账（10s 窗口），3s 轮询不要改成每次全量枚举。
 
 ### 导航列表选中高亮：一块选中药丸（docs/design/54 / 56）
 

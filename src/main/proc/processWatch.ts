@@ -11,6 +11,8 @@ export interface ProcessSnapshotRow {
   commandLine: string;
   /** CreationDate → Unix ms；未知为 0。 */
   startedAt: number;
+  /** 工作集（字节）；详情页签的内存合计用，watcher 不看。 */
+  workingSet?: number;
 }
 
 export type ProcessSnapshot = ReadonlyMap<number, ProcessSnapshotRow>;
@@ -148,17 +150,25 @@ export function isDescendantOf(
   return false;
 }
 
-/** 相对 baseline 新出现、且经历史边仍挂在 rootPid 子树上的进程。 */
+/**
+ * 相对 baseline 新出现、且经历史边仍挂在 rootPid 子树上的进程。
+ *
+ * `sinceMs` 是 bash 工具开始时刻：baseline 枚举本身要 ~1.8s，快速命令启动的服务
+ * 会落在 baseline 里，只靠「不在 S0」会漏掉主场景（`npm run dev &`）。创建时间
+ * 晚于工具起点、且祖先链成立的进程同样算新。
+ */
 export function diffNewInSubtree(
   baseline: ProcessSnapshot,
   current: ProcessSnapshot,
   rootPid: number,
+  sinceMs?: number,
 ): ProcessSnapshotRow[] {
   const merged = mergeSnapshots(baseline, current);
   const out: ProcessSnapshotRow[] = [];
   for (const [pid, row] of current) {
-    if (baseline.has(pid)) continue;
     if (pid === rootPid) continue;
+    const startedThisCall = sinceMs !== undefined && row.startedAt > 0 && row.startedAt >= sinceMs;
+    if (baseline.has(pid) && !startedThisCall) continue;
     if (!isDescendantOf(merged, pid, rootPid)) continue;
     out.push(row);
   }
@@ -188,6 +198,8 @@ export const WATCH_TIMING = {
   settleMs: 800,
   /** 存活复核三次，丢掉短命 helper。 */
   recheckMs: [1000, 5000, 15000] as const,
+  /** 第 0 档复核遇到枚举失败时的重试间隔（失败 ≠ 进程消失）。 */
+  recheckRetryMs: 1000,
   /** 登记/状态变化合批推送。 */
   pushBatchMs: 200,
 } as const;
@@ -196,8 +208,9 @@ export interface BashBoundaryState {
   sessionId: SessionId;
   rootPid: number;
   toolCallId: string;
-  /** tool_execution_start 时的基线 S0。 */
-  baseline: ProcessSnapshot;
+  /** tool_execution_start 时的基线 S0；枚举完成前为 null。 */
+  baseline: ProcessSnapshot | null;
+  /** tool_execution_start 时刻（diff 的创建时间判据）。 */
   startedAt: number;
 }
 
@@ -220,16 +233,23 @@ export interface ProcessWatcherDeps {
   markExited: (pid: number, sessionId: SessionId) => void;
 }
 
+interface PendingBoundary {
+  state: BashBoundaryState;
+  timer: ReturnType<typeof setTimeout> | null;
+  /** baseline 就绪前先到的 end；等 baseline 返回后补收口。 */
+  endedAt: number | null;
+}
+
 /**
  * bash 边界编排：start 记基线，end 延迟快照 diff，再按复核窗丢短命进程。
  * 同 session 串行处理最近一次 bash（并发 bash 时后一次覆盖前一次的 pending）。
+ *
+ * pending 必须同步建立：baseline 枚举要 ~1.8s，快速命令（`npm run dev &`）
+ * 的 end 会先到；等 await 完再登记 pending 会把这类边界整个丢掉。
  */
 export class ProcessWatcher {
   private readonly deps: ProcessWatcherDeps;
-  private readonly pending = new Map<
-    SessionId,
-    { state: BashBoundaryState; timer: ReturnType<typeof setTimeout> | null }
-  >();
+  private readonly pending = new Map<SessionId, PendingBoundary>();
   private readonly recheckTimers = new Set<ReturnType<typeof setTimeout>>();
   private disposed = false;
 
@@ -237,16 +257,24 @@ export class ProcessWatcher {
     this.deps = deps;
   }
 
-  /** tool_execution_start（bash）：记 t0 + 基线 S0。 */
+  /** tool_execution_start（bash）：记 t0 + 基线 S0（异步补齐）。 */
   async noteBashStart(sessionId: SessionId, rootPid: number, toolCallId: string): Promise<void> {
     if (this.disposed || rootPid <= 0) return;
-    const baseline = (await this.deps.enumerate()) ?? new Map();
     const existing = this.pending.get(sessionId);
     if (existing?.timer) clearTimeout(existing.timer);
-    this.pending.set(sessionId, {
-      state: { sessionId, rootPid, toolCallId, baseline, startedAt: Date.now() },
+    const entry: PendingBoundary = {
+      state: { sessionId, rootPid, toolCallId, baseline: null, startedAt: Date.now() },
       timer: null,
-    });
+      endedAt: null,
+    };
+    this.pending.set(sessionId, entry);
+    const baseline = (await this.deps.enumerate()) ?? new Map();
+    // 期间被新的 bash 取代 / 会话取消 / 应用退出：旧边界不复活
+    if (this.disposed || this.pending.get(sessionId) !== entry) return;
+    entry.state.baseline = baseline;
+    if (entry.endedAt !== null) {
+      this.armBoundary(entry, WATCH_TIMING.settleMs - (Date.now() - entry.endedAt));
+    }
   }
 
   /**
@@ -259,10 +287,13 @@ export class ProcessWatcher {
     if (!entry) return;
     if (toolCallId !== undefined && entry.state.toolCallId !== toolCallId) return;
     if (entry.timer) clearTimeout(entry.timer);
-    entry.timer = setTimeout(() => {
-      entry.timer = null;
-      void this.resolveBoundary(sessionId);
-    }, WATCH_TIMING.settleMs);
+    entry.timer = null;
+    if (entry.state.baseline === null) {
+      // baseline 还在枚举：先记下 end，baseline 返回后再按剩余 settle 收口
+      entry.endedAt = Date.now();
+      return;
+    }
+    this.armBoundary(entry, WATCH_TIMING.settleMs);
   }
 
   /** 会话 dispose：取消未决边界（不 kill 后台，回收由调用方决定）。 */
@@ -282,13 +313,25 @@ export class ProcessWatcher {
     this.recheckTimers.clear();
   }
 
-  private async resolveBoundary(sessionId: SessionId): Promise<void> {
-    const entry = this.pending.get(sessionId);
-    if (!entry || this.disposed) return;
+  private armBoundary(entry: PendingBoundary, delayMs: number): void {
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(
+      () => {
+        entry.timer = null;
+        void this.resolveBoundary(entry);
+      },
+      Math.max(0, delayMs),
+    );
+  }
+
+  private async resolveBoundary(entry: PendingBoundary): Promise<void> {
+    const { sessionId, baseline } = entry.state;
+    if (this.disposed || this.pending.get(sessionId) !== entry) return;
     this.pending.delete(sessionId);
+    if (!baseline) return;
     const current = await this.deps.enumerate();
     if (!current || this.disposed) return;
-    const rows = diffNewInSubtree(entry.state.baseline, current, entry.state.rootPid);
+    const rows = diffNewInSubtree(baseline, current, entry.state.rootPid, entry.state.startedAt);
     const candidates = pickServiceCandidates(rows);
     for (const row of candidates) {
       // 先活过 1s 复核再登记（设计 §3.1）：短命 helper 直接丢
@@ -302,13 +345,18 @@ export class ProcessWatcher {
     row: ProcessSnapshotRow,
     toolCallId: string,
     step: number,
+    retry = false,
   ): void {
     const delays = WATCH_TIMING.recheckMs;
-    const delay = step === 0 ? delays[0] : delays[step] - delays[step - 1];
+    const delay = retry
+      ? WATCH_TIMING.recheckRetryMs
+      : step === 0
+        ? delays[0]
+        : delays[step] - delays[step - 1];
     const timer = setTimeout(
       () => {
         this.recheckTimers.delete(timer);
-        void this.runRecheck(sessionId, row, toolCallId, step);
+        void this.runRecheck(sessionId, row, toolCallId, step, retry);
       },
       Math.max(0, delay),
     );
@@ -320,10 +368,21 @@ export class ProcessWatcher {
     row: ProcessSnapshotRow,
     toolCallId: string,
     step: number,
+    retried = false,
   ): Promise<void> {
     if (this.disposed) return;
     const snapshot = await this.deps.enumerate();
-    const alive = snapshot?.get(row.pid);
+    if (this.disposed) return;
+    if (!snapshot) {
+      // 枚举失败 ≠ 进程消失：不标 exited。第 0 档重试一次；后续档保留下一档检查
+      if (step === 0 && !retried) {
+        this.scheduleRecheck(sessionId, row, toolCallId, step, true);
+      } else if (step + 1 < WATCH_TIMING.recheckMs.length) {
+        this.scheduleRecheck(sessionId, row, toolCallId, step + 1);
+      }
+      return;
+    }
+    const alive = snapshot.get(row.pid);
     if (!alive) {
       if (step > 0) this.deps.markExited(row.pid, sessionId);
       return;

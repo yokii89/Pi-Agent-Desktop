@@ -1,4 +1,11 @@
-import { FolderOpen, GitPullRequest, Globe, type Icon, PuzzlePiece } from "@phosphor-icons/react";
+import {
+  FolderOpen,
+  GitPullRequest,
+  Globe,
+  type Icon,
+  PuzzlePiece,
+  Terminal,
+} from "@phosphor-icons/react";
 import type { TranslateFn } from "../../../shared/i18n";
 import type { ShortcutsMap } from "../../../shared/shortcuts";
 import type { ViewPanelBadge, ViewPlacementHint } from "../../../shared/view";
@@ -103,6 +110,17 @@ export function buildSidebarFeatures(input: SidebarFeatureInput): SidebarFeature
     icon: GitPullRequest,
     source: "builtin",
     open: isOpen("review") || input.reviewWindowOpen,
+    live: true,
+  });
+
+  features.push({
+    id: "procs",
+    title: t("panels.context.openProcs"),
+    tabTitle: t("panels.context.procs"),
+    description: t("panels.context.openProcsHint"),
+    icon: Terminal,
+    source: "builtin",
+    open: isOpen("procs"),
     live: true,
   });
 

@@ -18,16 +18,16 @@ function input(overrides: Partial<SidebarFeatureInput> = {}): SidebarFeatureInpu
 }
 
 describe("buildSidebarFeatures", () => {
-  it("内置功能按文件/浏览器/审阅排序，关闭浏览器开关后移除浏览器", () => {
+  it("内置功能按文件/浏览器/审阅/后台进程排序，关闭浏览器开关后移除浏览器", () => {
     const all = buildSidebarFeatures(input());
-    expect(all.map((feature) => feature.id)).toEqual(["files", "browser", "review"]);
+    expect(all.map((feature) => feature.id)).toEqual(["files", "browser", "review", "procs"]);
     expect(all[0]?.shortcut).toBe("Ctrl+P");
     expect(all[0]?.title).toBe("panels.context.openFiles");
     expect(all[0]?.tabTitle).toBe("panels.context.files");
     expect(all[1]?.shortcut).toBeUndefined();
 
     const noBrowser = buildSidebarFeatures(input({ browserEnabled: false }));
-    expect(noBrowser.map((feature) => feature.id)).toEqual(["files", "review"]);
+    expect(noBrowser.map((feature) => feature.id)).toEqual(["files", "review", "procs"]);
   });
 
   it("Catalog 行按 id 作为页签身份，live 面板不再生成第二枚页签", () => {
@@ -98,7 +98,7 @@ describe("buildSidebarFeatures", () => {
         allPanels: [{ id: "view-4", panelId: "queue", title: "Queue" }],
       }),
     );
-    expect(addableFeatures(features).map((feature) => feature.id)).toEqual(["browser"]);
+    expect(addableFeatures(features).map((feature) => feature.id)).toEqual(["browser", "procs"]);
   });
 
   it("live 面板的 placementHint.panelBadge 透传为页签/启动页徽章（docs/06 R7）", () => {
