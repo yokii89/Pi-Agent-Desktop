@@ -1,0 +1,200 @@
+/*
+ * 排队托盘（docs/design/93/95）：贴在输入卡正上方的浅色夹层。
+ * 比输入卡窄一档、向下压进 6px：输入卡（.inputBox，z-index:1）盖住托盘底边，
+ * 读起来是「输入框背后抽出的排队抽屉」，而不是两张并列卡片。
+ * 抽屉进出场：.trayClip 高度由 useQueueTrayDrawer 定帧补间，托盘顶对齐随顶缘上移。
+ */
+.trayClip {
+  width: calc(100% - 2 * var(--spacing-md));
+  /* 抵消 .inputStack 的 gap 后再多压 6px，让输入卡盖住托盘底边 */
+  margin: 0 auto calc(-1 * (var(--spacing-sm) + 6px));
+  height: 0;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.trayClip[data-closing] {
+  pointer-events: none;
+}
+
+.tray {
+  width: 100%;
+  padding: 0 0 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  list-style: none;
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 40px;
+  padding: 6px var(--spacing-sm) 6px 6px;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.row + .row {
+  border-top: 1px solid var(--color-border);
+}
+
+.row[data-busy] {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.row[data-dragging] {
+  opacity: 0.35;
+}
+
+/* 拖动期间禁止选中正文：手柄没有 preventDefault，靠这里挡住文本选择 */
+.tray[data-dragging] {
+  user-select: none;
+}
+
+/* 落点线：贴着将被插入的那条边，拖动时替代整行高亮 */
+.row[data-drop="before"] {
+  box-shadow: inset 0 2px 0 var(--color-accent);
+}
+
+.row[data-drop="after"] {
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+.grip {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.grip:hover {
+  color: var(--color-text-strong);
+}
+
+.grip:active {
+  cursor: grabbing;
+}
+
+.grip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.grip:focus-visible {
+  outline: 1px solid var(--color-accent);
+}
+
+/* 不可排序的行也占住手柄位，保证不同行的种类图标同一列 */
+.gripSpacer {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 24px;
+}
+
+.kindIcon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--color-accent);
+}
+
+.row[data-queue-kind="followUp"] .kindIcon {
+  color: var(--color-warning);
+}
+
+.text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.convertBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: var(--radius-overlay-item);
+  background: transparent;
+  /* 小字号动作标签用正文色：浅色档 muted 对白底只有 4.09，达不到 AA */
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.convertBtn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-strong);
+}
+
+.iconBtn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-overlay-item);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-strong);
+}
+
+.convertBtn:disabled,
+.iconBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.convertBtn:focus-visible,
+.iconBtn:focus-visible {
+  outline: 1px solid var(--color-accent);
+}
+
+/* 拖动跟手层：fixed 不受托盘 overflow 裁剪；不参与布局，无过渡（跟指针直接走） */
+.ghost {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 6px var(--spacing-sm) 6px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-overlay-item);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  pointer-events: none;
+}

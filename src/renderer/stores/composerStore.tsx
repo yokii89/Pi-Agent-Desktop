@@ -109,21 +109,12 @@ export function getComposerThinkingLevel(): ThinkingLevelId {
  * 输入栏偏好（思考档位 / @ 文件）。
  * 放在 SessionArea 之上的 Provider：空态↔会话态切换会卸载 TaskInput，
  * 偏好不应因此重置。
- *
- * `nested`：队列编辑卡会再挂一个 ComposerProvider（草稿/附件与主输入栏隔离），
- * 它的档位只是编辑卡的本地状态，不能覆盖组件外读取的模块级镜像。
  */
-export function ComposerProvider({
-  children,
-  nested = false,
-}: {
-  children: ReactNode;
-  nested?: boolean;
-}) {
+export function ComposerProvider({ children }: { children: ReactNode }) {
   const [thinkingLevel, setThinkingLevelState] = useState<ThinkingLevelId>(DEFAULT_THINKING_LEVEL);
   const [thinkingLevels, setThinkingLevelsState] =
     useState<ThinkingLevelId[]>(THINKING_FALLBACK_LEVELS);
-  if (!nested) currentThinkingLevel = thinkingLevel;
+  currentThinkingLevel = thinkingLevel;
   const [fileMentions, setFileMentions] = useState<FileMention[]>([]);
   const [imageAttachments, setImageAttachments] = useState<ComposerImageAttachment[]>([]);
   // 同步镜像：add 要在同一调用栈内返回是否超限，不能依赖 setState 更新器
@@ -135,25 +126,19 @@ export function ComposerProvider({
   const [pendingInsert, setPendingInsert] = useState<{ text: string; seq: number } | null>(null);
   const insertSeqRef = useRef(0);
 
-  const setThinkingLevel = useCallback(
-    (level: ThinkingLevelId) => {
-      // 发送链路在组件外读模块级镜像；状态更新是异步的，这里先落镜像
-      if (!nested) currentThinkingLevel = level;
-      setThinkingLevelState(level);
-    },
-    [nested],
-  );
+  const setThinkingLevel = useCallback((level: ThinkingLevelId) => {
+    // 发送链路在组件外读模块级镜像；状态更新是异步的，这里先落镜像
+    currentThinkingLevel = level;
+    setThinkingLevelState(level);
+  }, []);
 
-  const syncThinkingState = useCallback(
-    (level: ThinkingLevelId, available: ThinkingLevelId[]) => {
-      if (!nested) currentThinkingLevel = level;
-      setThinkingLevelState(level);
-      if (available.length > 0) {
-        setThinkingLevelsState((prev) => (sameLevels(prev, available) ? prev : available));
-      }
-    },
-    [nested],
-  );
+  const syncThinkingState = useCallback((level: ThinkingLevelId, available: ThinkingLevelId[]) => {
+    currentThinkingLevel = level;
+    setThinkingLevelState(level);
+    if (available.length > 0) {
+      setThinkingLevelsState((prev) => (sameLevels(prev, available) ? prev : available));
+    }
+  }, []);
 
   const addFileMention = useCallback((item: FileMention) => {
     setFileMentions((prev) => {

@@ -96,6 +96,19 @@ export const SEND_MOTION = {
 } as const;
 
 /**
+ * 排队托盘进出场（docs/design/95，方案 1「抽屉升出」）：
+ * 高度 0→实测 H 的定帧补间，顶缘带着托盘自己的边框上移，底边始终被输入卡压住；
+ * 队列增减时用 resize 续接，收起比展开快。收起曲线为缓入（起步慢、收尾利落）。
+ */
+export const QUEUE_TRAY_MOTION = {
+  enter: 0.26,
+  exit: 0.19,
+  /** 队列条数变化（展开态追加 / 交付）的高度续接。 */
+  resize: 0.18,
+  easeIn: [0.4, 0, 1, 1],
+} as const;
+
+/**
  * 冷启动进度条（PiColdStartBar，docs/会话进程懒加载方案 §4.2）：
  * 分段轨道爬行到 90% 封顶，进程就绪后补到 100% 再淡出卸载。
  */

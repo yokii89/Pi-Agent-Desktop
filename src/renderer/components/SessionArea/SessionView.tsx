@@ -21,7 +21,6 @@ import { AssistantMessage } from "./AssistantMessage";
 import { FileEditsSummary } from "./FileEditsSummary";
 import { FirstTokenWaiter } from "./FirstTokenWaiter";
 import { QuestionRail } from "./QuestionRail";
-import { QueueTail } from "./QueueTail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { SelectionToolbar } from "./SelectionToolbar";
 import styles from "./SessionView.module.css";
@@ -253,8 +252,6 @@ export function SessionView() {
                 <StreamMount key={stream.id} entry={stream} />
               ))}
               {showWaiter && <FirstTokenWaiter />}
-              {/* 未交付的排队消息永远挂在流尾；交付后由 store 落成普通用户条目 */}
-              <QueueTail />
             </>
           )}
         </div>

@@ -42,12 +42,6 @@ interface ToolbarProps {
   /** 运行中排队发送：等价 Enter（默认稍后；输入 /steer 时插话）（docs/design/73）。 */
   onQueueSend: () => void;
   onStop: () => void;
-  /** 队列编辑：工具栏左侧出现「取消」文字按钮（保存走发送键）。 */
-  onCancel?: () => void;
-  /** 队列编辑：发送键恒为上箭头，不随会话 running 形变成停止方块。 */
-  sendRunning?: boolean;
-  /** 队列编辑：+ 菜单隐藏「附件」（pi 队列只存文本，附件无处落）。 */
-  attachEnabled?: boolean;
 }
 
 /** 底部工具栏：+ / 访问模式 / 模型 / 思考档位 / 发送（docs/用户对话栏/4–7、docs/design/14）。 */
@@ -59,15 +53,11 @@ export function TaskInputToolbar({
   onSend,
   onQueueSend,
   onStop,
-  onCancel,
-  sendRunning,
-  attachEnabled = true,
 }: ToolbarProps) {
   const t = useT();
   const { thinkingLevel, thinkingLevels, setThinkingLevel } = useComposerStore();
   const { modelLabel, processAlive, refreshModelState } = useSessionMeta();
   const attachInputRef = useRef<HTMLInputElement | null>(null);
-  const flowRunning = sendRunning ?? running;
 
   const onAttachInputChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,16 +95,12 @@ export function TaskInputToolbar({
           </button>
         )}
         items={[
-          ...(attachEnabled
-            ? [
-                {
-                  key: "attach",
-                  label: t("session.input.attach"),
-                  icon: <Paperclip size={16} weight="regular" />,
-                  onSelect: () => attachInputRef.current?.click(),
-                },
-              ]
-            : []),
+          {
+            key: "attach",
+            label: t("session.input.attach"),
+            icon: <Paperclip size={16} weight="regular" />,
+            onSelect: () => attachInputRef.current?.click(),
+          },
           {
             key: "mention",
             label: t("session.input.mention"),
@@ -134,7 +120,7 @@ export function TaskInputToolbar({
 
       <div className={styles.spacer} />
 
-      {flowRunning && (
+      {running && (
         <span className={styles.runningMark} title={t("session.input.running")}>
           <Spinner size={16} weight="regular" className={styles.spin} />
         </span>
@@ -150,7 +136,7 @@ export function TaskInputToolbar({
         alive={processAlive}
       />
 
-      {flowRunning && canSend && (
+      {running && canSend && (
         <button
           type="button"
           className={styles.queueSendBtn}
@@ -161,17 +147,7 @@ export function TaskInputToolbar({
           <PaperPlaneRight size={18} weight="regular" />
         </button>
       )}
-      {onCancel && (
-        <button
-          type="button"
-          className={styles.cancelBtn}
-          title={t("session.queue.cancel")}
-          onClick={onCancel}
-        >
-          {t("session.queue.cancel")}
-        </button>
-      )}
-      <SendButton running={flowRunning} canSend={canSend} onSend={onSend} onStop={onStop} />
+      <SendButton running={running} canSend={canSend} onSend={onSend} onStop={onStop} />
     </div>
   );
 }

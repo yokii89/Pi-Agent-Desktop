@@ -43,11 +43,11 @@ import {
   claimFile,
   clearAttention,
   clearStartPending,
+  convertQueueItem,
   createBucketsState,
   deliveredQueueTexts,
   deriveRunningFiles,
   dropFileIndex,
-  editQueueItem,
   emptyBucket,
   ensureBucket,
   findCommandBorrowSessionId,
@@ -56,7 +56,9 @@ import {
   isFileProcessAlive,
   isFileRunning,
   loadMessagesIntoBucket,
+  moveQueueItem,
   patchBucket,
+  removeQueueItem,
   type SessionAttentionKind,
   type SessionBucketsState,
   type SessionPhase,
@@ -192,28 +194,28 @@ interface SessionTranscriptValue {
 
 /**
  * 会话队列：只在快照真正变化时换引用。
- * 队列动作是用户触发的突发（撤销 / 编辑会连清带排产生一串 queue_update），
- * 放进低频 meta 会让每个 meta 消费方跟着重渲染，单开一条 context 只唤 QueueTail。
+ * 队列动作是用户触发的突发（重排会连清带排产生一串 queue_update），
+ * 放进低频 meta 会让每个 meta 消费方跟着重渲染，单开一条 context 只唤 QueueTray。
  */
 interface SessionQueueValue {
   /** active 桶的 pi 队列快照（插话 / 稍后）。 */
   queue: PiQueuedMessages;
-  /**
-   * 单条撤销：全清后取回该条文本到输入框，其余按原序重新排队。
-   * `source` 是发起时该条原文，用于队列已变化时放弃；失败/放弃自行 toast。
-   */
-  withdrawQueuedItem: (kind: QueueIntent, index: number, source: string) => Promise<boolean>;
-  /**
-   * 单条编辑：全清后原位置替换该条文本（队列顺序不变），其余按原序重新排队。
-   * `source` 是发起时该条原文，`text` 是新文本；失败/放弃自行 toast。
-   */
-  editQueuedItem: (
-    kind: QueueIntent,
-    index: number,
-    source: string,
-    text: string,
-  ) => Promise<boolean>;
+  /** 正在执行 clear_queue 重写（单条动作的瞬态空快照不算最后一条离开）。 */
+  queueClearing: boolean;
+  /** 编辑：全清后取回该条文本到主输入栏，其余按原序重新排队。 */
+  takeBackQueuedItem: (kind: QueueIntent, index: number, source: string) => Promise<boolean>;
+  /** 删除：全清后移除该条，不回填输入栏。 */
+  discardQueuedItem: (kind: QueueIntent, index: number, source: string) => Promise<boolean>;
+  /** 插话 ⇄ 稍后：全清后移到另一队列末尾。 */
+  convertQueuedItem: (kind: QueueIntent, index: number, source: string) => Promise<boolean>;
+  /** 同种类内换位（拖动 / 键盘）；`to` 是移除后的最终下标。 */
+  moveQueuedItem: (kind: QueueIntent, from: number, to: number, source: string) => Promise<boolean>;
 }
+
+/** 队列重排结果：removed 是目标条原文（排序动作为 null），null 表示队列已变化。 */
+type QueueRewrite = (
+  cleared: PiQueuedMessages,
+) => { steering: string[]; followUp: string[]; removed: string | null } | null;
 
 /** 无队列时的稳定空快照（避免队列 context 每次渲染换引用）。 */
 const EMPTY_QUEUE: PiQueuedMessages = { steering: [], followUp: [] };
@@ -384,8 +386,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   activeKeyRef.current = bucketsState.activeKey;
   /** 待用新会话 id（docs/design/44 A2）：点击"新建会话"即对它预热，发送时消费。 */
   const pendingNewChatRef = useRef<{ cwd: string | null; id: SessionId } | null>(null);
-  /** 在途的单条撤销/编辑：stop 等它落定再 abort，避免重排的消息在停止后开新一轮。 */
-  const queueEditInFlightRef = useRef<Promise<boolean> | null>(null);
+  /** 在途的单条队列动作：stop 等它落定再 abort，避免重排的消息在停止后开新一轮。 */
+  const queueActionInFlightRef = useRef<Promise<boolean> | null>(null);
+  /**
+   * 正在执行「停止 = 取回队列再 abort」的层数：期间拒绝新的队列动作，
+   * 否则 clear_queue 与重排交错，取回文本后 stop 的 abort 又让重排消息开了新一轮。
+   */
+  const queueStopsRef = useRef(0);
 
   const activeBucket = getActiveBucket(bucketsState);
   const phase = activeBucket?.phase ?? "empty";
@@ -1614,60 +1621,55 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       bucket && bucket.queue.steering.length + bucket.queue.followUp.length > 0,
     );
     setState((prev) => applyEntries(prev, id, { type: "userStop" }));
-    if (!hasQueued && !queueEditInFlightRef.current) {
+    if (!hasQueued && !queueActionInFlightRef.current) {
       sessionService.stop(id);
       return;
     }
     // pi 的 abort 不清队列：先取回排队文本（回填输入框），再中止，避免停止后继续跑。
-    // 单条编辑在途时等它落定：编辑会把队列重新排入，先 abort 会让重排的消息在停止后开新一轮。
+    // 队列动作在途时等它落定：重排会把队列重新排入，先 abort 会让重排的消息在停止后开新一轮。
+    queueStopsRef.current += 1;
     void (async () => {
-      if (queueEditInFlightRef.current) await queueEditInFlightRef.current;
-      const still = bucketsStateRef.current.buckets.get(id);
-      if (still && still.queue.steering.length + still.queue.followUp.length > 0) {
-        const cleared = await clearQueue(id);
-        if (cleared) {
-          const texts = [...cleared.steering, ...cleared.followUp];
-          if (texts.length > 0) appendToComposer(texts.join("\n\n"));
-        } else {
-          const again = bucketsStateRef.current.buckets.get(id);
-          if (again && again.queue.steering.length + again.queue.followUp.length > 0) {
-            showToast(t("session.queue.stopClearFailed"));
+      try {
+        if (queueActionInFlightRef.current) await queueActionInFlightRef.current;
+        const still = bucketsStateRef.current.buckets.get(id);
+        if (still && still.queue.steering.length + still.queue.followUp.length > 0) {
+          const cleared = await clearQueue(id);
+          if (cleared) {
+            const texts = [...cleared.steering, ...cleared.followUp];
+            if (texts.length > 0) appendToComposer(texts.join("\n\n"));
+          } else {
+            const again = bucketsStateRef.current.buckets.get(id);
+            if (again && again.queue.steering.length + again.queue.followUp.length > 0) {
+              showToast(t("session.queue.stopClearFailed"));
+            }
           }
         }
+        sessionService.stop(id);
+      } finally {
+        queueStopsRef.current = Math.max(0, queueStopsRef.current - 1);
       }
-      sessionService.stop(id);
     })();
   }, [appendToComposer, clearQueue, setState, showToast]);
 
   /**
-   * 单条撤销 / 编辑的共同路径（docs/design/73）：pi 只有全量 clear_queue，
-   * 单条动作 = 清空全部 → 客户端重排（`replacement` null 移除 / 字符串替换）→
-   * 按 steering → followUp 顺序逐条重新 `prompt(streamingBehavior)`（与快照展示顺序一致）。
+   * 单条队列动作的共同路径（docs/design/93）：pi 只有全量 clear_queue，
+   * 单条动作 = 清空全部 → 客户端重排 → 按 steering → followUp 顺序逐条重新
+   * `prompt(streamingBehavior)`（与托盘展示顺序一致）。
    * 重新排队期间保持 queueClearing：清空的迟到空快照不会被当成交付；
    * 入队事件先于 prompt 响应写出（pi 单线程 stdout），循环结束时快照已全部就位。
+   * `onSuccess` 收到的 removed 是目标条原文（排序动作为 null）。
    */
-  const applyQueueItemAction = useCallback(
+  const applyQueueRewrite = useCallback(
     async (
-      kind: QueueIntent,
-      index: number,
-      source: string,
-      replacement: string | null,
+      rewrite: QueueRewrite,
+      onSuccess: (removed: string | null) => void,
     ): Promise<boolean> => {
       const id = activeKeyRef.current;
       if (!id) return false;
-      const bucket = bucketsStateRef.current.buckets.get(id);
-      if (!bucket) return false;
-      const list = kind === "steer" ? bucket.queue.steering : bucket.queue.followUp;
-      if (index < 0 || index >= list.length || list[index] !== source) {
-        // 渲染到点击之间队列变了：位置量已经指不准，宁可不做也不改错条目
-        showToast(t("session.queue.stale"));
-        return false;
-      }
-
       const cleared = await clearQueue(id);
       if (!cleared) return false;
-      const edited = editQueueItem(cleared, kind, index, source, replacement);
-      if (!edited) {
+      const next = rewrite(cleared);
+      if (!next) {
         // 清空往返期间该条已交付、下标指到了别人：整队文本回填输入框，一条都不能丢
         const texts = [...cleared.steering, ...cleared.followUp];
         if (texts.length > 0) appendToComposer(texts.join("\n\n"));
@@ -1675,8 +1677,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return false;
       }
       const toQueue: Array<{ kind: QueueIntent; text: string }> = [
-        ...edited.steering.map((text) => ({ kind: "steer" as const, text })),
-        ...edited.followUp.map((text) => ({ kind: "followUp" as const, text })),
+        ...next.steering.map((text) => ({ kind: "steer" as const, text })),
+        ...next.followUp.map((text) => ({ kind: "followUp" as const, text })),
       ];
 
       setState((prev) =>
@@ -1700,12 +1702,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           showToast(t("session.queue.editFailed"));
           return false;
         }
-        if (replacement === null) {
-          appendToComposer(edited.removed);
-          showToast(t("session.queue.withdrawn"));
-        } else {
-          showToast(t("session.queue.editSaved"));
-        }
+        onSuccess(next.removed);
         return true;
       } finally {
         setState((prev) =>
@@ -1716,33 +1713,69 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [appendToComposer, clearQueue, setState, showToast],
   );
 
-  /** 单条撤销：同一会话内同一时刻只允许一个单条动作（UI 侧另有 busy 拦截）。 */
-  const withdrawQueuedItem = useCallback(
-    (kind: QueueIntent, index: number, source: string): Promise<boolean> => {
-      if (queueEditInFlightRef.current) return Promise.resolve(false);
-      const task = applyQueueItemAction(kind, index, source, null);
-      queueEditInFlightRef.current = task;
+  /** 队列动作串行化：同一会话内同一时刻只允许一个单条动作。 */
+  const runQueueAction = useCallback(
+    (rewrite: QueueRewrite, onSuccess: (removed: string | null) => void): Promise<boolean> => {
+      if (queueActionInFlightRef.current || queueStopsRef.current > 0) {
+        return Promise.resolve(false);
+      }
+      const task = applyQueueRewrite(rewrite, onSuccess);
+      queueActionInFlightRef.current = task;
       void task.finally(() => {
-        queueEditInFlightRef.current = null;
+        queueActionInFlightRef.current = null;
       });
       return task;
     },
-    [applyQueueItemAction],
+    [applyQueueRewrite],
   );
 
-  const editQueuedItem = useCallback(
-    (kind: QueueIntent, index: number, source: string, text: string): Promise<boolean> => {
-      const next = text.trim();
-      // 空文本没有语义（排队气泡不能是空的），原样保留该条
-      if (!next || next === source || queueEditInFlightRef.current) return Promise.resolve(false);
-      const task = applyQueueItemAction(kind, index, source, next);
-      queueEditInFlightRef.current = task;
-      void task.finally(() => {
-        queueEditInFlightRef.current = null;
-      });
-      return task;
-    },
-    [applyQueueItemAction],
+  /** 编辑：取回该条文本到主输入栏，其余按原序重新排队。 */
+  const takeBackQueuedItem = useCallback(
+    (kind: QueueIntent, index: number, source: string): Promise<boolean> =>
+      runQueueAction(
+        (cleared) => removeQueueItem(cleared, kind, index, source),
+        (removed) => {
+          if (removed) appendToComposer(removed);
+          showToast(t("session.queue.editingReturned"));
+        },
+      ),
+    [appendToComposer, runQueueAction, showToast],
+  );
+
+  /** 删除：移除该条，文字不回填。 */
+  const discardQueuedItem = useCallback(
+    (kind: QueueIntent, index: number, source: string): Promise<boolean> =>
+      runQueueAction(
+        (cleared) => removeQueueItem(cleared, kind, index, source),
+        () => showToast(t("session.queue.deleted")),
+      ),
+    [runQueueAction, showToast],
+  );
+
+  /** 插话 ⇄ 稍后：移到另一队列末尾。 */
+  const convertQueuedItem = useCallback(
+    (kind: QueueIntent, index: number, source: string): Promise<boolean> =>
+      runQueueAction(
+        (cleared) => convertQueueItem(cleared, kind, index, source),
+        () =>
+          showToast(
+            kind === "steer" ? t("session.queue.toFollowUpDone") : t("session.queue.toSteerDone"),
+          ),
+      ),
+    [runQueueAction, showToast],
+  );
+
+  /** 同种类内换位（拖动 / 键盘）。 */
+  const moveQueuedItem = useCallback(
+    (kind: QueueIntent, from: number, to: number, source: string): Promise<boolean> =>
+      runQueueAction(
+        (cleared) => {
+          const next = moveQueueItem(cleared, kind, from, to, source);
+          return next ? { ...next, removed: null } : null;
+        },
+        () => undefined,
+      ),
+    [runQueueAction],
   );
 
   const entries: SessionEntry[] = activeBucket?.entries ?? [];
@@ -2119,10 +2152,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const queueValue = useMemo<SessionQueueValue>(
     () => ({
       queue: activeBucket?.queue ?? EMPTY_QUEUE,
-      withdrawQueuedItem,
-      editQueuedItem,
+      queueClearing: activeBucket?.queueClearing ?? false,
+      takeBackQueuedItem,
+      discardQueuedItem,
+      convertQueuedItem,
+      moveQueuedItem,
     }),
-    [activeBucket?.queue, withdrawQueuedItem, editQueuedItem],
+    [
+      activeBucket?.queue,
+      activeBucket?.queueClearing,
+      takeBackQueuedItem,
+      discardQueuedItem,
+      convertQueuedItem,
+      moveQueuedItem,
+    ],
   );
 
   return (

@@ -7,10 +7,10 @@ import { useGlidePill } from "../../hooks/useGlidePill";
 import { useT } from "../../hooks/useT";
 import { fsService } from "../../services/fsService";
 import { useBrowserStore } from "../../stores/browserStore";
-import { type FileMention, useComposerStore } from "../../stores/composerStore";
+import { useComposerStore } from "../../stores/composerStore";
 import { useExtensionViewStore } from "../../stores/extensionViewStore";
 import { useProjectStore } from "../../stores/projectStore";
-import { useSessionMeta } from "../../stores/sessionStore";
+import { useSessionMeta, useSessionQueue } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
 import {
   createFileAttachmentId,
@@ -49,30 +49,13 @@ type SlashGroupItem = PiSlashCommand | LocalSlashCommand;
 
 interface TaskInputProps {
   variant: "empty" | "session";
-  /** queueEdit：编辑排队消息形态（docs/design/73）。 */
-  mode?: "session" | "queueEdit";
-  /** queueEdit：打开时的草稿文本（队列原文）。 */
-  initialText?: string;
-  /** queueEdit：保存（Enter / 发送键）；返回 false 表示失败、保留编辑态。 */
-  onQueueEditSubmit?: (text: string, fileMentions: FileMention[]) => boolean | Promise<boolean>;
-  /** queueEdit：取消（工具栏「取消」按钮 / Esc）。 */
-  onQueueEditCancel?: () => void;
 }
 
 /**
  * 任务输入栏：empty 显示工作区/Git 顶栏；running/idle 为底部停靠精简版。
  * 元素芯片内联嵌在文本中间；@ 文件与 / 命令走上方建议列表。
- * queueEdit 形态供排队气泡原位编辑复用：同一张输入卡（含 / @ 建议与工具栏），
- * 但保存改走 onQueueEditSubmit、取消走按钮/Esc（见 QueueTail）。
  */
-export function TaskInput({
-  variant,
-  mode = "session",
-  initialText,
-  onQueueEditSubmit,
-  onQueueEditCancel,
-}: TaskInputProps) {
-  const isQueueEdit = mode === "queueEdit";
+export function TaskInput({ variant }: TaskInputProps) {
   const t = useT();
   const { phase, send, stop, getSlashCommands, switchingTo, modelInput, modelLabel } =
     useSessionMeta();
@@ -143,6 +126,9 @@ export function TaskInput({
   // （docs/design/08 §12.1；floating widget 与 modal 同属阻断交互）
   const { hasBlockingViewFor, modeTransitioning, sendBlockedReason } = useExtensionViewStore();
   const { activeSessionId } = useSessionMeta();
+  const { queue } = useSessionQueue();
+  // 排队托盘占住输入卡上方时，伙伴会压住托盘右侧的编辑/删除，先收起来
+  const queueOccupied = queue.steering.length + queue.followUp.length > 0;
   // 仅阻断「当前会话」的 floating 表单；新建空态（activeSessionId=null）不因后台问卷禁用输入
   const hasBlockingView = hasBlockingViewFor(activeSessionId);
 
@@ -170,18 +156,16 @@ export function TaskInput({
   const queueSendingRef = useRef(false);
   const cwd = currentProject?.dir ?? null;
 
-  const placeholder = isQueueEdit
-    ? t("session.queue.editPlaceholder")
-    : switching
-      ? t("session.restoring")
-      : modeTransitioning
-        ? (sendBlockedReason ?? t("session.input.placeholder.switchingMode"))
-        : running
-          ? // running 可编辑草稿的外显（docs/design/12 P1-1 / 13 P2-2）：能力不靠 toast 才被发现
-            t("session.input.placeholder.runningDraft")
-          : variant === "empty"
-            ? t("session.input.placeholder.ask")
-            : t("session.input.placeholder.followUp");
+  const placeholder = switching
+    ? t("session.restoring")
+    : modeTransitioning
+      ? (sendBlockedReason ?? t("session.input.placeholder.switchingMode"))
+      : running
+        ? // running 可编辑草稿的外显（docs/design/12 P1-1 / 13 P2-2）：能力不靠 toast 才被发现
+          t("session.input.placeholder.runningDraft")
+        : variant === "empty"
+          ? t("session.input.placeholder.ask")
+          : t("session.input.placeholder.followUp");
 
   useEffect(() => {
     if (chatElements.length > prevLenRef.current) setFocusSeq((n) => n + 1);
@@ -250,11 +234,10 @@ export function TaskInput({
     );
   }, [suggest, slashCommands]);
 
-  /** 本地命令（/steer）：查询为空或命中名称/说明时展示，不依赖 pi 命令表加载。
-      队列编辑不展示：条目已在队列里，插话/稍后归属由原队列种类决定。 */
+  /** 本地命令（/steer）：查询为空或命中名称/说明时展示，不依赖 pi 命令表加载。 */
   const localCommands = useMemo<LocalSlashCommand[]>(
-    () => (isQueueEdit ? [] : [{ name: "steer", description: t("session.queue.steerDesc") }]),
-    [isQueueEdit, t],
+    () => [{ name: "steer", description: t("session.queue.steerDesc") }],
+    [t],
   );
 
   /** 本地命令在前（输入栏命令 /steer），随后按 pi source 分组：命令（extension/prompt）与技能（skill）。 */
@@ -317,16 +300,6 @@ export function TaskInput({
   useEffect(() => {
     composerRef.current?.focus();
   }, []);
-
-  // queueEdit 草稿预填：appendText 写入并把光标放到末尾；StrictMode 双跑用 ref 挡一次
-  const prefilledRef = useRef(false);
-  useEffect(() => {
-    if (!isQueueEdit || !initialText || prefilledRef.current) return;
-    const composer = composerRef.current;
-    if (!composer) return;
-    prefilledRef.current = true;
-    composer.appendText(initialText);
-  }, [isQueueEdit, initialText]);
 
   // 会话流「添加到对话栏」（docs/design/12）：消费待引用文本追加进编辑器，seq 由 store 保证单次
   useEffect(() => {
@@ -426,17 +399,6 @@ export function TaskInput({
   const doSend = async (): Promise<void> => {
     const composer = composerRef.current;
     if (!composer) return;
-    if (isQueueEdit) {
-      const { text: rawText, fileMentions: orderedFiles } = composer.read();
-      const body = rawText.trim();
-      if (!body && orderedFiles.length === 0) return;
-      // @ 芯片序列化为 @displayPath 文本（队列只存文本，附件入口已隐藏）
-      const finalText = formatFileMentionPrompt(rawText, orderedFiles);
-      const ok = await onQueueEditSubmit?.(finalText, orderedFiles);
-      // false = 失败保留编辑态；成功由父级收起编辑并卸载本卡
-      if (ok === false) return;
-      return;
-    }
     // modal 打开时忽略发送（abort 仍可用，走 toolbar stop）；切换中同样忽略
     if (hasBlockingView || switching) {
       buddyRef.current?.nudge("angry");
@@ -795,7 +757,7 @@ export function TaskInput({
                 : t("session.input.suggestKeysSlash")}
             </p>
           )}
-          {suggest.kind === "slash" && running && !isQueueEdit && (
+          {suggest.kind === "slash" && running && (
             <p className={styles.suggestFooter}>{t("session.queue.slashHint")}</p>
           )}
         </div>
@@ -806,8 +768,8 @@ export function TaskInput({
         data-max={thinkingAtTop ? "" : undefined}
       >
         {/* 动物伙伴：骑在输入卡右上沿，纯装饰；姿态只跟随会话状态（设置 → 个性化）。
-            队列编辑不渲染：伙伴是会话输入卡的专属装饰。 */}
-        {!isQueueEdit && (
+            排队托盘展开时收起，避免压住托盘右侧动作。 */}
+        {!queueOccupied && (
           <InputBuddy
             ref={buddyRef}
             kind={inputBuddy}
@@ -819,7 +781,7 @@ export function TaskInput({
         )}
 
         {/* 思考等级顶档特效：顶档 = 当前模型可用档位的最高档（左下起辉走 .inputBox[data-max]::before） */}
-        {thinkingAtTop && !isQueueEdit && <ThinkingMaxAura />}
+        {thinkingAtTop && <ThinkingMaxAura />}
 
         {variant === "empty" && <TaskInputContextBar />}
 
@@ -852,18 +814,13 @@ export function TaskInput({
             fileMentions={fileMentions}
             onRemoveFileMention={removeFileMention}
             onSend={() => void doSend()}
-            onImages={
-              isQueueEdit
-                ? () => showToast(t("session.queue.editNoAttach"))
-                : (blobs, names) => void onImages(blobs, names)
-            }
-            onFiles={isQueueEdit ? () => showToast(t("session.queue.editNoAttach")) : onAttachFiles}
+            onImages={(blobs, names) => void onImages(blobs, names)}
+            onFiles={onAttachFiles}
             onContentChange={setHasContent}
             onTextChange={onComposerTextChange}
             insertTrigger={insertTrigger}
             onEnterIntercept={onEnterIntercept}
             onSuggestKey={onSuggestKey}
-            onEscape={isQueueEdit ? onQueueEditCancel : undefined}
             placeholder={placeholder}
             // 编辑锁定与发送解锁分离（docs/design/12 P1-1）：running 期间可编辑草稿，
             // 发送由 canSend / doSend 拦截，只有阻断浮层与会话切换锁编辑
@@ -879,14 +836,11 @@ export function TaskInput({
             onSend={() => void doSend()}
             onQueueSend={() => void doSend()}
             onStop={stop}
-            onCancel={isQueueEdit ? onQueueEditCancel : undefined}
-            sendRunning={isQueueEdit ? false : undefined}
-            attachEnabled={!isQueueEdit}
           />
         </div>
         {/* 运行态边框流光：只挂在会话态输入卡上，running 时点亮；
             纯装饰层，不参与布局，也不拦截输入/点击。 */}
-        {variant === "session" && !isQueueEdit && (
+        {variant === "session" && (
           <div
             className={styles.runBorder}
             data-active={running ? "true" : "false"}

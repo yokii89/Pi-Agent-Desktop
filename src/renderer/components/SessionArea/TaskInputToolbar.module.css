@@ -40,30 +40,6 @@
   color: var(--color-text-muted);
 }
 
-/* 队列编辑的取消入口：磨砂玻璃按钮（glass 配方），贴发送键左侧，与发送键同高 */
-.cancelBtn {
-  composes: glass from "../../styles/glass.module.css";
-  display: inline-flex;
-  align-items: center;
-  height: 34px;
-  padding: 0 14px;
-  margin-right: var(--spacing-xs);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-md);
-  color: var(--color-text);
-  flex-shrink: 0;
-  white-space: nowrap;
-  transition:
-    color 150ms ease,
-    border-color 150ms ease;
-}
-
-.cancelBtn:hover {
-  color: var(--color-text-strong);
-  border-color: var(--color-accent);
-}
-
 .iconBtn:hover:not(:disabled) {
   background: var(--color-bg-hover);
   color: var(--color-text);

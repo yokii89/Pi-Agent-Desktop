@@ -126,32 +126,69 @@ export function sameQueue(a: PiQueuedMessages, b: PiQueuedMessages): boolean {
 }
 
 /**
- * 单条撤销 / 编辑的「全清后客户端重排」（docs/design/73）：pi 只有全量 clear_queue，
- * 单条动作 = 取回全部 → 替换/移除目标条 → 其余按原序重新排队。
- * `replacement` 为 null 表示移除该条（撤销）；为字符串表示原位置替换（编辑），
- * 两份队列的顺序均不变（如 [插话A, 插话B, 稍后C] 编辑 A→a 后仍为 [插话a, 插话B, 稍后C]）。
+ * 单条队列动作的「全清后客户端重排」（docs/design/93）：pi 只有全量 clear_queue，
+ * 单条动作 = 取回全部 → 在本地快照上改一处 → 其余按原序重新排队。
  * `expected` 是发起动作时该位置的原文：清空往返期间若有消息交付，下标会指向另一条，
  * 对不上就返回 null 让调用方放弃，绝不改错条目。
- * 返回目标条的原文与重排结果；下标越界或原文不符返回 null。
  */
-export function editQueueItem(
+function queueAt(
   cleared: PiQueuedMessages,
   kind: QueueIntent,
   index: number,
   expected: string,
-  replacement: string | null,
-): { removed: string; steering: string[]; followUp: string[] } | null {
-  const key = kind === "steer" ? "steering" : "followUp";
-  const list = cleared[key];
+): string | null {
+  const list = kind === "steer" ? cleared.steering : cleared.followUp;
   if (index < 0 || index >= list.length) return null;
-  if (list[index] !== expected) return null;
-  const removed = list[index];
+  return list[index] === expected ? list[index] : null;
+}
+
+/** 移除一条（编辑取回 / 删除），其余顺序不变。 */
+export function removeQueueItem(
+  cleared: PiQueuedMessages,
+  kind: QueueIntent,
+  index: number,
+  expected: string,
+): { removed: string; steering: string[]; followUp: string[] } | null {
+  if (queueAt(cleared, kind, index, expected) === null) return null;
   const steering = [...cleared.steering];
   const followUp = [...cleared.followUp];
-  const target = key === "steering" ? steering : followUp;
-  if (replacement === null) target.splice(index, 1);
-  else target[index] = replacement;
-  return { removed, steering, followUp };
+  (kind === "steer" ? steering : followUp).splice(index, 1);
+  return { removed: expected, steering, followUp };
+}
+
+/** 插话 ⇄ 稍后：从原队列移除，追加到目标队列末尾（display 顺序 = steering → followUp）。 */
+export function convertQueueItem(
+  cleared: PiQueuedMessages,
+  kind: QueueIntent,
+  index: number,
+  expected: string,
+): { removed: string; steering: string[]; followUp: string[] } | null {
+  const removed = removeQueueItem(cleared, kind, index, expected);
+  if (!removed) return null;
+  if (kind === "steer") removed.followUp.push(expected);
+  else removed.steering.push(expected);
+  return { removed: expected, steering: removed.steering, followUp: removed.followUp };
+}
+
+/** 同一种类内拖动 / 键盘换位；`to` 是移除后的最终下标。跨种类换位走 convertQueueItem。 */
+export function moveQueueItem(
+  cleared: PiQueuedMessages,
+  kind: QueueIntent,
+  from: number,
+  to: number,
+  expected: string,
+): { steering: string[]; followUp: string[] } | null {
+  const list = kind === "steer" ? cleared.steering : cleared.followUp;
+  if (queueAt(cleared, kind, from, expected) === null) return null;
+  if (to < 0 || to >= list.length || to === from) {
+    return { steering: [...cleared.steering], followUp: [...cleared.followUp] };
+  }
+  const steering = [...cleared.steering];
+  const followUp = [...cleared.followUp];
+  const target = kind === "steer" ? steering : followUp;
+  const [item] = target.splice(from, 1);
+  target.splice(to, 0, item);
+  return { steering, followUp };
 }
 
 export function createBucketsState(): SessionBucketsState {

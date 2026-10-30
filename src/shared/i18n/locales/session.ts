@@ -75,44 +75,42 @@ export const sessionMessages = defineMessages({
     "zh-CN": "已停止；排队消息可能继续执行",
     "en-US": "Stopped; queued messages may still run",
   },
-  "session.queue.steerBadge": {
-    "zh-CN": "排队中 · 插话",
-    "en-US": "Queued · steering",
-  },
-  "session.queue.followUpBadge": {
-    "zh-CN": "排队中 · 稍后",
-    "en-US": "Queued · follow-up",
-  },
-  /* 气泡内徽标只写种类（与正文同行），完整状态挂在 aria-label 上 */
+  "session.queue.trayLabel": { "zh-CN": "排队消息", "en-US": "Queued messages" },
+  /* 行内种类；切换按钮写的是目标状态（follow-up 行显示「插话」） */
   "session.queue.steerLabel": { "zh-CN": "插话", "en-US": "Steering" },
   "session.queue.followUpLabel": { "zh-CN": "稍后", "en-US": "Follow-up" },
-  "session.queue.undo": { "zh-CN": "撤销", "en-US": "Withdraw" },
-  "session.queue.undoHint": {
-    "zh-CN": "撤销这条排队消息：文字回到输入框，其余保持原顺序",
-    "en-US": "Withdraw this queued message; its text goes back to the input, the rest keep order",
+  "session.queue.toSteerHint": {
+    "zh-CN": "改为插话：在本轮下一次模型调用前送达",
+    "en-US": "Make it steering: delivered before the next model call of this run",
   },
+  "session.queue.toFollowUpHint": {
+    "zh-CN": "改为稍后：本轮结束后处理",
+    "en-US": "Make it a follow-up: handled after this run ends",
+  },
+  "session.queue.toSteerDone": { "zh-CN": "已改为插话", "en-US": "Changed to steering" },
+  "session.queue.toFollowUpDone": { "zh-CN": "已改为稍后", "en-US": "Changed to follow-up" },
   "session.queue.edit": { "zh-CN": "编辑", "en-US": "Edit" },
   "session.queue.editHint": {
-    "zh-CN": "原地修改这条排队消息（顺序不变）",
-    "en-US": "Edit this queued message in place (order stays)",
+    "zh-CN": "编辑：取回这条消息到输入栏重新编辑",
+    "en-US": "Edit: take this message back to the input",
   },
-  "session.queue.save": { "zh-CN": "保存", "en-US": "Save" },
-  "session.queue.cancel": { "zh-CN": "取消", "en-US": "Cancel" },
-  "session.queue.editPlaceholder": {
-    "zh-CN": "编辑这条排队消息，Enter 保存",
-    "en-US": "Edit this queued message, Enter to save",
+  "session.queue.delete": { "zh-CN": "删除", "en-US": "Delete" },
+  "session.queue.deleteHint": {
+    "zh-CN": "删除这条排队消息（不回到输入栏）",
+    "en-US": "Delete this queued message (it won't return to the input)",
   },
-  "session.queue.editNoAttach": {
-    "zh-CN": "排队消息只保存文本，编辑不支持附件",
-    "en-US": "Queued messages are text-only; attachments aren't supported in edit",
+  "session.queue.deleted": {
+    "zh-CN": "已删除这条排队消息",
+    "en-US": "Queued message deleted",
   },
-  "session.queue.withdrawn": {
-    "zh-CN": "已撤销 1 条排队消息，文字回到输入框",
-    "en-US": "Withdrew 1 queued message; its text is back in the input",
+  "session.queue.editingReturned": {
+    "zh-CN": "已取回这条排队消息，文字回到输入栏",
+    "en-US": "Queued message taken back; its text is back in the input",
   },
-  "session.queue.editSaved": {
-    "zh-CN": "已更新这条排队消息",
-    "en-US": "Queued message updated",
+  "session.queue.reorder": { "zh-CN": "拖动排序", "en-US": "Reorder" },
+  "session.queue.reorderHint": {
+    "zh-CN": "拖动调整同类消息的顺序；也可用 ↑ / ↓",
+    "en-US": "Drag to reorder messages of the same kind; ↑ / ↓ also work",
   },
   "session.queue.editFailed": {
     "zh-CN": "排队消息未能全部排回，剩余文字已回到输入框",

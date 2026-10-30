@@ -6,18 +6,20 @@ import {
   claimFile,
   clearAttention,
   clearStartPending,
+  convertQueueItem,
   createBucketsState,
   deliveredQueueTexts,
   deriveRunningFiles,
   dropFileIndex,
-  editQueueItem,
   emptyBucket,
   ensureBucket,
   findCommandBorrowSessionId,
   isFileProcessAlive,
   isFileRunning,
   loadMessagesIntoBucket,
+  moveQueueItem,
   patchBucket,
+  removeQueueItem,
   sameQueue,
   setActiveKey,
   setAttention,
@@ -126,50 +128,69 @@ describe("queue delivery diff (docs/design/73)", () => {
     ).toEqual(["same", "same"]);
   });
 
-  it("edits a queued item in place and keeps the order of both queues", () => {
-    expect(editQueueItem({ steering: ["A", "B"], followUp: ["C"] }, "steer", 0, "A", "a")).toEqual({
-      removed: "A",
-      steering: ["a", "B"],
+  it("removes a queued item without reordering the rest", () => {
+    expect(removeQueueItem({ steering: ["A", "B"], followUp: ["C"] }, "steer", 1, "B")).toEqual({
+      removed: "B",
+      steering: ["A"],
       followUp: ["C"],
     });
-    expect(
-      editQueueItem({ steering: ["A", "B"], followUp: ["C"] }, "followUp", 0, "C", "c"),
-    ).toEqual({
-      removed: "C",
-      steering: ["A", "B"],
-      followUp: ["c"],
-    });
-  });
-
-  it("withdraws an item without reordering the rest", () => {
-    expect(editQueueItem({ steering: ["A", "B"], followUp: ["C"] }, "steer", 1, "B", null)).toEqual(
-      {
-        removed: "B",
-        steering: ["A"],
-        followUp: ["C"],
-      },
-    );
-    expect(
-      editQueueItem({ steering: ["A"], followUp: ["C", "D"] }, "followUp", 0, "C", null),
-    ).toEqual({
+    expect(removeQueueItem({ steering: ["A"], followUp: ["C", "D"] }, "followUp", 0, "C")).toEqual({
       removed: "C",
       steering: ["A"],
       followUp: ["D"],
     });
   });
 
+  it("converts a follow-up to steering by appending to the steering queue", () => {
+    expect(convertQueueItem({ steering: ["A"], followUp: ["C", "D"] }, "followUp", 0, "C")).toEqual(
+      {
+        removed: "C",
+        steering: ["A", "C"],
+        followUp: ["D"],
+      },
+    );
+  });
+
+  it("converts a steering item back to the follow-up tail", () => {
+    expect(convertQueueItem({ steering: ["A", "B"], followUp: ["C"] }, "steer", 0, "A")).toEqual({
+      removed: "A",
+      steering: ["B"],
+      followUp: ["C", "A"],
+    });
+  });
+
+  it("moves an item within its own queue and leaves the other queue alone", () => {
+    expect(
+      moveQueueItem({ steering: ["A", "B", "C"], followUp: ["D"] }, "steer", 0, 2, "A"),
+    ).toEqual({
+      steering: ["B", "C", "A"],
+      followUp: ["D"],
+    });
+    expect(moveQueueItem({ steering: ["A"], followUp: ["C", "D"] }, "followUp", 1, 0, "D")).toEqual(
+      {
+        steering: ["A"],
+        followUp: ["D", "C"],
+      },
+    );
+  });
+
+  it("treats a same-index move as a no-op", () => {
+    expect(moveQueueItem({ steering: ["A", "B"], followUp: [] }, "steer", 1, 1, "B")).toEqual({
+      steering: ["A", "B"],
+      followUp: [],
+    });
+  });
+
   it("rejects out-of-range indexes", () => {
-    expect(editQueueItem({ steering: ["A"], followUp: [] }, "steer", 1, "x", "y")).toBeNull();
-    expect(editQueueItem({ steering: [], followUp: [] }, "followUp", 0, "x", null)).toBeNull();
+    expect(removeQueueItem({ steering: ["A"], followUp: [] }, "steer", 1, "x")).toBeNull();
+    expect(removeQueueItem({ steering: [], followUp: [] }, "followUp", 0, "x")).toBeNull();
+    expect(moveQueueItem({ steering: ["A"], followUp: [] }, "steer", 2, 0, "A")).toBeNull();
   });
 
   it("rejects a stale index whose text no longer matches (delivery raced the clear)", () => {
-    expect(editQueueItem({ steering: ["B"], followUp: [] }, "steer", 0, "A", null)).toBeNull();
-    expect(editQueueItem({ steering: ["A"], followUp: [] }, "steer", 0, "A", "A2")).toEqual({
-      removed: "A",
-      steering: ["A2"],
-      followUp: [],
-    });
+    expect(removeQueueItem({ steering: ["B"], followUp: [] }, "steer", 0, "A")).toBeNull();
+    expect(convertQueueItem({ steering: ["B"], followUp: [] }, "steer", 0, "A")).toBeNull();
+    expect(moveQueueItem({ steering: ["B"], followUp: [] }, "steer", 0, 0, "A")).toBeNull();
   });
 
   it("treats byte-identical snapshots as unchanged (skip redundant renders)", () => {

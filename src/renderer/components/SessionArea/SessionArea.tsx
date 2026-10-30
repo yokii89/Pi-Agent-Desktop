@@ -4,6 +4,7 @@ import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
 import { WidgetMountAbove, WidgetMountBelow } from "../ExtensionView/ExtensionViewHost";
 import { BackgroundProcsCard } from "./BackgroundProcs/BackgroundProcsCard";
+import { QueueTray } from "./QueueTray";
 import styles from "./SessionArea.module.css";
 import { SessionView } from "./SessionView";
 import { TaskInput } from "./TaskInput";
@@ -46,6 +47,7 @@ export function SessionArea() {
           <div className={styles.dockedInput}>
             <div className={styles.inputStack} ref={inputStackRef}>
               <WidgetMountAbove />
+              <QueueTray />
               <TaskInput variant="session" />
               <WidgetMountBelow />
             </div>
