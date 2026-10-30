@@ -1,8 +1,6 @@
-/* 与输入栏同宽并居中：卡片在文档流列（比输入栏宽 100px）里按输入栏上限收口，
-   两侧边界与悬浮输入框对齐。 */
+/* 与输入栏同宽并居中：文档流列宽已与输入栏共用同一令牌，卡片直接铺满列即可对齐。 */
 .card {
-  width: min(100%, var(--session-input-column-cap));
-  margin-inline: auto;
+  width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-bg-surface);

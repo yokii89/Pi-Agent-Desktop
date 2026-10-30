@@ -19,7 +19,7 @@ import { WelcomeSplash } from "./WelcomeSplash";
  */
 export function SessionArea() {
   const { phase } = useSessionMeta();
-  const { terminalPanelVisible } = useUiStore();
+  const { terminalPanelVisible, rightSidebarOpen } = useUiStore();
   const isEmpty = phase === "empty";
   const runningRef = useRef<HTMLDivElement>(null);
   const inputStackRef = useRef<HTMLDivElement>(null);
@@ -42,7 +42,8 @@ export function SessionArea() {
         </div>
       ) : (
         <div className={styles.running} ref={runningRef}>
-          <BackgroundProcsCard />
+          {/* 右侧栏收起时后台进程由会话监控卡接管（同一份登记表，避免两块卡同时挂进程列表） */}
+          {rightSidebarOpen ? <BackgroundProcsCard /> : null}
           <SessionView />
           <div className={styles.dockedInput}>
             <div className={styles.inputStack} ref={inputStackRef}>

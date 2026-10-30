@@ -1,0 +1,271 @@
+/**
+ * 右侧会话监控卡（docs/design/96）。
+ *
+ * 卡底 = 中央会话区的背景色（--color-bg），**不用玻璃**：它要把自己读成
+ * 「会话区往右多出来的一栏」，而不是又一块浮在正文上的面板；只有顶部
+ * 「本轮概述」块浮起一档（--color-bg-surface），把摘要与下面的分区列表分开。
+ *
+ * 宽度 = 停靠层宽度（--session-monitor-width，与侧栏同值）减右侧 16px——
+ * 其中 8px 是滚动条槽、8px 是呼吸间距，于是对话流的滚动条落在卡片右侧，
+ * 卡片也不会压住它。色值/间距/字号一律走 tokens。
+ */
+.card {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  /* max()：收起补间结尾时 "停靠层宽 − 16px" 会短暂为负（负 width 在计算值时失效、
+     退化成 auto），夹到 0 才能让宽度随补间单调收敛 */
+  width: max(0px, calc(var(--session-monitor-width) - var(--spacing-md)));
+  max-height: calc(100% - var(--spacing-md) * 2);
+  margin: var(--spacing-md) var(--spacing-md) var(--spacing-md) 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  /* 停靠层是 pointer-events:none（要漏过去让右侧滚动条可拖），卡片自己重新接管指针 */
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+/* 卡头 + 摘要合成一块「本轮概述」：整张卡里唯一一块有底色的区域，
+   比下面的分区列表浮起一档 */
+.hero {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--color-bg-surface);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.headTitle {
+  overflow: hidden;
+  color: var(--color-text-strong);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headMeta {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* 内容区独立滚动：卡片高度受视口约束，长会话的产出/来源再多也不把卡撑出窗口 */
+.body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  min-height: 0;
+  padding: var(--spacing-md);
+  overflow-y: auto;
+}
+
+.summary {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.badge {
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  /* 行底色向内出血 6px，图标槽与分区标题仍然同一条左边线 */
+  margin: 0 calc(-1 * var(--spacing-xs) - 2px);
+  padding: 3px calc(var(--spacing-xs) + 2px);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+
+.row:hover {
+  background: var(--color-bg-hover);
+}
+
+/* 可点击行（改动 → 右侧栏审阅）：内边距交给按钮，行本身只承担列表与悬浮底色 */
+.rowActionable {
+  padding: 0;
+}
+
+.rowAction {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  padding: 3px calc(var(--spacing-xs) + 2px);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowAction:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.iconTile {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+}
+
+.rowText {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowTextMuted {
+  color: var(--color-text-muted);
+}
+
+.rowTrailing {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.diffStat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+}
+
+.add {
+  color: var(--color-success);
+}
+
+.del {
+  color: var(--color-danger);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-success);
+}
+
+.running {
+  color: var(--color-text-muted);
+}
+
+/* 停止按钮的可见性交给 CSS（:hover / :focus-within），animation 中断也不会
+   让键盘用户聚焦到一个透明元素上；行内紧凑，不占常驻宽度以外的空间 */
+.stopButton {
+  padding: 1px 6px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  visibility: hidden;
+}
+
+.row:hover .stopButton,
+.row:focus-within .stopButton {
+  visibility: visible;
+}
+
+.stopButton:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-strong);
+}
+
+.stopButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.rowError {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}

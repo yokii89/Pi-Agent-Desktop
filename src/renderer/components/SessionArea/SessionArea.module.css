@@ -47,11 +47,12 @@
 
 /* 会话进行中，输入框悬浮停靠在底部（终端面板展开时贴住面板边框，见 .inputFlush）。
    右内缩一个滚动条槽宽：文档流内容区被 .scroll 的 scrollbar-gutter 让掉了这 8px，
-   不补的话输入栏比会话列整体偏右 4px，同宽的卡片边界对不齐。 */
+   不补的话输入栏比会话列整体偏右 4px，同宽的卡片边界对不齐。
+   再让开会话监控卡（docs/design/96）的停靠层，输入栏才能在可见区域真正居中。 */
 .dockedInput {
   position: absolute;
   left: 0;
-  right: var(--scrollbar-size);
+  right: calc(var(--scrollbar-size) + var(--session-monitor-width));
   bottom: var(--session-input-offset);
   display: flex;
   justify-content: center;

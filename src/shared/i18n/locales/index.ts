@@ -2,10 +2,12 @@ import type { Catalog, LocaleId, MessageDefs } from "../types";
 import { browserMessages } from "./browser";
 import { chromeMessages } from "./chrome";
 import { commandPaletteMessages } from "./commandPalette";
+import { commitDialogMessages } from "./commitDialog";
 import { commonMessages } from "./common";
 import { contextMessages } from "./context";
 import { extensionMessages } from "./extensions";
 import { mcpMessages } from "./mcp";
+import { monitorMessages } from "./monitor";
 import { notificationMessages } from "./notification";
 import { panelMessages } from "./panels";
 import { procMessages } from "./proc";
@@ -26,6 +28,8 @@ const ALL_DEFS: MessageDefs = {
   ...browserMessages,
   ...extensionMessages,
   ...mcpMessages,
+  ...monitorMessages,
+  ...commitDialogMessages,
   ...notificationMessages,
   ...procMessages,
   ...uiMessages,

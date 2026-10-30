@@ -33,6 +33,13 @@ export function formatAbsoluteTime(timestampMs: number): string {
   ].join(" ");
 }
 
+/** 钟点（监控卡的「更新于」）：本地时区 HH:mm；跨天信息由会话日期承担，这里不补日期。 */
+export function formatClockTime(timestampMs: number): string {
+  if (!timestampMs) return "";
+  const at = new Date(timestampMs);
+  return `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
+}
+
 /** 紧凑用时（run 头 / 工具行）：`12s` / `1m 04s` / `3h 23m 33s`。 */
 export function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));

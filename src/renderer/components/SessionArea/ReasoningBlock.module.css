@@ -19,11 +19,15 @@
   font-size: var(--session-stream-font-sm);
   text-align: left;
   cursor: pointer;
+  transition: color 120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .head:hover {
-  color: var(--color-text);
-  background: var(--color-bg-hover);
+  color: var(--color-accent);
+}
+
+.head:active {
+  color: var(--color-accent-hover);
 }
 
 .head:focus-visible {
@@ -41,14 +45,14 @@
 }
 
 .meta {
-  /* 贴在标题右侧，不推到行末 */
+  /* 贴在标题右侧，不推到行末；不写 color —— 跟着 .head 的悬浮态一起转主题色 */
   flex-shrink: 0;
   font-family: var(--font-family-mono);
   font-size: var(--session-stream-font-sm);
-  color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
   display: inline-flex;
   align-items: center;
+  transition: color 120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .pulse {

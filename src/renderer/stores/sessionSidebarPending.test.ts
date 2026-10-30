@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SessionSummary } from "../../shared/ipc";
+import type { SessionId, SessionSummary } from "../../shared/ipc";
 import { emptyBucket, type SessionPhase } from "./sessionBuckets";
 import { mergeSessionLists, pickClaimedFile } from "./sessionStore";
 
@@ -22,6 +22,19 @@ function bucketPatch(
     cwd: patch.cwd ?? null,
     entries: entries as never,
   });
+}
+
+/** 发送瞬间登记的乐观行（store 里由 upsertPendingSummary 产出）。 */
+function seedRow(sessionId: string, firstUserMessage: string, at: number): SessionSummary {
+  return {
+    file: `pending:${sessionId}`,
+    id: sessionId,
+    startedAt: at,
+    updatedAt: at,
+    firstUserMessage,
+    sessionName: null,
+    cwd: null,
+  };
 }
 
 describe("mergeSessionLists optimistic pending rows", () => {
@@ -81,6 +94,34 @@ describe("mergeSessionLists optimistic pending rows", () => {
   it("skips empty buckets with no user text and not running", () => {
     const buckets = new Map([["s1", bucketPatch("s1", {})]]);
     expect(mergeSessionLists([], buckets)).toEqual([]);
+  });
+
+  it("keeps the row registered at send time while the bucket is still empty", () => {
+    // 冷启动期间：桶既没有用户消息也没 running，只有发送瞬间登记的乐观行能撑住侧栏
+    const buckets = new Map([["s1", bucketPatch("s1", {})]]);
+    const rows = new Map<SessionId, SessionSummary>([["s1", seedRow("s1", "帮我写个函数", 1000)]]);
+    const merged = mergeSessionLists([], buckets, undefined, rows);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].file).toBe("pending:s1");
+    expect(merged[0].firstUserMessage).toBe("帮我写个函数");
+    expect(merged[0].startedAt).toBe(1000);
+  });
+
+  it("prefers the bucket's own first user message over the registered row", () => {
+    const buckets = new Map([["s1", bucketPatch("s1", { firstUser: "真实的气泡文本" })]]);
+    const rows = new Map<SessionId, SessionSummary>([["s1", seedRow("s1", "登记的旧文本", 1000)]]);
+    expect(mergeSessionLists([], buckets, undefined, rows)[0].firstUserMessage).toBe(
+      "真实的气泡文本",
+    );
+  });
+
+  it("ignores the registered row once the real JSONL is claimed", () => {
+    const buckets = new Map([
+      ["s1", bucketPatch("s1", { sessionFile: "/tmp/real.jsonl", firstUser: "hello" })],
+    ]);
+    const rows = new Map<SessionId, SessionSummary>([["s1", seedRow("s1", "hello", 1000)]]);
+    const merged = mergeSessionLists([], buckets, undefined, rows);
+    expect(merged.every((s) => !s.file.startsWith("pending:"))).toBe(true);
   });
 
   it("pending row uses the name recorded before the JSONL is claimed", () => {

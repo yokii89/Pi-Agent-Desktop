@@ -1,9 +1,11 @@
 /* 中央会话区右上角后台进程悬浮卡片（docs/design/37 §4.3）。
-   视觉只用 tokens；贴 .running 右上，不挤压正文列宽。 */
+   视觉只用 tokens；贴 .running 右上，不挤压正文列宽。
+   右缘偏置同样让开会话监控卡（docs/design/96）：侧栏收起时这张卡让位，
+   但侧栏展开的补间期间两者可能短暂共存，同一基准线避免重叠。 */
 .card {
   position: absolute;
   top: var(--spacing-md);
-  right: var(--spacing-lg);
+  right: calc(var(--spacing-lg) + var(--session-monitor-width));
   z-index: calc(var(--z-input-overlay) - 1);
   display: flex;
   flex-direction: column;

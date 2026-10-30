@@ -12,6 +12,7 @@ import type { ProjectSessionGroup } from "../../utils/sessionGroups";
 import { HistoryList } from "./HistoryList";
 import { RevealOnRowHover } from "./RevealOnRowHover";
 import { deleteItem, openFolderItem, RowMenu } from "./RowMenu";
+import { noteNewPendingSessions } from "./revealPending";
 import { SectionHeader } from "./SectionHeader";
 import styles from "./SideNav.module.css";
 
@@ -21,7 +22,8 @@ interface ProjectListProps {
 
 /**
  * 侧边栏项目列表：项目 = 本地目录。整行为展开/收起名下历史会话的开关（同时切换项目上下文），
- * 悬浮行显示操作（更多 / 新建会话）；展开态在应用生命周期内保持，分区默认展开（展示全部项目）。
+ * 悬浮行显示操作（更多 / 新建会话）；展开态在应用生命周期内保持，分区默认展开（展示全部项目），
+ * 单个项目默认收起，但新会话落进该项目时自动展开。
  */
 export const ProjectList = memo(function ProjectList({ groups }: ProjectListProps) {
   const t = useT();
@@ -32,6 +34,24 @@ export const ProjectList = memo(function ProjectList({ groups }: ProjectListProp
   const collapse = useCollapseAnimation<HTMLDivElement, HTMLUListElement>(expanded);
   // 白名单记录被手动展开的项目；项目默认收起（首次打开软件不展开历史会话）
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
+  const seenPendingRef = useRef(new Set<string>());
+
+  // 发送瞬间的乐观行按 cwd 落进归属项目；那一档项目是收起的话行在数据里也看不见，所以自动揭开
+  useEffect(() => {
+    const revealed: string[] = [];
+    for (const group of groups) {
+      if (noteNewPendingSessions(group.sessions, seenPendingRef.current)) {
+        revealed.push(group.project.id);
+      }
+    }
+    if (revealed.length === 0) return;
+    setExpanded(true);
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of revealed) next.add(id);
+      return next;
+    });
+  }, [groups]);
 
   // 回调必须引用稳定：ProjectRow 是 memo 组件，回调换身份会让所有项目行跟着重渲染
   const toggleProject = useCallback((id: string): void => {

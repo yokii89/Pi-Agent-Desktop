@@ -283,6 +283,9 @@ function firstUserTextOf(entries: SessionEntry[]): string | null {
  * 磁盘历史 + 未落盘会话的乐观侧栏条目。
  * 新会话在 pi 写出 JSONL 前也要能立刻出现在左侧列表。
  * 注意：sessionFile 为 pending: 占位时仍视为「未落盘」。
+ * `pendingRows` 是发送瞬间登记的乐观行（按 sessionId）：冷启动期间桶还没有
+ * 用户消息、也还没 running，只有它能撑住这一行，否则侧栏的乐观行会被
+ * 桶变更后的重算冲掉，要等进程起完才出现。
  */
 export function mergeSessionLists(
   disk: SessionSummary[],
@@ -298,29 +301,32 @@ export function mergeSessionLists(
     }
   >,
   pendingNames?: ReadonlyMap<string, string | null>,
+  pendingRows?: ReadonlyMap<SessionId, SessionSummary>,
 ): SessionSummary[] {
   const pending: SessionSummary[] = [];
   for (const bucket of buckets.values()) {
     const realFile =
       bucket.sessionFile && !isPendingFile(bucket.sessionFile) ? bucket.sessionFile : null;
     if (realFile) continue;
-    const firstUser = firstUserTextOf(bucket.entries);
+    const seed = pendingRows?.get(bucket.sessionId) ?? null;
+    const firstUser = firstUserTextOf(bucket.entries) ?? seed?.firstUserMessage ?? null;
     const interesting =
       Boolean(firstUser) ||
       bucket.processAlive ||
       bucket.phase === "running" ||
-      Boolean(bucket.sessionFile && isPendingFile(bucket.sessionFile));
+      Boolean(bucket.sessionFile && isPendingFile(bucket.sessionFile)) ||
+      seed != null;
     if (!interesting) continue;
-    const now = Date.now();
     const file =
       bucket.sessionFile && isPendingFile(bucket.sessionFile)
         ? bucket.sessionFile
         : pendingFileKey(bucket.sessionId);
+    const now = Date.now();
     pending.push({
       file,
       id: bucket.sessionId,
-      startedAt: now,
-      updatedAt: now,
+      startedAt: seed?.startedAt ?? now,
+      updatedAt: seed?.updatedAt ?? now,
       firstUserMessage: firstUser ?? "新会话",
       sessionName: pendingNames?.get(file) ?? null,
       cwd: bucket.cwd,
@@ -379,6 +385,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const allSessionsRef = useRef<SessionSummary[]>([]);
   /** 未落盘会话的名字（pending key → name）；认领真实文件后随 pi JSONL 走。 */
   const pendingNamesRef = useRef<Map<string, string | null>>(new Map());
+  /**
+   * 发送瞬间登记的乐观侧栏行（sessionId → 摘要）。
+   * 桶侧要等冷启动返回、乐观气泡落桶才「有趣」，中间任何一次侧重算都会把行冲掉，
+   * 所以这一行必须有独立于桶 state 的登记；认领到真实 JSONL 或启动失败时撤销。
+   */
+  const pendingRowsRef = useRef<Map<SessionId, SessionSummary>>(new Map());
   const cwdRef = useRef<string | undefined>(undefined);
   cwdRef.current = currentProject?.dir;
   /** 高频动作只读 ref，避免 useCallback 依赖桶 state 导致闭包过期。 */
@@ -451,17 +463,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const diskSessionsRef = useRef<SessionSummary[]>([]);
   const refreshTimerRef = useRef<number | null>(null);
 
-  const applyDiskSessions = useCallback((disk: SessionSummary[]): SessionSummary[] => {
-    diskSessionsRef.current = disk;
-    allSessionsRef.current = disk;
-    const merged = mergeSessionLists(
-      disk,
-      bucketsStateRef.current.buckets,
-      pendingNamesRef.current,
-    );
-    setAllSessions(merged);
-    return disk;
+  /**
+   * 侧栏行 = 磁盘 + 未落盘桶（含发送瞬间登记的乐观行）。
+   * 桶已经不在了（进程结束 / 迁移）就撤销登记，避免留下没有归属的行。
+   */
+  const buildSidebarRows = useCallback((disk: SessionSummary[]): SessionSummary[] => {
+    const buckets = bucketsStateRef.current.buckets;
+    for (const sessionId of pendingRowsRef.current.keys()) {
+      if (!buckets.has(sessionId)) pendingRowsRef.current.delete(sessionId);
+    }
+    return mergeSessionLists(disk, buckets, pendingNamesRef.current, pendingRowsRef.current);
   }, []);
+
+  const applyDiskSessions = useCallback(
+    (disk: SessionSummary[]): SessionSummary[] => {
+      diskSessionsRef.current = disk;
+      allSessionsRef.current = disk;
+      setAllSessions(buildSidebarRows(disk));
+      return disk;
+    },
+    [buildSidebarRows],
+  );
 
   /**
    * 单个会话改名：真实文件同时改磁盘快照（否则下一次 rematerialize 会把名字冲掉）；
@@ -480,14 +502,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   /** 桶状态变化后重算侧栏（不发起 listAll）。 */
   const rematerializeSidebar = useCallback((): void => {
-    setAllSessions(
-      mergeSessionLists(
-        diskSessionsRef.current,
-        bucketsStateRef.current.buckets,
-        pendingNamesRef.current,
-      ),
-    );
-  }, []);
+    setAllSessions(buildSidebarRows(diskSessionsRef.current));
+  }, [buildSidebarRows]);
 
   /**
    * 桶提交后再刷新侧栏。
@@ -531,6 +547,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         cwd,
       };
       setAllSessions((prev) => [summary, ...prev.filter((s) => s.file !== file)]);
+      pendingRowsRef.current.set(sessionId, summary);
     },
     [],
   );
@@ -539,6 +556,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const dropPendingSummary = useCallback((sessionId: SessionId): void => {
     const file = pendingFileKey(sessionId);
     pendingNamesRef.current.delete(file);
+    pendingRowsRef.current.delete(sessionId);
     setAllSessions((prev) => prev.filter((s) => s.file !== file));
   }, []);
 
@@ -594,6 +612,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           const pendingName = pendingNamesRef.current.get(pendingKey) ?? null;
           const diskMatch = sessions.find((s) => s.file === claimed);
           pendingNamesRef.current.delete(pendingKey);
+          pendingRowsRef.current.delete(sessionId);
           const optimistic: SessionSummary = {
             file: claimed,
             id: sessionId,

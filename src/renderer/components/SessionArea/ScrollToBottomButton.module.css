@@ -1,6 +1,8 @@
 .jump {
   position: absolute;
-  right: 12px;
+  /* 让开会话监控卡（docs/design/96）：停靠层盖住窗口右缘那条窄带，
+     不加上这个变量，按钮会被卡片压住、既看不见也点不到（长会话恰恰最需要它）。 */
+  right: calc(12px + var(--session-monitor-width));
   bottom: 12px;
   height: 30px;
   min-width: 30px;

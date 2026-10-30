@@ -263,6 +263,8 @@ type UiAction =
   | { type: "setReviewWindowOpen"; open: boolean }
   /** 按当前形态打开审查：停靠态切侧栏 tab，浮窗态开浮窗。 */
   | { type: "openReview" }
+  /** 固定落在右侧栏打开审查：浮窗形态先收回停靠，再聚焦审查页签。 */
+  | { type: "openReviewDocked" }
   /** 浮窗 ⇄ 停靠 互切，保持审查可见。 */
   | { type: "toggleReviewMode" }
   | {
@@ -501,6 +503,15 @@ function uiReducer(state: UiState, action: UiAction): UiState {
         return applyTabState(state, openTab(state, "review"));
       }
       return state.reviewWindowOpen ? state : { ...state, reviewWindowOpen: true };
+    case "openReviewDocked": {
+      // 入口明确要求停在右侧栏（如监控卡的改动行）：浮窗形态先收回停靠再聚焦页签
+      // （与头部「形态互切」一致：切回停靠时浮窗关闭），不留下一个空侧栏。
+      const base: UiState =
+        state.reviewMode === "docked"
+          ? state
+          : { ...state, reviewMode: "docked", reviewWindowOpen: false };
+      return applyTabState(base, openTab(base, "review"));
+    }
     case "toggleReviewMode": {
       if (state.reviewMode === "docked") {
         // 停靠 → 浮窗：浮窗接手显示；侧栏移除审查页签，避免留下空面板
@@ -559,6 +570,8 @@ interface UiStoreValue extends UiState {
   closeCommandPalette: () => void;
   /** 打开代码审查（按当前形态：停靠切侧栏 tab，浮窗开浮窗）。 */
   openReview: () => void;
+  /** 打开代码审查并固定停在右侧栏（浮窗形态会收回停靠）。 */
+  openReviewDocked: () => void;
   /** 关闭代码审查浮窗（仅浮窗形态；停靠形态经页签关闭）。 */
   closeReviewWindow: () => void;
   /** 浮窗 ⇄ 停靠互切（审查头部按钮）。 */
@@ -685,6 +698,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     [],
   );
   const openReview = useCallback(() => dispatch({ type: "openReview" }), []);
+  const openReviewDocked = useCallback(() => dispatch({ type: "openReviewDocked" }), []);
   const closeReviewWindow = useCallback(
     () => dispatch({ type: "setReviewWindowOpen", open: false }),
     [],
@@ -706,6 +720,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
       openCommandPalette,
       closeCommandPalette,
       openReview,
+      openReviewDocked,
       closeReviewWindow,
       toggleReviewMode,
     }),
@@ -720,6 +735,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
       openCommandPalette,
       closeCommandPalette,
       openReview,
+      openReviewDocked,
       closeReviewWindow,
       toggleReviewMode,
     ],

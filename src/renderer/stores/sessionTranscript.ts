@@ -145,8 +145,9 @@ export interface EditsFileStat {
 }
 
 /**
- * 本轮文件编辑汇总卡：run 收口时由成功的 edit/write 工具结果聚合，
+ * 本轮文件编辑汇总卡：收口时由成功的 edit/write 工具结果聚合，
  * 出现在该轮文档流末尾（历史装载同样生成，保证恢复会话可回看）。
+ * 一个用户轮内只有一张：自动重试跨多个 run 时按整轮合并（docs/design/97）。
  */
 export interface EditsSummaryEntry {
   kind: "editsSummary";
@@ -760,8 +761,9 @@ function accumulateRunUsage(entries: SessionEntry[], usage: PiUsage | undefined)
 }
 
 function openRun(entries: SessionEntry[]): SessionEntry[] {
-  // 开新 run 前收口上一轮：若上一轮以 error 收束且尚未终态，保留 failed 而不是强写 completed
-  const next = closeOpenRuns(entries, statusFromLastError(entries));
+  // 开新 run 前收口上一轮：若上一轮以 error 收束且尚未终态，保留 failed 而不是强写 completed。
+  // 这里**不落编辑汇总卡**：会重开 run 说明还要续跑，本轮没结束（docs/design/97）。
+  const next = closeOpenRuns(entries, statusFromLastError(entries), false);
   return [
     ...next,
     {
@@ -896,7 +898,7 @@ function applyRetryEnd(
 }
 
 function closeRun(entries: SessionEntry[], status: RunStatus): SessionEntry[] {
-  return closeOpenRuns(entries, status);
+  return closeOpenRuns(entries, status, true);
 }
 
 /** 用户可见的 run 终态收口：failed 时补齐唯一错误卡。 */
@@ -905,7 +907,16 @@ function finalizeRun(entries: SessionEntry[], status: RunStatus): SessionEntry[]
   return status === "failed" ? ensureFinalErrorCard(closed) : closed;
 }
 
-function closeOpenRuns(entries: SessionEntry[], status: RunStatus): SessionEntry[] {
+/**
+ * 收口仍在运行的 run。`emitEdits` 决定是否落「本轮文件编辑汇总卡」：
+ * 只有真收口（agent_settled / 用户中断）落卡，`openRun` 给上一个 attempt 补的
+ * 收口不落——重试还要续跑，那不算本轮终点（docs/design/97）。
+ */
+function closeOpenRuns(
+  entries: SessionEntry[],
+  status: RunStatus,
+  emitEdits: boolean,
+): SessionEntry[] {
   const next = [...entries];
   for (let i = next.length - 1; i >= 0; i -= 1) {
     const entry = next[i];
@@ -926,7 +937,7 @@ function closeOpenRuns(entries: SessionEntry[], status: RunStatus): SessionEntry
         endedAt,
       );
       const closedStreams = markAssistantStreamsClosed(closedTools);
-      return appendEditsSummary(closedStreams, i);
+      return emitEdits ? upsertTurnEditsSummary(closedStreams) : closedStreams;
     }
     if (entry.kind === "run") break;
   }
@@ -957,7 +968,7 @@ function fileEditKey(path: string): string {
 }
 
 /**
- * 从 run 之后的 assistant 块收集成功落地的文件编辑。
+ * 从一个用户轮的起点开始收集成功落地的文件编辑（跨该轮内的多个 run）。
  * 只认 toolKind 为 edit/write 且 status=ok 的 change 载荷；
  * 同一文件多次编辑按路径合并累加。
  */
@@ -989,10 +1000,25 @@ function collectFileEdits(entries: SessionEntry[], fromIndex: number): EditsFile
   return [...byPath.values()];
 }
 
-/** run 收口后追加文件编辑汇总卡；无编辑则原样返回。 */
-function appendEditsSummary(entries: SessionEntry[], runIndex: number): SessionEntry[] {
-  const files = collectFileEdits(entries, runIndex + 1);
-  if (files.length === 0) return entries;
+/**
+ * 落卡 / 刷新一轮的文件编辑汇总卡：**同轮只保留一张**，原地摘除旧卡后追加到本轮末尾。
+ * 收集范围按用户轮（`findTurnStart`）而不是按 run——自动重试会跨多个 run，
+ * 按 run 收会把一整轮拆成几张「只改了 1 个文件」的误导卡（docs/design/97）。
+ * 复用旧卡 id：展开态等组件内状态不被重建冲掉。
+ */
+function upsertTurnEditsSummary(entries: SessionEntry[]): SessionEntry[] {
+  const turnStart = findTurnStart(entries);
+  let existingId: string | null = null;
+  for (let i = entries.length - 1; i >= turnStart; i -= 1) {
+    const entry = entries[i];
+    if (entry && entry.kind === "editsSummary") {
+      existingId = entry.id;
+      break;
+    }
+  }
+  const files = collectFileEdits(entries, turnStart);
+  const withoutOld = existingId ? entries.filter((entry) => entry.id !== existingId) : entries;
+  if (files.length === 0) return withoutOld;
   let totalAdditions = 0;
   let totalDeletions = 0;
   for (const file of files) {
@@ -1000,10 +1026,10 @@ function appendEditsSummary(entries: SessionEntry[], runIndex: number): SessionE
     totalDeletions += file.deletions;
   }
   return [
-    ...entries,
+    ...withoutOld,
     {
       kind: "editsSummary",
-      id: uid(),
+      id: existingId ?? uid(),
       files,
       totalAdditions,
       totalDeletions,
@@ -1418,7 +1444,7 @@ function entriesFromMessages(messages: PiChatMessage[], sessionStartedAt?: numbe
           status === "completed" ? "ok" : "cancelled",
           resolvedEnd,
         );
-        const withSummary = appendEditsSummary(closed, i);
+        const withSummary = upsertTurnEditsSummary(closed);
         entries.length = 0;
         entries.push(...withSummary);
         return;

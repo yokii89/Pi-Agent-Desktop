@@ -247,6 +247,34 @@ import { Play } from "@phosphor-icons/react";
 - 两者都遵守：首次挂载不播动画、`prefers-reduced-motion` 直接落终态（`glide()` 内建）、
   补间的中间产物（inline overflow、动画高度 state）落定后清干净。
 
+### 右侧会话监控卡：停靠位，不是浮层（docs/design/96）
+
+右侧上下文侧栏收起后，中央区右缘出现「会话监控卡」（`components/SessionMonitor/`）。硬约束：
+
+- **宽度与侧栏互补**：`--session-monitor-width` 与 `--context-sidebar-width` 在 `glide()` 同一条
+  定帧时间轴上互补补间（`hooks/useSessionMonitorDock.ts`，出现取 `collapseExit`、让位取 `collapseEnter`，
+  即侧栏那一侧的对称值），两个变量**同值**，所以文档流的内容区宽在开/关侧栏之间**不跳**——
+  这是断言项，改宽度/时长先复测。也不要给卡片单独设窗口宽度下限：它和「开侧栏」是同一个挤压程度。
+- **停靠层绝对定位，但正文必须按同一变量让位**：`.monitorDock` 是 `position:absolute` 覆盖层
+  （`pointer-events:none`，卡片自己接管指针），正文靠 `SessionView .scroll` 的
+  `padding-right: var(--session-monitor-width)` 让位，悬浮输入栏 / 跳到底部按钮的右偏置也加这一项。
+  **不要**改回「页面列 + 并列摆卡」的 flex 布局：滚动盒右缘会被挤到卡片左边，对话流的滚动条就出现在
+  屏幕中间（用户确认过要它贴着窗口右缘、卡片右侧）。卡片宽度 = 停靠层宽 − 16px（8px 滚动条槽 + 8px 呼吸）。
+- **卡片底色 = 会话区底色**（`--color-bg`，不用玻璃）：它要读成「会话区往右多出来的一栏」，
+  整张卡只有顶部「本轮概述」（`hero`）浮起一档用 `--color-bg-surface`。
+- **显隐只认** `page === "session" && phase !== "empty" && !rightSidebarOpen`；切页 / 回到空态不播动画，
+  侧栏收展才播。首次挂载直接落终态（启动不长出卡片）。
+- **数据只派生，不新增通道**：摘要 / 来源取会话条目，**改动取 `reviewStore.summary`
+  （项目工作区全部未提交改动，不是本轮差集）**，分支与推送读 `gitService`，技能读
+  `slashCommandCache`（未命中且进程存活才补发 `get_commands`，冷会话不为它 spawn pi），
+  MCP 只读 `mcp.json` 快照（**不跑** `pi mcp list` 探测）。不加 RPC、不加持久化。
+- **改动行是进入审阅的入口**（docs/design/99）：有改动时整行渲染为 `<li><button>`（不是给 `li`
+  加 role），点击先 `setFilterMode("all")` 对齐口径、再走 `uiStore.openReviewDocked()`
+  （浮窗形态先收回停靠，不要在侧栏留一个空白审阅页签）。无改动时行保持只读；
+  别改成 `openReview()`，那会按用户当前形态开到浮窗、不进右侧栏。
+- **后台进程只有一份实现**：`SessionArea/BackgroundProcs/useProcActions` 被中央浮卡与监控卡共用；
+  侧栏收起时中央浮卡让位（`SessionArea` 按 `rightSidebarOpen` 条件渲染），避免两块卡同时挂同一份登记表。
+
 ### 导航列表选中高亮：一块选中药丸（docs/design/54 / 56）
 
 左侧边栏与设置浮窗左栏的选中底色各只有一块，共用同一个选中药丸 hook

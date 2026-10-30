@@ -15,6 +15,10 @@
 }
 
 .row {
+  /* 悬浮反馈走「整行文字转主题色」，不铺灰底：底色令牌留给真正需要色块的行。
+     语义色（失败红 / +N -M / 运行态扫光）各自直写 color，按继承优先级天然保留。 */
+  --tool-row-ink: var(--color-text);
+  --tool-row-ink-muted: var(--color-text-muted);
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -26,13 +30,13 @@
   text-align: left;
   background: transparent;
   border: 0;
-  color: var(--color-text);
+  color: var(--tool-row-ink);
   cursor: pointer;
-  transition: background 120ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: color 120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .glyph {
-  color: var(--color-text-muted);
+  color: var(--tool-row-ink-muted);
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -40,7 +44,7 @@
 
 .action {
   flex-shrink: 0;
-  color: var(--color-text);
+  color: var(--tool-row-ink);
   font-size: var(--session-stream-font-md);
   white-space: nowrap;
 }
@@ -65,7 +69,7 @@
   padding: 1px 6px;
   border-radius: 4px;
   background: var(--color-bg-elevated);
-  color: var(--color-text);
+  color: var(--tool-row-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -78,7 +82,7 @@
   flex-shrink: 0;
   font-family: var(--font-family-mono);
   font-size: var(--session-stream-font-sm);
-  color: var(--color-text-muted);
+  color: var(--tool-row-ink-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -107,16 +111,27 @@
   border-bottom: 4px solid transparent;
   border-left: 5px solid currentColor;
   opacity: 0.75;
-  color: var(--color-text-muted);
-  transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+  color: var(--tool-row-ink-muted);
+  transition:
+    color 120ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.row:hover {
-  background: var(--color-bg-hover);
+.glyph,
+.action,
+.subjectChip,
+.stats {
+  transition: color 120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.row:active {
-  background: var(--color-bg-active);
+.row:not(.plain):hover {
+  --tool-row-ink: var(--color-accent);
+  --tool-row-ink-muted: var(--color-accent);
+}
+
+.row:not(.plain):active {
+  --tool-row-ink: var(--color-accent-hover);
+  --tool-row-ink-muted: var(--color-accent-hover);
 }
 
 .row:focus-visible {
@@ -126,10 +141,6 @@
 
 .row.plain {
   cursor: default;
-}
-
-.row.plain:hover {
-  background: transparent;
 }
 
 .row:disabled {

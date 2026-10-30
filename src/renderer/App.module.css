@@ -17,6 +17,9 @@
   grid-template-columns: var(--nav-track) 1fr var(--context-sidebar-width);
   /* chrome（窗控+开关）绝对定位宽度，顶栏中/右段内容避让用 */
   --titlebar-chrome-width: 200px;
+  /* 会话监控卡停靠层宽度（右侧栏收起时由 useSessionMonitorDock 补间，见 docs/design/96）；
+     与 --context-sidebar-width 互补，正文内容区靠它让位，两者同值故列宽不跳 */
+  --session-monitor-width: 0px;
   /* 背景保持纯平色，不铺任何径向渐变/环境光——否则四角会透出彩色光斑。
      顶栏与左右侧栏虽为磨砂玻璃，但这里已没有可变像素可"透"，backdrop-filter
      仅用于柔化其下方滚动内容；面板与中央区的分界改由各面板自身的
@@ -42,6 +45,40 @@
 }
 
 .pageArea {
+  position: relative;
+  display: flex;
   flex: 1;
+  min-width: 0;
   min-height: 0;
+}
+
+/* 页面本体：占满整个中央区宽度。会话监控卡是绝对定位的停靠层（见下），
+   所以这里的右键仍是窗口右缘——对话流的滚动条才能停在卡片右边（docs/design/96）。 */
+.pageStage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 会话监控卡的停靠层：宽度 = --session-monitor-width（与侧栏宽度同值，
+   由 hooks/useSessionMonitorDock 补间），卡片贴右、右侧让出 16px（其中 8px 是滚动条槽）。
+
+   为什么是绝对定位而不是并列的 flex 列：滚动条只能长在滚动盒的边框内缘，
+   若把停靠层做成 "页面 + 卡" 的两个 flex 列，滚动盒右缘就被挤到卡左边，
+   滚动条会出现在屏幕中间。改为绝对定位后主体仍占满宽度，正文靠
+   SessionView 的 padding-right 让位（同一个变量，随补间同步滑动）。
+   pointer-events:none 是必需的：停靠层盖住了滚动条所在的那条窄带，
+   否则滚动条拖不动（卡片自身重新接管指针）。 */
+.monitorDock {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  /* 卡片按内容高度收缩，不被停靠层拉成满高 */
+  align-items: flex-start;
+  width: var(--session-monitor-width);
+  overflow: hidden;
+  pointer-events: none;
 }

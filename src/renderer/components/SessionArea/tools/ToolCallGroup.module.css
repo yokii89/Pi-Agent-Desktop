@@ -5,6 +5,9 @@
 }
 
 .header {
+  /* 与单条工具行同一条悬浮配方：文字转主题色，不铺灰底 */
+  --tool-row-ink: var(--color-text);
+  --tool-row-ink-muted: var(--color-text-muted);
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -14,26 +17,28 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--color-text);
+  color: var(--tool-row-ink);
   font-size: var(--session-stream-font-md);
   text-align: left;
   cursor: pointer;
-  transition: background 120ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: color 120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .glyph {
-  color: var(--color-text-muted);
+  color: var(--tool-row-ink-muted);
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
 }
 
 .header:hover {
-  background: var(--color-bg-hover);
+  --tool-row-ink: var(--color-accent);
+  --tool-row-ink-muted: var(--color-accent);
 }
 
 .header:active {
-  background: var(--color-bg-active);
+  --tool-row-ink: var(--color-accent-hover);
+  --tool-row-ink-muted: var(--color-accent-hover);
 }
 
 .header:focus-visible {
@@ -48,14 +53,14 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--session-stream-font-md);
-  color: var(--color-text);
+  color: var(--tool-row-ink);
 }
 
 .warn {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  color: var(--color-text-muted);
+  color: var(--tool-row-ink-muted);
 }
 
 .caret {
@@ -66,8 +71,16 @@
   border-bottom: 4px solid transparent;
   border-left: 5px solid currentColor;
   opacity: 0.75;
-  color: var(--color-text-muted);
-  transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+  color: var(--tool-row-ink-muted);
+  transition:
+    color 120ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.glyph,
+.summary,
+.warn {
+  transition: color 120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .caretOpen {

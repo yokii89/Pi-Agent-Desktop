@@ -804,3 +804,208 @@ describe("agent_settled 收口 (docs/design/76)", () => {
     expect(run(ok).status).toBe("completed");
   });
 });
+
+/**
+ * 本轮文件编辑汇总卡：同轮唯一一张（docs/design/97）。
+ * 自动重试会跨多个 run（agent_end{willRetry} 之后由 agent_start 给旧 run 补收口），
+ * 按 run 落卡会把一整轮拆成几张「已编辑 1 个文件」的误导卡。
+ * 口径：中间 attempt 不落卡，本轮真收口（settled / 中断）落一张、按整轮合并。
+ */
+describe("本轮编辑汇总卡同轮唯一 (docs/design/97)", () => {
+  type EditsEntry = Extract<SessionEntry, { kind: "editsSummary" }>;
+
+  function summaries(entries: SessionEntry[]): EditsEntry[] {
+    return entries.filter((entry): entry is EditsEntry => entry.kind === "editsSummary");
+  }
+
+  function writeEvents(toolCallId: string, path: string): PiAgentEvent[] {
+    return [
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      {
+        type: "tool_execution_start",
+        toolCallId,
+        toolName: "write",
+        args: { path, content: "line1\nline2\nline3\n" },
+      },
+      {
+        type: "tool_execution_end",
+        toolCallId,
+        toolName: "write",
+        result: { content: [{ type: "text", text: `Successfully wrote to ${path}` }] },
+      },
+    ];
+  }
+
+  function assistantEnd(stopReason: string, errorMessage?: string): PiAgentEvent {
+    return {
+      type: "message_end",
+      message: { role: "assistant", content: [], stopReason, errorMessage },
+    };
+  }
+
+  function replayTurn(events: PiAgentEvent[]): SessionEntry[] {
+    let entries = sessionEntriesReducer([], { type: "userMessage", text: "改点东西" });
+    for (const event of events) {
+      entries = sessionEntriesReducer(entries, { type: "event", event });
+    }
+    return entries;
+  }
+
+  it("重试续跑：旧 run 被 agent_start 补收口时不落卡（本轮还没结束）", () => {
+    const midRetry = replayTurn([
+      { type: "agent_start" },
+      ...writeEvents("w1", "src/a.ts"),
+      { type: "agent_end", willRetry: true },
+      // 重开 run：旧 run 在这里收口，但它不是本轮终点，此刻不该出现汇总卡
+      { type: "agent_start" },
+    ]);
+    const runs = midRetry.filter((entry) => entry.kind === "run");
+    expect(runs).toHaveLength(2);
+    expect(summaries(midRetry)).toHaveLength(0);
+  });
+
+  it("重试续跑：本轮 settled 落一张跨 run 合并卡", () => {
+    const entries = replayTurn([
+      { type: "agent_start" },
+      ...writeEvents("w1", "src/a.ts"),
+      { type: "agent_end", willRetry: true },
+      { type: "agent_start" },
+      ...writeEvents("w2", "src/b.ts"),
+      { type: "agent_end" },
+      { type: "agent_settled", aborted: false },
+    ]);
+    const cards = summaries(entries);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.files.map((file) => file.path)).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(entries.at(-1)?.kind).toBe("editsSummary");
+  });
+
+  it("本轮以失败终止：照样落卡，且是整轮那一张而不是半轮", () => {
+    const entries = replayTurn([
+      { type: "agent_start" },
+      ...writeEvents("w1", "src/a.ts"),
+      { type: "agent_end", willRetry: true },
+      { type: "agent_start" },
+      assistantEnd("error", "Connection error."),
+      { type: "agent_end" },
+      { type: "agent_settled", aborted: false },
+    ]);
+    const cards = summaries(entries);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.files.map((file) => file.path)).toEqual(["src/a.ts"]);
+  });
+
+  it("同轮再次 settled：卡不叠加，原地刷新并复用条目 id", () => {
+    const first = replayTurn([
+      { type: "agent_start" },
+      ...writeEvents("w1", "src/a.ts"),
+      { type: "agent_end" },
+      { type: "agent_settled", aborted: false },
+    ]);
+    const firstId = summaries(first)[0]?.id;
+    expect(firstId).toBeTruthy();
+
+    const again = replayTurnFor(first, [
+      { type: "agent_start" },
+      ...writeEvents("w2", "src/b.ts"),
+      { type: "agent_end" },
+      { type: "agent_settled", aborted: false },
+    ]);
+    const cards = summaries(again);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.id).toBe(firstId);
+    expect(cards[0]?.files.map((file) => file.path)).toEqual(["src/a.ts", "src/b.ts"]);
+  });
+
+  it("用户中断算本轮终点：落卡", () => {
+    let entries = sessionEntriesReducer([], { type: "userMessage", text: "改点东西" });
+    for (const event of [
+      { type: "agent_start" } as PiAgentEvent,
+      ...writeEvents("w1", "src/a.ts"),
+    ]) {
+      entries = sessionEntriesReducer(entries, { type: "event", event });
+    }
+    entries = sessionEntriesReducer(entries, { type: "userStop" });
+    expect(summaries(entries)).toHaveLength(1);
+  });
+
+  it("本轮没有成功的 edit/write：不落卡", () => {
+    const entries = replayTurn([
+      { type: "agent_start" },
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      {
+        type: "tool_execution_start",
+        toolCallId: "c1",
+        toolName: "bash",
+        args: { command: "ls" },
+      },
+      {
+        type: "tool_execution_end",
+        toolCallId: "c1",
+        toolName: "bash",
+        result: { content: [{ type: "text", text: "a.ts" }] },
+      },
+      { type: "agent_end" },
+      { type: "agent_settled", aborted: false },
+    ]);
+    expect(summaries(entries)).toHaveLength(0);
+  });
+
+  it("历史装载与实时同口径：跨失败 attempt 合并成一张", () => {
+    const messages: PiChatMessage[] = [
+      { role: "user", content: [{ type: "text", text: "改点东西" }] },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: "w1",
+            name: "write",
+            arguments: { path: "src/a.ts", content: "line1\nline2\nline3\n" },
+          },
+        ],
+        stopReason: "toolUse",
+      },
+      {
+        role: "toolResult",
+        content: [{ type: "text", text: "Successfully wrote to src/a.ts" }],
+        toolCallId: "w1",
+        toolName: "write",
+        isError: false,
+      },
+      { role: "assistant", content: [], stopReason: "error", errorMessage: "Request timed out." },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: "w2",
+            name: "write",
+            arguments: { path: "src/b.ts", content: "line1\nline2\nline3\n" },
+          },
+        ],
+        stopReason: "toolUse",
+      },
+      {
+        role: "toolResult",
+        content: [{ type: "text", text: "Successfully wrote to src/b.ts" }],
+        toolCallId: "w2",
+        toolName: "write",
+        isError: false,
+      },
+      { role: "assistant", content: [], stopReason: "error", errorMessage: "Connection error." },
+    ];
+    const entries = sessionEntriesReducer([], { type: "loadMessages", messages });
+    const cards = summaries(entries);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.files.map((file) => file.path)).toEqual(["src/a.ts", "src/b.ts"]);
+  });
+
+  function replayTurnFor(entries: SessionEntry[], events: PiAgentEvent[]): SessionEntry[] {
+    let next = entries;
+    for (const event of events) {
+      next = sessionEntriesReducer(next, { type: "event", event });
+    }
+    return next;
+  }
+});

@@ -10,6 +10,7 @@ import { RollbackPromptHost } from "./components/Review/RollbackPromptHost";
 import { ReviewWindow } from "./components/ReviewWindow/ReviewWindow";
 import { ScheduledTasksPage } from "./components/ScheduledTasks/ScheduledTasksPage";
 import { SessionArea } from "./components/SessionArea/SessionArea";
+import { SessionMonitor } from "./components/SessionMonitor/SessionMonitor";
 import { SettingsDialog } from "./components/Settings/SettingsDialog";
 import { SideNav } from "./components/SideNav/SideNav";
 import { SplashGate } from "./components/Splash/SplashGate";
@@ -19,6 +20,7 @@ import { Toast } from "./components/ui/Toast";
 import { useContextSidebarCollapse } from "./hooks/useContextSidebarCollapse";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import { useNotificationSounds } from "./hooks/useNotificationSounds";
+import { useSessionMonitorDock } from "./hooks/useSessionMonitorDock";
 import { procService } from "./services/procService";
 import { BrowserProvider } from "./stores/browserStore";
 import { ComposerProvider } from "./stores/composerStore";
@@ -145,10 +147,18 @@ function TerminalPanelHost() {
 }
 
 function AppLayout() {
-  const { navCollapsed, rightSidebarOpen, rightSidebarWidth, reviewWindowOpen } = useUiStore();
+  const { navCollapsed, rightSidebarOpen, rightSidebarWidth, reviewWindowOpen, page } =
+    useUiStore();
+  const { phase } = useSessionMeta();
   // 右侧侧栏收展走下拉曲线补间（docs/design/53）：mounted/closed 滞后于 store，
   // 收起演完才卸载 aside、才套 sidebarClosed，补间写的就是下面的同一个 CSS 变量
   const sidebar = useContextSidebarCollapse(rightSidebarOpen, rightSidebarWidth);
+  // 会话监控卡（docs/design/96）：只在「会话页 + 有会话 + 右侧栏收起」的落点上出现，
+  // 宽度让位与侧栏补间互补，中央区列宽在开/关侧栏之间不跳
+  const monitorVisible = page === "session" && phase !== "empty" && !rightSidebarOpen;
+  // 只有侧栏收展才补间：切页 / 回到空态本来就瞬时，再挤一下新页面反而更晃
+  const monitorAnimated = page === "session" && phase !== "empty";
+  const monitorMounted = useSessionMonitorDock(sidebar.ref, monitorVisible, monitorAnimated);
   useGlobalShortcuts();
 
   return (
@@ -169,7 +179,14 @@ function AppLayout() {
       <SideNav />
       <main className={styles.main}>
         <div className={styles.pageArea}>
-          <CentralPage />
+          <div className={styles.pageStage}>
+            <CentralPage />
+          </div>
+          {monitorMounted ? (
+            <div className={styles.monitorDock}>
+              <SessionMonitor active={monitorVisible} />
+            </div>
+          ) : null}
         </div>
         <TerminalPanelHost />
       </main>
