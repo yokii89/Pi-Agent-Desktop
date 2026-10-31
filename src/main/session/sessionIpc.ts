@@ -235,6 +235,8 @@ function mapModelState(
       : {};
   const model = record.model;
   let modelLabel = fallbackLabel;
+  let modelProvider: string | null = null;
+  let modelId: string | null = null;
   let modelInput: PiModelState["modelInput"] = null;
   let contextWindow: number | null = null;
   if (model && typeof model === "object") {
@@ -242,6 +244,8 @@ function mapModelState(
     else if (typeof model.provider === "string" && typeof model.id === "string") {
       modelLabel = `${model.provider}/${model.id}`;
     }
+    if (typeof model.provider === "string" && model.provider) modelProvider = model.provider;
+    if (typeof model.id === "string" && model.id) modelId = model.id;
     modelInput = mapModelInput(model.input) ?? null;
     if (typeof model.contextWindow === "number" && model.contextWindow > 0) {
       contextWindow = model.contextWindow;
@@ -249,6 +253,8 @@ function mapModelState(
   }
   return {
     modelLabel,
+    modelProvider,
+    modelId,
     thinkingLevel: isThinkingLevelId(record.thinkingLevel)
       ? record.thinkingLevel
       : DEFAULT_THINKING_LEVEL,
@@ -508,6 +514,8 @@ export function registerSessionIpc(): void {
           // 无进程可问能力，可用档位留空由渲染层回退设计稿五档
           return {
             modelLabel: fallback,
+            modelProvider: info.provider,
+            modelId: info.model,
             thinkingLevel: isThinkingLevelId(info.thinkingLevel)
               ? info.thinkingLevel
               : DEFAULT_THINKING_LEVEL,

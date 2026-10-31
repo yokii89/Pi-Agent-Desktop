@@ -105,6 +105,10 @@ interface SessionMetaValue {
   startPending: boolean;
   /** pi 配置 / 会话生效的模型展示。 */
   modelLabel: string;
+  /** 当前模型 provider（输入栏模型芯片品牌图标）；未知为 null。 */
+  modelProvider: string | null;
+  /** 当前模型 id（输入栏模型芯片品牌图标）；未知为 null。 */
+  modelId: string | null;
   /** 当前模型输入模态（null = 未知，不拦附图）。 */
   modelInput: PiModelInputModality[] | null;
   /** active 桶上下文用量；null = 尚未拉取或会话未启动。 */
@@ -372,6 +376,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [globalPinnedFiles, setGlobalPinnedFiles] = useState<string[]>([]);
   const [archivedFiles, setArchivedFiles] = useState<Record<string, number>>({});
   const [modelLabel, setModelLabel] = useState("pi");
+  const [modelProvider, setModelProvider] = useState<string | null>(null);
+  const [modelId, setModelId] = useState<string | null>(null);
   const [modelInput, setModelInput] = useState<PiModelInputModality[] | null>(null);
   const [piReady, setPiReady] = useState(false);
   const [switchingToFile, setSwitchingToFile] = useState<string | null>(null);
@@ -673,6 +679,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (seq !== modelStateSeqRef.current) return;
     if (state?.modelLabel) {
       setModelLabel(state.modelLabel);
+      setModelProvider(state.modelProvider);
+      setModelId(state.modelId);
       setModelInput(state.modelInput ?? null);
       if (id) {
         setState((prev) =>
@@ -695,6 +703,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const prefix = info.provider ? `${info.provider}/` : "";
       const suffix = info.thinkingLevel ? `:${info.thinkingLevel}` : "";
       setModelLabel(`${prefix}${info.model}${suffix}`);
+      setModelProvider(info.provider);
+      setModelId(info.model);
     }
   }, [setState, syncThinkingState]);
 
@@ -2080,6 +2090,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       transcriptReady,
       startPending,
       modelLabel,
+      modelProvider,
+      modelId,
       modelInput,
       contextUsage: activeBucket?.contextUsage ?? null,
       contextBreakdown: activeBucket?.contextBreakdown ?? null,
@@ -2131,6 +2143,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       transcriptReady,
       startPending,
       modelLabel,
+      modelProvider,
+      modelId,
       modelInput,
       activeBucket?.contextUsage,
       activeBucket?.contextBreakdown,

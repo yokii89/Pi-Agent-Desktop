@@ -56,7 +56,7 @@ export function TaskInputToolbar({
 }: ToolbarProps) {
   const t = useT();
   const { thinkingLevel, thinkingLevels, setThinkingLevel } = useComposerStore();
-  const { modelLabel, processAlive, refreshModelState } = useSessionMeta();
+  const { modelLabel, modelProvider, modelId, processAlive, refreshModelState } = useSessionMeta();
   const attachInputRef = useRef<HTMLInputElement | null>(null);
 
   const onAttachInputChange = useCallback(
@@ -127,7 +127,7 @@ export function TaskInputToolbar({
       )}
 
       <ContextUsageChip />
-      <ModelMenu label={modelLabel} />
+      <ModelMenu label={modelLabel} provider={modelProvider} modelId={modelId} />
       <ThinkingChip
         level={thinkingLevel}
         levels={thinkingLevels}
@@ -409,7 +409,15 @@ function isSameModel(label: string, model: PiModelOption): boolean {
 }
 
 /** 输入栏模型下拉：打开时拉取凭据可用模型，选中即切换（无会话则写默认模型）。 */
-const ModelMenu = memo(function ModelMenu({ label }: { label: string }) {
+const ModelMenu = memo(function ModelMenu({
+  label,
+  provider,
+  modelId,
+}: {
+  label: string;
+  provider: string | null;
+  modelId: string | null;
+}) {
   const t = useT();
   const { refreshModelState, refreshContextUsage } = useSessionMeta();
   const { showToast } = useUiStore();
@@ -488,6 +496,9 @@ const ModelMenu = memo(function ModelMenu({ label }: { label: string }) {
             onClick();
           }}
         >
+          {provider && modelId ? (
+            <AiModelIcon provider={provider} modelId={modelId} size={16} />
+          ) : null}
           <span className={styles.modelLabel}>
             {displayModelLabel(label) || t("session.model.select")}
           </span>

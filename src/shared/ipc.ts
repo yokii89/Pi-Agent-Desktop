@@ -430,6 +430,10 @@ export function clampThinkingLevel(
 export interface PiModelState {
   /** 当前模型展示名，如 `anthropic/claude-sonnet-4`；未启动时为 null。 */
   modelLabel: string | null;
+  /** 当前模型 provider（输入栏模型芯片的品牌图标用）；未知为 null。 */
+  modelProvider: string | null;
+  /** 当前模型 id（输入栏模型芯片的品牌图标用）；未知为 null。 */
+  modelId: string | null;
   /** 会话当前实际档位（pi `get_state.thinkingLevel`，不再归一化）。 */
   thinkingLevel: ThinkingLevelId;
   /**
