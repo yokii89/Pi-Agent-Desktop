@@ -2,10 +2,14 @@ import { PuzzlePiece, X } from "@phosphor-icons/react";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef } from "react";
 import { useT } from "../../hooks/useT";
 import type { RightSidebarTab } from "../../stores/uiStore";
+import { revealInNearestScroller } from "../../utils/revealInScroller";
 import { sidebarBadgeLabel } from "./badgeSemantics";
 import styles from "./ContextSidebar.module.css";
 import { SidebarBadge } from "./SidebarBadge";
 import type { SidebarFeature } from "./sidebarFeatures";
+
+/** 页签条尺寸停稳多久后再定位激活页签（避开展开补间 / 拖宽途中的来回蹭）。 */
+const TAB_REVEAL_SETTLE_MS = 150;
 
 /**
  * 可关闭的右侧栏页签条。
@@ -31,11 +35,30 @@ export function SidebarTabBar({
   const featureById = new Map(features.map((feature) => [feature.id, feature]));
   const tabRefs = useRef(new Map<RightSidebarTab, HTMLButtonElement>());
   const activeRef = useRef<HTMLButtonElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
 
-  // 从加号菜单打开的新页签追加在末尾，滚动容器要把它带进可视区
-  // biome-ignore lint/correctness/useExhaustiveDependencies: activeTab 是触发滚动的信号
+  // 从加号菜单打开的新页签追加在末尾，滚动容器要把它带进可视区。
+  // 只滚页签条自己：挂载时侧栏还在展开补间里（宽度从 0 长起），scrollIntoView
+  // 会把 #root 一起横滚，整页弹跳一下（见 utils/revealInScroller.ts 文件头）。
+  // 页签条宽度还在变（展开补间、拖宽）时不逐帧定位——那会在窄条里来回蹭；
+  // 等尺寸停稳再定位，打开补间结束后激活页签照样落在视野里。
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeTab 是触发定位的信号
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const strip = stripRef.current;
+    const active = activeRef.current;
+    if (!strip || !active) return;
+    const reveal = (): void => revealInNearestScroller(active, "x");
+    reveal();
+    let timer = 0;
+    const observer = new ResizeObserver(() => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(reveal, TAB_REVEAL_SETTLE_MS);
+    });
+    observer.observe(strip);
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+    };
   }, [activeTab]);
 
   const handleKeyDown = (
@@ -58,7 +81,12 @@ export function SidebarTabBar({
   };
 
   return (
-    <div className={styles.tabStrip} role="tablist" aria-label={t("panels.context.tabList")}>
+    <div
+      ref={stripRef}
+      className={styles.tabStrip}
+      role="tablist"
+      aria-label={t("panels.context.tabList")}
+    >
       {tabs.map((tab) => {
         const feature = featureById.get(tab);
         const title = feature?.tabTitle ?? feature?.title ?? t("panels.context.extensionFallback");

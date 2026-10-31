@@ -6,6 +6,7 @@ import { FileIcon } from "../../../fileIcons";
 import { useT } from "../../../hooks/useT";
 import { fsService } from "../../../services/fsService";
 import { normalizePathKey } from "../../../utils/fileOpen";
+import { revealInNearestScroller } from "../../../utils/revealInScroller";
 import styles from "./FileTree.module.css";
 
 /** 「在树中定位」请求（uiStore fileRevealRequest 的载荷）。 */
@@ -227,10 +228,11 @@ function FileTreeNode({
     if (expandKeys.has(normalizePathKey(node.path))) setOpen(true);
   }, [isDir, expandKeys, node.path]);
 
-  // reveal：命中本节点 → 滚进可视区
+  // reveal：命中本节点 → 滚进可视区（只滚文件面板这一层，不碰祖先滚动容器）
   useEffect(() => {
     if (revealKey !== null && normalizePathKey(revealKey) === normalizePathKey(node.path)) {
-      rowRef.current?.scrollIntoView({ block: "nearest" });
+      const row = rowRef.current;
+      if (row) revealInNearestScroller(row);
     }
   }, [revealKey, node.path]);
 

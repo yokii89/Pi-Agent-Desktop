@@ -116,6 +116,17 @@ export function ContextSidebar() {
   const openRef = useRef(rightSidebarOpen);
   openRef.current = rightSidebarOpen;
   const prevWidthRef = useRef(rightSidebarWidth);
+  /**
+   * 挂载即按当前视觉宽度落一次内联宽度：展开补间的第一拍之前，aside 若按 CSS 兜底
+   * 宽度（--context-sidebar-width）挂在 0 宽轨道上，会伸出视口制造横向溢出——任何
+   * scrollIntoView / 滚动锚定都能把 #root 横滚一下再被夹回（整页弹跳）。
+   * 应用首次挂载（侧栏本就展开）时 panelGeometry 还是 0，随即由
+   * useContextSidebarCollapse 的 firstRun 写入终宽，两者同帧、不闪烁。
+   */
+  useLayoutEffect(() => {
+    const grid = rootRef.current?.parentElement;
+    if (grid) writePanelGeometry(grid, { sidebar: panelGeometry().sidebar });
+  }, []);
   // 拖拽中的宽度直接写网格根元素的 CSS 变量（不经 React 渲染），松手时一次性提交 store，
   // 避免拖拽帧反复重渲染全局（与终端面板高度拖拽同一策略）
   const [dragging, setDragging] = useState(false);
