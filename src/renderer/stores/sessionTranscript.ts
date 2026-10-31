@@ -1,5 +1,12 @@
 import { t } from "../../shared/i18n";
-import type { PiAgentEvent, PiChatMessage, PiStreamDelta, PiUsage } from "../../shared/ipc";
+import type {
+  PiAgentEvent,
+  PiChatMessage,
+  PiNestedToolCall,
+  PiStreamDelta,
+  PiUsage,
+} from "../../shared/ipc";
+import { sanitizeNestedToolCalls } from "../../shared/nestedCalls";
 import { addPiUsage, isZeroPiUsage } from "../../shared/usage";
 import type { BrowserContextItem } from "../services/browserService";
 import { imagesFromMessageContent, type UserMessageImage } from "../utils/imageAttach";
@@ -121,6 +128,11 @@ export interface ToolAssistantBlock {
   durationMs: number | null;
   /** 在 assistant content 数组中的槽位（并行工具与 message_end 对账用）。 */
   contentIndex: number;
+  /**
+   * 该工具运行期间通过 `ctx.executeTool()` 调过的其他工具（codemode 里的 MCP 调用走这条）。
+   * 只保留 name/status；toolResult 消息到达时回填，历史装载同口径。
+   */
+  nestedCalls?: PiNestedToolCall[];
 }
 
 export type AssistantBlock =
@@ -295,10 +307,15 @@ function applyEvent(entries: SessionEntry[], event: PiAgentEvent): SessionEntry[
     case "message_update":
       return applyDelta(entries, event.assistantMessageEvent);
     case "message_end":
+      // toolResult 的嵌套调用记录（codemode 里的 MCP 调用）回填到发起它的工具块
+      if (event.message.role === "toolResult") return attachNestedCalls(entries, event.message);
       if (event.message.role !== "assistant") return entries;
       // usage 累加放在 message_end（权威终值）：流式 partial 的 usage 会重复计入
       return accumulateRunUsage(applyMessageEnd(entries, event.message), event.message.usage);
     case "tool_execution_start":
+      // 嵌套调用不进文档流：事实留在父工具的 nestedCalls 里（对齐 TUI），
+      // 否则会先长出一个顶层工具块、message_end 对账时又消失（MCP 行闪现）
+      if (event.parentToolCallId) return entries;
       return upsertToolBlock(
         entries,
         event.toolCallId,
@@ -315,6 +332,7 @@ function applyEvent(entries: SessionEntry[], event: PiAgentEvent): SessionEntry[
         }),
       );
     case "tool_execution_update":
+      if (event.parentToolCallId) return entries;
       return upsertToolBlock(entries, event.toolCallId, "tool", undefined, (block) => {
         if (!event.partialResult) return block;
         const result = buildToolResult(block.toolKind, block.args, event.partialResult, false);
@@ -331,6 +349,7 @@ function applyEvent(entries: SessionEntry[], event: PiAgentEvent): SessionEntry[
         };
       });
     case "tool_execution_end":
+      if (event.parentToolCallId) return entries;
       return upsertToolBlock(
         entries,
         event.toolCallId,
@@ -1367,6 +1386,33 @@ function applyMessageEnd(entries: SessionEntry[], message: PiChatMessage): Sessi
   return next;
 }
 
+/**
+ * toolResult 消息上的嵌套调用记录回填到发起它的工具块。
+ * pi 在工具结果消息上记 `nestedCalls`（codemode 脚本里的 MCP 调用走这条），
+ * 它不在 assistant content 里，所以不能靠 blocksFromContent 对账。
+ */
+function attachNestedCalls(entries: SessionEntry[], message: PiChatMessage): SessionEntry[] {
+  const calls = sanitizeNestedToolCalls(message.nestedCalls);
+  const toolCallId = message.toolCallId;
+  if (!calls || !toolCallId) return entries;
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const entry = entries[i];
+    if (entry.kind !== "assistant") continue;
+    const index = entry.blocks.findIndex(
+      (block) => block.kind === "tool" && block.toolCallId === toolCallId,
+    );
+    if (index === -1) continue;
+    const block = entry.blocks[index] as ToolAssistantBlock;
+    if (block.nestedCalls && block.nestedCalls.length > 0) return entries;
+    const blocks = [...entry.blocks];
+    blocks[index] = { ...block, nestedCalls: calls.calls };
+    const next = [...entries];
+    next[i] = { ...entry, blocks };
+    return next;
+  }
+  return entries;
+}
+
 function upsertToolBlock(
   entries: SessionEntry[],
   toolCallId: string,
@@ -1611,6 +1657,7 @@ function attachToolResult(entries: SessionEntry[], message: PiChatMessage, ended
   if (!toolCallId) return;
   const content = message.content;
   const resultText = extractText(content);
+  const nestedCalls = sanitizeNestedToolCalls(message.nestedCalls);
   const isError =
     message.isError === true ||
     readStringField(content, "isError") === "true" ||
@@ -1636,6 +1683,7 @@ function attachToolResult(entries: SessionEntry[], message: PiChatMessage, ended
       result,
       resultText: capRawResultText(resultText ?? block.resultText),
       endedAt: block.endedAt ?? endedAt,
+      ...(nestedCalls ? { nestedCalls: nestedCalls.calls } : {}),
     };
     // entries 是 entriesFromMessages 正在组装的本地数组，就地写回；
     // 此前补丁落在局部副本上从未生效，历史装载的工具结果一直丢失

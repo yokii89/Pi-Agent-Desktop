@@ -3,6 +3,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import type { PiChatMessage, SessionTranscriptPayload } from "../../shared/ipc";
+import { sanitizeNestedToolCalls } from "../../shared/nestedCalls";
 import { sanitizePiUsage } from "../../shared/usage";
 import { getPiAgentDir } from "./piInfo";
 
@@ -70,6 +71,7 @@ interface DiskMessageBody {
   toolCallId?: unknown;
   toolName?: unknown;
   isError?: unknown;
+  nestedCalls?: unknown;
 }
 
 function isoToUnixMs(value: unknown): number | null {
@@ -98,6 +100,8 @@ function mapDiskMessage(raw: unknown): PiChatMessage | null {
   if (typeof body.toolCallId === "string") message.toolCallId = body.toolCallId;
   if (typeof body.toolName === "string") message.toolName = body.toolName;
   if (typeof body.isError === "boolean") message.isError = body.isError;
+  const nestedCalls = sanitizeNestedToolCalls(body.nestedCalls);
+  if (nestedCalls) message.nestedCalls = nestedCalls;
   const ts = isoToUnixMs(body.timestamp);
   // entriesFromMessages 期望 number 时间戳；附在 message 上供其读取
   if (ts !== null) (message as PiChatMessage & { timestamp?: number }).timestamp = ts;

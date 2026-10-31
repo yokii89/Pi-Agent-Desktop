@@ -361,6 +361,11 @@ export interface PiSlashCommand {
   name: string;
   description?: string;
   source: "extension" | "prompt" | "skill";
+  /**
+   * 技能源文件绝对路径（`source === "skill"` 时取 pi 的 `sourceInfo.path`）。
+   * 监控卡用它把「模型读了某个 SKILL.md」精确映射回技能名。
+   */
+  filePath?: string;
 }
 
 /** 思考档位：与 pi 的 ThinkingLevel 一一对应（低 → 高）。 */
@@ -951,8 +956,27 @@ export interface PiChatMessage {
   toolName?: string;
   /** toolResult 专用：是否失败。 */
   isError?: boolean;
+  /**
+   * toolResult 专用：该工具运行期间通过 `ctx.executeTool()` 调过的其他工具
+   * （codemode 脚本里的 MCP 调用走这条）。pi 的有界记录，results 不在其中。
+   */
+  nestedCalls?: PiNestedToolCalls;
   /** 磁盘 JSONL 解析出的 unix ms 时间戳（历史装载合成 run 边界用）。 */
   timestamp?: number;
+}
+
+/** 嵌套调用记录里监控卡用得到的字段（arguments / durationMs 不跨层保留）。 */
+export interface PiNestedToolCall {
+  /** 工具全名；MCP 为 `mcp__<server>__<tool>`。 */
+  name: string;
+  status?: "ok" | "error" | "unfinished";
+}
+
+/** 一次工具调用内部的嵌套调用记录（pi ToolResultMessage.nestedCalls 子集）。 */
+export interface PiNestedToolCalls {
+  calls: PiNestedToolCall[];
+  /** false = 记录被截断或还有未完成的调用。 */
+  complete?: boolean;
 }
 
 /** message_update 携带的流式 delta（pi assistantMessageEvent 子集）。 */
@@ -1027,11 +1051,14 @@ export type PiAgentEvent =
       toolCallId: string;
       toolName: string;
       args?: unknown;
+      /** 由另一个工具（如 codemode 脚本）发起时，指向发起方的 toolCallId。 */
+      parentToolCallId?: string;
     }
   | {
       type: "tool_execution_update";
       toolCallId: string;
       partialResult?: unknown;
+      parentToolCallId?: string;
     }
   | {
       type: "tool_execution_end";
@@ -1041,6 +1068,7 @@ export type PiAgentEvent =
       isError?: boolean;
       /** execute() 实测耗时（毫秒，单调钟）；工具未实际执行时 pi 不携带该字段。 */
       durationMs?: number;
+      parentToolCallId?: string;
     }
   | {
       type: "auto_retry_start";

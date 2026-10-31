@@ -61,8 +61,6 @@ export function MonitorRow({
 
 interface MonitorSectionProps {
   title: string;
-  /** 标题右缘的提示徽章（如 MCP 配置待重载）。 */
-  badge?: ReactNode;
   children: ReactNode;
 }
 
@@ -70,12 +68,11 @@ interface MonitorSectionProps {
  * 监控卡的一个分区。空分区由调用方先行过滤（这里不做"子节点计数"判断：
  * 真实场景里判断依据是数据行数，不是渲染出来的 DOM）。
  */
-export function MonitorSection({ title, badge, children }: MonitorSectionProps) {
+export function MonitorSection({ title, children }: MonitorSectionProps) {
   return (
     <section className={styles.section}>
       <header className={styles.sectionHead}>
         <h3 className={styles.sectionTitle}>{title}</h3>
-        {badge ? <span className={styles.badge}>{badge}</span> : null}
       </header>
       <ul className={styles.rows}>{children}</ul>
     </section>

@@ -1009,3 +1009,113 @@ describe("本轮编辑汇总卡同轮唯一 (docs/design/97)", () => {
     return next;
   }
 });
+
+describe("nested tool calls (codemode MCP, docs/design/105)", () => {
+  const CODEMODE_CALL = {
+    type: "toolCall",
+    id: "call-code",
+    name: "codemode",
+    arguments: { code: "await mcp.filesystem.list_directory({ path: '.' })" },
+  };
+  const NESTED = {
+    name: "mcp__filesystem__list_directory",
+    status: "ok" as const,
+    // 真实 JSONL 里还有 arguments / durationMs；收窄后只留 name/status
+    arguments: { path: "." },
+    durationMs: 4,
+  };
+
+  function assistantWithCodemode(): PiChatMessage {
+    return { role: "assistant", content: [CODEMODE_CALL], stopReason: "toolUse" };
+  }
+
+  function findTool(entries: SessionEntry[], toolCallId: string) {
+    for (const entry of entries) {
+      if (entry.kind !== "assistant") continue;
+      for (const block of entry.blocks) {
+        if (block.kind === "tool" && block.toolCallId === toolCallId) return block;
+      }
+    }
+    throw new Error("missing tool block");
+  }
+
+  it("嵌套 tool_execution_* 不进文档流，nestedCalls 回填到父工具块并扛住 message_end 重建", () => {
+    let entries: SessionEntry[] = [];
+    entries = sessionEntriesReducer(entries, { type: "event", event: { type: "agent_start" } });
+    entries = sessionEntriesReducer(entries, {
+      type: "event",
+      event: { type: "message_start", message: assistantWithCodemode() },
+    });
+    // codemode 执行期间发起的嵌套 MCP 调用
+    for (const event of [
+      {
+        type: "tool_execution_start",
+        toolCallId: "nested-1",
+        toolName: "mcp__filesystem__list_directory",
+        parentToolCallId: "call-code",
+        args: { path: "." },
+      },
+      {
+        type: "tool_execution_end",
+        toolCallId: "nested-1",
+        toolName: "mcp__filesystem__list_directory",
+        parentToolCallId: "call-code",
+        result: { content: [] },
+      },
+    ] as PiAgentEvent[]) {
+      entries = sessionEntriesReducer(entries, { type: "event", event });
+    }
+    const toolBlocks = () =>
+      entries.flatMap((entry) =>
+        entry.kind === "assistant" ? entry.blocks.filter((block) => block.kind === "tool") : [],
+      );
+    expect(toolBlocks().map((block) => block.name)).toEqual(["codemode"]);
+
+    // 工具结果消息到达：嵌套调用记录挂在父工具上
+    entries = sessionEntriesReducer(entries, {
+      type: "event",
+      event: {
+        type: "message_end",
+        message: {
+          role: "toolResult",
+          toolCallId: "call-code",
+          toolName: "codemode",
+          content: [{ type: "text", text: "ok" }],
+          nestedCalls: { calls: [NESTED] },
+        } as unknown as PiChatMessage,
+      },
+    });
+    expect(findTool(entries, "call-code").nestedCalls).toEqual([
+      { name: "mcp__filesystem__list_directory", status: "ok" },
+    ]);
+
+    // 后续 assistant message_end 按 content 重建块：nestedCalls 不能被冲掉
+    entries = sessionEntriesReducer(entries, {
+      type: "event",
+      event: { type: "message_end", message: assistantWithCodemode() },
+    });
+    expect(findTool(entries, "call-code").nestedCalls).toEqual([
+      { name: "mcp__filesystem__list_directory", status: "ok" },
+    ]);
+  });
+
+  it("历史装载从 toolResult 消息的 nestedCalls 回填", () => {
+    const entries = sessionEntriesReducer([], {
+      type: "loadMessages",
+      messages: [
+        { role: "user", content: [{ type: "text", text: "看下目录" }] },
+        assistantWithCodemode(),
+        {
+          role: "toolResult",
+          toolCallId: "call-code",
+          toolName: "codemode",
+          content: [{ type: "text", text: "ok" }],
+          nestedCalls: { calls: [NESTED] },
+        } as unknown as PiChatMessage,
+      ],
+    });
+    expect(findTool(entries, "call-code").nestedCalls).toEqual([
+      { name: "mcp__filesystem__list_directory", status: "ok" },
+    ]);
+  });
+});

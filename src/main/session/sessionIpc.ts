@@ -123,16 +123,29 @@ function mapSlashCommands(data: unknown): PiSlashCommand[] {
   const out: PiSlashCommand[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
-    const record = item as { name?: unknown; description?: unknown; source?: unknown };
+    const record = item as {
+      name?: unknown;
+      description?: unknown;
+      source?: unknown;
+      sourceInfo?: unknown;
+    };
     if (typeof record.name !== "string" || !record.name) continue;
     const source =
       record.source === "extension" || record.source === "prompt" || record.source === "skill"
         ? record.source
         : "extension";
+    // 技能的 sourceInfo.path 就是技能源文件路径；监控卡据此把模型读取映射回技能名
+    const sourceInfo =
+      record.sourceInfo && typeof record.sourceInfo === "object"
+        ? (record.sourceInfo as { path?: unknown })
+        : null;
+    const sourcePath =
+      source === "skill" && typeof sourceInfo?.path === "string" ? sourceInfo.path : undefined;
     out.push({
       name: record.name,
       description: typeof record.description === "string" ? record.description : undefined,
       source,
+      ...(sourcePath ? { filePath: sourcePath } : {}),
     });
   }
   return out;

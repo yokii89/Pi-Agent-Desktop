@@ -10,7 +10,6 @@ export const monitorMessages = defineMessages({
   "monitor.section.env": { "zh-CN": "环境信息", "en-US": "Environment" },
   "monitor.section.procs": { "zh-CN": "后台进程", "en-US": "Background" },
   "monitor.section.capabilities": { "zh-CN": "技能与 MCP", "en-US": "Skills & MCP" },
-  "monitor.section.outputs": { "zh-CN": "产出", "en-US": "Outputs" },
   "monitor.section.sources": { "zh-CN": "来源", "en-US": "Sources" },
 
   "monitor.env.changes.none": { "zh-CN": "无改动", "en-US": "No changes" },
@@ -47,14 +46,16 @@ export const monitorMessages = defineMessages({
 
   "monitor.procs.running": { "zh-CN": "运行中", "en-US": "Running" },
 
-  "monitor.capabilities.skillCount": {
-    "zh-CN": "{count} 个技能",
-    "en-US": "{count} skills",
+  /** 行右缘的调用次数（会话累计）。 */
+  "monitor.capabilities.times": { "zh-CN": "{count} 次", "en-US": "{count}×" },
+  /** 技能行悬浮：两种来源拆开展示。 */
+  "monitor.capabilities.skillCommands": {
+    "zh-CN": "命令 {count} 次",
+    "en-US": "command ×{count}",
   },
-  "monitor.capabilities.mcp": { "zh-CN": "MCP", "en-US": "MCP" },
-  "monitor.capabilities.mcpCount": {
-    "zh-CN": "{count} 个已启用",
-    "en-US": "{count} enabled",
+  "monitor.capabilities.skillReads": {
+    "zh-CN": "读取 {count} 次",
+    "en-US": "read ×{count}",
   },
-  "monitor.capabilities.dirty": { "zh-CN": "需重载", "en-US": "Reload needed" },
+  "monitor.capabilities.more": { "zh-CN": "还有 {count} 项", "en-US": "{count} more" },
 });

@@ -4,7 +4,6 @@ import {
   GitBranch,
   GitCommit,
   GitDiff,
-  Globe,
   Image,
   Plugs,
   Robot,
@@ -14,7 +13,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useOpenProcPanel } from "../../hooks/useOpenProcPanel";
 import { useT } from "../../hooks/useT";
 import { fsService } from "../../services/fsService";
-import { useBrowserStore } from "../../stores/browserStore";
 import { useReviewStore } from "../../stores/reviewStore";
 import { useSessionEntries, useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -30,10 +28,12 @@ import {
   editsFromWorkingTree,
   lastAssistantText,
   sessionUpdatedAt,
-  shortenUrl,
 } from "./sessionMonitorData";
 import { useMonitorCapabilities } from "./useMonitorCapabilities";
 import { useMonitorEnvironment } from "./useMonitorEnvironment";
+
+/** 技能 / MCP 行的总上限：再多的靠「还有 N 项」收口（卡片窄，且这一区只求扫一眼）。 */
+const CAPABILITY_ROW_LIMIT = 6;
 
 interface SessionMonitorProps {
   /** 卡片处于展开态：收起过程中仍挂载（要播完让位补间），但不再发新请求。 */
@@ -60,7 +60,6 @@ export function SessionMonitor({ active }: SessionMonitorProps) {
     setFilterMode,
   } = useReviewStore();
   const { openReviewDocked, openSidebarTab, showToast } = useUiStore();
-  const browser = useBrowserStore();
   const procs = useProcActions(meta.activeSessionId);
   const openProcPanel = useOpenProcPanel();
   const [commitOpen, setCommitOpen] = useState(false);
@@ -72,6 +71,7 @@ export function SessionMonitor({ active }: SessionMonitorProps) {
     cwd: meta.sessionWorkingDir,
     processAlive: meta.processAlive,
     requestCommands: meta.getSlashCommands,
+    entries,
   });
 
   const summary = useMemo(() => lastAssistantText(entries), [entries]);
@@ -85,18 +85,6 @@ export function SessionMonitor({ active }: SessionMonitorProps) {
     if (active && reviewPhase === "ready") refreshIfStale();
   }, [active, reviewPhase, refreshIfStale]);
   const sources = useMemo(() => collectSources(entries, 3), [entries]);
-  const viewedPages = useMemo(() => {
-    const open = browser.pages.filter((page) => page.url && page.url !== "about:blank");
-    if (open.length > 0) {
-      return open
-        .slice(-3)
-        .reverse()
-        .map((page) => ({ key: page.id, url: page.url, title: page.title }));
-    }
-    return browser.recentUrls
-      .slice(0, 2)
-      .map((entry) => ({ key: entry.url, url: entry.url, title: "" }));
-  }, [browser.pages, browser.recentUrls]);
 
   const edits = editsFromWorkingTree(workingTree);
   // 文件数 > 0 就算有改动：二进制文件的增删行是 null（按 0 计），不能因此判成「无改动」
@@ -121,7 +109,39 @@ export function SessionMonitor({ active }: SessionMonitorProps) {
         : env.push.hasUpstream
           ? t("monitor.env.push.synced")
           : t("monitor.env.push.noUpstream");
-  const hasCapabilities = capabilities.skills.length > 0 || (capabilities.mcp?.total ?? 0) > 0;
+  // 调用明细：技能名 / MCP server 各占一行，次数在右缘；超出的收进一行「还有 N 项」
+  const capabilityRows = useMemo(() => {
+    const rows = [
+      ...capabilities.usage.skills.map((skill) => {
+        const details: string[] = [];
+        if (skill.commands > 0) {
+          details.push(t("monitor.capabilities.skillCommands", { count: skill.commands }));
+        }
+        if (skill.reads > 0) {
+          details.push(t("monitor.capabilities.skillReads", { count: skill.reads }));
+        }
+        return {
+          key: `skill:${skill.name}`,
+          kind: "skill" as const,
+          text: skill.name,
+          count: skill.commands + skill.reads,
+          title: details.join(t("monitor.listSeparator")),
+        };
+      }),
+      ...capabilities.usage.mcp.map((server) => ({
+        key: `mcp:${server.server}`,
+        kind: "mcp" as const,
+        text: server.server,
+        count: server.count,
+        title: server.tools.map((tool) => `${tool.tool} ×${tool.count}`).join("\n"),
+      })),
+    ];
+    return {
+      visible: rows.slice(0, CAPABILITY_ROW_LIMIT),
+      hidden: rows.slice(CAPABILITY_ROW_LIMIT),
+    };
+  }, [capabilities.usage, t]);
+  const hasCapabilities = capabilityRows.visible.length > 0;
 
   return (
     <>
@@ -215,40 +235,32 @@ export function SessionMonitor({ active }: SessionMonitorProps) {
           ) : null}
 
           {hasCapabilities ? (
-            <MonitorSection
-              title={t("monitor.section.capabilities")}
-              badge={capabilities.mcpDirty ? t("monitor.capabilities.dirty") : null}
-            >
-              {capabilities.skills.length > 0 ? (
+            <MonitorSection title={t("monitor.section.capabilities")}>
+              {capabilityRows.visible.map((row) => (
                 <MonitorRow
-                  icon={<Sparkle size={16} weight="regular" />}
-                  text={capabilities.skills.slice(0, 2).join(t("monitor.listSeparator"))}
-                  title={capabilities.skills.join("\n")}
-                  trailing={t("monitor.capabilities.skillCount", {
-                    count: capabilities.skills.length,
-                  })}
-                />
-              ) : null}
-              {capabilities.mcp && capabilities.mcp.total > 0 ? (
-                <MonitorRow
-                  icon={<Plugs size={16} weight="regular" />}
-                  text={t("monitor.capabilities.mcp")}
-                  trailing={t("monitor.capabilities.mcpCount", { count: capabilities.mcp.enabled })}
-                />
-              ) : null}
-            </MonitorSection>
-          ) : null}
-
-          {viewedPages.length > 0 ? (
-            <MonitorSection title={t("monitor.section.outputs")}>
-              {viewedPages.map((page) => (
-                <MonitorRow
-                  key={page.key}
-                  icon={<Globe size={16} weight="regular" />}
-                  text={shortenUrl(page.url)}
-                  title={page.title || page.url}
+                  key={row.key}
+                  icon={
+                    row.kind === "skill" ? (
+                      <Sparkle size={16} weight="regular" />
+                    ) : (
+                      <Plugs size={16} weight="regular" />
+                    )
+                  }
+                  text={row.text}
+                  title={row.title || undefined}
+                  trailing={t("monitor.capabilities.times", { count: row.count })}
                 />
               ))}
+              {capabilityRows.hidden.length > 0 ? (
+                <li className={styles.moreRow}>
+                  <span
+                    className={`${styles.rowText} ${styles.rowTextMuted}`}
+                    title={capabilityRows.hidden.map((row) => row.text).join("\n")}
+                  >
+                    {t("monitor.capabilities.more", { count: capabilityRows.hidden.length })}
+                  </span>
+                </li>
+              ) : null}
             </MonitorSection>
           ) : null}
 
