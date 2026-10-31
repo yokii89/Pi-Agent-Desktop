@@ -14,8 +14,10 @@ import { useNowTick } from "../../../hooks/useNowTick";
 import { useT } from "../../../hooks/useT";
 import type { ToolAssistantBlock } from "../../../stores/sessionTranscript";
 import type { ToolKind } from "../../../stores/toolPayload";
+import { detectCommandBrand } from "../../../utils/commandIcon";
 import { parseMcpToolName } from "../../../utils/mcpToolName";
 import { formatElapsed } from "../../../utils/time";
+import { CommandBrandIcon } from "./CommandBrandIcon";
 import styles from "./ToolCall.module.css";
 import { ToolResultRouter } from "./ToolResultRouter";
 
@@ -152,15 +154,17 @@ export const ToolCall = memo(function ToolCall({ block, railed, defaultOpen }: T
       ? { text: formatToolDuration(block.durationMs), tone: "" }
       : null;
 
-  // MCP 调用芯片显示 `server · tool` 短名（title 给全名）；args 里的 path 等
-  // 不再顶替芯片——原始身份是用户认不出 MCP 调用的根因，展开后的参数里仍可见
+  // MCP 调用主体显示 `server · tool` 短名（title 给全名）；args 里的 path 等
+  // 不再顶替主体——原始身份是用户认不出 MCP 调用的根因，展开后的参数里仍可见
   const mcpParts = block.toolKind === "mcp" ? parseMcpToolName(block.name) : null;
+  // 终端命令额外显示执行主体品牌（pnpm / git / node…），命令原文仍是主体
+  const commandBrand = block.toolKind === "terminal" ? detectCommandBrand(block.subject) : null;
   const rawSubject = mcpParts
     ? `${mcpParts.server} · ${mcpParts.tool}`
     : block.subject || block.name;
-  // Codex 展示路径/命令原文（芯片内省略），不再缩成 basename
+  // Codex 展示路径/命令原文（超长省略），不再缩成 basename
   const subjectText = rawSubject;
-  const chipTitle = mcpParts ? block.name : undefined;
+  const subjectTitle = mcpParts ? block.name : undefined;
 
   return (
     <div
@@ -183,7 +187,8 @@ export const ToolCall = memo(function ToolCall({ block, railed, defaultOpen }: T
           <ToolGlyph kind={block.toolKind} />
         </span>
         <span className={`${styles.action} ${action.tone}`}>{action.text}</span>
-        <span className={styles.subjectChip} title={chipTitle}>
+        {commandBrand && <CommandBrandIcon brand={commandBrand} className={styles.brand} />}
+        <span className={styles.subjectChip} title={subjectTitle}>
           {subjectText}
         </span>
         {elapsedStats && (

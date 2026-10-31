@@ -53,6 +53,14 @@
   color: var(--color-accent);
 }
 
+/* 命令品牌徽标（pnpm / git / node…）：动作文案与命令原文之间的执行主体标记 */
+.brand {
+  display: block;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
 .actionMuted {
   color: var(--color-text-muted);
 }
@@ -61,14 +69,11 @@
   color: var(--color-danger);
 }
 
-/* 路径 / 命令芯片（Codex 深底等宽）；不拉伸占满，让箭头贴住左侧文案 */
+/* 工具主体（命令 / 路径 / 查询词）：等宽文本直接坐在行底色上，不铺芯片底色 */
 .subjectChip {
   font-family: var(--font-family-mono);
   font-size: var(--session-stream-font-sm);
   line-height: 1.5;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--color-bg-elevated);
   color: var(--tool-row-ink);
   overflow: hidden;
   text-overflow: ellipsis;

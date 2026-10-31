@@ -47,7 +47,7 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 | 前端框架 | React 19 + JSX | 函数组件 + Hooks，禁止 class 组件 |
 | 构建工具 | Vite | 渲染进程用 Vite；主进程用 tsc 编译 |
 | 语言 | TypeScript（strict） | 所有新文件一律 `.ts` / `.tsx`，禁止 JS |
-| 图标 | **Phosphor Icons（`@phosphor-icons/react`）** | UI 图标唯一图标库，见下文规范；文件类型图标与 AI 厂商品牌 logo 为资源型资产，分别见对应小节 |
+| 图标 | **Phosphor Icons（`@phosphor-icons/react`）** | UI 图标唯一图标库，见下文规范；文件类型 / 命令品牌图标与 AI 厂商品牌 logo 为资源型资产，分别见对应小节 |
 | 样式 | CSS / CSS Modules | 暂不引入 Tailwind 等框架，如需变更先在本文件登记 |
 | 代码质量 | Biome | 格式化 + Lint 一体，配置沿用 pi 仓库的 `biome.json`，禁止再引入 ESLint/Prettier |
 | 测试 | vitest | 仅用于 `packages/view-sdk` 与可纯测的主进程协议逻辑（如 `viewHostProtocol`）；不引入渲染层测试框架 |
@@ -77,7 +77,7 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 ## Phosphor Icons 使用规范
 
 - 统一从 `@phosphor-icons/react` 导入，**禁止**内联 SVG、emoji、或混入其他图标库（如 lucide、Material Icons）。
-- **AI 厂商品牌 logo 是唯一例外**：统一走 `@lobehub/icons`（见「第三方 AI 品牌 logo」），不要用 Phosphor 通用图标冒充品牌。
+- **AI 厂商品牌 logo 与命令/语言品牌图标是例外**：前者统一走 `@lobehub/icons`（见「第三方 AI 品牌 logo」），后者复用 `fileIcons` 资源型资产（见「命令品牌徽标」），不要用 Phosphor 通用图标冒充品牌。
 - 导入方式：命名导入具体图标，如 `import { Play, GearSix } from "@phosphor-icons/react";`，不要 `import * as Icons`。
 - 图标风格（weight）全应用统一为 **`"regular"`**；强调/选中态用 `"fill"`。不得在一处用 `"duotone"` 另一处用 `"bold"`。
 - 尺寸通过 `size` 属性传递数字（如 `size={20}`），图标尺寸遵循 16 / 20 / 24 三档：行内文字旁 16，工具栏 20，页面级 24。
@@ -91,9 +91,10 @@ import { Play } from "@phosphor-icons/react";
 
 ## 文件类型图标（文件树资源型图标）
 
-- **用途与边界**：文件树等处按文件后缀/文件名展示的语言与文件类型图标（如 ts、py、docker 的彩色 logo）。这类图标属于**资源型 SVG 资产**，不适用上文 Phosphor 唯一图标库条款；UI 图标（按钮、工具栏、占位符）与**文件夹图标**仍必须使用 Phosphor。
+- **用途与边界**：文件树等处按文件后缀/文件名展示的语言与文件类型图标（如 ts、py、docker 的彩色 logo），以及会话工具行的命令品牌徽标（pnpm / git / node / python…）。这类图标属于**资源型 SVG 资产**，不适用上文 Phosphor 唯一图标库条款；UI 图标（按钮、工具栏、占位符）与**文件夹图标**仍必须使用 Phosphor。
 - **来源**：[peakoss/vscode-jetbrains-icon-theme](https://github.com/peakoss/vscode-jetbrains-icon-theme) 的 2023 图标集；原始图标出自 JetBrains Design Resources（Apache 2.0），上游主题映射代码为 MIT。许可全文与出处说明随资产存放在 `src/renderer/fileIcons/LICENSE.md` / `NOTICE.md`，**不得删除**。
-- **结构**：SVG 位于 `src/renderer/fileIcons/assets/{light,dark}/`（同名图标两套主题，内容与上游一致，仅文件名归一化）；映射数据在 `src/renderer/fileIcons/mapping.ts`（**生成物，禁止手改**，已从 Biome 检查中豁免）；解析逻辑在 `resolve.ts`（文件名精确命中 → 后缀最长匹配 → 兜底图标），组件封装为 `fileIcons/FileIcon.tsx`（内部经 `useUiStore` 感知主题）。
+- **结构**：SVG 位于 `src/renderer/fileIcons/assets/{light,dark}/`（同名图标两套主题，内容与上游一致，仅文件名归一化）；映射数据在 `src/renderer/fileIcons/mapping.ts`（**生成物，禁止手改**，已从 Biome 检查中豁免）；解析逻辑在 `resolve.ts`（文件名精确命中 → 后缀最长匹配 → 兜底图标；`getNamedIconUrl` 供命令品牌徽标按资产名直取），组件封装为 `fileIcons/FileIcon.tsx`（经 `useResolvedTheme` 跟随根元素 `data-theme` 感知主题）。
+- **命令品牌徽标**：会话工具行的 pnpm / git / node / python 等品牌徽标复用本资产池；识别逻辑在 `src/renderer/utils/commandIcon.ts`——只认命令的第一个可执行主体（跳过 `cd` / 环境变量 / `sudo` 等包装），未命中回退 Phosphor 终端图标。不新增品牌资产、不用 Phosphor 通用图标冒充品牌；Git 标志复用上游的 `file_gitignore`（图形即 Git logo）。
 - **主题适配**：暗色主题优先使用上游 `_dark` 变体，缺失时自动回退浅色图标。
 - **更新**：`pnpm run gen:file-icons`（`scripts/generate-file-icons.mjs`，需要网络）重新拉取并生成；要扩大覆盖范围时修改脚本/上游数据，不手改生成物。该脚本仅在更新图标集时手动运行，日常构建不依赖网络。
 

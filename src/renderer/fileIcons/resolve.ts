@@ -61,9 +61,14 @@ export function resolveIconName(fileName: string): string {
   return DEFAULT_FILE_ICON;
 }
 
+/** 按资产名取图标 URL（命令品牌徽标等直接引用本资产池）；缺失返回 null。 */
+export function getNamedIconUrl(name: string, theme: Theme): string | null {
+  const dark = theme === "dark" ? darkIcons[name] : undefined;
+  return dark ?? lightIcons[name] ?? null;
+}
+
 /** 文件对应的图标 URL；暗色主题优先 _dark 变体，缺失时回退浅色。 */
 export function getFileIconUrl(fileName: string, theme: Theme): string {
   const name = resolveIconName(fileName);
-  const dark = theme === "dark" ? darkIcons[name] : undefined;
-  return dark ?? lightIcons[name] ?? lightIcons[DEFAULT_FILE_ICON];
+  return getNamedIconUrl(name, theme) ?? lightIcons[DEFAULT_FILE_ICON];
 }
