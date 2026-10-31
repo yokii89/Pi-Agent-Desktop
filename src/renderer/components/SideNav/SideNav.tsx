@@ -29,7 +29,7 @@ export function SideNav() {
   const t = useT();
   const { navCollapsed, page, navigate, dispatch, settingsOpen, openSettings, shortcuts } =
     useUiStore();
-  const { newSession, allSessions, pinnedFiles, globalPinnedFiles, archivedFiles } =
+  const { newSession, allSessions, pinnedFiles, globalPinnedFiles, archivedFiles, sessionOrder } =
     useSessionMeta();
   const { projects } = useProjectStore();
   const { sidebars: visibleSidebars } = useExtensionViewStore();
@@ -41,6 +41,7 @@ export function SideNav() {
 
   // History → Project 归属：全局置顶条目提出进「置顶」分区；有工作目录且命中项目的进项目，
   // 其余进"任务"（无重复）；组内置顶由 buildSessionTree 提到各自列表最前；
+  // 项目组再叠加用户拖拽出的手动顺序（docs/design/109）；
   // 已归档条目不进主列表（docs/design/32）
   const tree = useMemo(
     () =>
@@ -49,8 +50,9 @@ export function SideNav() {
         projects,
         pinnedFiles,
         globalPinnedFiles,
+        sessionOrder,
       ),
-    [allSessions, archivedFiles, projects, pinnedFiles, globalPinnedFiles],
+    [allSessions, archivedFiles, projects, pinnedFiles, globalPinnedFiles, sessionOrder],
   );
 
   // 启动空闲时预热 GSAP chunk：首次展开项目的图标回弹、行内操作揭示不再等下载。

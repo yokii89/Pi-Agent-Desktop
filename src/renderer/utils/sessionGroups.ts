@@ -66,17 +66,47 @@ function sortByPin(sessions: SessionSummary[], pinnedFiles: readonly string[]): 
 }
 
 /**
+ * 项目组内的最终展示顺序（docs/design/109）：
+ * - 没手动排过（`orderFiles` 为空）的分组保持原行为：工作区置顶在前（置顶顺序），其余时间倒序；
+ * - 手动排过的分组：置顶块不动；手动排序之后新建、还没排过的会话排在置顶块下方最前
+ *   （新建会话仍出现在最上方），排过的按保存的顺序跟在后面；
+ * - 置顶会话不参与手动顺序：即使它出现在 `orderFiles` 里（置顶前拖过），位置仍由 pins 决定。
+ */
+export function applySessionOrder(
+  sessions: SessionSummary[],
+  pinnedFiles: readonly string[],
+  orderFiles: readonly string[],
+): SessionSummary[] {
+  if (orderFiles.length === 0) return sortByPin(sessions, pinnedFiles);
+  const pinnedRank = new Map(pinnedFiles.map((file, index) => [file, index]));
+  const manualRank = new Map(orderFiles.map((file, index) => [file, index]));
+  const pinned: SessionSummary[] = [];
+  const fresh: SessionSummary[] = [];
+  const ranked: SessionSummary[] = [];
+  for (const session of sessions) {
+    if (pinnedRank.has(session.file)) pinned.push(session);
+    else if (manualRank.has(session.file)) ranked.push(session);
+    else fresh.push(session);
+  }
+  pinned.sort((a, b) => (pinnedRank.get(a.file) ?? 0) - (pinnedRank.get(b.file) ?? 0));
+  ranked.sort((a, b) => (manualRank.get(a.file) ?? 0) - (manualRank.get(b.file) ?? 0));
+  return [...pinned, ...fresh, ...ranked];
+}
+
+/**
  * 按"会话工作目录 → 项目"把历史会话分组：
  * - 全局置顶会话从分组中提出，单独成区（"置顶"分区固定在侧栏最顶部，docs/design/45）；
  * - 其余 cwd 等于某项目目录或位于其内部 → 归入该项目；多个项目嵌套时归入路径最深（最具体）的一个；
  * - 无 cwd 或映射不到任何项目 → 归入顶层"任务"。
- * 每条会话只出现在一个位置；组内默认保持入参的时间倒序，工作区置顶会话提到该组最前。
+ * 每条会话只出现在一个位置；组内默认保持入参的时间倒序，工作区置顶会话提到该组最前，
+ * 项目组再叠加用户在侧栏拖拽出的手动顺序（docs/design/109）。
  */
 export function buildSessionTree(
   sessions: SessionSummary[],
   projects: PideskProject[],
   pinnedFiles: readonly string[] = [],
   globalPinnedFiles: readonly string[] = [],
+  sessionOrder: Readonly<Record<string, readonly string[]>> = {},
 ): SessionTree {
   const globalRank = new Map(globalPinnedFiles.map((file, index) => [file, index]));
   const globalPinned = sessions
@@ -112,7 +142,11 @@ export function buildSessionTree(
     tasks: sortByPin(tasks, pinnedFiles),
     projectGroups: projects.map((project) => ({
       project,
-      sessions: sortByPin(grouped.get(project.id) ?? [], pinnedFiles),
+      sessions: applySessionOrder(
+        grouped.get(project.id) ?? [],
+        pinnedFiles,
+        sessionOrder[project.id] ?? [],
+      ),
     })),
   };
 }

@@ -1,5 +1,7 @@
 import {
   Archive,
+  ArrowDown,
+  ArrowUp,
   Copy,
   DotsThree,
   EnvelopeSimple,
@@ -44,6 +46,8 @@ const ICONS = {
   unread: <EnvelopeSimple size={16} weight="regular" />,
   archive: <Archive size={16} weight="regular" />,
   trash: <Trash size={16} weight="regular" />,
+  moveUp: <ArrowUp size={16} weight="regular" />,
+  moveDown: <ArrowDown size={16} weight="regular" />,
 } as const;
 
 interface RowMenuProps {
@@ -138,6 +142,24 @@ export function deleteItem(label: string, onSelect: () => void): MenuItem {
     label,
     tone: "danger",
     icon: ICONS.trash,
+    onSelect,
+  };
+}
+
+/**
+ * 「上移 / 下移」条目（docs/design/108 / 109）：长按拖拽排序的键盘/读屏等价入口，
+ * 到列表首尾时禁用（不隐藏——隐藏会让菜单项位置随条目位置跳动）。
+ */
+export function moveItem(
+  direction: "up" | "down",
+  disabled: boolean,
+  onSelect: () => void,
+): MenuItem {
+  return {
+    key: `move-${direction}`,
+    label: translate(direction === "up" ? "sidenav.row.moveUp" : "sidenav.row.moveDown"),
+    icon: direction === "up" ? ICONS.moveUp : ICONS.moveDown,
+    disabled,
     onSelect,
   };
 }

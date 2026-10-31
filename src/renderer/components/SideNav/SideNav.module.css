@@ -603,6 +603,84 @@
   color: var(--color-text-strong);
 }
 
+/* ── 长按拖拽排序（docs/design/108）─────────────────────────────────────
+   被拖行原地淡出、跟手浮层 portal 到 body：侧栏 .nav 带 backdrop-filter，
+   它会让 fixed 后代的包含块变成侧栏自身并被 overflow 裁掉，浮层不能留在树里。 */
+.reorderList {
+  position: relative;
+}
+
+.reorderList[data-reordering] {
+  cursor: grabbing;
+  /* 跟手拖动期间禁止选中项目名（列表行没有可复制的正文） */
+  user-select: none;
+}
+
+/* 指针扫过只是在选落点：抑制行的悬浮位移与操作按钮揭示，避免跟手层旁边一团乱动 */
+.reorderList[data-reordering] .projectMain {
+  transform: none;
+}
+
+.reorderList[data-reordering] .historyTitle {
+  transform: none;
+}
+
+.reorderList[data-reordering] .hoverReveal {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.projectRow[data-dragging] {
+  opacity: 0.35;
+}
+
+/* 会话行拖拽（docs/design/109）：被拖行原地淡出 */
+.historyItem[data-dragging] {
+  opacity: 0.35;
+}
+
+/* 落点线：2px 强调色横条，画在项目组之间的空隙中央（展开的子列表不穿线） */
+.dropLine {
+  position: absolute;
+  right: 6px;
+  left: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+
+/* 项目内会话列表的落点线：列表有树线缩进，线跟着行内容区起点走 */
+.historyDropLine {
+  composes: dropLine;
+  left: calc(var(--spacing-md) + 8px);
+}
+
+/* 跟手浮层里的文字：容器整体 85%，文字再单独压 85%——比卡片底色更早淡出，
+   读起来是「拎起来的一行」而不是一块实心标签，下方列表也能更清楚地透出来。 */
+.dragGhostLabel {
+  opacity: 0.85;
+}
+
+/* 跟手浮层：读成「把这一行拎起来了」，位置由 hook 的指针位移直接写内联样式。
+   85% 透明度：比实心卡片轻一档、仍能透出下方行与落点线，但文字保持清晰。 */
+.dragGhost {
+  position: fixed;
+  z-index: var(--z-float);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 7px var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-text-strong);
+  font-size: var(--font-size-md);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
 .projectActions {
   position: relative;
   z-index: 1;

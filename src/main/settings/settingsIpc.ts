@@ -32,7 +32,12 @@ import {
 import { envelope } from "../ipc/envelope";
 import { onPrefetchSettingChanged } from "../session/speculativePrefetch";
 import { applyTrayEnabled } from "../window/tray";
-import { clampSessionStreamFontPx, SETTABLE_KEYS, sanitizeArchivedSessions } from "./schema";
+import {
+  clampSessionStreamFontPx,
+  SETTABLE_KEYS,
+  sanitizeArchivedSessions,
+  sanitizeSessionOrder,
+} from "./schema";
 import { getSettings, updateSettings } from "./settings";
 
 function asString(value: unknown): string | null {
@@ -125,6 +130,12 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         // 归档表与读盘兜底共用同一份结构校验（docs/design/32）；整表形状非法时丢弃该键，不清空用户归档
         const archived = sanitizeArchivedSessions(value);
         if (archived) clean.archivedSessions = archived;
+        break;
+      }
+      case "sessionOrder": {
+        // 项目内手动顺序（docs/design/109）：整表形状非法时丢弃该键，不清空现有顺序
+        const order = sanitizeSessionOrder(value);
+        if (order) clean.sessionOrder = order;
         break;
       }
       case "browserRecentUrls": {

@@ -40,6 +40,7 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   pinnedSessions: [],
   globalPinnedSessions: [],
   archivedSessions: {},
+  sessionOrder: {},
   browserRecentUrls: [],
   browserViewportWidth: null,
   defaultProjectDir: null,
@@ -100,6 +101,29 @@ export function sanitizeArchivedSessions(value: unknown): Record<string, number>
   return archived;
 }
 
+/**
+ * 项目内手动排序表的结构校验（docs/design/109）：键为项目 id，值为 JSONL 路径数组。
+ * 读盘兜底与 IPC patch 共用：非法条目 / 重复项丢弃；
+ * 空数组等于「该组没有手动顺序」，不落键；整表形状非法返回 undefined（保留旧值）。
+ */
+export function sanitizeSessionOrder(value: unknown): Record<string, string[]> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  const order: Record<string, string[]> = {};
+  for (const [group, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!group || !Array.isArray(raw)) continue;
+    const files: string[] = [];
+    for (const entry of raw) {
+      if (typeof entry === "string" && entry.length > 0 && !files.includes(entry)) {
+        files.push(entry);
+      }
+    }
+    if (files.length > 0) order[group] = files;
+  }
+  return order;
+}
+
 /** 允许通过 IPC 更新的设置键白名单。 */
 export const SETTABLE_KEYS = [
   "projects",
@@ -114,6 +138,7 @@ export const SETTABLE_KEYS = [
   "pinnedSessions",
   "globalPinnedSessions",
   "archivedSessions",
+  "sessionOrder",
   "browserRecentUrls",
   "browserViewportWidth",
   "defaultProjectDir",

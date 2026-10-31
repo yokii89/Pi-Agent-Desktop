@@ -140,6 +140,13 @@ export interface PideskSettings {
    * 浏览 / 恢复 / 删除在设置 → 已归档对话分区进行。
    */
   archivedSessions: Record<string, number>;
+  /**
+   * 项目分组内**未置顶**会话的手动顺序（项目 id → JSONL 绝对路径数组，数组顺序即展示顺序；
+   * docs/design/109）。只有用户拖拽 / 上移下移过的分组才在表里；不在表里的分组保持时间倒序。
+   * 表里存在但没排过的新会话排在该组手动块**之前**——新建的会话仍然出现在最上方。
+   * 工作区置顶的会话不受此表影响，永远按 pinnedSessions 的顺序排在最前。
+   */
+  sessionOrder: Record<string, string[]>;
   /** 浏览器面板最近访问 URL（localhost / 内网优先展示）。 */
   browserRecentUrls: BrowserRecentUrl[];
   /** 浏览器面板响应式视口宽度（px）；null 表示跟随面板宽度。 */

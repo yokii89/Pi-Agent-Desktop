@@ -17,6 +17,7 @@ import {
   deleteItem,
   exportItem,
   markUnreadItem,
+  moveItem,
   openFolderItem,
   pinGlobalItem,
   pinWorkspaceItem,
@@ -51,6 +52,18 @@ interface HistoryItemProps {
   processAlive?: boolean;
   /** 该会话是否正在 running（结束确认文案区分）。 */
   running?: boolean;
+  /** 参与长按拖拽排序（docs/design/109）：置顶行与不可排序列表为 false。 */
+  reorderable?: boolean;
+  /** 正被长按拖动：原行淡出，跟手浮层由列表渲染。 */
+  dragging?: boolean;
+  /** 长按拖动松手后的 click 要吞掉（否则会顺带打开会话）。 */
+  consumeDragClick?: () => boolean;
+  /** 行菜单的「上移 / 下移」；只在可排序行传入，边界项禁用。 */
+  reorderMove?: {
+    canMoveUp: boolean;
+    canMoveDown: boolean;
+    onMove: (direction: -1 | 1) => void;
+  };
   onOpen: () => void;
 }
 
@@ -80,6 +93,10 @@ export function HistoryItem({
   treeLast = false,
   processAlive = false,
   running = false,
+  reorderable = false,
+  dragging = false,
+  consumeDragClick,
+  reorderMove,
   onOpen,
 }: HistoryItemProps) {
   const t = useT();
@@ -133,7 +150,11 @@ export function HistoryItem({
       clearTimer();
       setCardAnchor(null);
     };
-    const onEnter = (): void => show(HOVER_CARD_DELAY);
+    const onEnter = (): void => {
+      // 长按拖拽排序期间不弹详情卡：指针扫过只是在选落点，卡片会压住浮层和落点线
+      if (row.closest("[data-reordering]")) return;
+      show(HOVER_CARD_DELAY);
+    };
     const onFocusIn = (): void => show(0);
     // 键盘聚焦是明确意图，无需等待；focusout 要排除行内按钮之间的焦点转移
     const onFocusOut = (event: FocusEvent): void => {
@@ -189,6 +210,11 @@ export function HistoryItem({
       // 选中药丸（docs/design/54）的落点标记：activeSessionFile 命中本行时高亮滑到这里
       data-side-active={active ? "session" : undefined}
       data-side-hover=""
+      // 长按拖拽排序（docs/design/109）的可拖行标记；置顶行不带，既不能起手也不参与落点
+      data-history-row={reorderable ? "" : undefined}
+      data-reorder-id={reorderable ? session.file : undefined}
+      data-reorder-label={reorderable ? title : undefined}
+      data-dragging={dragging ? "" : undefined}
     >
       {treeDepth !== undefined && <TreeGuideLines depth={treeDepth} last={treeLast} />}
       {renaming ? (
@@ -213,7 +239,16 @@ export function HistoryItem({
           onBlur={(event) => commitRename(event.currentTarget.value)}
         />
       ) : (
-        <button type="button" className={styles.historyMain} disabled={disabled} onClick={onOpen}>
+        <button
+          type="button"
+          className={styles.historyMain}
+          data-reorder-handle={reorderable ? "" : undefined}
+          disabled={disabled}
+          onClick={() => {
+            if (consumeDragClick?.()) return;
+            onOpen();
+          }}
+        >
           <span className={styles.historyTitle}>{title}</span>
           <ExtensionReloadNotice sessionFile={session.file} />
         </button>
@@ -251,6 +286,13 @@ export function HistoryItem({
               setCardAnchor(null);
               togglePin(session.file);
             }),
+            // 手动排序（docs/design/109）：与长按拖动等价，到可见块首尾时禁用
+            ...(reorderMove
+              ? [
+                  moveItem("up", !reorderMove.canMoveUp, () => reorderMove.onMove(-1)),
+                  moveItem("down", !reorderMove.canMoveDown, () => reorderMove.onMove(1)),
+                ]
+              : []),
             // 「结束进程」：仅该会话有存活 pi 实例时显示；结束 ≠ 删除，JSONL 保留
             processAlive
               ? {

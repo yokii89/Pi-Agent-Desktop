@@ -19,6 +19,8 @@ interface ProjectStoreValue {
   ready: boolean;
   selectProject: (id: string | null) => void;
   removeProject: (id: string) => void;
+  /** 把项目挪到列表的新下标（长按拖拽 / 行菜单上移下移共用）；越界夹取，写出设置。 */
+  moveProject: (id: string, toIndex: number) => void;
   /** 通过系统文件夹选择器添加项目；取消/失败返回 null。添加后自动选中。 */
   addProjectByPicker: () => Promise<PideskProject | null>;
 }
@@ -73,6 +75,20 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     [currentProjectId],
   );
 
+  const moveProject = useCallback((id: string, toIndex: number) => {
+    const current = projectsRef.current;
+    const from = current.findIndex((project) => project.id === id);
+    if (from < 0) return;
+    const to = Math.min(Math.max(toIndex, 0), current.length - 1);
+    if (to === from) return;
+    const next = [...current];
+    const [moved] = next.splice(from, 1);
+    if (!moved) return;
+    next.splice(to, 0, moved);
+    setProjects(next);
+    settingsService.set({ projects: next });
+  }, []);
+
   const addProjectByPicker = useCallback(async (): Promise<PideskProject | null> => {
     const settings = await settingsService.get();
     const dir = await projectService.pickDirectory(settings?.defaultProjectDir ?? null);
@@ -104,9 +120,18 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       ready,
       selectProject,
       removeProject,
+      moveProject,
       addProjectByPicker,
     }),
-    [projects, currentProjectId, ready, selectProject, removeProject, addProjectByPicker],
+    [
+      projects,
+      currentProjectId,
+      ready,
+      selectProject,
+      removeProject,
+      moveProject,
+      addProjectByPicker,
+    ],
   );
 
   return <ProjectStoreContext.Provider value={value}>{children}</ProjectStoreContext.Provider>;

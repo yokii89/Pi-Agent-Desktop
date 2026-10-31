@@ -93,6 +93,13 @@ interface SessionMetaValue {
   globalPinnedFiles: string[];
   /** 已归档的会话（JSONL 绝对路径 → 归档时间 Unix ms）；侧栏主列表不展示，管理入口在设置页（docs/design/32）。 */
   archivedFiles: Record<string, number>;
+  /**
+   * 项目分组内未置顶会话的手动顺序（项目 id → JSONL 路径数组；docs/design/109）。
+   * 未登记的分组保持时间倒序；置顶会话不受影响。
+   */
+  sessionOrder: Readonly<Record<string, string[]>>;
+  /** 写入某个项目分组的手动顺序（拖拽落位 / 行菜单上移下移）。 */
+  setSessionOrder: (groupKey: string, files: string[]) => void;
   /** 主进程当前 active 会话是否有存活 pi 进程。 */
   processAlive: boolean;
   /** 存活 pi 进程的会话数（含后台 Tab）；> 0 表示存在任意活跃会话。 */
@@ -375,6 +382,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [pinnedFiles, setPinnedFiles] = useState<string[]>([]);
   const [globalPinnedFiles, setGlobalPinnedFiles] = useState<string[]>([]);
   const [archivedFiles, setArchivedFiles] = useState<Record<string, number>>({});
+  const [sessionOrder, setSessionOrderState] = useState<Record<string, string[]>>({});
+  const sessionOrderRef = useRef<Record<string, string[]>>({});
+  sessionOrderRef.current = sessionOrder;
   const [modelLabel, setModelLabel] = useState("pi");
   const [modelProvider, setModelProvider] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
@@ -1055,6 +1065,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setPinnedFiles(settings.pinnedSessions);
       setGlobalPinnedFiles(settings.globalPinnedSessions);
       setArchivedFiles(settings.archivedSessions);
+      setSessionOrderState(settings.sessionOrder);
     });
     return () => {
       cancelled = true;
@@ -1145,6 +1156,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const commitPinned = useCallback((next: string[]): void => {
     setPinnedFiles(next);
     void settingsService.set({ pinnedSessions: next });
+  }, []);
+
+  /**
+   * 写入某个项目分组的手动顺序（docs/design/109）：传整组未置顶会话的文件数组；
+   * 空数组 = 该组没有手动顺序，直接从表里删掉，不留空键。
+   */
+  const setSessionOrder = useCallback((groupKey: string, files: string[]): void => {
+    const next = { ...sessionOrderRef.current };
+    if (files.length === 0) {
+      if (next[groupKey] === undefined) return;
+      delete next[groupKey];
+    } else {
+      next[groupKey] = files;
+    }
+    sessionOrderRef.current = next;
+    setSessionOrderState(next);
+    void settingsService.set({ sessionOrder: next });
   }, []);
 
   const togglePin = useCallback(
@@ -2084,6 +2112,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       pinnedFiles,
       globalPinnedFiles,
       archivedFiles,
+      sessionOrder,
       processAlive,
       liveSessionCount,
       switchingTo: switchingToFile,
@@ -2105,6 +2134,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ensureSession,
       getSlashCommands,
       newSession,
+      setSessionOrder,
       togglePin,
       toggleGlobalPin,
       markSessionUnread,
@@ -2137,6 +2167,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       pinnedFiles,
       globalPinnedFiles,
       archivedFiles,
+      sessionOrder,
       processAlive,
       liveSessionCount,
       switchingToFile,
@@ -2157,6 +2188,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ensureSession,
       getSlashCommands,
       newSession,
+      setSessionOrder,
       togglePin,
       toggleGlobalPin,
       markSessionUnread,

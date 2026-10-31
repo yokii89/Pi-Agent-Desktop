@@ -123,6 +123,8 @@ export const sidenavMessages = defineMessages({
   "sidenav.projects.noHistory": { "zh-CN": "暂无历史会话", "en-US": "No session history" },
 
   "sidenav.row.moreActions": { "zh-CN": "更多操作", "en-US": "More actions" },
+  "sidenav.row.moveUp": { "zh-CN": "上移", "en-US": "Move up" },
+  "sidenav.row.moveDown": { "zh-CN": "下移", "en-US": "Move down" },
   "sidenav.row.moreActionsFor": {
     "zh-CN": "更多操作：{name}",
     "en-US": "More actions: {name}",

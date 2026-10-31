@@ -36,6 +36,7 @@ export function useActionContext(): ActionContext {
     activeSessionFile,
     pinnedFiles,
     archivedFiles,
+    sessionOrder,
   } = useSessionMeta();
   const { projects } = useProjectStore();
   const { canRollback, rollbackBlockReason, requestRollbackPrompt } = useReviewStore();
@@ -65,6 +66,8 @@ export function useActionContext(): ActionContext {
             excludeArchivedSessions(allSessions, archivedFiles),
             projects,
             pinnedFiles,
+            [],
+            sessionOrder,
           ),
         ).map((session) => ({ file: session.file, cwd: session.cwd })),
         activeFile: activeSessionFile,
@@ -97,6 +100,7 @@ export function useActionContext(): ActionContext {
       activeSessionFile,
       pinnedFiles,
       archivedFiles,
+      sessionOrder,
       projects,
       openSessionFile,
       canRollback,

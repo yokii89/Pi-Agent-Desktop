@@ -22,6 +22,7 @@ function fakeSettings(): PideskSettings {
     pinnedSessions: ["C:/s/a.jsonl"],
     globalPinnedSessions: ["C:/s/c.jsonl"],
     archivedSessions: { "C:/s/b.jsonl": 1 },
+    sessionOrder: { p1: ["C:/s/a.jsonl"] },
     browserRecentUrls: [],
     browserViewportWidth: null,
     defaultProjectDir: "C:/projects",

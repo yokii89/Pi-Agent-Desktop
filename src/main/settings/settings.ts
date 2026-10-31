@@ -24,6 +24,7 @@ import {
   DEFAULT_SETTINGS,
   SETTINGS_FILENAME,
   sanitizeArchivedSessions,
+  sanitizeSessionOrder,
 } from "./schema";
 
 /**
@@ -117,6 +118,8 @@ export function getSettings(): PideskSettings {
     // 归档表同样只保结构：键为路径、值为归档时间的合法条目才保留（docs/design/32）
     archivedSessions:
       sanitizeArchivedSessions(settings.archivedSessions) ?? DEFAULT_SETTINGS.archivedSessions,
+    // 项目内手动顺序同理只保结构（项目 id → 去重后的路径数组）；docs/design/109
+    sessionOrder: sanitizeSessionOrder(settings.sessionOrder) ?? DEFAULT_SETTINGS.sessionOrder,
     maxParallelSessions:
       typeof loaded.maxParallelSessions === "number" &&
       Number.isFinite(loaded.maxParallelSessions) &&
@@ -159,6 +162,7 @@ export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   next.inputBuddy = normalizeInputBuddy(next.inputBuddy);
   next.accentColor = normalizeAccentColor(next.accentColor);
   next.shortcuts = sanitizeShortcutsRecord(next.shortcuts);
+  next.sessionOrder = sanitizeSessionOrder(next.sessionOrder) ?? DEFAULT_SETTINGS.sessionOrder;
   next.splashEnabled = next.splashEnabled !== false;
   next.splashLogoImage = normalizeSplashLogoImage(next.splashLogoImage);
   next.splashLogoSize = clampSplashLogoSize(next.splashLogoSize);
