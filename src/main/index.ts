@@ -17,6 +17,7 @@ import { getSettings, updateSettings } from "./settings/settings";
 import { registerTerminalLifecycle } from "./terminal/terminal";
 import { disposeUpdater, scheduleStartupCheck } from "./updater/updaterService";
 import { disposeViewHost, ensureViewHost } from "./view/viewHost";
+import { registerWallpaperProtocol, registerWallpaperScheme } from "./wallpaper/wallpaperProtocol";
 import { createMainWindow, getMainWindow } from "./window/createMainWindow";
 import { disposeInspectorWindow } from "./window/inspectorWindow";
 import { disposeTray, initTrayFromSettings } from "./window/tray";
@@ -24,6 +25,8 @@ import { disposeTray, initTrayFromSettings } from "./window/tray";
 registerTerminalLifecycle();
 registerBrowserLifecycle();
 registerWatcherLifecycle();
+// 壁纸媒体协议必须在 app ready 之前登记 scheme，窗口才能加载 pidesk-media:// 素材
+registerWallpaperScheme();
 
 /**
  * 后台进程残留锁（docs/design/37 §5.4 P0）：
@@ -78,6 +81,7 @@ function bootstrapEnvironmentProbe(): void {
 
 app.whenReady().then(async () => {
   registerIpc();
+  registerWallpaperProtocol();
   // 旧 settings.sessionTitles → pi session_info：先于窗口，首屏列表就带名字
   try {
     await migrateLegacySessionTitles();

@@ -449,9 +449,66 @@ export const settingsMessages = defineMessages({
   },
 
   "settings.personalization.hint": {
-    "zh-CN": "调整界面字体与会话区阅读密度；改动立即生效并写入本机设置。",
+    "zh-CN": "调整界面字体、背景壁纸与会话区阅读密度；改动立即生效并写入本机设置。",
     "en-US":
-      "Tune UI fonts and reading density in the session stream. Changes apply immediately and are saved.",
+      "Tune UI fonts, the background wallpaper, and reading density in the session stream. Changes apply immediately and are saved.",
+  },
+  "settings.personalization.group.wallpaper": {
+    "zh-CN": "壁纸",
+    "en-US": "Wallpaper",
+  },
+  "settings.personalization.wallpaper": {
+    "zh-CN": "背景壁纸",
+    "en-US": "Background wallpaper",
+  },
+  "settings.personalization.wallpaper.description": {
+    "zh-CN": "选择本机的图片或视频铺满应用背景；文件只在本机读取。",
+    "en-US":
+      "Use a local image or video as the app background. The file is read from this device only.",
+  },
+  "settings.personalization.wallpaper.current": {
+    "zh-CN": "当前：{name}",
+    "en-US": "Current: {name}",
+  },
+  "settings.personalization.wallpaper.choose": {
+    "zh-CN": "选择文件",
+    "en-US": "Choose file",
+  },
+  "settings.personalization.wallpaper.change": {
+    "zh-CN": "更换文件",
+    "en-US": "Change file",
+  },
+  "settings.personalization.wallpaper.remove": {
+    "zh-CN": "移除背景",
+    "en-US": "Remove",
+  },
+  "settings.personalization.wallpaper.unsupported": {
+    "zh-CN": "不支持这个文件格式",
+    "en-US": "This file format isn't supported",
+  },
+  "settings.personalization.wallpaper.dialogTitle": {
+    "zh-CN": "选择背景壁纸",
+    "en-US": "Choose a wallpaper",
+  },
+  "settings.personalization.wallpaper.filterMedia": {
+    "zh-CN": "图片或视频",
+    "en-US": "Images or videos",
+  },
+  "settings.personalization.wallpaper.filterImage": {
+    "zh-CN": "图片",
+    "en-US": "Images",
+  },
+  "settings.personalization.wallpaper.filterVideo": {
+    "zh-CN": "视频",
+    "en-US": "Videos",
+  },
+  "settings.personalization.wallpaperDim": {
+    "zh-CN": "遮罩强度",
+    "en-US": "Scrim strength",
+  },
+  "settings.personalization.wallpaperDim.description": {
+    "zh-CN": "数值越高，背景越淡、文字越清晰。",
+    "en-US": "Higher values fade the wallpaper and keep text crisp.",
   },
   "settings.personalization.group.font": { "zh-CN": "字体", "en-US": "Font" },
   "settings.personalization.streamFont": {

@@ -3,7 +3,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--color-bg);
+  background: var(--color-canvas);
   /*
    * 输入区停靠偏移：默认（终端面板收起/未开）留一档窗口底距；
    * 面板展开时（.inputFlush）切 0——输入区直接坐在面板 border-top 上，

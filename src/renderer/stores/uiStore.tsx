@@ -34,6 +34,11 @@ import { clampSessionStreamFontPx, DEFAULT_SESSION_STREAM_FONT_PX } from "../../
 import { DEFAULT_RAIL_STYLE, normalizeRailStyle, type RailStyle } from "../../shared/railStyles";
 import { normalizeShortcutsMap, type ShortcutsMap } from "../../shared/shortcuts";
 import {
+  clampWallpaperDim,
+  DEFAULT_WALLPAPER_DIM,
+  normalizeWallpaperPath,
+} from "../../shared/wallpaper";
+import {
   BINDABLE_ACTION_IDS,
   type BindableActionId,
   DEFAULT_SHORTCUTS,
@@ -214,6 +219,10 @@ interface UiState {
   questionRailStyle: RailStyle;
   /** 自定义主题色（设置 → 外观）；null = 跟随主题默认，见 applyAccentColor。 */
   accentColor: string | null;
+  /** 本地背景壁纸绝对路径（设置 → 个性化）；null = 主题纯色背景（docs/design/111）。 */
+  wallpaperPath: string | null;
+  /** 壁纸遮罩强度（0–100）：越高背景越淡、正文越清晰。 */
+  wallpaperDim: number;
   /** 输入栏右上角的动物伙伴（设置 → 个性化）；none 表示不显示。 */
   inputBuddy: InputBuddyKind;
   /** 全局快捷键映射（设置 → 键盘快捷键）。 */
@@ -256,6 +265,8 @@ type UiAction =
   | { type: "setFontMonoPreset"; preset: FontMonoPreset }
   | { type: "setQuestionRailStyle"; style: RailStyle }
   | { type: "setAccentColor"; color: string | null }
+  | { type: "setWallpaperPath"; path: string | null }
+  | { type: "setWallpaperDim"; dim: number }
   | { type: "setInputBuddy"; kind: InputBuddyKind }
   | { type: "setShortcut"; id: BindableActionId; combo: string }
   | { type: "resetShortcuts" }
@@ -278,6 +289,8 @@ type UiAction =
       fontMonoPreset: FontMonoPreset;
       questionRailStyle: RailStyle;
       accentColor: string | null;
+      wallpaperPath: string | null;
+      wallpaperDim: number;
       inputBuddy: InputBuddyKind;
       localePreference: LocalePreference;
       shortcuts: ShortcutsMap;
@@ -318,6 +331,8 @@ const initialState: UiState = {
   fontMonoPreset: "default",
   questionRailStyle: DEFAULT_RAIL_STYLE,
   accentColor: null,
+  wallpaperPath: null,
+  wallpaperDim: DEFAULT_WALLPAPER_DIM,
   inputBuddy: DEFAULT_INPUT_BUDDY,
   shortcuts: { ...DEFAULT_SHORTCUTS },
   commandPaletteOpen: false,
@@ -467,6 +482,16 @@ function uiReducer(state: UiState, action: UiAction): UiState {
       if (state.accentColor === color) return state;
       return { ...state, accentColor: color };
     }
+    case "setWallpaperPath": {
+      const path = normalizeWallpaperPath(action.path);
+      if (state.wallpaperPath === path) return state;
+      return { ...state, wallpaperPath: path };
+    }
+    case "setWallpaperDim": {
+      const dim = clampWallpaperDim(action.dim);
+      if (state.wallpaperDim === dim) return state;
+      return { ...state, wallpaperDim: dim };
+    }
     case "setInputBuddy": {
       const kind = normalizeInputBuddy(action.kind);
       if (state.inputBuddy === kind) return state;
@@ -541,6 +566,8 @@ function uiReducer(state: UiState, action: UiAction): UiState {
         fontMonoPreset: normalizeFontMonoPreset(action.fontMonoPreset),
         questionRailStyle: normalizeRailStyle(action.questionRailStyle),
         accentColor: normalizeAccentColor(action.accentColor),
+        wallpaperPath: normalizeWallpaperPath(action.wallpaperPath),
+        wallpaperDim: clampWallpaperDim(action.wallpaperDim),
         inputBuddy: normalizeInputBuddy(action.inputBuddy),
         localePreference,
         locale: resolveLocale(localePreference, navigator.language),
@@ -600,6 +627,8 @@ export function UiProvider({ children }: { children: ReactNode }) {
         fontMonoPreset: settings.fontMonoPreset ?? "default",
         questionRailStyle: settings.questionRailStyle ?? DEFAULT_RAIL_STYLE,
         accentColor: settings.accentColor ?? null,
+        wallpaperPath: settings.wallpaperPath ?? null,
+        wallpaperDim: settings.wallpaperDim ?? DEFAULT_WALLPAPER_DIM,
         inputBuddy: settings.inputBuddy ?? DEFAULT_INPUT_BUDDY,
         localePreference: settings.locale ?? "system",
         shortcuts: settings.shortcuts ?? { ...DEFAULT_SHORTCUTS },
@@ -623,6 +652,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
       fontMonoPreset: state.fontMonoPreset,
       questionRailStyle: state.questionRailStyle,
       accentColor: state.accentColor,
+      wallpaperPath: state.wallpaperPath,
       inputBuddy: state.inputBuddy,
       locale: state.localePreference,
       shortcuts: state.shortcuts,
@@ -638,10 +668,20 @@ export function UiProvider({ children }: { children: ReactNode }) {
     state.fontMonoPreset,
     state.questionRailStyle,
     state.accentColor,
+    state.wallpaperPath,
     state.inputBuddy,
     state.localePreference,
     state.shortcuts,
   ]);
+
+  // 遮罩强度拖动时每帧都变：合并 250ms 再落盘，避免拖一次滑杆写几十次 settings.json
+  useEffect(() => {
+    if (!state.hydrated) return;
+    const timer = window.setTimeout(() => {
+      void settingsService.set({ wallpaperDim: state.wallpaperDim });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [state.hydrated, state.wallpaperDim]);
 
   // 主题属性必须用 layout effect：被动 effect 是子先父后，xterm 这类在被动 effect 里
   // 读 tokens 建配色的子组件会先跑，读到上一套颜色（终端整块不跟主题换）
@@ -668,6 +708,13 @@ export function UiProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     applyAccentColor(state.accentColor, state.theme);
   }, [state.accentColor, state.theme]);
+
+  // 壁纸开关落成根元素标记：tokens.css 据此把 --color-canvas 切成透明；
+  // layout effect 与主题同路，避免首帧先画一层实底再被壁纸顶掉
+  useLayoutEffect(() => {
+    if (state.wallpaperPath) document.documentElement.dataset.wallpaper = "on";
+    else delete document.documentElement.dataset.wallpaper;
+  }, [state.wallpaperPath]);
 
   const navigate = useCallback((page: PageId) => dispatch({ type: "navigate", page }), []);
   const openSidebarTab = useCallback(

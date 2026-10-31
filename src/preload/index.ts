@@ -147,6 +147,7 @@ import {
   SESSION_IPC,
   SETTINGS_IPC,
   TERMINAL_IPC,
+  WALLPAPER_IPC,
   WINDOW_IPC,
 } from "../shared/ipc";
 import type {
@@ -244,6 +245,10 @@ contextBridge.exposeInMainWorld("pidesk", {
       ipcRenderer.invoke(SETTINGS_IPC.set, patch),
   },
 
+  wallpaper: {
+    /** 打开系统文件选择器挑选本地壁纸（图片 / 视频）；取消返回 null。 */
+    pick: (): Promise<IpcResult<string | null>> => ipcRenderer.invoke(WALLPAPER_IPC.pick),
+  },
   notification: {
     /** 订阅主进程推送的提示音播放请求（扩展 SDK notify，docs/design/18）。 */
     onPlay: (callback: (message: NotificationPushMessage) => void): (() => void) =>

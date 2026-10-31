@@ -1239,6 +1239,14 @@
   width: 180px;
 }
 
+/* 个性化 → 背景壁纸：当前文件由说明行展示，控件只放选择 / 移除 */
+.wallpaperActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
 .splashTextFields {
   display: flex;
   flex-direction: column;

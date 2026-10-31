@@ -175,6 +175,10 @@ export interface PideskGlobalApi {
     get(): Promise<IpcResult<PideskSettings>>;
     set(patch: Partial<PideskSettings>): Promise<IpcResult<PideskSettings>>;
   };
+  wallpaper: {
+    /** 打开系统文件选择器挑选本地壁纸（图片 / 视频）；取消返回 null。 */
+    pick(): Promise<IpcResult<string | null>>;
+  };
   notification: {
     /** 订阅主进程提示音播放推送（扩展 SDK）。 */
     onPlay(callback: (message: NotificationPushMessage) => void): () => void;

@@ -17,6 +17,8 @@ function fakeSettings(): PideskSettings {
     terminalTabCompletion: "cycle",
     theme: "dark",
     accentColor: null,
+    wallpaperPath: null,
+    wallpaperDim: 70,
     locale: "zh-CN",
     navCollapsed: true,
     pinnedSessions: ["C:/s/a.jsonl"],
@@ -64,6 +66,9 @@ describe("settingsSync whitelist", () => {
     expect(picked).not.toHaveProperty("piExecutablePath");
     // 标识图片是本机资产，不进 Gist；其余开屏偏好可同步
     expect(picked).not.toHaveProperty("splashLogoImage");
+    // 壁纸路径 / 遮罩都是本机素材的附属状态，同样不进 Gist
+    expect(picked).not.toHaveProperty("wallpaperPath");
+    expect(picked).not.toHaveProperty("wallpaperDim");
     expect(picked.splashTextZh).toBe("求知 · 探索");
     expect(picked.theme).toBe("dark");
     expect(picked.welcomeRecentsEnabled).toBe(true);

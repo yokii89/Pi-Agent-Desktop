@@ -1,0 +1,33 @@
+/**
+ * 全窗口壁纸层（docs/design/111）。
+ *
+ * 挂载在 `.app` 的第一个子节点：`.app` 有 `position: relative` + `isolation: isolate`，
+ * 本层用 `z-index: -1` 落到内容之下、应用底色之上；`.app` 与各页面底座的背景
+ * 在壁纸开启时切成 `--color-canvas`（= transparent），壁纸才透得出来。
+ */
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--color-bg);
+}
+
+.media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* 遮罩取主题底色：暗色主题压暗、亮色主题洗淡，正文对比度两边都靠这条兜住。
+   opacity 用 calc 读强度（0–100），比在 color-mix 里拼百分比更稳。 */
+.veil {
+  position: absolute;
+  inset: 0;
+  background: var(--color-bg);
+  opacity: calc(var(--wallpaper-dim) / 100);
+}

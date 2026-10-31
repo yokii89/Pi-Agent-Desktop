@@ -29,6 +29,7 @@ import {
   isSplashFontPreset,
   isSplashLogoDataUrl,
 } from "../../shared/splash";
+import { clampWallpaperDim, normalizeWallpaperPath } from "../../shared/wallpaper";
 import { envelope } from "../ipc/envelope";
 import { onPrefetchSettingChanged } from "../session/speculativePrefetch";
 import { applyTrayEnabled } from "../window/tray";
@@ -163,6 +164,16 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         // null（恢复默认）是合法值；非法 hex 归一为 null 而不是丢弃整项，
         // 否则渲染层回写时永远清不掉旧值
         clean.accentColor = normalizeAccentColor(value);
+        break;
+      case "wallpaperPath":
+        // null（移除壁纸）是合法值；不支持的扩展名归一为 null，避免写进打不开的路径
+        clean.wallpaperPath = normalizeWallpaperPath(value);
+        break;
+      case "wallpaperDim":
+        // 非法值整项丢弃（保留用户现有强度），合法值夹到 0–100
+        if (typeof value === "number" && Number.isFinite(value)) {
+          clean.wallpaperDim = clampWallpaperDim(value);
+        }
         break;
       case "locale":
         // 白名单外的值整项丢弃，不把脏语言写进设置（渲染层每次回写都带这个键）

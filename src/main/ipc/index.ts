@@ -21,6 +21,7 @@ import { registerUpdaterIpc } from "../updater/updaterIpc";
 import { registerUsageIpc } from "../usage/usageIpc";
 import { registerViewActivateIpc } from "../view/viewActivateIpc";
 import { registerViewIpc } from "../view/viewIpc";
+import { registerWallpaperIpc } from "../wallpaper/wallpaperIpc";
 import { registerInspectorFloatIpc } from "../window/inspectorFloatIpc";
 import { registerWindowIpc } from "../window/windowIpc";
 
@@ -49,6 +50,7 @@ export function registerIpc(): void {
     registerWorkerIpc,
     registerViewIpc,
     registerViewActivateIpc,
+    registerWallpaperIpc,
     registerUpdaterIpc,
     registerInspectorFloatIpc,
   ] as const;

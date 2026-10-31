@@ -21,11 +21,13 @@
      utils/panelGeometry 直写内联宽度，不逐帧改这个继承型变量（docs/design/103）；
      与 --context-sidebar-width 互补，正文内容区靠它让位，两者同值故列宽不跳 */
   --session-monitor-width: 0px;
-  /* 背景保持纯平色，不铺任何径向渐变/环境光——否则四角会透出彩色光斑。
-     顶栏与左右侧栏虽为磨砂玻璃，但这里已没有可变像素可"透"，backdrop-filter
-     仅用于柔化其下方滚动内容；面板与中央区的分界改由各面板自身的
-     --glass-border 细线承担（SideNav 右、ContextSidebar 左、TitleBar 下）。 */
-  background: var(--color-bg);
+  /* 背景默认是纯平色，不铺任何径向渐变/环境光——否则四角会透出彩色光斑。
+     唯一例外是用户自选的本地背景壁纸（docs/design/111）：此时 --color-canvas
+     变为 transparent，壁纸层（WallpaperBackground，z-index:-1）透出来；
+     isolation 让负层只落在本壳内容之下，不跑到窗口外。
+     顶栏与左右侧栏仍是玻璃层，面板分界靠各自的 --glass-border 细线。 */
+  isolation: isolate;
+  background: var(--color-canvas);
 }
 
 .navCollapsed {

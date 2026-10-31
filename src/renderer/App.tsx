@@ -17,6 +17,7 @@ import { SplashGate } from "./components/Splash/SplashGate";
 import { TerminalPanel } from "./components/TerminalPanel/TerminalPanel";
 import { TitleBar } from "./components/TitleBar/TitleBar";
 import { Toast } from "./components/ui/Toast";
+import { WallpaperBackground } from "./components/Wallpaper/WallpaperBackground";
 import { useContextSidebarCollapse } from "./hooks/useContextSidebarCollapse";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import { useNotificationSounds } from "./hooks/useNotificationSounds";
@@ -147,8 +148,15 @@ function TerminalPanelHost() {
 }
 
 function AppLayout() {
-  const { navCollapsed, rightSidebarOpen, rightSidebarWidth, reviewWindowOpen, page } =
-    useUiStore();
+  const {
+    navCollapsed,
+    rightSidebarOpen,
+    rightSidebarWidth,
+    reviewWindowOpen,
+    page,
+    wallpaperPath,
+    wallpaperDim,
+  } = useUiStore();
   const { phase } = useSessionMeta();
   // 右侧侧栏收展走下拉曲线补间（docs/design/53）：mounted/closed 滞后于 store，
   // 收起演完才卸载 aside、才套 sidebarClosed，补间写的就是下面的同一个 CSS 变量
@@ -175,6 +183,7 @@ function AppLayout() {
       // 直写网格轨道与各消费元素，不逐帧改这个继承型变量（见该文件头）
       style={{ "--context-sidebar-width": `${rightSidebarWidth}px` } as CSSProperties}
     >
+      {wallpaperPath ? <WallpaperBackground path={wallpaperPath} dim={wallpaperDim} /> : null}
       <TitleBar />
       <SideNav />
       <main className={styles.main}>

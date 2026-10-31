@@ -150,6 +150,7 @@ import { Play } from "@phosphor-icons/react";
 - 所有颜色、间距、字号只允许引用 `src/renderer/styles/tokens.css` 中定义的 CSS 变量（如 `var(--color-bg)`），组件内禁止写死色值。
 - 主题切换通过在根元素切换 `data-theme` 属性实现（如 `data-theme="dark"`），tokens.css 为每套主题提供同名变量。
 - 磨砂玻璃（顶栏 + 左右侧栏）的**配方**集中在 `src/renderer/styles/glass.module.css`，组件用 CSS Modules 的 `composes` 复用，不要在组件里重写一套玻璃属性；相关令牌为 `--glass-*`。应用背景为纯平色（`--color-bg`），**不得铺彩色环境光/径向渐变**（旧 `--ambient-glow-*` 会在窗口四角透出彩色光斑，已移除）；面板分隔靠各自的 `--glass-border`。
+- **唯一例外是用户自选的本地背景壁纸**（设置 → 个性化 → 壁纸，docs/design/111）：壁纸层在 `components/Wallpaper/`，页面底座改用 `--color-canvas`（壁纸开启时透明），遮罩跟主题取色；素材只从本机读取、不进仓库与设置同步。除此之外仍不得铺环境光/渐变。
 - tokens.css 当前为占位初始值，调整色板以更新该文件为准。
 
 ## 代码风格

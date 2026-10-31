@@ -5,6 +5,17 @@
  * 组件内禁止写死色值，只允许引用此处的变量。
  */
 
+/* 页面底座（应用壳 / 会话区 / 功能页）专用底色：默认等于主题底色；
+   用户启用本地背景壁纸时切成透明，让壁纸层透出来（docs/design/111）。
+   弹出层、输入框、卡片仍用 --color-bg，不跟着透明。 */
+:root {
+  --color-canvas: var(--color-bg);
+}
+
+:root[data-wallpaper="on"] {
+  --color-canvas: transparent;
+}
+
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;

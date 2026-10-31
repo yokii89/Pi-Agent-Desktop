@@ -19,6 +19,7 @@ import {
   DEFAULT_SPLASH_TEXT_SUB,
   DEFAULT_SPLASH_TEXT_ZH,
 } from "../../shared/splash";
+import { DEFAULT_WALLPAPER_DIM } from "../../shared/wallpaper";
 
 /** 设置 schema 当前版本；未来字段迁移时递增并编写迁移逻辑。 */
 export const SETTINGS_VERSION = 1;
@@ -35,6 +36,9 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   theme: "dark",
   // 自定义主题色；null = 跟随主题默认蓝（tokens.css 的 --color-accent）
   accentColor: null,
+  // 本地背景壁纸（docs/design/111）；null = 主题纯色背景
+  wallpaperPath: null,
+  wallpaperDim: DEFAULT_WALLPAPER_DIM,
   locale: "system",
   navCollapsed: false,
   pinnedSessions: [],
@@ -133,6 +137,8 @@ export const SETTABLE_KEYS = [
   "terminalTabCompletion",
   "theme",
   "accentColor",
+  "wallpaperPath",
+  "wallpaperDim",
   "locale",
   "navCollapsed",
   "pinnedSessions",

@@ -123,6 +123,13 @@ export interface PideskSettings {
   theme: ThemeId;
   /** 自定义主题色（#RRGGBB），覆盖 tokens.css 的 --color-accent 及其派生令牌；null = 跟随主题默认。 */
   accentColor: string | null;
+  /**
+   * 本地背景壁纸的绝对路径；null = 使用主题纯色背景（docs/design/111）。
+   * 图片 / 视频由扩展名判定，素材只留在本机、不进设置同步。
+   */
+  wallpaperPath: string | null;
+  /** 壁纸遮罩强度（0–100）：数值越高背景越淡、正文越清晰；见 shared/wallpaper。 */
+  wallpaperDim: number;
   /** 界面语言；system 跟随 OS，否则固定 zh-CN / en-US。 */
   locale: LocalePreference;
   /** 侧边栏默认折叠。 */
@@ -228,6 +235,11 @@ export function clampSessionStreamFontPx(value: unknown): number {
 export const SETTINGS_IPC = {
   get: "pidesk:settings:get",
   set: "pidesk:settings:set",
+} as const;
+
+export const WALLPAPER_IPC = {
+  /** 打开系统文件选择器挑选本地壁纸；取消返回 null（是否支持由渲染层校验并提示）。 */
+  pick: "pidesk:wallpaper:pick",
 } as const;
 
 export const PROJECT_IPC = {
