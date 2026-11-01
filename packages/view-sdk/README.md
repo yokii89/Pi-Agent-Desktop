@@ -852,6 +852,27 @@ For a bare scheduler (not bound to a session) use `createViewFrameScheduler()`.
 Reconnection stays with `superviseSlot`: the scheduler owns *when*, the session
 owns *whether the wire exists*.
 
+## Host discovery (env + rendezvous)
+
+`connectDesktopView()` resolves the Host in this order:
+
+1. **rendezvous file** at `PIDESK_VIEW_RENDEZVOUS` / `PI_VIEW_RENDEZVOUS` — written by the
+   PiDesk View Host, one file **per PiDesk instance** (`%TMP%/pidesk-view-host-<pid>.json`).
+   Reading it lets a client survive a Host restart (new pipe name / port, new token).
+2. **baked spawn env** — `PIDESK_VIEW_ENDPOINT` + `PIDESK_VIEW_TOKEN`, injected when the pi
+   process was started.
+
+If the endpoint from (1) cannot be reached — connect fails, **or** the Host drops the socket
+before `hello` because the token is not its own — the client retries once against (2) and,
+when that differs, **latches onto it** for the life of the client (`refreshEnv()` stops
+reading the file). Before 0.5.2 a stale/hijacked file was fatal: a second PiDesk instance
+(dev build + installed app) overwrote the shared singleton, and every session of the first
+instance silently fell back to the TUI/RPC path — which is how `ask_user_question`'s desktop
+questionnaire disappeared (`docs/design/122`).
+
+In-memory identity always wins over a re-read env: `sessionId` (possibly changed via
+`setSessionId()`) and the connection `role` survive both refresh paths.
+
 ## Telling "user cancelled" from "host refused"
 
 ```ts
@@ -900,6 +921,7 @@ in Host / this SDK; the rest are open protocol or Host items.
 | `select` ignored option `description` | **Fixed** | Host renders `label — description` in the native `<option>`. |
 | Dependent controls (e.g. thinking levels follow model) need full-tree update | Works | `session.update(buildSpec())` after `change`; keep control `id`s stable. |
 | Extension modules can form static import cycles when both use the SDK | Packaging | Put shared constants in a leaf module; lazy-`import()` the desktop path from the TUI module if needed. |
+| A second PiDesk instance could hijack the shared rendezvous file → desktop path silently unavailable | **Fixed (0.5.2)** | The Host now writes one rendezvous file per instance and reclaims stale ones by pid; the client falls back to the baked spawn-time endpoint (and latches) when the file's Host is unreachable. See “Host discovery (env + rendezvous)”. |
 | SDK not published to npm | **Fixed** | Published to npmjs.org as `@pidesk/view-sdk` 0.2.0 under the public `pidesk` organization (`publishConfig.access: "public"`), so a public `pi install` no longer needs vendoring. Consumers developing against a local PiDesk checkout may still use `file:../../../pidesk/packages/view-sdk`, which requires `dist/` to exist (`pnpm install` runs it via `prepare`). |
 | `placementRequired` did not reject an unknown placement | **Fixed** | `resolvePlacement` used to fold any unknown string to `modal` **before** consulting `required`, so the rejection branch was unreachable while all eight slots exist — the flag only caught "known but unimplemented". It now asks "is this a known slot?" first: an explicit non-enum name (a typo, or a slot a newer SDK invented) + `placementRequired: true` is rejected with `code: "placement"`, exactly as `ViewSpec`'s JSDoc and `docs/design/08` §5.3.3 promised. An **omitted** `placement` is still the documented `modal` default and is never rejected. Pre-checking `hello.placements` stays the cheap path (`openPanelResult`'s `code: "placement"`), but it is no longer the only one. Decision recorded in `docs/design/20` §6.2. |
 | No JSON Patch / partial update | **Fixed (P2)** | Envelope type `patch` + Host capability `view-patch`. `session.patch({ ops })` replaces subtrees by child-index path (`[]` = whole root); soft `false` on older Hosts → fall back to full `update()`. Renderer still receives a merged full tree. See `docs/design/19` §10.3. |

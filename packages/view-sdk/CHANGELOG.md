@@ -1,5 +1,33 @@
 # @pidesk/view-sdk
 
+## 0.5.2 — 2026-11-01
+**Rendezvous hijack resilience** (PiDesk `docs/design/122`). No wire, capability
+or public API change; additive behaviour only, safe for `^0.5.1` consumers.
+
+```bash
+npm install @pidesk/view-sdk@0.5.2
+```
+
+- **Fall back to the spawn-time endpoint** when the Host named in the rendezvous
+  file cannot be reached. The file lives in `os.tmpdir()` and used to be a
+  singleton, so a second PiDesk instance (dev build + installed app, or an
+  elevated process) could point it at its own pipe and hijack every session of
+  the first instance — on Windows that surfaces as `connect EPERM`, and the
+  extension's own `catch` turned it into a silent TUI/RPC fallback. Order is now:
+  current endpoint → refreshed rendezvous (Host restart, unchanged from 0.5.1) →
+  spawn env with the rendezvous variables ignored. Once that fallback is taken it
+  is latched for the life of the client, so `refreshEnv()` no longer reads the
+  hijacked file back in.
+- **A peer that closes the socket before `hello` is now a connect failure.** The
+  Host destroys unauthenticated sockets without a word, so a wrong token used to
+  leave the client `ready` with `hello === null` and pushed the failure into
+  `open()` as a timeout. It now rejects, which lets the fallback above run.
+- **In-memory identity wins.** Neither path overwrites `sessionId` (possibly
+  changed via `setSessionId()`) or the connection `role`.
+- Returns are unchanged when the fallback cannot apply: with no usable spawn env
+  the original connect error still propagates — the SDK never pretends to be
+  connected.
+
 ## 0.5.1 — 2026-10-28
 
 **Access-mode contribution helper + public manifest subset** (PiDesk
