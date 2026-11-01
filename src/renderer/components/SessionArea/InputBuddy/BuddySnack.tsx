@@ -47,6 +47,44 @@ export function BuddySnack({ kind }: BuddySnackProps) {
             <path d="M 0 -13 L 0 13" fill="none" strokeWidth={3.5} />
           </>
         )}
+        {kind === "pea" && (
+          <>
+            {/* 裂开的豆荚：三颗豌豆露在外面，吃相才看得懂 */}
+            <path
+              className={styles.peaLeafLight}
+              d="M -34 4 C -28 -16, 20 -18, 32 -2 C 36 12, -28 20, -34 4 Z"
+              strokeWidth={4.5}
+            />
+            <path className={styles.peaVein} d="M -28 2 C -8 10, 12 8, 28 -2" strokeWidth={3} />
+            <circle className={styles.peaBall} cx="-15" cy="2" r="6.5" strokeWidth={3} />
+            <circle className={styles.peaBall} cx="0" cy="4" r="6.5" strokeWidth={3} />
+            <circle className={styles.peaBall} cx="15" cy="2" r="6.5" strokeWidth={3} />
+          </>
+        )}
+        {kind === "steve" && (
+          <>
+            {/* 我的世界的苹果：切角方块 + 像素高光 + 短梗与阶梯叶 */}
+            <path
+              className={styles.steveApple}
+              d="M -19 0 L -12 -6 L 12 -6 L 19 0 L 19 13 L 12 21 L -12 21 L -19 13 Z"
+              strokeWidth={4.5}
+            />
+            <rect
+              className={styles.steveAppleLight}
+              x={-13}
+              y={-1}
+              width={9}
+              height={7}
+              stroke="none"
+            />
+            <rect className={styles.steveHair} x={-4} y={-17} width={8} height={13} stroke="none" />
+            <path
+              className={styles.steveAppleLeaf}
+              d="M 4 -17 L 12 -22 L 23 -17 L 23 -13 L 12 -12 L 4 -14 Z"
+              strokeWidth={3.5}
+            />
+          </>
+        )}
       </g>
     </g>
   );

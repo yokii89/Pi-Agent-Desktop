@@ -206,7 +206,7 @@ export function PersonalizationPanel() {
       <SettingsSection title={t("settings.personalization.group.buddy")}>
         <SettingRow
           // 形象比名字更好认：每一格直接给默认姿态的 SVG，形名只留在读屏与悬停提示里。
-          // 档位会随新形象增加而变宽（已 5 款），故不像其余条目那样贴在右侧控件列。
+          // 档位会随新形象增加而变宽（已 7 款），故不像其余条目那样贴在右侧控件列。
           stack
           label={t("settings.personalization.buddy")}
           description={t("settings.personalization.buddy.description")}

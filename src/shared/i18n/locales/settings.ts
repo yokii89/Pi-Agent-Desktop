@@ -659,7 +659,7 @@ export const settingsMessages = defineMessages({
     "en-US": "Input companion",
   },
   "settings.personalization.buddy": {
-    "zh-CN": "动物形象",
+    "zh-CN": "伙伴形象",
     "en-US": "Mascot",
   },
   "settings.personalization.buddy.description": {
@@ -686,6 +686,14 @@ export const settingsMessages = defineMessages({
   "settings.personalization.buddy.option.capy": {
     "zh-CN": "卡皮巴拉",
     "en-US": "Capybara",
+  },
+  "settings.personalization.buddy.option.pea": {
+    "zh-CN": "豌豆射手",
+    "en-US": "Peashooter",
+  },
+  "settings.personalization.buddy.option.steve": {
+    "zh-CN": "史蒂夫",
+    "en-US": "Steve",
   },
 
   "settings.config.group.runtime": {

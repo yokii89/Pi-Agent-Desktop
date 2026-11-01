@@ -11,7 +11,7 @@ export function BuddyEffects() {
   return (
     <>
       {/* 思考中：缺一小口的圆环（转起来就是加载圈）。位置必须在角色轮廓之外——
-          这一色是「应用背景上的记号色」，压到浅色毛面上会整圈消失（狗耳右侧的空档刚好四款共用）。 */}
+          这一色是「应用背景上的记号色」，压到浅色毛面上会整圈消失（狗耳右侧的空档刚好各款共用）。 */}
       <g data-part="thinking" className={styles.mark} fill="none" strokeWidth={5.5}>
         <g data-part="thinking-spinner">
           {/* 缺口摆到左上：正右方的缺口在静止帧里会被读成一个字母 C */}

@@ -6,6 +6,8 @@ import { BuddyCapy } from "./BuddyCapy";
 import { BuddyCat } from "./BuddyCat";
 import { BuddyDog } from "./BuddyDog";
 import { BuddyParrot } from "./BuddyParrot";
+import { BuddyPea } from "./BuddyPea";
+import { BuddySteve } from "./BuddySteve";
 import type { BuddyPose } from "./buddyPose";
 import styles from "./InputBuddy.module.css";
 import { useBuddyMood } from "./useBuddyMood";
@@ -48,7 +50,7 @@ interface InputBuddyProps {
 }
 
 /**
- * 输入栏右上角的动物伙伴：装饰 + 点击彩蛋。
+ * 输入栏右上角的伙伴形象：装饰 + 点击彩蛋。
  * 常态姿态跟随会话状态（生成中思考、收口时庆祝/头晕/委屈、投喂时进食）；
  * 点一下随机换个表情，误触发送时生气一下，都不写回任何业务 store。
  */
@@ -125,6 +127,8 @@ export function InputBuddy({ kind, running, switching, alert, sessionId, ref }: 
       {kind === "cat" && <BuddyCat pose={pose} />}
       {kind === "parrot" && <BuddyParrot pose={pose} />}
       {kind === "capy" && <BuddyCapy pose={pose} />}
+      {kind === "pea" && <BuddyPea pose={pose} />}
+      {kind === "steve" && <BuddySteve pose={pose} />}
     </button>
   );
 }

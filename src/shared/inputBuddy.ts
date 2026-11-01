@@ -1,8 +1,8 @@
 /**
- * 输入栏动物伙伴（docs/动物形象 中用户设计的四款形象）。
+ * 输入栏伙伴（docs/动物形象 中用户设计的四款动物 + 豌豆射手 / 史蒂夫）。
  * 纯装饰：不进会话数据、不参与发送，只把用户偏好持久化到 settings.json。
  */
-export const INPUT_BUDDY_KINDS = ["none", "dog", "cat", "parrot", "capy"] as const;
+export const INPUT_BUDDY_KINDS = ["none", "dog", "cat", "parrot", "capy", "pea", "steve"] as const;
 
 export type InputBuddyKind = (typeof INPUT_BUDDY_KINDS)[number];
 

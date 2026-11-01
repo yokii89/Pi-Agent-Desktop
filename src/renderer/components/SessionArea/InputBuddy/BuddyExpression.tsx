@@ -8,7 +8,7 @@ interface BuddySpecialEyesProps {
   size: number;
 }
 
-/** 四款角色共用的特殊五官；可见性由 SVG 的 data-pose 统一控制。 */
+/** 各款角色共用的特殊五官；可见性由 SVG 的 data-pose 统一控制。 */
 export function BuddySpecialEyes({ left, right, y, size }: BuddySpecialEyesProps) {
   const brow = size * 1.7;
   const droop = size * 1.5;

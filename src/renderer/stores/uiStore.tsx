@@ -223,7 +223,7 @@ interface UiState {
   wallpaperPath: string | null;
   /** 壁纸遮罩强度（0–100）：越高背景越淡、正文越清晰。 */
   wallpaperDim: number;
-  /** 输入栏右上角的动物伙伴（设置 → 个性化）；none 表示不显示。 */
+  /** 输入栏右上角的伙伴形象（设置 → 个性化）；none 表示不显示。 */
   inputBuddy: InputBuddyKind;
   /** 全局快捷键映射（设置 → 键盘快捷键）。 */
   shortcuts: ShortcutsMap;

@@ -4,6 +4,8 @@ import { BuddyCapy } from "../SessionArea/InputBuddy/BuddyCapy";
 import { BuddyCat } from "../SessionArea/InputBuddy/BuddyCat";
 import { BuddyDog } from "../SessionArea/InputBuddy/BuddyDog";
 import { BuddyParrot } from "../SessionArea/InputBuddy/BuddyParrot";
+import { BuddyPea } from "../SessionArea/InputBuddy/BuddyPea";
+import { BuddySteve } from "../SessionArea/InputBuddy/BuddySteve";
 import styles from "./BuddySwatch.module.css";
 
 /** 「无」档的占位图形尺寸：与会话区伙伴的空槽位视觉重量对齐，不抢小动物的焦点。 */
@@ -40,6 +42,8 @@ export function BuddySwatch({ kind, label, selected, disabled, onSelect }: Buddy
         {kind === "cat" && <BuddyCat pose="idle" />}
         {kind === "parrot" && <BuddyParrot pose="idle" />}
         {kind === "capy" && <BuddyCapy pose="idle" />}
+        {kind === "pea" && <BuddyPea pose="idle" />}
+        {kind === "steve" && <BuddySteve pose="idle" />}
         {kind === "none" && (
           <CircleDashed size={EMPTY_ICON_SIZE} weight="regular" className={styles.empty} />
         )}

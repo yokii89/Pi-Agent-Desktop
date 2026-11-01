@@ -767,7 +767,7 @@ export function TaskInput({ variant }: TaskInputProps) {
         className={[styles.inputBox, variant === "session" ? styles.inputSession : ""].join(" ")}
         data-max={thinkingAtTop ? "" : undefined}
       >
-        {/* 动物伙伴：骑在输入卡右上沿，纯装饰；姿态只跟随会话状态（设置 → 个性化）。
+        {/* 伙伴形象：骑在输入卡右上沿，纯装饰；姿态只跟随会话状态（设置 → 个性化）。
             排队托盘展开时收起，避免压住托盘右侧动作。 */}
         {!queueOccupied && (
           <InputBuddy

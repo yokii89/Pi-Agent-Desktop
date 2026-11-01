@@ -247,7 +247,7 @@
   --glass-blur: 24px;
   --glass-saturate: 150%;
 
-  /* 输入栏伙伴（docs/动物形象）：角色插画自身的配色，不属于 UI 语义色。
+  /* 输入栏伙伴（docs/动物形象 + 植物大战僵尸）：角色插画自身的配色，不属于 UI 语义色。
      ink 是压在浅色毛面上的线稿色，两套主题同值；mark 是直接落在应用背景上的
      记号（胡须 / 问号 / Zzz / 警觉射线 / 音符），深底必须提亮，否则整组看不见。 */
   --buddy-ink: #2b2824;
@@ -281,6 +281,25 @@
   --buddy-capy-heart: #ff8c7a;
   --buddy-capy-bubble: #d8f3fa;
   --buddy-capy-sweat: #7ec8e3;
+  /* 豌豆射手：亮绿脑袋 + 深绿叶片，炮口内壁与豆粒各拉一档明暗 */
+  --buddy-pea-coat: #74c94a;
+  --buddy-pea-shade: #56a832;
+  --buddy-pea-leaf: #4f9e2d;
+  --buddy-pea-leaf-light: #9bdd63;
+  --buddy-pea-mouth: #2e571f;
+  --buddy-pea-ball: #b6e96d;
+  /* 史蒂夫：我的世界像素风——肤 / 发 / 嘴 / 瞳各一档，青色短袖与苹果单独拉明暗 */
+  --buddy-steve-skin: #c89a72;
+  --buddy-steve-skin-shade: #a97c58;
+  --buddy-steve-hair: #5b3d24;
+  --buddy-steve-hair-shade: #4a3019;
+  --buddy-steve-mouth: #221812;
+  --buddy-steve-iris: #3e3e8c;
+  --buddy-steve-shirt: #00a8a0;
+  --buddy-steve-shirt-shade: #008f88;
+  --buddy-steve-apple: #d23a2c;
+  --buddy-steve-apple-light: #e85a4a;
+  --buddy-steve-apple-leaf: #4f9e2d;
 }
 
 :root[data-theme="light"] {
@@ -406,6 +425,25 @@
   --buddy-capy-heart: #ff8c7a;
   --buddy-capy-bubble: #d8f3fa;
   --buddy-capy-sweat: #7ec8e3;
+  /* 豌豆射手：亮绿脑袋 + 深绿叶片，炮口内壁与豆粒各拉一档明暗 */
+  --buddy-pea-coat: #74c94a;
+  --buddy-pea-shade: #56a832;
+  --buddy-pea-leaf: #4f9e2d;
+  --buddy-pea-leaf-light: #9bdd63;
+  --buddy-pea-mouth: #2e571f;
+  --buddy-pea-ball: #b6e96d;
+  /* 史蒂夫：我的世界像素风——肤 / 发 / 嘴 / 瞳各一档，青色短袖与苹果单独拉明暗 */
+  --buddy-steve-skin: #c89a72;
+  --buddy-steve-skin-shade: #a97c58;
+  --buddy-steve-hair: #5b3d24;
+  --buddy-steve-hair-shade: #4a3019;
+  --buddy-steve-mouth: #221812;
+  --buddy-steve-iris: #3e3e8c;
+  --buddy-steve-shirt: #00a8a0;
+  --buddy-steve-shirt-shade: #008f88;
+  --buddy-steve-apple: #d23a2c;
+  --buddy-steve-apple-light: #e85a4a;
+  --buddy-steve-apple-leaf: #4f9e2d;
 }
 
 /* 启动动画（开屏）：跟随主题——深色档黑底白字，浅色档白底黑字；
