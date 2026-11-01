@@ -253,7 +253,7 @@ export function Composer({
     }
     for (const node of root.querySelectorAll<HTMLElement>(`[${SLASH_CMD_ATTR}]`)) {
       const isSkill = isSkillCommand(node.getAttribute(SLASH_CMD_ATTR) ?? "");
-      node.className = isSkill ? `${styles.slashChip} ${styles.slashChipSkill}` : styles.slashChip;
+      node.className = styles.slashChip;
       // HMR / 旧芯片可能缺图标壳：统一补齐，避免只有文案没有 PuzzlePiece
       if (isSkill && !node.querySelector("[data-skill-icon]")) {
         node.insertBefore(
@@ -264,7 +264,7 @@ export function Composer({
       for (const child of node.children) {
         if (!(child instanceof HTMLElement)) continue;
         if (child.getAttribute("aria-hidden") === "true") child.className = styles.fileIcon;
-        else child.className = isSkill ? styles.labelFull : styles.label;
+        else child.className = styles.label;
       }
     }
     for (const node of root.querySelectorAll<HTMLElement>(`[${EL_ID_ATTR}]`)) {

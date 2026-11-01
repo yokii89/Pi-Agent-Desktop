@@ -37,10 +37,12 @@
   margin: 0 2px;
   padding: 2px 6px;
   box-sizing: border-box;
+  max-width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-elevated);
-  color: var(--color-text);
+  /* 芯片文字跟随主题色（设置 → 外观 → 主题色），与用户气泡同一取色思路 */
+  color: var(--color-accent);
   /* 与输入栏正文同字号；写死 12px 会比「达娃大」这类正文小一圈 */
   font-size: inherit;
   font-weight: 500;
@@ -54,23 +56,12 @@
 .fileChip:hover {
   border-color: var(--color-border-strong);
   background: var(--color-bg-hover);
+  color: var(--color-accent-hover);
 }
 
 /* / 斜杠命令芯片：与 @ 文件芯片同一视觉（背景同 --color-bg-elevated） */
 .slashChip {
   composes: fileChip;
-}
-
-/* 技能芯片：允许撑开，全名不截断 */
-.slashChipSkill {
-  max-width: none;
-}
-
-.labelFull {
-  max-width: none;
-  overflow: visible;
-  text-overflow: clip;
-  white-space: nowrap;
 }
 
 /* JetBrains 文件图标 / Phosphor 文件夹 — 与候选栏 16px 一致 */
@@ -81,7 +72,8 @@
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  color: var(--color-text-muted);
+  /* 品牌 SVG 自带颜色；文件夹 / 技能等 currentColor 图标跟随芯片文字色（主题色） */
+  color: inherit;
   line-height: 0;
 }
 
@@ -93,9 +85,9 @@
   object-fit: contain;
 }
 
+/* 文件名一律显示完整：不做 max-width + ellipsis。
+   超长名（带空格或多行内芯片撞满一行）才在芯片内换行，不把输入栏撑出横向滚动 */
 .label {
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

@@ -24,14 +24,14 @@ export function createSkillIconShell(skillIcon?: Node | null): HTMLElement {
 
 /**
  * 输入栏 / 斜杠命令原子芯片：视觉与 @ 文件芯片一致（同一背景令牌）。
- * 技能带 PuzzlePiece 图标且全名不截断；普通命令保持紧凑 label。
+ * 技能带 PuzzlePiece 图标；命令名一律全名展示，不截断。
  */
 export function createSlashChip(name: string, skillIcon?: Node | null): HTMLElement {
   const chip = document.createElement("span");
   chip.contentEditable = "false";
   chip.setAttribute(SLASH_CMD_ATTR, name);
   const skill = isSkillCommand(name);
-  chip.className = skill ? `${styles.slashChip} ${styles.slashChipSkill}` : styles.slashChip;
+  chip.className = styles.slashChip;
   chip.dataset.label = name;
   chip.title = `/${name}`;
 
@@ -40,7 +40,7 @@ export function createSlashChip(name: string, skillIcon?: Node | null): HTMLElem
   }
 
   const label = document.createElement("span");
-  label.className = skill ? styles.labelFull : styles.label;
+  label.className = styles.label;
   label.textContent = `/${name}`;
 
   chip.append(label);

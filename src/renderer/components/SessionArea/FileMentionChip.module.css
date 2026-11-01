@@ -44,10 +44,8 @@ button.chip:focus-visible {
   object-fit: contain;
 }
 
+/* 文件名一律显示完整（与输入栏芯片同一口径），超长时才在芯片内换行 */
 .label {
   min-width: 0;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
