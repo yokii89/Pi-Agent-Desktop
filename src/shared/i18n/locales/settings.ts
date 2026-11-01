@@ -1180,6 +1180,40 @@ export const settingsMessages = defineMessages({
     "zh-CN": "注册表：{path}",
     "en-US": "Registry: {path}",
   },
+  "settings.models.credential.originPiBadge": {
+    "zh-CN": "来自 pi",
+    "en-US": "From pi",
+  },
+  "settings.models.credential.sourceMissingBadge": {
+    "zh-CN": "pi 中已失效",
+    "en-US": "Missing in pi",
+  },
+  "settings.models.credential.unlinked": {
+    "zh-CN": "已取消继承「{name}」，pi 登录保持不变",
+    "en-US": "Stopped inheriting “{name}”; pi login is unchanged",
+  },
+
+  "settings.models.inherit.title": {
+    "zh-CN": "从 pi 继承",
+    "en-US": "Inherit from pi",
+  },
+  "settings.models.inherit.description": {
+    "zh-CN": "pi CLI 中已登录、但 PiDesk 尚未收录的凭据。导入只建立引用，不会修改 pi 的登录文件。",
+    "en-US":
+      "Credentials already signed in through pi CLI but not listed here yet. Importing only links them; pi's login files are left untouched.",
+  },
+  "settings.models.inherit.import": {
+    "zh-CN": "导入",
+    "en-US": "Import",
+  },
+  "settings.models.inherit.imported": {
+    "zh-CN": "已继承「{name}」",
+    "en-US": "Inherited “{name}”",
+  },
+  "settings.models.inherit.importFailed": {
+    "zh-CN": "导入失败",
+    "en-US": "Import failed",
+  },
 
   "settings.models.overrides.title": {
     "zh-CN": "模型能力",

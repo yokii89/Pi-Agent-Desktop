@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { app } from "electron";
-import type { PiAuthProviderStatus, PiAuthSnapshot, PiAuthUpsertRequest } from "../../shared/ipc";
+import type {
+  PiAuthProviderStatus,
+  PiAuthSnapshot,
+  PiAuthUpsertRequest,
+  PiImportableProvider,
+} from "../../shared/ipc";
 import {
   extractSecret,
   isGatewayProvider,
@@ -25,6 +30,11 @@ interface StoredCredential {
   id: string;
   name: string;
   provider: string;
+  /**
+   * pidesk = PiDesk 创建，激活时重写 auth.json；
+   * pi = 从 pi CLI 已有登录继承，激活只切默认 provider，不改写 auth.json。
+   */
+  origin: "pidesk" | "pi";
   kind: "api_key" | "oauth" | "unknown";
   /** 明文密钥，只存主进程侧文件（0600）。 */
   secret: string | null;
@@ -62,7 +72,9 @@ function emptyFile(): CredentialsFile {
   return { version: FILE_VERSION, credentials: [], activeByProvider: {}, activeCredentialId: null };
 }
 
-function isStoredCredential(value: unknown): value is StoredCredential {
+function isStoredCredential(
+  value: unknown,
+): value is Omit<StoredCredential, "origin"> & { origin?: unknown } {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const r = value as Record<string, unknown>;
   return typeof r.id === "string" && typeof r.provider === "string";
@@ -74,9 +86,15 @@ function readRegistryLenient(): CredentialsFile {
     const parsed = JSON.parse(stripBom(raw)) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return emptyFile();
     const record = parsed as Partial<CredentialsFile>;
-    const credentials = Array.isArray(record.credentials)
-      ? record.credentials.filter(isStoredCredential)
-      : [];
+    // 旧注册表没有 origin：默认按 PiDesk 创建处理（与当时行为一致）
+    const credentials = (
+      Array.isArray(record.credentials) ? record.credentials.filter(isStoredCredential) : []
+    ).map(
+      (credential): StoredCredential => ({
+        ...credential,
+        origin: credential.origin === "pi" ? "pi" : "pidesk",
+      }),
+    );
     const activeByProvider: Record<string, string> = {};
     if (record.activeByProvider && typeof record.activeByProvider === "object") {
       for (const [provider, id] of Object.entries(record.activeByProvider)) {
@@ -119,7 +137,6 @@ function migrateFromAuthJsonIfEmpty(): CredentialsFile {
     const type = typeof record.type === "string" ? record.type : null;
     const kind: StoredCredential["kind"] =
       type === "api_key" ? "api_key" : type === "oauth" ? "oauth" : "unknown";
-    const secret = extractSecret(record);
     const baseUrl = typeof record.baseUrl === "string" && record.baseUrl ? record.baseUrl : null;
     const api = typeof record.api === "string" && record.api ? record.api : null;
     const preferredModel =
@@ -135,8 +152,10 @@ function migrateFromAuthJsonIfEmpty(): CredentialsFile {
       id,
       name: providerLabel(provider),
       provider,
+      // 来自 auth.json = 现有登录属于 pi：只建立引用，不复制密钥、激活时不重写
+      origin: "pi",
       kind,
-      secret,
+      secret: null,
       baseUrl,
       api,
       preferredModel,
@@ -158,6 +177,33 @@ function migrateFromAuthJsonIfEmpty(): CredentialsFile {
   return registry;
 }
 
+function asAuthRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function describeAuthRecord(record: Record<string, unknown>): {
+  kind: StoredCredential["kind"];
+  secret: string | null;
+  expiresAt: number | null;
+  /** 带 refresh 的 OAuth 由 pi 自动续期，到期不应显示「已过期」。 */
+  renewable: boolean;
+} {
+  const type = typeof record.type === "string" ? record.type : null;
+  const kind: StoredCredential["kind"] =
+    type === "api_key" ? "api_key" : type === "oauth" ? "oauth" : "unknown";
+  const rawExpires =
+    typeof record.expires === "number" && Number.isFinite(record.expires) ? record.expires : null;
+  const refresh = typeof record.refresh === "string" ? record.refresh.trim() : "";
+  return {
+    kind,
+    secret: extractSecret(record),
+    expiresAt: rawExpires !== null && rawExpires < Number.MAX_SAFE_INTEGER ? rawExpires : null,
+    renewable: refresh.length > 0,
+  };
+}
+
 /**
  * 映射为渲染层状态。`active` 只表示「全局当前激活」——
  * 即 settings.defaultProvider 指向的那一条，而不是各 provider 自己的候选指针。
@@ -165,23 +211,56 @@ function migrateFromAuthJsonIfEmpty(): CredentialsFile {
 function mapCredential(
   stored: StoredCredential,
   activeCredentialId: string | null,
+  live?: Record<string, unknown>,
 ): PiAuthProviderStatus {
   const active = activeCredentialId !== null && activeCredentialId === stored.id;
-  const expiresAt = stored.expiresAt;
-  const expired = expiresAt !== null && expiresAt < Date.now();
+  // pi 来源以 auth.json 当前值为准：CLI / 扩展刷新 token 后不显示过期
+  const liveFields = stored.origin === "pi" && live ? describeAuthRecord(live) : null;
+  const sourceMissing = stored.origin === "pi" && !live;
+  const kind = liveFields?.kind ?? stored.kind;
+  const secret = liveFields?.secret ?? stored.secret;
+  const expiresAt = liveFields ? liveFields.expiresAt : stored.expiresAt;
+  const renewable = liveFields?.renewable ?? false;
+  const expired = !renewable && expiresAt !== null && expiresAt < Date.now();
   return {
     id: stored.id,
     name: stored.name,
     provider: stored.provider,
-    kind: stored.kind,
-    maskedCredential: stored.secret ? maskSecret(stored.secret) : null,
+    origin: stored.origin,
+    kind,
+    maskedCredential: sourceMissing ? null : secret ? maskSecret(secret) : null,
     baseUrl: stored.baseUrl,
     api: stored.api,
     preferredModel: stored.preferredModel,
     expiresAt,
     expired,
+    sourceMissing,
     active,
   };
+}
+
+/** auth.json 中已有、注册表未收录的 provider（只含掩码，供「从 pi 继承」列表）。 */
+function listImportableProviders(
+  registry: CredentialsFile,
+  auth: Record<string, unknown>,
+): PiImportableProvider[] {
+  const known = new Set(registry.credentials.map((credential) => credential.provider));
+  const result: PiImportableProvider[] = [];
+  for (const [provider, value] of Object.entries(auth)) {
+    if (known.has(provider)) continue;
+    const record = asAuthRecord(value);
+    if (!record) continue;
+    const { kind, secret, expiresAt, renewable } = describeAuthRecord(record);
+    result.push({
+      provider,
+      label: providerLabel(provider),
+      kind,
+      maskedCredential: secret ? maskSecret(secret) : null,
+      expiresAt,
+      expired: !renewable && expiresAt !== null && expiresAt < Date.now(),
+    });
+  }
+  return result.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /**
@@ -215,9 +294,17 @@ function resolveActiveProvider(registry: CredentialsFile): {
 
 function toSnapshot(registry: CredentialsFile): PiAuthSnapshot {
   const { activeProvider, activeCredentialId } = resolveActiveProvider(registry);
-  const providers = registry.credentials.map((c) => mapCredential(c, activeCredentialId));
+  const auth = readAuthLenient();
+  const providers = registry.credentials.map((credential) =>
+    mapCredential(
+      credential,
+      activeCredentialId,
+      asAuthRecord(auth[credential.provider]) ?? undefined,
+    ),
+  );
   return {
     providers,
+    importable: listImportableProviders(registry, auth),
     activeProvider,
     activeCredentialId,
     file: registryFile(),
@@ -228,6 +315,42 @@ function findCredential(registry: CredentialsFile, id: string): StoredCredential
   const found = registry.credentials.find((c) => c.id === id);
   if (!found) throw new Error(`未找到凭据：${id}`);
   return found;
+}
+
+/**
+ * 把 auth.json 中已有、注册表未收录的 provider 导入为 origin=pi 的凭据。
+ * 不写 auth.json、不自动激活；之后可像普通凭据一样切换。
+ */
+export function importProvider(provider: string): PiAuthSnapshot {
+  const providerId = provider.trim();
+  if (!providerId) throw new Error("provider 不能为空");
+  const registry = migrateFromAuthJsonIfEmpty();
+  if (registry.credentials.some((credential) => credential.provider === providerId)) {
+    throw new Error(`该 provider 已在凭据列表中：${providerId}`);
+  }
+  const record = asAuthRecord(readAuthLenient()[providerId]);
+  if (!record) throw new Error(`pi 登录文件中没有该 provider：${providerId}`);
+  const { kind, expiresAt } = describeAuthRecord(record);
+
+  const target: StoredCredential = {
+    id: randomUUID(),
+    name: providerLabel(providerId),
+    provider: providerId,
+    origin: "pi",
+    kind,
+    // 只建立引用：密钥始终从 auth.json 现读，不在 PiDesk 注册表留第二份
+    secret: null,
+    baseUrl: typeof record.baseUrl === "string" && record.baseUrl ? record.baseUrl : null,
+    api: typeof record.api === "string" && record.api ? record.api : null,
+    preferredModel: null,
+    expiresAt,
+  };
+  const next: CredentialsFile = {
+    ...registry,
+    credentials: [...registry.credentials, target],
+  };
+  writeRegistry(next);
+  return toSnapshot(next);
 }
 
 function applyToAuthJson(stored: StoredCredential): void {
@@ -241,12 +364,18 @@ function applyToAuthJson(stored: StoredCredential): void {
   });
 }
 
-/** 投影激活凭据到 auth.json，并清掉注册表里其它厂商的键（防止模型列表混入）。 */
+/**
+ * 投影激活凭据到 auth.json，并清掉注册表里其它「PiDesk 创建」厂商的键（防止模型列表混入）。
+ * origin=pi 的凭据由 pi / 扩展自己维护，永不在这里写入或清理。
+ */
 function projectActiveToAuthJson(stored: StoredCredential, registry: CredentialsFile): void {
+  if (stored.origin === "pi") return;
   applyToAuthJson(stored);
   pruneAuthToSingleProvider(
     stored.provider,
-    registry.credentials.map((c) => c.provider),
+    registry.credentials
+      .filter((credential) => credential.origin !== "pi")
+      .map((credential) => credential.provider),
   );
 }
 
@@ -285,6 +414,9 @@ export function upsertCredential(req: PiAuthUpsertRequest): PiAuthSnapshot {
   const registry = migrateFromAuthJsonIfEmpty();
   const existingId = req.id?.trim() || null;
   const existing = existingId ? findCredential(registry, existingId) : null;
+  if (existing?.origin === "pi") {
+    throw new Error("从 pi 继承的凭据不支持在 PiDesk 内编辑；请到 pi 侧修改登录");
+  }
 
   if (!existing && !apiKey) {
     throw new Error("新增凭据必须提供 API Key");
@@ -350,6 +482,7 @@ export function upsertCredential(req: PiAuthUpsertRequest): PiAuthSnapshot {
       id: randomUUID(),
       name,
       provider,
+      origin: "pidesk",
       kind,
       secret: apiKey,
       baseUrl: gateway ? baseUrlRaw.replace(/\/+$/, "").replace(/\/v1\/?$/i, "") : null,
@@ -402,7 +535,8 @@ export function removeCredential(id: string): PiAuthSnapshot {
       next.activeByProvider[target.provider] = remain.id;
     } else {
       delete next.activeByProvider[target.provider];
-      removeProviderAuth(target.provider);
+      // 继承条目只解除 PiDesk 侧引用，auth.json 归 pi / 扩展所有
+      if (target.origin !== "pi") removeProviderAuth(target.provider);
     }
   }
 

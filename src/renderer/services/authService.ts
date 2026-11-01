@@ -29,4 +29,10 @@ export const authService = {
     if (!api) return Promise.reject(new Error("preload 未就绪"));
     return unwrap(api.pi.auth.remove(id));
   },
+  /** 导入 auth.json 中已有的 provider（origin=pi，不改写 auth.json）。 */
+  import(provider: string): Promise<PiAuthSnapshot | null> {
+    const api = pideskApi();
+    if (!api) return Promise.reject(new Error("preload 未就绪"));
+    return unwrap(api.pi.auth.import(provider));
+  },
 };

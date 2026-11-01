@@ -4,6 +4,7 @@ import {
   type PiApiKeyProviderOption,
   type PiAuthProviderStatus,
   type PiAuthSnapshot,
+  type PiImportableProvider,
   type PiModelOption,
   type PiModelOverridePatch,
   type PiModelOverridesSnapshot,
@@ -56,6 +57,7 @@ export function ModelsPanel() {
   const [formApiType, setFormApiType] = useState("openai-completions");
   const [formPreferredModel, setFormPreferredModel] = useState("");
   const [formSaving, setFormSaving] = useState(false);
+  const [importingProvider, setImportingProvider] = useState<string | null>(null);
 
   // 模型能力（docs/design/49 起，docs/design/50 改版）
   const [overrides, setOverrides] = useState<PiModelOverridesSnapshot>({});
@@ -167,16 +169,40 @@ export function ModelsPanel() {
     }
   };
 
-  const removeCredential = async (credentialId: string, name: string): Promise<void> => {
+  const removeCredential = async (
+    credentialId: string,
+    name: string,
+    origin: "pidesk" | "pi",
+  ): Promise<void> => {
     try {
       const snapshot = await authService.remove(credentialId);
       if (snapshot) setAuth(snapshot);
       if (formOpen === credentialId) setFormOpen(null);
-      showToast(t("settings.models.credential.removed", { name }));
+      showToast(
+        t(
+          origin === "pi"
+            ? "settings.models.credential.unlinked"
+            : "settings.models.credential.removed",
+          { name },
+        ),
+      );
       // 顶上了新的激活项时模型列表要跟着变
       void refreshModelsForActive();
     } catch (err) {
       showToast(err instanceof Error ? err.message : t("settings.models.credential.removeFailed"));
+    }
+  };
+
+  const importProvider = async (provider: PiImportableProvider): Promise<void> => {
+    setImportingProvider(provider.provider);
+    try {
+      const snapshot = await authService.import(provider.provider);
+      if (snapshot) setAuth(snapshot);
+      showToast(t("settings.models.inherit.imported", { name: provider.label }));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("settings.models.inherit.importFailed"));
+    } finally {
+      setImportingProvider(null);
     }
   };
 
@@ -432,6 +458,16 @@ export function ModelsPanel() {
                         {t("settings.models.credential.activeBadge")}
                       </span>
                     )}
+                    {credential.origin === "pi" && (
+                      <span className={styles.authOriginBadge}>
+                        {t("settings.models.credential.originPiBadge")}
+                      </span>
+                    )}
+                    {credential.sourceMissing && (
+                      <span className={styles.authMissingBadge}>
+                        {t("settings.models.credential.sourceMissingBadge")}
+                      </span>
+                    )}
                     {credential.expired && (
                       <span className={styles.authExpiredBadge}>
                         {t("settings.models.credential.expired")}
@@ -457,14 +493,23 @@ export function ModelsPanel() {
                 </div>
                 <div className={styles.authActions}>
                   {!credential.active && (
-                    <Button onClick={() => void activateCredential(credential.id, credential.name)}>
+                    <Button
+                      disabled={credential.sourceMissing}
+                      onClick={() => void activateCredential(credential.id, credential.name)}
+                    >
                       {t("settings.models.credential.activate")}
                     </Button>
                   )}
-                  <Button onClick={() => openEditForm(credential)}>
-                    {t("settings.models.credential.edit")}
-                  </Button>
-                  <Button onClick={() => void removeCredential(credential.id, credential.name)}>
+                  {credential.origin !== "pi" && (
+                    <Button onClick={() => openEditForm(credential)}>
+                      {t("settings.models.credential.edit")}
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() =>
+                      void removeCredential(credential.id, credential.name, credential.origin)
+                    }
+                  >
                     {t("common.remove")}
                   </Button>
                 </div>
@@ -573,6 +618,46 @@ export function ModelsPanel() {
           </p>
         )}
       </SettingsSection>
+
+      {auth && auth.importable.length > 0 && (
+        <SettingsSection title={t("settings.models.inherit.title")}>
+          <p className={styles.authHint}>{t("settings.models.inherit.description")}</p>
+          <div className={styles.authList}>
+            {auth.importable.map((provider) => (
+              <div key={provider.provider} className={styles.authRow}>
+                <AiProviderLogo providerId={provider.provider} size={22} />
+                <div className={styles.authRowMain}>
+                  <div className={styles.authIdLine}>
+                    <span className={styles.authId}>{provider.label}</span>
+                    {provider.expired && (
+                      <span className={styles.authExpiredBadge}>
+                        {t("settings.models.credential.expired")}
+                      </span>
+                    )}
+                  </div>
+                  <span className={styles.authMeta}>
+                    {provider.provider}
+                    {provider.kind === "api_key"
+                      ? " · API Key"
+                      : provider.kind === "oauth"
+                        ? " · OAuth"
+                        : ""}
+                    {provider.maskedCredential ? ` · ${provider.maskedCredential}` : ""}
+                  </span>
+                </div>
+                <div className={styles.authActions}>
+                  <Button
+                    disabled={importingProvider === provider.provider}
+                    onClick={() => void importProvider(provider)}
+                  >
+                    {t("settings.models.inherit.import")}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SettingsSection>
+      )}
 
       <ModelOverridesSection
         rows={overrideRows}

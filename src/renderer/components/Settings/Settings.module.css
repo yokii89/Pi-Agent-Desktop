@@ -729,6 +729,24 @@
   color: #fff;
 }
 
+.authOriginBadge {
+  padding: 1px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.authMissingBadge {
+  padding: 1px 6px;
+  border: 1px solid var(--color-danger, #c44);
+  border-radius: var(--radius-pill);
+  color: var(--color-danger, #c44);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
 .authMeta {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);

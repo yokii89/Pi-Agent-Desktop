@@ -194,7 +194,7 @@ export interface PideskSettings {
   fontMonoPreset: FontMonoPreset;
   /** 对话流问题导航分段栏的标记样式 id；见 shared/railStyles。 */
   questionRailStyle: RailStyle;
-  /** 输入栏右上角的动物伙伴；见 shared/inputBuddy。 */
+  /** 输入栏右上角的伙伴形象；见 shared/inputBuddy。 */
   inputBuddy: InputBuddyKind;
   /** 渲染层全局快捷键映射（设置 → 键盘快捷键）；见 shared/shortcuts。 */
   shortcuts: ShortcutsMap;
@@ -596,6 +596,11 @@ export interface PiAuthProviderStatus {
   name: string;
   /** 标准 provider id：deepseek / anthropic / newapi …（auth.json 键名）。 */
   provider: string;
+  /**
+   * 凭据来源：pidesk = 在 PiDesk 里创建（激活时重写 auth.json）；
+   * pi = 从 pi CLI 已有登录导入（只读，激活只切默认 provider，不改写 auth.json）。
+   */
+  origin: "pidesk" | "pi";
   kind: PiAuthKind;
   /** 掩码凭据；无凭据为 null。 */
   maskedCredential: string | null;
@@ -607,12 +612,29 @@ export interface PiAuthProviderStatus {
   /** 过期时间（Unix ms）；永不过期或未知为 null。 */
   expiresAt: number | null;
   expired: boolean;
+  /**
+   * pi 来源专用：auth.json 中已不存在该 provider 的登录（CLI 侧已登出 / 删除）。
+   * pidesk 来源恒为 false。
+   */
+  sourceMissing: boolean;
   /** 是否为全局当前激活凭据（仅 settings.defaultProvider 对应的那一条为 true）。 */
   active: boolean;
 }
 
+/** auth.json 中已有、但尚未导入 PiDesk 注册表的 provider（只含掩码信息）。 */
+export interface PiImportableProvider {
+  provider: string;
+  label: string;
+  kind: PiAuthKind;
+  maskedCredential: string | null;
+  expiresAt: number | null;
+  expired: boolean;
+}
+
 export interface PiAuthSnapshot {
   providers: PiAuthProviderStatus[];
+  /** auth.json 中可导入的 provider（已收录的不会再出现）。 */
+  importable: PiImportableProvider[];
   /** 当前激活凭据所属的 provider id（settings.defaultProvider）；无凭据时为 null。 */
   activeProvider: string | null;
   /** 当前激活凭据 id；无时为 null。 */
@@ -658,6 +680,8 @@ export const AUTH_IPC = {
   remove: "pidesk:pi:authRemove",
   /** 激活某凭据（写入 pi defaultProvider，并按 preferredModel 更新 defaultModel）。 */
   setActive: "pidesk:pi:authSetActive",
+  /** 把 auth.json 中已有的 provider 导入注册表（origin=pi，不改写 auth.json）。 */
+  import: "pidesk:pi:authImport",
   /** 常见 API Key provider 下拉选项（静态表）。 */
   listApiKeyProviders: "pidesk:pi:authListApiKeyProviders",
 } as const;

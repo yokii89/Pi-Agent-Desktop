@@ -37,12 +37,18 @@ const API_KEY_PROVIDERS: PiApiKeyProviderOption[] = [
 /** 网关 provider 集合：只有这些允许自定义 baseUrl / api。 */
 const GATEWAY_PROVIDER_IDS = new Set(API_KEY_PROVIDERS.filter((p) => p.gateway).map((p) => p.id));
 
+/** 不在新建表单里、但可能从 pi CLI 继承到的 provider 展示名。 */
+const INHERITED_PROVIDER_LABELS: Record<string, string> = {
+  qoder: "Qoder",
+  "qoder-cn": "Qoder CN",
+};
+
 export function isGatewayProvider(id: string): boolean {
   return GATEWAY_PROVIDER_IDS.has(id);
 }
 
 export function providerLabel(id: string): string {
-  return API_KEY_PROVIDERS.find((p) => p.id === id)?.label ?? id;
+  return API_KEY_PROVIDERS.find((p) => p.id === id)?.label ?? INHERITED_PROVIDER_LABELS[id] ?? id;
 }
 
 export function normalizeGatewayApi(value: string | null | undefined): PiGatewayApiType {

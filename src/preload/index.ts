@@ -302,6 +302,9 @@ contextBridge.exposeInMainWorld("pidesk", {
       /** 移除命名凭据。 */
       remove: (id: string): Promise<IpcResult<PiAuthSnapshot>> =>
         ipcRenderer.invoke(AUTH_IPC.remove, { id }),
+      /** 导入 auth.json 中已有的 provider（origin=pi，不改写 auth.json）。 */
+      import: (provider: string): Promise<IpcResult<PiAuthSnapshot>> =>
+        ipcRenderer.invoke(AUTH_IPC.import, { provider }),
     },
   },
 

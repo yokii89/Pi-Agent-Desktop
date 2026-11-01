@@ -38,6 +38,7 @@ import { exportSessionHtml, exportSessionMarkdown } from "./exportSession";
 import { invalidateGatewayModelCache, listApiKeyProviders } from "./piAuth";
 import {
   activateCredential,
+  importProvider,
   listCredentials,
   reassertActiveCredential,
   removeCredential,
@@ -692,6 +693,16 @@ export function registerSessionIpc(): void {
         await applyDefaultModelToSession("all", { retries: 3, delayMs: 250 });
         reassertActiveCredential();
         return snapshot;
+      }),
+  );
+
+  ipcMain.handle(
+    AUTH_IPC.import,
+    (_event, req: { provider?: string }): IpcResult<PiAuthSnapshot> =>
+      envelope(() => {
+        const provider = typeof req?.provider === "string" ? req.provider : "";
+        if (!provider.trim()) throw new Error("provider 不能为空");
+        return importProvider(provider);
       }),
   );
 
