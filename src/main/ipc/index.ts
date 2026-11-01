@@ -15,6 +15,7 @@ import { registerSchedulerIpc } from "../scheduler/schedulerIpc";
 import { registerPrefetchIpc } from "../session/prefetchIpc";
 import { registerRuntimeIpc } from "../session/runtimeIpc";
 import { registerSessionIpc } from "../session/sessionIpc";
+import { registerSessionUiIpc } from "../session/sessionUiIpc";
 import { registerSettingsIpc } from "../settings/settingsIpc";
 import { registerTerminalIpc } from "../terminal/terminalIpc";
 import { registerUpdaterIpc } from "../updater/updaterIpc";
@@ -33,6 +34,7 @@ export function registerIpc(): void {
     registerNotificationIpc,
     registerProjectIpc,
     registerSessionIpc,
+    registerSessionUiIpc,
     registerProcIpc,
     registerRuntimeIpc,
     registerPrefetchIpc,

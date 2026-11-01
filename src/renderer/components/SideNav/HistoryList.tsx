@@ -6,6 +6,7 @@ import { useBlockingSessionIds } from "../../stores/extensionViewStore";
 import { useProjectStore } from "../../stores/projectStore";
 import type { SessionAttentionKind } from "../../stores/sessionBuckets";
 import { useSessionMeta } from "../../stores/sessionStore";
+import { usePendingUiSessionIds } from "../../stores/sessionUiStore";
 import { moveToIndex } from "../../utils/listReorder";
 import { findOwningProject } from "../../utils/sessionGroups";
 import { HistoryItem } from "./HistoryItem";
@@ -78,6 +79,8 @@ export function HistoryList({
     pinnedFiles,
   } = useSessionMeta();
   const blockingSessionIds = useBlockingSessionIds();
+  // 扩展对话框（pi ctx.ui.*）与 blocking 视图同语义：会话在等人，不是在做事（docs/design/82）
+  const uiDialogSessionIds = usePendingUiSessionIds();
   const { projects } = useProjectStore();
 
   const visible = showAll ? sessions : sessions.slice(0, VISIBLE_LIMIT);
@@ -131,7 +134,8 @@ export function HistoryList({
   const statusOf = (file: string): HistoryItemStatus => {
     if (isFileRunning(file)) {
       const sessionId = getSessionIdForFile(file);
-      if (sessionId && blockingSessionIds.has(sessionId)) return "awaiting";
+      if (sessionId && (blockingSessionIds.has(sessionId) || uiDialogSessionIds.has(sessionId)))
+        return "awaiting";
       return "running";
     }
     return attentionFiles.get(file) ?? null;

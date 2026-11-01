@@ -14,7 +14,7 @@ import type {
   SessionPushMessage,
   SessionStartRequest,
 } from "../../shared/ipc";
-import { SESSION_IPC } from "../../shared/ipc";
+import { SESSION_IPC, SESSION_UI_IPC } from "../../shared/ipc";
 import { procService } from "../proc/procService";
 import { getSettings } from "../settings/settings";
 import {
@@ -24,6 +24,12 @@ import {
   retainSessionViews,
 } from "../view/viewHost";
 import { getMainWindow } from "../window/createMainWindow";
+import {
+  getSessionUiLedger,
+  initSessionUi,
+  type SessionUiAnswer,
+  type SessionUiSink,
+} from "./extensionUi";
 import { resolvePiCommand } from "./piLauncher";
 import { readDefaultModel } from "./piSettings";
 import {
@@ -107,6 +113,34 @@ function push(sessionId: SessionId, message: Omit<SessionPushMessage, "sessionId
     ...message,
     sessionId,
   } as SessionPushMessage);
+}
+
+/**
+ * 扩展 UI 子协议的传输：推给渲染层 + 写回该会话 pi 的 stdin。
+ * 与 SessionPushMessage 分开一条通道，不改会话事件流的固定结构（docs/design/123）。
+ */
+const sessionUiSink: SessionUiSink = {
+  push(message) {
+    const win = getMainWindow();
+    if (!win) return false;
+    win.webContents.send(SESSION_UI_IPC.output, message);
+    return true;
+  },
+  writeLine(sessionId, record) {
+    const child = instances.get(sessionId)?.child;
+    if (!child) return false;
+    try {
+      child.stdin.write(`${JSON.stringify(record)}\n`);
+      return true;
+    } catch {
+      // 进程正在退出：调用方按「已不在」处理
+      return false;
+    }
+  },
+};
+
+function sessionUi() {
+  return getSessionUiLedger() ?? initSessionUi(sessionUiSink);
 }
 
 function flushEventBatch(inst: SessionInstance): void {
@@ -234,6 +268,8 @@ function bindInstanceIO(inst: SessionInstance, child: ChildProcessWithoutNullStr
     inst.pendingRequests.clear();
     // pi 退出 → 旁路对端关闭；只回收该会话名下打开中的视图
     closeSessionViews(inst.id);
+    // 未答的扩展对话框同样随进程结算（写不回也要撤窗）
+    sessionUi().dropSession(inst.id);
     registry.remove(inst.id);
     // 实例对象保留与否：exit 后进程已死，移除 Map 以便同 file 冷启动新 id
     instances.delete(inst.id);
@@ -490,6 +526,13 @@ function handleProtocolLine(inst: SessionInstance, line: string): void {
     return;
   }
 
+  // 扩展 UI 子协议：对话框方法必须应答，否则 pi 侧工具永久挂起（docs/design/122 §3）。
+  // 放在白名单判定之前：它不是会话事件，不该被当成未知事件丢弃。
+  if (record.type === "extension_ui_request") {
+    sessionUi().handleRecord(inst.id, parsed);
+    return;
+  }
+
   if (typeof record.type === "string" && FORWARD_EVENT_TYPES.has(record.type)) {
     const agentEvent = parsed as PiAgentEvent;
     if (agentEvent.type === "agent_start") {
@@ -610,7 +653,21 @@ export async function clearSessionQueue(sessionId: SessionId): Promise<PiQueuedM
 
 /** 中断当前执行（RPC abort；pi 会在空闲后应答）。 */
 export function interruptSession(sessionId: SessionId): void {
+  // 中断即撤窗：被 abort 的工具不会再消费应答，留着对话框只会把用户锁在死界面上
+  sessionUi().dropSession(sessionId);
   request(sessionId, "abort").catch(() => {});
+}
+
+/**
+ * 渲染层作答扩展对话框（写回 `extension_ui_response`）。
+ * 返回 false = 该请求已被超时 / 会话结束先行结算，或应答与方法不匹配。
+ */
+export function respondSessionUi(
+  sessionId: SessionId,
+  id: string,
+  answer: SessionUiAnswer,
+): boolean {
+  return sessionUi().respond(sessionId, id, answer);
 }
 
 /**
@@ -774,6 +831,8 @@ export function disposeSession(sessionId: SessionId): void {
     pending.reject(new Error("pi 会话已结束"));
   }
   inst.pendingRequests.clear();
+  // 未答的扩展对话框随会话一起结算（写回失败也无妨，渲染层必须收到撤窗通知）
+  sessionUi().dropSession(sessionId);
   // 显式 dispose 也推 exit，渲染层桶状态与「进程已不在」对齐（B5）
   markRuntimeExit(sessionId);
   clearSessionCwd(sessionId);

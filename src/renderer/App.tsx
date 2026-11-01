@@ -11,6 +11,7 @@ import { ReviewWindow } from "./components/ReviewWindow/ReviewWindow";
 import { ScheduledTasksPage } from "./components/ScheduledTasks/ScheduledTasksPage";
 import { SessionArea } from "./components/SessionArea/SessionArea";
 import { SessionMonitor } from "./components/SessionMonitor/SessionMonitor";
+import { ExtensionUiDialogHost } from "./components/SessionUi/ExtensionUiDialogHost";
 import { SettingsDialog } from "./components/Settings/SettingsDialog";
 import { SideNav } from "./components/SideNav/SideNav";
 import { SplashGate } from "./components/Splash/SplashGate";
@@ -203,6 +204,7 @@ function AppLayout() {
       <SettingsDialog />
       <AppErrorBoundary>
         <ExtensionViewHost />
+        <ExtensionUiDialogHost />
       </AppErrorBoundary>
       <CommandPalette />
       {reviewWindowOpen && <ReviewWindow />}

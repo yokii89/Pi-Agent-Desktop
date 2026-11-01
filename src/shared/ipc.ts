@@ -358,6 +358,78 @@ export const SESSION_IPC = {
   getStats: "pidesk:session:getStats",
 } as const;
 
+/**
+ * 扩展 UI 子协议（pi RPC `extension_ui_request` / `extension_ui_response`）。
+ *
+ * 独立域，不改 `SessionPushMessage` 固定结构（同 docs/design/37 后台进程推送的做法）。
+ * 对话框方法必须应答：pi 侧 `ctx.ui.select/confirm/input/editor` 会一直等
+ * `extension_ui_response`，不应答就是永久挂起（docs/design/122 §3）。
+ */
+export const SESSION_UI_IPC = {
+  /** 主进程推送：`{ sessionId, type, id, payload }`。 */
+  output: "pidesk:sessionUi:output",
+  /** 渲染层应答（或声明已自行撤窗）：回 `{ ok, data: { settled } }`。 */
+  respond: "pidesk:sessionUi:respond",
+} as const;
+
+/** 需要应答的 pi 扩展对话框方法。 */
+export type SessionUiDialogMethod = "select" | "confirm" | "input" | "editor";
+
+/** `extension_ui_request` 的对话框子集（字段名与 pi 一致，已消毒）。 */
+export interface SessionUiDialogRequest {
+  method: SessionUiDialogMethod;
+  title: string;
+  /** select 的候选项（字符串数组，应答值必须是其中之一）。 */
+  options?: string[];
+  /** confirm 的正文。 */
+  message?: string;
+  /** input 的占位符。 */
+  placeholder?: string;
+  /** editor 的初值。 */
+  prefill?: string;
+  /** pi 侧超时（ms）：到点 pi 自行按未答结算，渲染层只需撤窗、不再写回。 */
+  timeoutMs?: number;
+}
+
+/** 渲染层要撤窗的原因（主进程已自行结算，对话框不能再提交）。 */
+export type SessionUiSettleReason = "timeout" | "session" | "answered";
+
+/** `notify` 降级为应用内提示条。 */
+export interface SessionUiNotice {
+  message: string;
+  level: "info" | "warning" | "error";
+}
+
+/**
+ * 扩展 UI 推送消息：`id` 区分同一会话上并发的多个请求（对齐终端多 Tab 条款）。
+ * `setStatus` / `setWidget` / `setTitle` / `set_editor_text` 本轮不转发（无对应界面，
+ * 且它们是发后即忘方法，不应答不会挂起会话），见 docs/design/123 §6。
+ */
+export type SessionUiPush =
+  | { sessionId: SessionId; type: "request"; id: string; payload: SessionUiDialogRequest }
+  | {
+      sessionId: SessionId;
+      type: "settled";
+      id: string;
+      payload: { reason: SessionUiSettleReason };
+    }
+  | { sessionId: SessionId; type: "notice"; id: string; payload: SessionUiNotice };
+
+/** 渲染层 → 主进程的应答；三者选一：`value` / `confirmed` / `cancelled`。 */
+export interface SessionUiRespondRequest {
+  sessionId: SessionId;
+  /** 必须原样带回推送里的 `id`（pi 按它关联）。 */
+  id: string;
+  value?: string;
+  confirmed?: boolean;
+  cancelled?: boolean;
+}
+
+/** 应答结果：`settled=false` 表示该请求已被超时 / 会话结束先行结算。 */
+export interface SessionUiRespondResult {
+  settled: boolean;
+}
+
 /** 磁盘优先读取的会话 transcript（openSessionFile 加速路径）。 */
 export interface SessionTranscriptPayload {
   messages: PiChatMessage[];

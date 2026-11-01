@@ -121,6 +121,9 @@ import type {
   SessionStartRequest,
   SessionSummary,
   SessionTranscriptPayload,
+  SessionUiPush,
+  SessionUiRespondRequest,
+  SessionUiRespondResult,
   StylePatchClearRequest,
   StylePatchExportRequest,
   StylePatchExportResult,
@@ -266,6 +269,12 @@ export interface PideskGlobalApi {
     /** 读取会话用量统计（RPC get_session_stats，上下文占用）。 */
     getStats(sessionId: SessionId): Promise<IpcResult<PiSessionStats>>;
     onOutput(callback: (message: SessionPushMessage) => void): () => void;
+  };
+  sessionUi: {
+    /** 订阅扩展 UI 子协议推送（pi extension_ui_request）。 */
+    onOutput(callback: (message: SessionUiPush) => void): () => void;
+    /** 作答扩展对话框。 */
+    respond(req: SessionUiRespondRequest): Promise<IpcResult<SessionUiRespondResult>>;
   };
   proc: {
     list(sessionId: SessionId): Promise<IpcResult<ManagedProcess[]>>;

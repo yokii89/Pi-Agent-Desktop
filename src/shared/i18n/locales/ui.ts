@@ -21,6 +21,23 @@ export const uiMessages = defineMessages({
   "ui.view.tabAnswered": { "zh-CN": "{label}（已作答）", "en-US": "{label} (answered)" },
   "ui.view.tabAttention": { "zh-CN": "{label}（未完成）", "en-US": "{label} (incomplete)" },
   "ui.view.fallbackTitle": { "zh-CN": "扩展", "en-US": "Extension" },
+  // 扩展 UI 子协议对话框（pi ctx.ui.select / confirm / input / editor，docs/design/123）
+  "ui.extensionDialog.ariaLabel": { "zh-CN": "扩展提问", "en-US": "Extension question" },
+  "ui.extensionDialog.selectAriaLabel": {
+    "zh-CN": "候选项列表",
+    "en-US": "Option list",
+  },
+  "ui.extensionDialog.inputPlaceholder": {
+    "zh-CN": "输入回答…",
+    "en-US": "Type an answer…",
+  },
+  "ui.extensionDialog.submit": { "zh-CN": "提交", "en-US": "Submit" },
+  "ui.extensionDialog.confirmYes": { "zh-CN": "确认", "en-US": "Confirm" },
+  "ui.extensionDialog.cancel": { "zh-CN": "取消", "en-US": "Cancel" },
+  "ui.extensionDialog.noOptions": {
+    "zh-CN": "该扩展没有给出候选项，请取消。",
+    "en-US": "The extension provided no options; please cancel.",
+  },
   "ui.view.fallbackTitleView": { "zh-CN": "扩展视图", "en-US": "Extension view" },
   "ui.view.fallbackTitleSettings": { "zh-CN": "扩展设置", "en-US": "Extension settings" },
   "ui.view.closeTitled": { "zh-CN": "关闭 {title}", "en-US": "Close {title}" },

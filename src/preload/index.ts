@@ -124,6 +124,9 @@ import type {
   SessionStartRequest,
   SessionSummary,
   SessionTranscriptPayload,
+  SessionUiPush,
+  SessionUiRespondRequest,
+  SessionUiRespondResult,
   StylePatchClearRequest,
   StylePatchExportRequest,
   StylePatchExportResult,
@@ -145,6 +148,7 @@ import {
   PROC_IPC,
   PROJECT_IPC,
   SESSION_IPC,
+  SESSION_UI_IPC,
   SETTINGS_IPC,
   TERMINAL_IPC,
   WALLPAPER_IPC,
@@ -409,6 +413,15 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 订阅会话事件流 `{ sessionId, type: "event" | "eventBatch" | "exit" | "error", payload }`。 */
     onOutput: (callback: (message: SessionPushMessage) => void): (() => void) =>
       subscribe<SessionPushMessage>(SESSION_IPC.output, callback),
+  },
+
+  sessionUi: {
+    /** 订阅扩展 UI 子协议推送（对话框请求 / 撤窗通知 / notify 降级提示）。 */
+    onOutput: (callback: (message: SessionUiPush) => void): (() => void) =>
+      subscribe<SessionUiPush>(SESSION_UI_IPC.output, callback),
+    /** 作答扩展对话框；`settled:false` 表示该请求已被超时或会话结束先行结算。 */
+    respond: (req: SessionUiRespondRequest): Promise<IpcResult<SessionUiRespondResult>> =>
+      ipcRenderer.invoke(SESSION_UI_IPC.respond, req),
   },
 
   proc: {

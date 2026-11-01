@@ -115,6 +115,15 @@ import { Play } from "@phosphor-icons/react";
 - **返回值统一信封**：请求-响应类 handler 一律返回 `{ ok: true, data }` 或 `{ ok: false, error: string }`，渲染层通过统一工具函数（如 `unwrap()`）解包，禁止 handler 直接 throw 或返回裸值。
 - **终端流式输出消息格式固定（仅中央工作区底部的终端面板）**：主进程推送的消息为 `{ type: "data" | "exit" | "error", payload: string | number }`；多实例域（终端 Tab）在此基础上附加 `id` 字段以区分实例，渲染层按 `type` 分发，不得发明其他结构。面板可见性与终端进程生命周期是两个独立概念：隐藏面板不得 kill pty。
 - **会话推送消息格式固定（中央会话区）**：主进程推送的消息为 `{ sessionId, type: "event" | "eventBatch" | "exit" | "error", payload }`（多实例并行：对齐终端条款，**必带** `sessionId`）；`event` 时 `payload` 为单条 pi RPC 事件对象，`eventBatch` 时为约 32ms 合批后的事件数组（边界事件仍走单条 `event` 并立即 flush）；事件经白名单转发，类型见 `src/shared/ipc.ts`，渲染层按 `sessionId` 路由到对应会话桶，不得发明其他结构。同 `sessionFile` 至多一个存活进程；切换 active / 隐藏不 kill，手动结束只走侧栏行菜单「结束进程」。
+- **扩展 UI 子协议是独立域（`pidesk:sessionUi:*`）**：pi RPC 的第四个记录族 `extension_ui_request`
+  **不进会话事件白名单**，必须在 `handleProtocolLine` 里先于白名单分流给
+  `src/main/session/extensionUi.ts` 的登记表（协议解析与传输分育：该模块不 import electron，
+  经 `SessionUiSink` 注入，以便纯测）。推送为 `{ sessionId, type: "request" | "settled" | "notice", id, payload }`
+  （`id` 区分同会话并发的多个请求），渲染层经 `pidesk:sessionUi:respond` 作答。
+  **硬约束：`select` / `confirm` / `input` / `editor` 必须得到一次应答**——pi 会始终等
+  `extension_ui_response`，漏应答就是工具永久挂起（docs/design/122 §3、123）。
+  超时（pi 自行结算，**不得再写回**）、中断、进程退出、dispose 四条路径均须推 `settled`
+  撤窗；不认识的方法一律按未答应答一次。渲染层只弹 active 会话的对话框，后台会话保留请求。
 - 渲染进程访问的 API 必须在 `src/preload` 中定义并在 `src/renderer/global.d.ts` 中补充类型声明。
 
 ### 主进程代码组织
