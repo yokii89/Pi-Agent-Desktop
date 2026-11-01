@@ -154,6 +154,7 @@
 
 /* 围栏代码块（CodeHighlight 外壳）：会话区沿用 .md pre 的观感 */
 .fence {
+  composes: frost from "../../styles/glass.module.css";
   margin: var(--spacing-md) 0;
   background: var(--color-code-bg);
   border: 1px solid var(--color-border);

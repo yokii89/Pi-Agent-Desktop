@@ -7,7 +7,7 @@
 
 /* 页面底座（应用壳 / 会话区 / 功能页）专用底色：默认等于主题底色；
    用户启用本地背景壁纸时切成透明，让壁纸层透出来（docs/design/111）。
-   弹出层、输入框、卡片仍用 --color-bg，不跟着透明。 */
+   弹出层、输入框仍用 --color-bg，不跟着透明。 */
 :root {
   --color-canvas: var(--color-bg);
 }
@@ -16,14 +16,41 @@
   --color-canvas: transparent;
 }
 
+/* 会话流色块半透明（docs/design/120，修订 doc 111 §4.2「卡片一律保持实底」）：
+   壁纸开启后，正文里的代码卡 / 表格头 / 工具结果卡仍是整块实底，会读成「贴在壁纸上的灰矩形」。
+   把中央对话流文档流（SessionView 打 data-stream-surface）用到的四张底色统一降到 55% 不透明
+   ——与侧栏 --glass-bg 同档，透出壁纸又保住卡片边界。
+   - 基准值走 *-solid（各主题各一份），所以关掉壁纸自动回到实底，不必逐组件写两套；
+   - 作用域只在文档流子树，设置页 / 侧栏 / 输入栏 / 弹层不受影响；
+   - 磨砂模糊不在这里（那是 backdrop-filter，不是颜色），见 glass.module.css 的 .frost。 */
+:root[data-wallpaper="on"] [data-stream-surface] {
+  --color-bg-elevated: color-mix(in srgb, var(--color-bg-elevated-solid) 55%, transparent);
+  --color-bg-surface: color-mix(in srgb, var(--color-bg-surface-solid) 55%, transparent);
+  --color-code-bg: color-mix(in srgb, var(--color-code-bg-solid) 55%, transparent);
+  --terminal-bg: color-mix(in srgb, var(--terminal-bg-solid) 55%, transparent);
+}
+
+/* 与 glass.module.css 同一条无障碍退路：系统要求减少透明度时整块回到实底 */
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-wallpaper="on"] [data-stream-surface] {
+    --color-bg-elevated: var(--color-bg-elevated-solid);
+    --color-bg-surface: var(--color-bg-surface-solid);
+    --color-code-bg: var(--color-code-bg-solid);
+    --terminal-bg: var(--terminal-bg-solid);
+  }
+}
+
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  /* 背景层 */
+  /* 背景层：*-solid 是实底基准值，公共名指向它；壁纸模式下的会话流会把公共名
+     重写成半透明（见文件头 data-stream-surface 规则） */
   --color-bg: #111113;
-  --color-bg-elevated: #18181b;
-  --color-bg-surface: #202024;
+  --color-bg-elevated-solid: #18181b;
+  --color-bg-surface-solid: #202024;
+  --color-bg-elevated: var(--color-bg-elevated-solid);
+  --color-bg-surface: var(--color-bg-surface-solid);
   --color-bg-hover: rgba(255, 255, 255, 0.06);
   --color-bg-active: rgba(255, 255, 255, 0.1);
 
@@ -52,7 +79,8 @@
   --color-spark: color-mix(in oklab, var(--color-accent) 72%, white);
   /* 代码底（行内 code / pre / fence 共用）：与 bg-surface 同档，
      深底上"浮起一档"，对齐 ZCode 代码卡对比度（docs/design/33） */
-  --color-code-bg: #202024;
+  --color-code-bg-solid: #202024;
+  --color-code-bg: var(--color-code-bg-solid);
 
   /* 运行态文字扫光（docs/design/26）：strong/soft 同族，
      soft 取 22% 与 PiStateMark .ghost 的 opacity 同值 */
@@ -98,8 +126,10 @@
   --heat-3: #316fd2;
   --heat-4: #6aa3ff;
 
-  /* 终端（比主背景更深） */
-  --terminal-bg: #0d0d0f;
+  /* 终端（比主背景更深）：底部终端面板与 xterm 始终用实底，
+     只有会话流里的工具输出块会在壁纸模式下透出背景（见文件头） */
+  --terminal-bg-solid: #0d0d0f;
+  --terminal-bg: var(--terminal-bg-solid);
   --terminal-fg: #cccccc;
   /* 分屏焦点窗格描边（docs/design/57）：比 --color-accent-soft 实一档，
      1px 内描边在 --terminal-bg 上也要读得出「焦点在哪个窗格」 */
@@ -246,6 +276,9 @@
   /* 模糊强度与饱和度增强：与主题无关，亮色沿用 */
   --glass-blur: 24px;
   --glass-saturate: 150%;
+  /* 会话流卡片的磨砂档（docs/design/120）：卡片面积比侧栏小得多，沿用 24px 会把
+     卡底下的壁纸糊成一团均匀色、反而读成实底，取一半让纹理仍可辨。与主题无关。 */
+  --glass-blur-card: 12px;
 
   /* 输入栏伙伴（docs/动物形象 + 植物大战僵尸）：角色插画自身的配色，不属于 UI 语义色。
      ink 是压在浅色毛面上的线稿色，两套主题同值；mark 是直接落在应用背景上的
@@ -307,8 +340,10 @@
 
   /* 背景层（亮色 P2 校色，先保持同名变量可用） */
   --color-bg: #f5f5f7;
-  --color-bg-elevated: #ffffff;
-  --color-bg-surface: #ececef;
+  --color-bg-elevated-solid: #ffffff;
+  --color-bg-surface-solid: #ececef;
+  --color-bg-elevated: var(--color-bg-elevated-solid);
+  --color-bg-surface: var(--color-bg-surface-solid);
   --color-bg-hover: rgba(0, 0, 0, 0.05);
   --color-bg-active: rgba(0, 0, 0, 0.09);
 
@@ -330,7 +365,8 @@
   --color-selection: color-mix(in oklab, var(--color-accent) 26%, transparent);
   /* 顶档特效色：浅底上往黑里压一档，同时与 accent 描边拉开（暗色主题往白里提，同一个配比） */
   --color-spark: color-mix(in oklab, var(--color-accent) 72%, black);
-  --color-code-bg: #e2e2e6;
+  --color-code-bg-solid: #e2e2e6;
+  --color-code-bg: var(--color-code-bg-solid);
 
   /* 状态色 */
   --color-success: #0f7b6c;
@@ -370,7 +406,8 @@
   --heat-4: #2359ad;
 
   /* 终端 */
-  --terminal-bg: #ffffff;
+  --terminal-bg-solid: #ffffff;
+  --terminal-bg: var(--terminal-bg-solid);
   --terminal-fg: #1e1e1e;
   --terminal-pane-ring: rgba(47, 111, 224, 0.45);
 

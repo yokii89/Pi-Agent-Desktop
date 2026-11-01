@@ -32,3 +32,23 @@
     backdrop-filter: none;
   }
 }
+
+/**
+ * 会话流卡片的磨砂（docs/design/120）：只补背景模糊。
+ * 底色不在这里——那四张令牌由 tokens.css 的 [data-stream-surface] 规则统一降到 55%。
+ *
+ * 与 .glass 的两点不同，都是有意的：
+ * - 只在 html[data-wallpaper="on"] 下挂 backdrop-filter。没铺壁纸时模糊没有可透的东西，
+ *   但 Chromium 仍会为每个元素建图层，长会话里几十个代码卡就是白付的 GPU；
+ * - 不上颗粒与上缘高光。代码卡要读成「一张纸」，糊噪点会把等宽字弄脏。
+ *
+ * 只给卡片级容器 composes；行内 code、表格头、骨架条只要半透明就够了，
+ * 逐字符挂模糊既糊又贵。
+ *
+ * 作用域跟着 [data-stream-surface] 走：同一个类名也可能出现在输入栏弹层里
+ * （如 ElementDetail），那边底色仍是实底，挂 blur 只会白建图层。
+ */
+:root[data-wallpaper="on"] [data-stream-surface] .frost {
+  -webkit-backdrop-filter: blur(var(--glass-blur-card)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur-card)) saturate(var(--glass-saturate));
+}

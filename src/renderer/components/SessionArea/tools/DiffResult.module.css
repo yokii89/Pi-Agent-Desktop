@@ -1,4 +1,5 @@
 .diff {
+  composes: frost from "../../../styles/glass.module.css";
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg-elevated);

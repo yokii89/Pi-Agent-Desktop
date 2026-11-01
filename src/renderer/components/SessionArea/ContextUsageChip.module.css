@@ -51,7 +51,10 @@
   min-width: 168px;
   padding: 8px 12px;
   border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
+  /* 实底基准值：会话流在壁纸模式下整体降到 55% 半透明（docs/design/120），
+     但这层是浮在正文之上的 tooltip，要盖住下层内容才能读，所以不跟着透。
+     ui/Popover / Modal 那类走 createPortal 到 body 的浮层天然在作用域外，不必这样处理。 */
+  background: var(--color-bg-surface-solid);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-overlay);
   color: var(--color-text);

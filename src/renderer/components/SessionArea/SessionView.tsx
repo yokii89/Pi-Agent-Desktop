@@ -217,7 +217,11 @@ export function SessionView() {
 
   return (
     <div className={styles.view}>
-      {showRestoreHint && <div className={styles.restoreHint}>{t("session.restoring")}</div>}
+      {showRestoreHint && (
+        <div className={styles.restoreHint} data-stream-surface="">
+          {t("session.restoring")}
+        </div>
+      )}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: 会话流是只读阅读面，右键只用来抑制浏览器默认菜单，不伪装成交互 role */}
       <div
         className={`${styles.scroll} ${mode === "free" ? styles.scrollFree : ""}`}
@@ -225,7 +229,9 @@ export function SessionView() {
         data-panel-geo="monitor-scroll"
         onContextMenu={(event) => event.preventDefault()}
       >
-        <div className={styles.inner} ref={contentRef}>
+        {/* 壁纸模式下会话流色块半透明的作用域锚点：tokens.css 只在这棵子树里重写底色令牌，
+            输入栏 / 问题导航栏 / 悬浮弹层按 data-stream-surface 之外保持实底（docs/design/120） */}
+        <div className={styles.inner} data-stream-surface="" ref={contentRef}>
           {showSkeleton ? (
             <div className={styles.skeleton} aria-hidden>
               <div className={styles.skeletonTitle} />
