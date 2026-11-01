@@ -1,13 +1,16 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { type FollowMode, scrollTransition } from "../utils/stickToBottomRules";
 
 /**
  * 滚动跟随状态机（docs/design/10 §3.5 / docs/design/13 P1-1）。
  *
  * 取代「一颗 pinned 布尔 + entries 变化补一次 scrollTop」：
  * - follow：内容高度变化（ResizeObserver 信号）就贴底；free：完全不动，只回报未读高度。
- * - follow → free 只能由用户主动上滚（scrollTop 减少）或产生选区触发；
- *   内容增长导致的程序贴底（scrollTop 只增）不会误判。
- * - free → follow：用户滚回底部（距底 < 48px）或调用 jumpToLatest()。
+ * - follow → free 只能由用户主动上滚（scrollTop 减少且真的离了底）或产生选区触发；
+ *   内容增长导致的程序贴底（scrollTop 只增）、内容变矮导致的浏览器钳位（仍贴底）不会误判。
+ * - free → follow：用户**向下**滚回底部（距底 < 48px）或调用 jumpToLatest()。
+ *   判定规则集中在 utils/stickToBottomRules（含「贴底附近小幅滚轮不得回弹」的回归测试，
+ *   与它为什么必须按方向而不是按单帧位移判定，见 docs/design/121）。
  * - follow 期容器 CSS 需 `overflow-anchor: none`（SessionView 按 mode 切换），
  *   不和 Chromium 原生滚动锚定抢 scrollTop；free 期恢复 auto，补 content-visibility 首次实现跳动。
  *
@@ -16,12 +19,7 @@ import { type RefObject, useCallback, useEffect, useRef, useState } from "react"
  * （流式增长触发的贴底）会按规范取消动画，表现为"滑到一半瞬移"。
  */
 
-/** 距底多近仍视为"在底部"（px）：free → follow 的回贴阈值。 */
-const REATTACH_THRESHOLD_PX = 48;
-/** follow 时 scrollTop 减少超过该值才算用户上滚（px）：过滤滚动抖动。 */
-const USER_SCROLL_UP_PX = 2;
-
-export type FollowMode = "follow" | "free";
+export type { FollowMode };
 
 /** 距视口底部还有多少内容（px）。 */
 function distanceToBottom(el: HTMLElement): number {
@@ -89,26 +87,21 @@ export function useStickToBottom<T extends HTMLElement>(
     return () => observer.disconnect();
   }, [containerRef, contentRef]);
 
-  // 滚动事件只在 scrollTop 变化时触发：减少 = 用户上滚（唯一 follow → free 的滚动信号）
+  // 滚动事件只在 scrollTop 变化时触发：上滚且真的离了底 = 用户上滚（唯一 follow → free 的滚动信号）
+  // 判定本身在 utils/stickToBottomRules，这里只负责量尺寸与入账
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
     const onScroll = (): void => {
       const prevTop = lastTopRef.current;
-      lastTopRef.current = el.scrollTop;
+      const top = el.scrollTop;
+      lastTopRef.current = top;
       const distance = distanceToBottom(el);
-      if (modeRef.current === "follow") {
-        if (el.scrollTop < prevTop - USER_SCROLL_UP_PX && distance > REATTACH_THRESHOLD_PX) {
-          goFree();
-        }
-        return;
-      }
-      if (distance < REATTACH_THRESHOLD_PX) {
-        goFollow();
-      } else {
-        setUnreadPx(distance);
-      }
+      const transition = scrollTransition({ mode: modeRef.current, prevTop, top, distance });
+      if (transition === "release") goFree();
+      else if (transition === "reattach") goFollow();
+      else if (transition === "unread") setUnreadPx(distance);
     };
 
     el.addEventListener("scroll", onScroll, { passive: true });
