@@ -131,6 +131,12 @@ let hostEnv: ViewHostEnv | null = null;
 let starting: Promise<ViewHostEnv> | null = null;
 let nextConnectionId = 0;
 
+/** tmpdir 里 rendezvous 文件的命名前缀/后缀（`pidesk-view-host-<pid>.json`，含旧版固定名）。 */
+const RENDEZVOUS_PREFIX = "pidesk-view-host";
+const RENDEZVOUS_SUFFIX = ".json";
+/** 解析不出 pid 的 rendezvous 只保留这么久：原子写走 rename，正常读不到半截文件。 */
+const RENDEZVOUS_UNPARSABLE_MAX_AGE_MS = 60_000;
+
 const connections = new Map<string, ViewConnection>();
 const views = new Map<string, OpenView>();
 /** sessionId + contributionKey → live viewId（docs/design/16 §7.1）。 */
@@ -889,11 +895,72 @@ function listenAsync(srv: net.Server, pathOrPort: string | number, host?: string
 }
 
 /**
- * 稳定 rendezvous 路径：不绑 Electron pid，Host 重启后仍有效。
- * 单机单 PiDesk 实例的产品形态下用 tmpdir 固定名足够；同名文件由后启动的 Host 覆盖。
+ * 稳定 rendezvous 路径：**绑本实例 pid**。
+ *
+ * 旧实现用 tmpdir 固定名（`pidesk-view-host.json`），前提是「单机单 PiDesk 实例」。该
+ * 前提已被真实场景打破：dev 实例与安装包实例同时开着时，后启动者覆盖同名文件，先启
+ * 动者的所有会话在下次 connect 时被劫持到别人的 pipe 上（Windows 上 `connect EPERM`），
+ * 扩展侧只能静默回落——`ask_user_question` 的桌面问卷就是这么消失的。
+ *
+ * 路径经 spawn env（`PIDESK_VIEW_RENDEZVOUS`）注入，所以旧 SDK 也各读各家的文件；
+ * Host 重启（pid 变化）留下的陈旧文件由 {@link pruneStaleRendezvous} 按 pid 存活回收。
  */
 export function getViewHostRendezvousPath(): string {
-  return path.join(os.tmpdir(), "pidesk-view-host.json");
+  return path.join(os.tmpdir(), `${RENDEZVOUS_PREFIX}-${process.pid}${RENDEZVOUS_SUFFIX}`);
+}
+
+/** pid 可 signal（0 号信号）即视为存活；EPERM 是「存在但没权限」，同样算存活。 */
+function isPidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/**
+ * 回收陈旧 rendezvous（含旧版固定名文件）：只删「文件里写的 pid 已经不在」的那些。
+ *
+ * 按 mtime 判活会误删长期运行实例的文件，按 pid 判活不会。解析不出 pid 的文件
+ * （半截/手写/未来格式）只在超过 {@link RENDEZVOUS_UNPARSABLE_MAX_AGE_MS} 后才删，
+ * 避免和正在写入的实例抢。返回删除条数，失败一律静默（tmp 目录不是功能前提）。
+ */
+export function pruneStaleRendezvous(dir = os.tmpdir(), now = Date.now()): number {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return 0;
+  }
+  let removed = 0;
+  for (const name of names) {
+    if (!name.startsWith(RENDEZVOUS_PREFIX) || !name.endsWith(RENDEZVOUS_SUFFIX)) continue;
+    const file = path.join(dir, name);
+    let pid: unknown;
+    try {
+      pid = (JSON.parse(fs.readFileSync(file, "utf8")) as { pid?: unknown }).pid;
+    } catch {
+      pid = undefined;
+    }
+    if (typeof pid === "number") {
+      if (isPidAlive(pid)) continue;
+    } else {
+      try {
+        if (now - fs.statSync(file).mtimeMs < RENDEZVOUS_UNPARSABLE_MAX_AGE_MS) continue;
+      } catch {
+        continue;
+      }
+    }
+    try {
+      fs.unlinkSync(file);
+      removed += 1;
+    } catch {
+      // 别的实例刚抢了写锁或文件已消失
+    }
+  }
+  return removed;
 }
 
 function writeViewHostRendezvous(env: {
@@ -913,6 +980,7 @@ function writeViewHostRendezvous(env: {
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, payload, "utf8");
   fs.renameSync(tmp, file);
+  pruneStaleRendezvous(path.dirname(file));
   return file;
 }
 

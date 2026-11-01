@@ -131,6 +131,15 @@ export function readEnv(env: ViewProcessEnv): ViewHostEnv | null {
 }
 
 /**
+ * 去掉 rendezvous 变量后的进程 env：`readEnv` 会因此回退到 spawn 时注入的
+ * endpoint/token（rendezvous 文件不参与）。
+ */
+function withoutRendezvous(env: ViewProcessEnv): ViewProcessEnv {
+  const { PIDESK_VIEW_RENDEZVOUS: _p, PI_VIEW_RENDEZVOUS: _q, ...rest } = env;
+  return rest;
+}
+
+/**
  * Parse Host endpoint into a `net.connect` target.
  * - Windows named pipe: `\\.\pipe\pidesk-view-<pid>`
  * - Unix socket path: `/tmp/pidesk-view-<pid>.sock`
@@ -299,6 +308,8 @@ export class DesktopViewClient {
   #disposed = false;
   #ready = false;
   #forceReconnect = false;
+  /** rendezvous 指向的 Host 连不上过 → 本次进程生命周期内只认 spawn env（docs/design/15 P0-1 补充）。 */
+  #latchedToSpawnEnv = false;
 
   constructor(env: ViewHostEnv, options?: ConnectDesktopViewOptions) {
     this.#env = { ...env };
@@ -395,7 +406,8 @@ export class DesktopViewClient {
    * Returns true when endpoint/token/sessionId changed.
    */
   refreshEnv(source?: ViewProcessEnv): boolean {
-    const next = readEnv(source ?? this.#optionsEnv ?? process.env);
+    const env = source ?? this.#optionsEnv ?? process.env;
+    const next = readEnv(this.#latchedToSpawnEnv ? withoutRendezvous(env) : env);
     if (!next) return false;
     const merged: ViewHostEnv = {
       endpoint: next.endpoint,
@@ -472,9 +484,38 @@ export class DesktopViewClient {
     } catch (err) {
       // Host restart: rendezvous file should carry the new pipe/port.
       const changed = this.refreshEnv();
-      if (!changed || this.#env.endpoint === staleEndpoint) throw err;
-      await this.#connectOnce();
+      if (changed && this.#env.endpoint !== staleEndpoint) {
+        await this.#connectOnce();
+        return;
+      }
+      // rendezvous 是 tmpdir 里的单例文件：多开 PiDesk（dev 实例 + 安装包，或提权
+      // 进程）时后启动者覆盖它，先启动者的会话被引到别人的 pipe 上——Windows 上
+      // 表现为 `connect EPERM`，或对面 token 不符被静默 destroy。此时 spawn env 里
+      // 那份 endpoint 才是本会话自己的 Host。
+      if (this.#adoptSpawnEnvEndpoint()) {
+        await this.#connectOnce();
+        return;
+      }
+      throw err;
     }
+  }
+
+  /**
+   * 回退到 spawn 时注入的 endpoint/token，并记住这个决定（后续重连不再读回那份
+   * 被抢注的 rendezvous）。只有当文件指向的 Host 连不上时才走到这里。
+   * 返回 true 表示 endpoint 确实换了，调用方应重试一次连接。
+   */
+  #adoptSpawnEnvEndpoint(): boolean {
+    const spawn = readEnv(withoutRendezvous(this.#optionsEnv ?? process.env));
+    if (!spawn || spawn.endpoint === this.#env.endpoint) return false;
+    this.#latchedToSpawnEnv = true;
+    this.#env = {
+      ...spawn,
+      // sessionId / role 是连接上下文（setSessionId 可能改过），不被回退覆盖
+      sessionId: this.#env.sessionId ?? spawn.sessionId,
+      role: this.#env.role ?? spawn.role,
+    };
+    return true;
   }
 
   async #connectOnce(): Promise<void> {
@@ -532,12 +573,24 @@ export class DesktopViewClient {
 
     // Wait for hello; old hosts without hello still allow open().
     if (!this.#hello) {
-      await Promise.race([
-        new Promise<void>((resolve) => {
-          this.#helloResolvers.push(resolve);
-        }),
-        sleep(this.#helloTimeoutMs),
-      ]);
+      const helloArrived = new Promise<void>((resolve) => {
+        this.#helloResolvers.push(resolve);
+      });
+      // Host 认不了 token 时直接 destroy socket，一声不吭。把它当成连接失败抛出去，
+      // 让 #connectWithRefresh 有机会回退到正确的 Host，而不是让 open() 干等到超时。
+      let rejectEarlyClose: ((err: Error) => void) | null = null;
+      const closedEarly = new Promise<never>((_, reject) => {
+        rejectEarlyClose = reject;
+      });
+      const onEarlyClose = (): void =>
+        rejectEarlyClose?.(new Error(`View Host closed before hello (${this.#env.endpoint})`));
+      socket.once("close", onEarlyClose);
+      try {
+        await Promise.race([helloArrived, sleep(this.#helloTimeoutMs), closedEarly]);
+      } finally {
+        rejectEarlyClose = null;
+        socket.off("close", onEarlyClose);
+      }
     }
 
     this.#ready = true;
