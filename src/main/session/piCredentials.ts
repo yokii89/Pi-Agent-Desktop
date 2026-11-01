@@ -12,6 +12,7 @@ import {
   extractSecret,
   isGatewayProvider,
   maskSecret,
+  mergePreferredModelAuth,
   providerLabel,
   pruneAuthToSingleProvider,
   readAuthLenient,
@@ -635,6 +636,8 @@ export function reassertActiveCredential(): void {
 /**
  * 把用户刚选中的模型回写到「当前全局激活」凭据的 preferredModel，
  * 保证下次激活该凭据时能直接落到同一模型，而不是退回 provider id。
+ * 同时并入 auth.json 同 provider 条目：pi 扩展的模型粘性（每轮 agent_start 重申）读的是那里，
+ * 两处不一致时芯片选的模型会被扩展每轮抢回去。
  */
 export function syncPreferredModelForActive(provider: string, modelId: string): void {
   const providerId = provider.trim();
@@ -643,6 +646,7 @@ export function syncPreferredModelForActive(provider: string, modelId: string): 
   const registry = migrateFromAuthJsonIfEmpty();
   const { activeProvider, activeCredentialId } = resolveActiveProvider(registry);
   if (activeProvider !== providerId || !activeCredentialId) return;
+  mergePreferredModelAuth(providerId, model);
   const index = registry.credentials.findIndex((c) => c.id === activeCredentialId);
   if (index < 0) return;
   if (registry.credentials[index].preferredModel === model) return;

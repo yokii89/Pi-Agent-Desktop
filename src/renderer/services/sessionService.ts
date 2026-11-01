@@ -204,12 +204,12 @@ export const sessionService = {
     return unwrap(api.session.getModelState(id)).catch(() => null);
   },
 
-  /** 切换模型；目标会话未启动时仅写入 pi settings 默认模型。 */
+  /** 切换模型；无存活会话实例时仅落盘 pi 默认模型（新会话生效），并广播其它存活实例。 */
   setModel(provider: string, modelId: string, sessionId?: SessionId): Promise<PiModelOption> {
     const api = pideskApi();
+    if (!api) return Promise.reject(new Error("preload 未就绪"));
     const id = sessionId ?? currentSessionId;
-    if (!api || !id) return Promise.reject(new Error("会话未启动"));
-    return unwrap(api.session.setModel({ sessionId: id, provider, modelId }));
+    return unwrap(api.session.setModel({ sessionId: id ?? undefined, provider, modelId }));
   },
 
   /** 读取可用模型列表（force 时短连；否则钉死目标 sessionId）。 */

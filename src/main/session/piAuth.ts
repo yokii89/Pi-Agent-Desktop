@@ -185,6 +185,22 @@ export function writeProviderAuth(
   if (gateway) invalidateGatewayModelCache();
 }
 
+/**
+ * 把宿主选定的模型并入 auth.json 的既有 provider 条目：只改 `preferredModel`，
+ * token / refresh / machineID 等字段原样保留（继承自 pi 的凭据不得被重写）。
+ * 扩展侧的 preferredModel 粘性（如 yoki-newapi 每轮 `agent_start` 重申）读的就是这个字段，
+ * 不回写会和输入栏芯片来回抢模型。provider 键不存在时不创建条目。
+ */
+export function mergePreferredModelAuth(provider: string, modelId: string): void {
+  const next = readAuthStrict();
+  const entry = next[provider];
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return;
+  const record = entry as Record<string, unknown>;
+  if (record.preferredModel === modelId) return;
+  next[provider] = { ...record, preferredModel: modelId };
+  writeAuth(next);
+}
+
 /** 删除 auth.json 中某 provider 键。 */
 export function removeProviderAuth(provider: string): void {
   const next = readAuthStrict();

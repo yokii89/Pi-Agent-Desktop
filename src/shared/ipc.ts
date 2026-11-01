@@ -961,7 +961,9 @@ export interface SessionSetThinkingLevelRequest extends SessionProcessRequest {
   level: ThinkingLevelId;
 }
 
-export interface SessionSetModelRequest extends SessionProcessRequest {
+export interface SessionSetModelRequest {
+  /** 目标实例；缺省表示当前无存活会话实例，只落盘默认模型并广播其它实例。 */
+  sessionId?: SessionId;
   provider: string;
   modelId: string;
 }

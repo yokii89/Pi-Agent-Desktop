@@ -593,7 +593,9 @@ export function registerSessionIpc(): void {
     SESSION_IPC.setModel,
     (_event, req: SessionSetModelRequest): Promise<IpcResult<PiModelOption>> =>
       envelopeAsync(async () => {
-        const sessionId = requireSessionId(req?.sessionId);
+        // 目标实例可缺省：无存活实例时只落盘默认模型，仍然广播其它实例
+        const sessionId =
+          typeof req?.sessionId === "string" && req.sessionId.length > 0 ? req.sessionId : null;
         if (typeof req?.provider !== "string" || typeof req?.modelId !== "string") {
           throw new Error("参数不完整");
         }
@@ -616,7 +618,7 @@ export function registerSessionIpc(): void {
         };
         // C2：改默认模型时广播到所有存活实例；目标会话未启动也广播其它实例
         let targetApplied = false;
-        if (hasSession(sessionId)) {
+        if (sessionId !== null && hasSession(sessionId)) {
           try {
             const data = await setSessionModel(sessionId, provider, modelId);
             const models = mapModels({ models: data ? [data] : [] });

@@ -394,7 +394,7 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 读取目标会话的模型与思考档位（未启动时回退 pi 配置，不读其它实例）。 */
     getModelState: (sessionId: SessionId): Promise<IpcResult<PiModelState>> =>
       ipcRenderer.invoke(SESSION_IPC.getModelState, { sessionId }),
-    /** 切换模型（目标会话存活时 RPC set_model，并写入 pi settings 默认模型）。 */
+    /** 切换模型（目标会话存活时 RPC set_model；无会话则只落盘 pi 默认模型，仍广播其它存活实例）。 */
     setModel: (req: SessionSetModelRequest): Promise<IpcResult<PiModelOption>> =>
       ipcRenderer.invoke(SESSION_IPC.setModel, req),
     /** 读取可用模型列表（force 时短连；否则钉死 sessionId）。 */
