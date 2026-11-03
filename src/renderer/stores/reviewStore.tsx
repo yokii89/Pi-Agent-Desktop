@@ -17,6 +17,7 @@ import type {
 } from "../../shared/ipc";
 import { gitService } from "../services/gitService";
 import { sessionService } from "../services/sessionService";
+import type { ChangeFocusHit } from "../utils/reviewFocus";
 import {
   emptyRollbackInspect,
   type RollbackBlockReason,
@@ -115,6 +116,11 @@ interface ReviewStoreValue {
   selectedChange: GitChange | null;
   selectChange: (change: GitChange) => void;
   clearSelection: () => void;
+  /**
+   * 聚焦一个已匹配到的变更条目（会话区编辑汇总卡点开文件）：
+   * 筛选口径切到命中所在的那个范围，视图回到「变更」，选中这一行。
+   */
+  focusChange: (hit: ChangeFocusHit) => void;
   refresh: () => Promise<void>;
   /** Review 面板可见时调用：数据过期才刷新，保证切 Tab 不重复执行 git。 */
   refreshIfStale: () => void;
@@ -402,6 +408,14 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     setSelectedKey(null);
   }, []);
 
+  const focusChange = useCallback((hit: ChangeFocusHit): void => {
+    // 入口展示的是哪个范围，面板就切到哪个范围（与「审阅」按钮 / 监控卡改动行同一套做法）
+    setFilterMode(hit.source === "lastRound" ? "lastRound" : "all");
+    // 定点点开某个文件：停在图谱视图会让点击看起来没反应
+    setReviewView("changes");
+    setSelectedKey(changeKey(hit.change));
+  }, []);
+
   const bumpGraphRefresh = useCallback((): void => {
     setGraphRefreshSeq((n) => n + 1);
   }, []);
@@ -666,6 +680,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         : null,
       selectChange,
       clearSelection,
+      focusChange,
       refresh,
       refreshIfStale,
       canRollback: preRoundTreeOid !== null && lastRound.length > 0,
@@ -703,6 +718,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     selectedKey,
     selectChange,
     clearSelection,
+    focusChange,
     refresh,
     refreshIfStale,
     preRoundTreeOid,

@@ -11,13 +11,20 @@ interface FileLinkProps {
   /** 展示文案；缺省时显示完整 path。 */
   label?: string;
   className?: string;
+  /** tooltip 文案；缺省时展示完整 path。 */
+  title?: string;
+  /**
+   * 覆盖主点击动作（缺省 = 在右侧文件面板预览）。
+   * Ctrl/Cmd+点击不受影响，始终交系统默认程序。
+   */
+  onOpen?: () => void;
 }
 
 /**
- * 可点击文件路径：主点击在右侧文件面板预览；
+ * 可点击文件路径：主点击在右侧文件面板预览（或由 onOpen 接管，如编辑汇总卡跳审阅）；
  * Ctrl/Cmd+点击保留系统默认程序打开。
  */
-export function FileLink({ path: rawPath, label, className }: FileLinkProps) {
+export function FileLink({ path: rawPath, label, className, title, onOpen }: FileLinkProps) {
   const t = useT();
   const { sessionWorkingDir } = useSessionMeta();
   const { dispatch, showToast } = useUiStore();
@@ -32,6 +39,10 @@ export function FileLink({ path: rawPath, label, className }: FileLinkProps) {
       });
       return;
     }
+    if (onOpen) {
+      onOpen();
+      return;
+    }
     dispatch({ type: "openFileInPanel", path: rawPath });
   };
 
@@ -40,7 +51,7 @@ export function FileLink({ path: rawPath, label, className }: FileLinkProps) {
       type="button"
       className={`${styles.link} ${className ?? ""}`}
       onClick={open}
-      title={t("session.fileLink.title", { path: rawPath })}
+      title={title ?? t("session.fileLink.title", { path: rawPath })}
     >
       {label ?? rawPath}
     </button>

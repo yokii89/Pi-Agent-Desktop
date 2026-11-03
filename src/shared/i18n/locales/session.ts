@@ -439,6 +439,10 @@ export const sessionMessages = defineMessages({
   "session.fileEdits.undo": { "zh-CN": "撤销", "en-US": "Undo" },
   "session.fileEdits.undoing": { "zh-CN": "撤销中…", "en-US": "Undoing…" },
   "session.fileEdits.review": { "zh-CN": "审阅", "en-US": "Review" },
+  "session.fileEdits.openReviewTitle": {
+    "zh-CN": "{path}（点击在审阅中查看改动 · Ctrl+点击系统打开）",
+    "en-US": "{path} (click to see the change in Review · Ctrl+click to open with system)",
+  },
 
   "session.tool.batchRead": {
     "zh-CN": "已读取 {count} 个文件",

@@ -6,6 +6,7 @@ import { useReviewStore } from "../../stores/reviewStore";
 import { useSessionMeta } from "../../stores/sessionStore";
 import type { EditsFileStat, EditsSummaryEntry } from "../../stores/sessionTranscript";
 import { useUiStore } from "../../stores/uiStore";
+import { type ChangeFocusHit, findChangeFocus } from "../../utils/reviewFocus";
 import { ROLLBACK_BLOCK_REASON_TEXT } from "../../utils/rollbackLastRound";
 import styles from "./FileEditsSummary.module.css";
 import { FileLink } from "./FileLink";
@@ -23,21 +24,24 @@ interface FileEditsSummaryProps {
  * 本轮文件编辑汇总卡：run 收口后出现在文档流末尾。
  * 展示路径一律为相对工作目录/仓库根的相对路径。
  * 历史卡：只读工具结果快照；最新卡：lastRound 就绪后切到 Git 统计（与撤销/审阅同源）。
+ * 文件行点开 = 右侧栏审阅里这个条目的 diff（工作区已无此改动时回落文件面板预览）。
  */
 export function FileEditsSummary({ entry, isLatest }: FileEditsSummaryProps) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   const {
     lastRound,
+    changes,
     repoRoot,
     canRollback,
     rollingBack,
     rollbackBlockReason,
     requestRollbackPrompt,
     setFilterMode,
+    focusChange,
   } = useReviewStore();
   const { sessionWorkingDir } = useSessionMeta();
-  const { openReview } = useUiStore();
+  const { openReview, openReviewDocked, dispatch } = useUiStore();
 
   const files = resolveDisplayFiles(entry, isLatest, lastRound, sessionWorkingDir, repoRoot);
   const totalAdditions = files.reduce((sum, file) => sum + file.additions, 0);
@@ -47,6 +51,12 @@ export function FileEditsSummary({ entry, isLatest }: FileEditsSummaryProps) {
   const hidden = files.length - VISIBLE_FILES;
   const visible = expanded ? files : files.slice(0, VISIBLE_FILES);
   const roots = [repoRoot, sessionWorkingDir];
+  // 每行点开去哪，取决于工作区里还有没有这个条目：悬停文案与点击共用同一次匹配，
+  // 否则会出现「说进审阅、实际回落文件预览」的谎话。
+  const rows = visible.map((file) => ({
+    file,
+    hit: findChangeFocus(file.path, lastRound, changes, repoRoot, sessionWorkingDir),
+  }));
   /** 最新卡且已切到 Git lastRound：标题与撤销范围同源。 */
   const usingGitRound = isLatest && lastRound.length > 0;
   const title = !isLatest
@@ -61,6 +71,20 @@ export function FileEditsSummary({ entry, isLatest }: FileEditsSummaryProps) {
   const handleOpenReview = () => {
     setFilterMode("lastRound");
     openReview();
+  };
+
+  /**
+   * 点开列表里的文件：在右侧栏「审阅」里定位到这个文件的 diff（而不是只预览内容）。
+   * 条目已不在当前工作区（已提交 / 非 Git 工作区 / 快照路径对不上）时回到原有行为：
+   * 在「工作区文件」面板预览，至少让点击有去处。
+   */
+  const openFile = (file: EditsFileStat, hit: ChangeFocusHit | null) => {
+    if (hit) {
+      focusChange(hit);
+      openReviewDocked();
+      return;
+    }
+    dispatch({ type: "openFileInPanel", path: toOpenPath(file.path, roots) });
   };
 
   // 确认弹窗由 reviewStore 驱动、全局宿主渲染（快捷键与按钮共用同一确认流）
@@ -113,13 +137,15 @@ export function FileEditsSummary({ entry, isLatest }: FileEditsSummaryProps) {
         )}
       </div>
       <ul className={styles.list}>
-        {visible.map((file) => (
+        {rows.map(({ file, hit }) => (
           <li key={file.path} className={styles.item}>
             <FileIcon fileName={baseName(file.path)} className={styles.fileIcon} />
             <FileLink
               path={toOpenPath(file.path, roots)}
               label={file.path}
               className={styles.filePath}
+              title={hit ? t("session.fileEdits.openReviewTitle", { path: file.path }) : undefined}
+              onOpen={() => openFile(file, hit)}
             />
             <span className={styles.stats}>
               {file.additions > 0 && <span className={styles.add}>+{file.additions}</span>}

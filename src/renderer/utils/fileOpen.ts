@@ -34,7 +34,8 @@ function toPosix(p: string): string {
   return p.replace(/\\/g, "/");
 }
 
-function isAbsolutePath(p: string): boolean {
+/** 盘符 / POSIX 根 / UNC 前缀视为绝对路径（Windows 路径比较各处共用）。 */
+export function isAbsolutePath(p: string): boolean {
   return /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith("/") || p.startsWith("\\\\");
 }
 

@@ -1,6 +1,8 @@
 import { Minus, Plus, Trash } from "@phosphor-icons/react";
+import { useEffect, useRef } from "react";
 import type { GitChange } from "../../../shared/ipc";
 import { useT } from "../../hooks/useT";
+import { revealInNearestScroller } from "../../utils/revealInScroller";
 import styles from "./ChangeList.module.css";
 
 /** 状态 → 字母章文案与语义色。 */
@@ -43,8 +45,23 @@ export function ChangeList({
   onDiscard,
 }: ChangeListProps) {
   const t = useT();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 选中条目滚进视野：会话区编辑汇总卡点开靠后的文件时，不滚就只看得到详情、见不到高亮行。
+  // revealInNearestScroller 只在超出容器时动，所以行内点击（已可见）这一趟是空操作。
+  // biome-ignore lint/correctness/useExhaustiveDependencies: changes 不直接读，但它是「行重新渲染」的依据（选中键未变而列表换层时要重新定位）
+  useEffect(() => {
+    if (!selectedKey) return;
+    const host = scrollRef.current;
+    if (!host) return;
+    const row = Array.from(host.querySelectorAll<HTMLElement>("[data-change-key]")).find(
+      (el) => el.dataset.changeKey === selectedKey,
+    );
+    if (row) revealInNearestScroller(row, "y");
+  }, [selectedKey, changes]);
+
   return (
-    <div className={styles.listScroll}>
+    <div className={styles.listScroll} ref={scrollRef}>
       <ul className={styles.list}>
         {changes.map((change) => {
           const key = `${change.layer}|${change.path}`;
@@ -62,6 +79,7 @@ export function ChangeList({
                   className={[styles.row, key === selectedKey ? styles.rowSelected : ""].join(" ")}
                   onClick={() => onRowClick(change)}
                   aria-pressed={key === selectedKey}
+                  data-change-key={key}
                   title={fullTitle}
                 >
                   <span className={[styles.badge, badge.toneClass].join(" ")} aria-hidden="true">
