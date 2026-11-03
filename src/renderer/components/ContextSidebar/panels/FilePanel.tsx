@@ -2,6 +2,8 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowSquareOut,
+  Eye,
+  EyeSlash,
   Globe,
   MagnifyingGlass,
 } from "@phosphor-icons/react";
@@ -295,6 +297,23 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           <span className={panelStyles.previewMeta}>
             {previewMeta(activePreview.result, imageSize, t)}
           </span>
+          {isMarkdownPath(activePreview.path) && (
+            <IconButton
+              title={t("panels.files.mdToggle", {
+                mode:
+                  mdViewMode === "preview"
+                    ? t("panels.files.mdSource")
+                    : t("panels.files.mdPreview"),
+              })}
+              onClick={() => setMdViewMode(mdViewMode === "preview" ? "source" : "preview")}
+            >
+              {mdViewMode === "preview" ? (
+                <Eye size={16} weight="regular" />
+              ) : (
+                <EyeSlash size={16} weight="regular" />
+              )}
+            </IconButton>
+          )}
           {isHtmlPath(activePreview.path) && browserEnabled && (
             <IconButton
               title={t("panels.files.openInBrowser")}
@@ -333,7 +352,6 @@ export function FilePanel({ active = true }: { active?: boolean }) {
             onImageSize={setImageSize}
             onOpenInSystem={() => openInSystem(activePreview.path)}
             mdMode={mdViewMode}
-            onMdModeChange={setMdViewMode}
           />
         ) : previewLoading ? (
           <p className={panelStyles.noMatch}>{t("panels.files.loading")}</p>
@@ -384,13 +402,11 @@ function FilePreviewBody({
   onImageSize,
   onOpenInSystem,
   mdMode,
-  onMdModeChange,
 }: {
   preview: PreviewState;
   onImageSize: (size: string | null) => void;
   onOpenInSystem: () => void;
   mdMode: MarkdownViewMode;
-  onMdModeChange: (mode: MarkdownViewMode) => void;
 }) {
   const t = useT();
   const { result } = preview;
@@ -436,7 +452,6 @@ function FilePreviewBody({
         content={result.content}
         truncated={result.truncated}
         mode={mdMode}
-        onModeChange={onMdModeChange}
         focusLine={preview.focusLine}
       />
     );

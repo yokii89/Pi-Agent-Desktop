@@ -5,18 +5,6 @@
   height: 100%;
 }
 
-/* 预览 / 源码两态切换：紧凑分段条，常显（不依赖 hover）。
-   侧栏窄幅，轨道不铺底色、只留原来那圈描边；--seg-radius 保持默认 --radius-md，
-   裁出来的滑块圆角逐像素等于旧按钮的 --radius-sm。
-   不加横向 padding / margin：panelBody 已有，与代码预览 previewContent 对齐 */
-.modeSeg {
-  --seg-track: transparent;
-  --seg-pad: var(--spacing-sm);
-  --seg-ink-active: var(--color-text);
-
-  margin-bottom: var(--spacing-xs);
-}
-
 .body {
   flex: 1;
   min-height: 0;

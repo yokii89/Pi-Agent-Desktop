@@ -158,6 +158,7 @@ export const contextMessages = defineMessages({
   // —— MarkdownPreview ——
   "panels.files.mdPreview": { "zh-CN": "预览", "en-US": "Preview" },
   "panels.files.mdSource": { "zh-CN": "源码", "en-US": "Source" },
+  "panels.files.mdToggle": { "zh-CN": "切换到{mode}", "en-US": "Switch to {mode}" },
 
   // —— ReviewWindow（代码审查浮窗；原侧栏 ReviewPanel）——
   "panels.review.windowTitle": { "zh-CN": "代码审查", "en-US": "Code Review" },
