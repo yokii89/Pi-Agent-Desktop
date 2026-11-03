@@ -19,7 +19,7 @@ export type TerminalSplitDirection = "row" | "column";
 export interface TerminalPaneState {
   tabs: TerminalTab[];
   panes: string[];
-  /** 焦点窗格在 panes 中的下标：工具条高亮、「结束进程」与键盘输入都跟着它。 */
+  /** 焦点窗格在 panes 中的下标：工具条高亮、分屏落点与键盘输入都跟着它。 */
   focusedPane: number;
   /** 分屏方向；非 null 时 panes 恒为 2 项（不变量由 reducer 维持）。 */
   split: TerminalSplitDirection | null;

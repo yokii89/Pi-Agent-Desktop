@@ -2,7 +2,6 @@ import {
   Plus,
   SquareSplitHorizontal,
   SquareSplitVertical,
-  Stop,
   Terminal,
   X,
 } from "@phosphor-icons/react";
@@ -72,6 +71,8 @@ interface SplitResizeSession {
  * 演完收起才 display:none，pty 与 xterm 缓冲全程保持存活。
  * 分屏（docs/design/57）：窗口内容渲染 terminalStore.panes 的 1..2 个窗格，
  * 比例走内联 flex-grow、分隔条拖拽改比例（双击复位），焦点窗格带描边。
+ * 工具条右侧只放「点了不丢东西」的动作：销毁实例的入口是页签 × 与页签右键菜单，
+ * 不再有常驻的「结束当前终端」按钮——它和旁边的隐藏按钮只差几像素，误触就关掉终端。
  */
 export function TerminalPanel({ hidden }: TerminalPanelProps) {
   const t = useT();
@@ -135,18 +136,24 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
     if (!hidden && activeTabId) paneRefs.current[focusedPane]?.focus();
   }, [hidden, activeTabId, focusedPane]);
 
+  /**
+   * 取消进行中的收展补间，并摘掉补间留下的内联 overflow。
+   * 所有取消路径都必须走这里：收展切换（下面的 layoutEffect）与拖高度把手
+   * （onResizeMove）都能打断补间，只 cancel 不摘内联的话 `overflow: hidden`
+   * 会永久留在 DOM 上——补间的中间产物落定后要清干净（docs/design/53）。
+   */
+  const cancelCollapseTween = useCallback((): void => {
+    cancelRef.current?.();
+    cancelRef.current = null;
+    rootRef.current?.style.removeProperty("overflow");
+  }, []);
+
   // 收起/展开补间（docs/design/53）：走浮层同一条定帧时间轴，曲线用下拉曲线
   //（glide() 默认缓动 = GLIDE_MOTION.easeOut），时长沿用面板折叠档（NAV_MOTION）。
   // 补间期间 inline overflow:hidden 裁掉被压出面板的工具条，落定后摘除不留残留。
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
-
-    const stopTween = (): void => {
-      cancelRef.current?.();
-      cancelRef.current = null;
-      root.style.removeProperty("overflow");
-    };
 
     const playTween = (direction: "enter" | "exit"): void => {
       const from = root.offsetHeight;
@@ -183,9 +190,9 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
     }
     if (lastHidden.current === hidden) return;
     lastHidden.current = hidden;
-    stopTween();
+    cancelCollapseTween();
     playTween(hidden ? "exit" : "enter");
-  }, [hidden, terminalPanelHeight]);
+  }, [hidden, terminalPanelHeight, cancelCollapseTween]);
 
   const newTerminal = (): void => {
     void createTab(currentProject?.dir);
@@ -247,11 +254,10 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
     const session = resizeRef.current;
     if (!session) return;
     if (!session.moved) {
-      // 真正开始拖拽才接管：停掉进行中的收展补间，从当前视觉值重新起算，
-      // 补间可能已在按下后推进，沿用按下时的起点会跳一帧
+      // 真正开始拖拽才接管：停掉进行中的收展补间（连同它留下的内联 overflow），
+      // 从当前视觉值重新起算，补间可能已在按下后推进，沿用按下时的起点会跳一帧
       session.moved = true;
-      cancelRef.current?.();
-      cancelRef.current = null;
+      cancelCollapseTween();
       session.startY = event.clientY;
       session.startHeight = rootRef.current?.offsetHeight ?? session.startHeight;
       document.body.style.cursor = "row-resize";
@@ -260,7 +266,6 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
     const next = session.startHeight + (session.startY - event.clientY);
     setDragHeight(clampHeight(next, session.maxHeight));
   };
-
   const onResizeEnd = (event: ReactPointerEvent<HTMLDivElement>): void => {
     const session = resizeRef.current;
     if (!session) return;
@@ -276,7 +281,7 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
     dispatch({ type: "setTerminalPanelHeight", height: clampHeight(next, session.maxHeight) });
   };
 
-  // 点击窗格：把焦点（工具条高亮 / 结束进程的目标）与键盘输入都交给它。
+  // 点击窗格：把焦点（工具条高亮 / 分屏落点）与键盘输入都交给它。
   // 空白处点击不会落到 xterm 的 textarea 上，必须显式 focus 一次
   const focusPaneAt = (index: number): void => {
     focusPane(index);
@@ -395,14 +400,6 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
             onClick={() => void toggleSplit("column", currentProject?.dir)}
           >
             <SquareSplitVertical size={16} weight={split === "column" ? "fill" : "regular"} />
-          </IconButton>
-          <IconButton
-            className={styles.iconBtnCompact}
-            title={activeTab ? t("terminal.killCurrent") : t("terminal.noneRunning")}
-            disabled={!activeTab}
-            onClick={() => activeTab && closeTab(activeTab.id)}
-          >
-            <Stop size={16} weight="regular" />
           </IconButton>
           <IconButton
             className={styles.iconBtnCompact}

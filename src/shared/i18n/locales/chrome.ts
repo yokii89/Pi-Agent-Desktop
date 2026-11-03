@@ -28,11 +28,6 @@ export const chromeMessages = defineMessages({
     "en-US": "Up to {count} terminal instances",
   },
   "terminal.newInstance": { "zh-CN": "新建终端实例", "en-US": "New terminal instance" },
-  "terminal.killCurrent": {
-    "zh-CN": "结束当前终端进程",
-    "en-US": "End current terminal process",
-  },
-  "terminal.noneRunning": { "zh-CN": "无运行中的终端", "en-US": "No running terminal" },
   "terminal.empty": { "zh-CN": "无终端实例", "en-US": "No terminal instances" },
   "terminal.splitRow": { "zh-CN": "左右分屏", "en-US": "Split left and right" },
   "terminal.splitColumn": { "zh-CN": "上下分屏", "en-US": "Split top and bottom" },
