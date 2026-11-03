@@ -47,7 +47,7 @@ export function MarkdownPreview({
       {truncated && <p className={panelStyles.truncatedNote}>{t("panels.files.truncatedNote")}</p>}
       <div className={styles.body}>
         {mode === "preview" ? (
-          <MarkdownDoc text={content} sourcePath={path} codeHighlight />
+          <MarkdownDoc text={content} sourcePath={path} codeHighlight mermaid />
         ) : (
           <CodeHighlight code={content} filePath={path} focusLine={focusLine} />
         )}

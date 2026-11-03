@@ -71,6 +71,7 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 - `shiki`（runtime）：右侧「文件」面板只读预览的代码语法高亮（TextMate 文法 + 双主题 CSS 变量）；经 `shiki/core` 细粒度动态加载，禁止整包 `import "shiki"` 静态引入。
 - `@vitest/coverage-v8`（dev）：`packages/view-sdk` 的行/分支覆盖率口径（`pnpm test:sdk:coverage`）。版本必须与 `vitest` 主版本配对；**仅 SDK 测试用**，不扩展到主进程 / 渲染层（后者仍按本文件"测试"条款只跑断言）。`NODE_V8_COVERAGE` 对 vitest worker 无效，不要再试。
 - `electron-updater`（runtime）：设置 →「应用更新」的检查/下载/安装。GitHub Releases + NSIS `latest.yml`/blockmap；发布流程见 `scripts/release.mjs` 与 `.github/workflows/release.yml`。
+- `mermaid`（runtime）：会话区 / 文件面板 / ExtensionView 的 ` ```mermaid ` 围栏出图。**只能经 `src/renderer/utils/mermaidLoader.ts` 动态 `import()`**（同 GSAP 条款）——它自带 60+ 个按图表类型切分的惰性 chunk（含 elk 布局引擎），静态引入会把它们全部塞进主 bundle。**不写 `manualChunks` 规则**：mermaid 内部已是动态 import，强行归组反而废掉惰性分块。CSP 无需放宽（`securityLevel: "strict"` 下生产策略实测可跑）。
 
 多模态图片附件**零新依赖**：解码/缩放用浏览器 `createImageBitmap` + `canvas`，不引入 sharp / jimp 等图像库。
 

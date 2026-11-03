@@ -41,21 +41,28 @@ export const MarkdownContent = memo(function MarkdownContent({
   return <StreamingMarkdown text={text} className={className} caret={caret} breaks={breaks} />;
 });
 
-/** 完成态 / 前缀块：纯静态渲染，text 不变则 memo 跳过（切分管线的前提）。 */
+/**
+ * 完成态 / 前缀块：纯静态渲染，text 不变则 memo 跳过（切分管线的前提）。
+ * `streaming` 只影响 mermaid：定型块出图，活动尾块在半截围栏下维持源码（docs/design/125）。
+ */
 const StaticMarkdown = memo(function StaticMarkdown({
   text,
   className,
   breaks,
+  streaming = false,
 }: {
   text: string;
   className?: string;
   breaks: boolean;
+  streaming?: boolean;
 }) {
   return (
     <MarkdownDoc
       text={text}
       codeCopy
       codeHighlight
+      mermaid
+      streaming={streaming}
       breaks={breaks}
       className={[styles.session, className].filter(Boolean).join(" ")}
     />
@@ -91,6 +98,7 @@ function StreamingMarkdown({
         text={visibleTail}
         className={caret ? [className, styles.caretHost].filter(Boolean).join(" ") : className}
         breaks={breaks}
+        streaming
       />
     </div>
   );

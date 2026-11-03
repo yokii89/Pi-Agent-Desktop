@@ -1,0 +1,33 @@
+/* ` ```mermaid ` 围栏（docs/design/125）：外壳类复用 markdown.module.css 的 .fence 一套，
+   这里只补图表区自己的皮肤与操作条。颜色/间距一律引用 tokens。 */
+
+/* 头部操作条：放大 / 源码切换 / 复制，与 .fenceLang 同一行右对齐 */
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/*
+ * mermaid 输出是 `width="100%"` + 内联 `max-width: 自然宽度`，只封顶不保底——
+ * 比正文窄的容器会把整张图缩到看不清。MermaidBlock 把内联 max-width 同步写成
+ * min-width（同值即自然宽），于是：窄图保持自然宽不放大、宽图按自然宽横向滚动。
+ */
+.graph {
+  max-height: 70vh;
+  padding: 0 var(--spacing-sm) var(--spacing-md);
+  overflow: auto;
+}
+
+.graph > svg {
+  display: block;
+  height: auto;
+  margin: 0 auto;
+}
+
+/* 语法有误时的提示行：不遮源码，只在源码下方补一句结论 */
+.hint {
+  padding: 0 var(--spacing-sm) var(--spacing-md);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}

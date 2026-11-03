@@ -13,6 +13,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { normalizeFenceLang, resolveMarkdownRef } from "../../utils/markdownRefs";
 import { FileLink, looksLikeFilePath } from "../SessionArea/FileLink";
 import { CodeHighlight, countCodeLines } from "../ui/CodeHighlight";
+import { MermaidBlock } from "./MermaidBlock";
 import styles from "./markdown.module.css";
 
 /** 模块级常量：避免每次 render 新建插件数组导致 memo 失效。 */
@@ -23,6 +24,13 @@ const remarkPluginsWithBreaks = [remarkGfm, remarkBreaks];
 /** 流式代码块高亮护栏（docs/design/10 §3.9）：超过即退回纯 <pre>，避免长代码拖慢流式。 */
 const MAX_HIGHLIGHT_CHARS = 20_000;
 const MAX_HIGHLIGHT_LINES = 200;
+
+/**
+ * mermaid 出图护栏（docs/design/125）：渲染代价随节点数增长，超限直接留在源码视图，
+ * 不让模型偶尔吐出的巨型图把渲染进程卡住。
+ */
+const MAX_MERMAID_CHARS = 8_000;
+const MAX_MERMAID_LINES = 200;
 
 /** 本地图片 dataUrl 缓存：同一文件多次引用 / 重渲染只读一次盘。 */
 const imageDataUrlCache = new Map<string, Promise<string | null>>();
@@ -65,6 +73,13 @@ interface MarkdownDocProps {
    * 是段内换行语义。默认 false——文件面板预览与 ExtensionView 保持 CommonMark 折叠。
    */
   breaks?: boolean;
+  /** ` ```mermaid ` 围栏渲染成图表（docs/design/125）。关闭时维持普通源码围栏。 */
+  mermaid?: boolean;
+  /**
+   * 流式态：mermaid 只在块定型后出图，半途只走源码分支（docs/design/125）。
+   * 半截围栏必然解析失败，逐 delta 试错会让图反复闪并重排整段对话。
+   */
+  streaming?: boolean;
 }
 
 /** 提取围栏 code 的纯文本（react-markdown 的 code children 就是字符串，此为兜底）。 */
@@ -79,6 +94,7 @@ function flattenText(node: ReactNode): string {
  * 块级围栏统一外壳（docs/design/13 P1-5）：语言标签 + 可选「复制」按钮 + 可选 shiki 高亮。
  * - 单行走紧凑态（docs/design/85）：不出头部行，代码与复制按钮同一行、垂直居中，
  *   语言标签与高亮都不出现，无语言 / 有语言的单行长得完全一样；
+ * - mermaid 围栏整块交给 MermaidBlock（外壳与头部由它自己按同一套类渲染）；
  * - 有语言且未超护栏 → CodeHighlight（shiki，双主题）；
  * - 无语言 / 超护栏 / 未开高亮 → 纯 <pre>；
  * - 复制按钮随 codeCopy 开关（会话区开），语言标签有语言即显示。
@@ -88,10 +104,14 @@ function FenceShell({
   children,
   codeHighlight,
   codeCopy,
+  mermaid,
+  streaming,
 }: {
   children?: ReactNode;
   codeHighlight: boolean;
   codeCopy: boolean;
+  mermaid: boolean;
+  streaming: boolean;
 }) {
   const { showToast } = useUiStore();
   const t = useT();
@@ -104,6 +124,16 @@ function FenceShell({
   const code = flattenText(child?.children).replace(/\n$/, "");
   // 空围栏仍走原路径：紧凑态是给「一行内容」用的，空块没有可居中的东西
   const singleLine = code.length > 0 && countCodeLines(code) <= 1;
+  if (
+    mermaid &&
+    !streaming &&
+    lang === "mermaid" &&
+    !singleLine &&
+    code.length <= MAX_MERMAID_CHARS &&
+    countCodeLines(code) <= MAX_MERMAID_LINES
+  ) {
+    return <MermaidBlock code={code} codeCopy={codeCopy} source={<pre>{children}</pre>} />;
+  }
   const highlightable =
     !singleLine &&
     codeHighlight &&
@@ -271,6 +301,8 @@ function buildComponents(opts: {
   sourcePath?: string | null;
   codeHighlight?: boolean;
   codeCopy?: boolean;
+  mermaid?: boolean;
+  streaming?: boolean;
 }): Components {
   const components: Components = {
     // 行内 / 无语言 code：像文件路径时升级 FileLink（会话区原样保留）
@@ -293,9 +325,14 @@ function buildComponents(opts: {
       </MarkdownLink>
     ),
   };
-  if (opts.codeHighlight || opts.codeCopy) {
+  if (opts.codeHighlight || opts.codeCopy || opts.mermaid) {
     components.pre = (props) => (
-      <FenceShell codeHighlight={opts.codeHighlight ?? false} codeCopy={opts.codeCopy ?? false}>
+      <FenceShell
+        codeHighlight={opts.codeHighlight ?? false}
+        codeCopy={opts.codeCopy ?? false}
+        mermaid={opts.mermaid ?? false}
+        streaming={opts.streaming ?? false}
+      >
         {props.children}
       </FenceShell>
     );
@@ -320,12 +357,14 @@ export const MarkdownDoc = memo(function MarkdownDoc({
   codeHighlight,
   codeCopy,
   breaks = false,
+  mermaid = false,
+  streaming = false,
 }: MarkdownDocProps) {
   return (
     <div className={[styles.md, className].filter(Boolean).join(" ")}>
       <Markdown
         remarkPlugins={breaks ? remarkPluginsWithBreaks : remarkPlugins}
-        components={buildComponents({ sourcePath, codeHighlight, codeCopy })}
+        components={buildComponents({ sourcePath, codeHighlight, codeCopy, mermaid, streaming })}
       >
         {text}
       </Markdown>

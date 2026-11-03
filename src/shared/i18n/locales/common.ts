@@ -38,6 +38,20 @@ export const commonMessages = defineMessages({
     "zh-CN": "无法加载图片：{src}",
     "en-US": "Could not load image: {src}",
   },
+  "common.mermaid.diagram": { "zh-CN": "Mermaid 图表", "en-US": "Mermaid diagram" },
+  "common.mermaid.renderFailed": {
+    "zh-CN": "图表语法有误，已显示源码",
+    "en-US": "Invalid diagram syntax; showing source",
+  },
+  "common.mermaid.showSource": {
+    "zh-CN": "查看源码",
+    "en-US": "View source",
+  },
+  "common.mermaid.showGraph": {
+    "zh-CN": "查看图表",
+    "en-US": "View diagram",
+  },
+  "common.mermaid.zoom": { "zh-CN": "放大查看", "en-US": "Zoom in" },
   "common.delete": { "zh-CN": "删除", "en-US": "Delete" },
   "common.rename": { "zh-CN": "重命名", "en-US": "Rename" },
   "common.open": { "zh-CN": "打开", "en-US": "Open" },
