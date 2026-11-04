@@ -39,6 +39,11 @@ interface PopoverProps {
    * resolve 之前不挂载面板，避免浮层先被原生视图盖住；reject 时仍继续打开。
    */
   beforeOpen?: () => Promise<void> | void;
+  /**
+   * 面板宽度跟随触发器（选取器/下拉栏手感）：写内联 `min-width`，
+   * 覆盖外壳的 `--panel-min-width` 下限。内容更宽时仍按内容撑开，不会截断长文案。
+   */
+  matchTriggerWidth?: boolean;
   /** 逻辑开合变化；关闭回调在退场动画与卸载完成后触发（解除抑制的时机）。 */
   onOpenChange?: (open: boolean) => void;
 }
@@ -64,6 +69,7 @@ export function Popover({
   rootClassName,
   panelClassName,
   beforeOpen,
+  matchTriggerWidth = false,
   onOpenChange,
 }: PopoverProps) {
   const [open, setOpen] = useState(false);
@@ -210,6 +216,7 @@ export function Popover({
       const anchor = root.getBoundingClientRect();
       // 用布局盒尺寸而非 getBoundingClientRect：入场时面板带着 scale(0.95)，
       // 后者量到的是缩放后的盒子，异步灌入的长列表会被算错高度而翻边。
+      if (matchTriggerWidth) panel.style.minWidth = `${root.offsetWidth}px`;
       const width = panel.offsetWidth;
       const height = panel.offsetHeight;
       const viewportW = window.innerWidth;
@@ -248,7 +255,7 @@ export function Popover({
     const observer = new ResizeObserver(place);
     observer.observe(panel);
     return () => observer.disconnect();
-  }, [open, mounted, align, direction, overlay]);
+  }, [open, mounted, align, direction, overlay, matchTriggerWidth]);
 
   useEffect(
     () => () => {

@@ -1,9 +1,11 @@
+import { Lightning, PencilSimple, Trash } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   clampThinkingLevel,
   type PiApiKeyProviderOption,
   type PiAuthProviderStatus,
   type PiAuthSnapshot,
+  type PiAuthUpsertRequest,
   type PiImportableProvider,
   type PiModelOption,
   type PiModelOverridePatch,
@@ -25,9 +27,10 @@ import {
 import { AiModelIcon } from "../AiIcons/AiModelIcon";
 import { AiProviderLogo } from "../AiIcons/AiProviderLogo";
 import { Button } from "../ui/Button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { GlideChevron } from "../ui/GlideChevron";
 import { Menu, type MenuItem } from "../ui/Menu";
-import { Select } from "../ui/Select";
+import { CredentialDialog } from "./CredentialDialog";
 import { ModelOverridesSection } from "./ModelOverridesSection";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import styles from "./Settings.module.css";
@@ -49,14 +52,9 @@ export function ModelsPanel() {
   const [applying, setApplying] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  const [formOpen, setFormOpen] = useState<"create" | string | null>(null);
-  const [formName, setFormName] = useState("");
-  const [formProvider, setFormProvider] = useState("anthropic");
-  const [formApiKey, setFormApiKey] = useState("");
-  const [formBaseUrl, setFormBaseUrl] = useState("");
-  const [formApiType, setFormApiType] = useState("openai-completions");
-  const [formPreferredModel, setFormPreferredModel] = useState("");
-  const [formSaving, setFormSaving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogCredential, setDialogCredential] = useState<PiAuthProviderStatus | null>(null);
+  const [dialogSaving, setDialogSaving] = useState(false);
   const [importingProvider, setImportingProvider] = useState<string | null>(null);
 
   // 模型能力（docs/design/49 起，docs/design/50 改版）
@@ -65,6 +63,7 @@ export function ModelsPanel() {
 
   const activeProviderId = auth?.activeProvider ?? null;
 
+  /** provider id → 是否网关类：静态表说了算，注册表里的历史凭据按有无 baseUrl 兜底。 */
   const providerGatewayMap = useMemo(() => {
     const map = new Map<string, boolean>();
     for (const option of apiKeyProviders) {
@@ -75,8 +74,6 @@ export function ModelsPanel() {
     }
     return map;
   }, [apiKeyProviders, auth?.providers]);
-
-  const formIsGateway = providerGatewayMap.get(formProvider) === true;
 
   const loadAuth = useCallback(async (): Promise<void> => {
     const [snapshot, providers] = await Promise.all([
@@ -169,27 +166,31 @@ export function ModelsPanel() {
     }
   };
 
-  const removeCredential = async (
-    credentialId: string,
-    name: string,
-    origin: "pidesk" | "pi",
-  ): Promise<void> => {
+  /** 二次确认中的凭据（null = 确认窗关闭）；pidesk 来源删密钥，pi 来源只取消继承。 */
+  const [pendingRemove, setPendingRemove] = useState<PiAuthProviderStatus | null>(null);
+  const [removing, setRemoving] = useState(false);
+
+  const removeCredential = async (credential: PiAuthProviderStatus): Promise<void> => {
+    setRemoving(true);
     try {
-      const snapshot = await authService.remove(credentialId);
+      const snapshot = await authService.remove(credential.id);
       if (snapshot) setAuth(snapshot);
-      if (formOpen === credentialId) setFormOpen(null);
+      if (dialogCredential?.id === credential.id) setDialogOpen(false);
+      setPendingRemove(null);
       showToast(
         t(
-          origin === "pi"
+          credential.origin === "pi"
             ? "settings.models.credential.unlinked"
             : "settings.models.credential.removed",
-          { name },
+          { name: credential.name },
         ),
       );
       // 顶上了新的激活项时模型列表要跟着变
       void refreshModelsForActive();
     } catch (err) {
       showToast(err instanceof Error ? err.message : t("settings.models.credential.removeFailed"));
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -207,87 +208,32 @@ export function ModelsPanel() {
   };
 
   const openCreateForm = (): void => {
-    setFormOpen("create");
-    const firstProvider = apiKeyProviders[0]?.id ?? "anthropic";
-    setFormName("");
-    setFormProvider(firstProvider);
-    setFormApiKey("");
-    setFormBaseUrl("");
-    setFormApiType("openai-completions");
-    setFormPreferredModel("");
+    setDialogCredential(null);
+    setDialogOpen(true);
   };
 
   const openEditForm = (credential: PiAuthProviderStatus): void => {
-    setFormOpen(credential.id);
-    setFormName(credential.name);
-    setFormProvider(credential.provider);
-    setFormApiKey("");
-    setFormBaseUrl(credential.baseUrl ?? "");
-    setFormApiType(
-      credential.api === "openai-responses" ? "openai-responses" : "openai-completions",
-    );
-    setFormPreferredModel(credential.preferredModel ?? "");
+    setDialogCredential(credential);
+    setDialogOpen(true);
   };
 
-  const handleProviderChange = (nextProvider: string): void => {
-    setFormProvider(nextProvider);
-    const isGateway = providerGatewayMap.get(nextProvider) === true;
-    if (!isGateway) {
-      setFormBaseUrl("");
-      setFormApiType("openai-completions");
-    }
-    // 新建时名称留空则用厂商 label；有内容则保留用户输入
-    if (formOpen === "create" && !formName.trim()) {
-      const label = apiKeyProviders.find((p) => p.id === nextProvider)?.label;
-      if (label) setFormName(label);
-    }
-  };
-
-  const submitForm = async (): Promise<void> => {
-    const isEdit = formOpen !== "create";
-    const provider = formProvider.trim();
-    const name = formName.trim();
-    if (!provider) {
-      showToast(t("settings.models.credential.providerRequired"));
-      return;
-    }
-    if (!name) {
-      showToast(t("settings.models.credential.nameRequired"));
-      return;
-    }
-    if (!isEdit && !formApiKey.trim()) {
-      showToast(t("settings.models.credential.apiKeyRequired"));
-      return;
-    }
-    const isGateway = providerGatewayMap.get(provider) === true;
-    const baseUrl = formBaseUrl.trim();
-    if (isGateway && !isEdit && !baseUrl) {
-      showToast(t("settings.models.credential.baseUrlRequired"));
-      return;
-    }
-    setFormSaving(true);
+  /** 校验已挪进对话框内联呈现；这里只管写盘、对账模型列表与提示结果。 */
+  const saveCredential = async (req: PiAuthUpsertRequest): Promise<void> => {
+    setDialogSaving(true);
     try {
-      const snapshot = await authService.upsert({
-        id: isEdit ? formOpen : null,
-        name,
-        provider,
-        apiKey: formApiKey.trim() || null,
-        preferredModel: formPreferredModel.trim(),
-        ...(isGateway ? { baseUrl: baseUrl || null, api: formApiType } : {}),
-      });
+      const snapshot = await authService.upsert(req);
       if (snapshot) setAuth(snapshot);
-      setFormOpen(null);
-      setFormApiKey("");
+      setDialogOpen(false);
       showToast(
-        isEdit
-          ? t("settings.models.credential.updated", { name })
-          : t("settings.models.credential.added", { name }),
+        req.id
+          ? t("settings.models.credential.updated", { name: req.name })
+          : t("settings.models.credential.added", { name: req.name }),
       );
       void refreshModelsForActive();
     } catch (err) {
       showToast(err instanceof Error ? err.message : t("settings.models.credential.saveFailed"));
     } finally {
-      setFormSaving(false);
+      setDialogSaving(false);
     }
   };
 
@@ -494,23 +440,33 @@ export function ModelsPanel() {
                 <div className={styles.authActions}>
                   {!credential.active && (
                     <Button
+                      className={styles.authIconBtn}
                       disabled={credential.sourceMissing}
+                      title={t("settings.models.credential.activate")}
+                      aria-label={t("settings.models.credential.activate")}
                       onClick={() => void activateCredential(credential.id, credential.name)}
                     >
-                      {t("settings.models.credential.activate")}
+                      <Lightning size={16} weight="regular" />
                     </Button>
                   )}
                   {credential.origin !== "pi" && (
-                    <Button onClick={() => openEditForm(credential)}>
-                      {t("settings.models.credential.edit")}
+                    <Button
+                      className={styles.authIconBtn}
+                      title={t("settings.models.credential.edit")}
+                      aria-label={t("settings.models.credential.edit")}
+                      onClick={() => openEditForm(credential)}
+                    >
+                      <PencilSimple size={16} weight="regular" />
                     </Button>
                   )}
                   <Button
-                    onClick={() =>
-                      void removeCredential(credential.id, credential.name, credential.origin)
-                    }
+                    className={styles.authIconBtn}
+                    variant="danger"
+                    title={t("common.remove")}
+                    aria-label={t("common.remove")}
+                    onClick={() => setPendingRemove(credential)}
                   >
-                    {t("common.remove")}
+                    <Trash size={16} weight="regular" />
                   </Button>
                 </div>
               </div>
@@ -518,92 +474,6 @@ export function ModelsPanel() {
           </div>
         ) : (
           <p className={styles.modelEmpty}>{t("settings.models.credential.empty")}</p>
-        )}
-
-        {formOpen && (
-          <div className={styles.authFormCard}>
-            <p className={styles.authFormTitle}>
-              {formOpen === "create"
-                ? t("settings.models.credential.create")
-                : t("settings.models.credential.editTitle", {
-                    name: formName || formOpen,
-                  })}
-            </p>
-            <div className={styles.authForm}>
-              <input
-                className={styles.authInput}
-                type="text"
-                placeholder={t("settings.models.credential.namePlaceholder")}
-                value={formName}
-                autoComplete="off"
-                onChange={(e) => setFormName(e.target.value)}
-              />
-              {formOpen === "create" ? (
-                <Select
-                  className={styles.authSelect}
-                  value={formProvider}
-                  ariaLabel={t("settings.models.credential.providerLabel")}
-                  options={apiKeyProviders.map((option) => ({
-                    value: option.id,
-                    label: option.label,
-                  }))}
-                  onChange={handleProviderChange}
-                />
-              ) : (
-                <span className={styles.authFixedProvider}>
-                  <AiProviderLogo providerId={formProvider} size={16} />
-                  {formProvider}
-                </span>
-              )}
-              <input
-                className={styles.authInput}
-                type="password"
-                placeholder={
-                  formOpen === "create"
-                    ? t("settings.models.credential.apiKeyPlaceholder")
-                    : t("settings.models.credential.apiKeyKeepPlaceholder")
-                }
-                value={formApiKey}
-                autoComplete="off"
-                onChange={(e) => setFormApiKey(e.target.value)}
-              />
-              {formIsGateway && (
-                <>
-                  <input
-                    className={styles.authInput}
-                    type="text"
-                    placeholder={t("settings.models.credential.baseUrlPlaceholder")}
-                    value={formBaseUrl}
-                    autoComplete="off"
-                    onChange={(e) => setFormBaseUrl(e.target.value)}
-                  />
-                  <Select
-                    className={styles.authSelect}
-                    value={formApiType}
-                    ariaLabel={t("settings.models.credential.apiTypeLabel")}
-                    options={[
-                      { value: "openai-completions", label: "openai-completions" },
-                      { value: "openai-responses", label: "openai-responses" },
-                    ]}
-                    onChange={setFormApiType}
-                  />
-                </>
-              )}
-              <input
-                className={styles.authInput}
-                type="text"
-                placeholder={t("settings.models.credential.preferredModelPlaceholder")}
-                value={formPreferredModel}
-                onChange={(e) => setFormPreferredModel(e.target.value)}
-              />
-            </div>
-            <div className={styles.authFormActions}>
-              <Button onClick={() => setFormOpen(null)}>{t("common.cancel")}</Button>
-              <Button onClick={() => void submitForm()} disabled={formSaving}>
-                {formSaving ? t("settings.models.credential.saving") : t("common.save")}
-              </Button>
-            </div>
-          </div>
         )}
 
         {auth?.file && (
@@ -664,6 +534,42 @@ export function ModelsPanel() {
         loading={loadingModels}
         savingKey={savingOverrideKey}
         onSave={saveOverride}
+      />
+
+      <CredentialDialog
+        open={dialogOpen}
+        credential={dialogCredential}
+        providers={apiKeyProviders}
+        gatewayByProvider={providerGatewayMap}
+        activeProviderId={activeProviderId}
+        activeModels={models}
+        busy={dialogSaving}
+        onClose={() => setDialogOpen(false)}
+        onSubmit={saveCredential}
+      />
+
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        nested
+        tone="danger"
+        busy={removing}
+        busyLabel={t("settings.models.credential.removing")}
+        title={t("settings.models.credential.removeConfirm.title")}
+        confirmLabel={t("common.remove")}
+        message={
+          pendingRemove
+            ? t(
+                pendingRemove.origin === "pi"
+                  ? "settings.models.credential.removeConfirm.inherited"
+                  : "settings.models.credential.removeConfirm.message",
+                { name: pendingRemove.name },
+              )
+            : ""
+        }
+        onConfirm={() => {
+          if (pendingRemove) void removeCredential(pendingRemove);
+        }}
+        onCancel={() => setPendingRemove(null)}
       />
     </div>
   );

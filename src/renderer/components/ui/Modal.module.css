@@ -6,9 +6,18 @@
   align-items: center;
   justify-content: center;
   padding: var(--spacing-xl);
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--color-backdrop);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
+}
+
+/* 二级浮窗档：更淡的一层、不再叠模糊（配方集中在 tokens，见 --color-backdrop-nested）。
+   声明在 .backdrop 之后，同权重按顺序覆盖；调用方两个类名一起挂。 */
+.backdropNested {
+  z-index: var(--z-modal-nested);
+  background: var(--color-backdrop-nested);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .panel {

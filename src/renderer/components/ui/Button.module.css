@@ -2,8 +2,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 5px var(--spacing-md);
+  gap: var(--button-gap, 6px);
+  /* 尺寸走变量：站点类与 .button 同权重，直接写 padding 谁赢取决于打包顺序 */
+  padding: var(--button-padding, 5px var(--spacing-md));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg-surface);

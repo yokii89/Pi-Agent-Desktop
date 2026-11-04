@@ -57,6 +57,13 @@
   opacity: 0.6;
 }
 
+/* 行首图标（厂商 / 模型 logo 属资源型图标）：不参与伸展，文字仍占主宽 */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 /* 行尾辅助说明（"推荐""需硬件"）：列宽不参与伸展，名字超长先截断 */
 .hint {
   flex-shrink: 0;

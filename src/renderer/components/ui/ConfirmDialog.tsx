@@ -22,6 +22,11 @@ export interface ConfirmDialogProps {
   /** busy 时确认按钮文案，默认与 confirmLabel 相同。 */
   busyLabel?: string;
   /**
+   * 二级浮窗：从另一层浮窗（设置浮窗、浮窗里的对话框）里发起确认时传 true，
+   * 遮罩淡一档、不叠第二次模糊，Esc 只关这一层（见 Modal.nested 与 docs/design/128）。
+   */
+  nested?: boolean;
+  /**
    * 可选第三动作（如「保留后台进程」）：放在取消与确认之间。
    * 不传则保持经典双钮。
    */
@@ -45,6 +50,7 @@ export function ConfirmDialog({
   tone = "default",
   busy = false,
   busyLabel,
+  nested = false,
   secondaryLabel,
   secondaryBusyLabel,
   onConfirm,
@@ -70,7 +76,13 @@ export function ConfirmDialog({
   };
 
   return (
-    <Modal open={open} onClose={handleCancel} ariaLabel={title} panelClassName={styles.panel}>
+    <Modal
+      open={open}
+      onClose={handleCancel}
+      ariaLabel={title}
+      panelClassName={styles.panel}
+      nested={nested}
+    >
       <div className={styles.body}>
         <h2 className={styles.title}>{title}</h2>
         <div className={styles.message}>{message}</div>

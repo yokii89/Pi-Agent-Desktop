@@ -246,10 +246,20 @@
      浮窗里发起的确认弹窗（ConfirmDialog/--z-modal）要压在浮窗上方。 */
   --z-float: 40;
   --z-modal: 150;
+  /**
+   * 二级浮窗（叠在设置等一层浮窗之上的对话框）：夹在 --z-modal 与 --z-menu 之间。
+   * 必须低于 --z-menu，否则对话框里的下拉/菜单会被对话框自己盖住（点了没反应）。
+   */
+  --z-modal-nested: 155;
   /* Menu/Popover 必须高于 Modal：设置浮窗里的「选择」菜单 portal 到 body，
      若仍低于 modal 遮罩会被完全盖住（表现为按钮点了没反应）。 */
   --z-menu: 160;
   --z-toast: 200;
+
+  /* 遮罩：一层浮窗用 --z-modal 档（重遮罩 + 模糊），二级浮窗只补一层淡遮罩。
+     模糊留给最外层：同屏叠两次 backdrop-filter 会把下层浮窗糊成一团，还多付一次全屏合成。 */
+  --color-backdrop: rgba(0, 0, 0, 0.55);
+  --color-backdrop-nested: rgba(0, 0, 0, 0.28);
 
   /* 阴影 */
   --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.4);

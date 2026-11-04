@@ -1,5 +1,5 @@
 import { Check } from "@phosphor-icons/react";
-import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useRef } from "react";
 import { type GlideCancel, glide, mix } from "../../utils/glideMotion";
 import { GLIDE_MOTION } from "../../utils/motionTokens";
 import { GlideChevron } from "./GlideChevron";
@@ -10,6 +10,8 @@ import styles from "./Select.module.css";
 export interface SelectOption {
   value: string;
   label: string;
+  /** 行首图标（厂商 logo 等资源型图标）；选中后同样出现在触发器上。 */
+  icon?: ReactNode;
   /** 行尾辅助说明（如"推荐""需硬件"）。 */
   hint?: string;
   /** 行的悬停说明（对齐原生 <option title>）。 */
@@ -35,6 +37,8 @@ interface SelectProps {
   placeholder?: string;
   align?: "left" | "right";
   direction?: "top" | "bottom";
+  /** 面板宽度跟随触发器（见 Popover）。 */
+  matchTriggerWidth?: boolean;
 }
 
 /**
@@ -57,6 +61,7 @@ export function Select({
   placeholder = "",
   align = "left",
   direction = "bottom",
+  matchTriggerWidth = false,
 }: SelectProps) {
   const listRef = useRef<OptionListHandle>(null);
   const labelRef = useRef<HTMLSpanElement>(null);
@@ -155,6 +160,11 @@ export function Select({
     selected: option.value === value,
     node: (
       <>
+        {option.icon && (
+          <span className={styles.icon} aria-hidden="true">
+            {option.icon}
+          </span>
+        )}
         <span className={styles.label}>{option.label}</span>
         {option.hint && <span className={styles.hint}>{option.hint}</span>}
         {option.value === value && (
@@ -172,6 +182,7 @@ export function Select({
       direction={direction}
       rootClassName={rootClassName}
       panelClassName={panelClassName}
+      matchTriggerWidth={matchTriggerWidth}
       trigger={({ open, onClick }) => (
         <button
           id={id}
@@ -188,6 +199,11 @@ export function Select({
           }}
           onKeyDown={(event) => onTriggerKeyDown(event, open, onClick)}
         >
+          {current?.icon && (
+            <span className={styles.icon} aria-hidden="true">
+              {current.icon}
+            </span>
+          )}
           <span ref={labelRef} className={styles.label} data-empty={current ? undefined : ""}>
             {current?.label ?? placeholder}
           </span>

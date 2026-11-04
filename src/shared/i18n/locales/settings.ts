@@ -1128,13 +1128,9 @@ export const settingsMessages = defineMessages({
     "zh-CN": "保存凭据失败",
     "en-US": "Failed to save credential",
   },
-  "settings.models.credential.providerRequired": {
-    "zh-CN": "请选择 Provider",
-    "en-US": "Select a provider",
-  },
   "settings.models.credential.providerLabel": {
-    "zh-CN": "Provider",
-    "en-US": "Provider",
+    "zh-CN": "厂商 / 网关",
+    "en-US": "Provider or gateway",
   },
   "settings.models.credential.nameRequired": {
     "zh-CN": "请填写凭据名称",
@@ -1157,28 +1153,24 @@ export const settingsMessages = defineMessages({
     "en-US": "Edit credential: {name}",
   },
   "settings.models.credential.namePlaceholder": {
-    "zh-CN": "凭据名称（如 DeepSeek 公司）",
-    "en-US": "Credential name (e.g. DeepSeek work)",
+    "zh-CN": "如 DeepSeek 公司",
+    "en-US": "e.g. DeepSeek work",
   },
   "settings.models.credential.apiKeyPlaceholder": {
     "zh-CN": "粘贴 API Key",
     "en-US": "Paste API key",
   },
-  "settings.models.credential.apiKeyKeepPlaceholder": {
-    "zh-CN": "留空则保留原密钥",
-    "en-US": "Leave blank to keep the current key",
-  },
   "settings.models.credential.baseUrlPlaceholder": {
-    "zh-CN": "自定义 Base URL（如 https://api.example.com）",
-    "en-US": "Custom Base URL (e.g. https://api.example.com)",
+    "zh-CN": "https://api.example.com",
+    "en-US": "https://api.example.com",
   },
   "settings.models.credential.apiTypeLabel": {
     "zh-CN": "API 协议",
     "en-US": "API protocol",
   },
   "settings.models.credential.preferredModelPlaceholder": {
-    "zh-CN": "偏好默认模型（可选）",
-    "en-US": "Preferred default model (optional)",
+    "zh-CN": "模型 ID，如 claude-sonnet-4-5",
+    "en-US": "Model ID, e.g. claude-sonnet-4-5",
   },
   "settings.models.credential.saving": {
     "zh-CN": "保存中…",
@@ -1199,6 +1191,77 @@ export const settingsMessages = defineMessages({
   "settings.models.credential.unlinked": {
     "zh-CN": "已取消继承「{name}」，pi 登录保持不变",
     "en-US": "Stopped inheriting “{name}”; pi login is unchanged",
+  },
+
+  /* 凭据二级浮窗（docs/design/128）：字段 label 与说明成对，校验改内联，文案不再靠 placeholder 自解释 */
+  "settings.models.credential.nameLabel": {
+    "zh-CN": "凭据名称",
+    "en-US": "Credential name",
+  },
+  "settings.models.credential.apiKeyLabel": {
+    "zh-CN": "API Key",
+    "en-US": "API key",
+  },
+  "settings.models.credential.baseUrlLabel": {
+    "zh-CN": "Base URL",
+    "en-US": "Base URL",
+  },
+  "settings.models.credential.gatewayOptionHint": {
+    "zh-CN": "需要 Base URL",
+    "en-US": "Needs a Base URL",
+  },
+  "settings.models.credential.modelLabel": {
+    "zh-CN": "偏好默认模型",
+    "en-US": "Preferred default model",
+  },
+  "settings.models.credential.modelNone": {
+    "zh-CN": "不指定（沿用当前默认）",
+    "en-US": "Not set (keep the current default)",
+  },
+  "settings.models.credential.modelManual": {
+    "zh-CN": "手动填写模型 ID",
+    "en-US": "Type a model ID",
+  },
+  "settings.models.credential.modelFromList": {
+    "zh-CN": "从列表选择",
+    "en-US": "Pick from the list",
+  },
+  "settings.models.credential.save": {
+    "zh-CN": "保存凭据",
+    "en-US": "Save credential",
+  },
+  "settings.models.credential.required": {
+    "zh-CN": "必填",
+    "en-US": "required",
+  },
+  "settings.models.credential.apiKeyReveal": {
+    "zh-CN": "显示密钥",
+    "en-US": "Show key",
+  },
+  "settings.models.credential.apiKeyHide": {
+    "zh-CN": "隐藏密钥",
+    "en-US": "Hide key",
+  },
+  "settings.models.credential.footerNote": {
+    "zh-CN": "保存不会切换当前正在使用的凭据，要生效请在列表点「激活」。",
+    "en-US":
+      "Saving does not switch the credential in use. Click Activate in the list to apply it.",
+  },
+  "settings.models.credential.removing": {
+    "zh-CN": "移除中…",
+    "en-US": "Removing…",
+  },
+  "settings.models.credential.removeConfirm.title": {
+    "zh-CN": "移除这份凭据？",
+    "en-US": "Remove this credential?",
+  },
+  "settings.models.credential.removeConfirm.message": {
+    "zh-CN": "将删除「{name}」及其保存在本机的密钥，移除后无法恢复。",
+    "en-US": "Deletes “{name}” and the key stored on this machine. This can't be undone.",
+  },
+  "settings.models.credential.removeConfirm.inherited": {
+    "zh-CN": "「{name}」是从 pi 继承的登录；取消继承不会改动 pi 侧的登录。",
+    "en-US": "“{name}” is inherited from a pi login. Unlinking leaves that login unchanged.",
   },
 
   "settings.models.inherit.title": {

@@ -762,6 +762,12 @@
   flex-shrink: 0;
 }
 
+/* 行内动作只留图标：宽度走 Button 的 --button-padding 变量，
+   站点类与 .button 同权重，直接写 padding 谁赢取决于打包顺序 */
+.authIconBtn {
+  --button-padding: 6px 10px;
+}
+
 .authFilePath {
   display: flex;
   align-items: center;
@@ -792,34 +798,17 @@
   font-size: var(--font-size-md);
 }
 
-.authForm {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  flex-wrap: wrap;
-}
-
 .authFormActions {
   display: flex;
   justify-content: flex-end;
   gap: var(--spacing-sm);
 }
 
-.authFixedProvider {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 var(--spacing-sm);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-  font-size: var(--font-size-md);
-}
-
-.authSelect,
+/* 模型能力覆盖的搜索框仍复用（凭据表单已搬进二级浮窗，见 CredentialDialog.module.css） */
 .authInput {
   height: 32px;
+  flex: 1;
+  min-width: 160px;
   padding: 0 var(--spacing-sm);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -829,16 +818,6 @@
   outline: none;
 }
 
-.authSelect {
-  min-width: 140px;
-}
-
-.authInput {
-  flex: 1;
-  min-width: 160px;
-}
-
-.authSelect:focus,
 .authInput:focus {
   border-color: var(--color-border-strong);
 }
