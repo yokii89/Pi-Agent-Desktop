@@ -237,6 +237,9 @@ function ListField({ node, bridge }: { node: ListViewNode; bridge: ViewFormBridg
   const previewMode = node.items.some(
     (item) => typeof item.preview === "string" && item.preview.length > 0,
   );
+  // 280 内滚只给诊断列表（readonly）与预览两栏（与固定高预览面板配对，docs/design/79）；
+  // 表单答题列表随内容全量展示（docs/design/126），超出视口交给外层滚动容器。
+  const listClass = [styles.list, readonly || previewMode ? styles.listCapped : ""].join(" ");
   const selectedValue =
     typeof raw === "string" && raw
       ? raw
@@ -282,7 +285,7 @@ function ListField({ node, bridge }: { node: ListViewNode; bridge: ViewFormBridg
   // 不用 OptionList 是因为它的行天生是 button/listbox option，拦截点击只能得到
   // 「看起来能点但没反应」；这里换成真正的 list/listitem 语义。
   const list = readonly ? (
-    <div className={styles.list}>
+    <div className={listClass}>
       <ul className={[styles.listRows, styles.readonlyList].join(" ")}>
         {node.items.map((item) => (
           <li
@@ -301,7 +304,7 @@ function ListField({ node, bridge }: { node: ListViewNode; bridge: ViewFormBridg
       </ul>
     </div>
   ) : (
-    <div className={styles.list}>
+    <div className={listClass}>
       <OptionList
         rows={rows}
         role="listbox"

@@ -176,15 +176,23 @@
 }
 
 /* 列表壳：圆角走浮层那一档（壳 12 / 行 8），内边距给药丸留出与行间距一致的呼吸位。
-   这是常驻内嵌列表，不能 composes overlayShell 的 shell——那套配方带 position: fixed。 */
+   这是常驻内嵌列表，不能 composes overlayShell 的 shell——那套配方带 position: fixed。
+   高度随内容走（docs/design/126）：表单答题列表必须全量展示、不画内滚条，
+   超出视口交给外层滚动容器（widget/modal/panel body）。 */
 .list {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-overlay);
   padding: var(--spacing-xs);
+  background: var(--color-bg-elevated);
+}
+
+/* 280 内滚只留给两类列表：readonly 诊断列表（pi-telegram-main 的线程/事件，
+   最多 20 行，整段展开会把面板变成一条长页）与预览两栏的左列（docs/design/79：
+   与固定高 280 的预览面板配对）。 */
+.listCapped {
   max-height: 280px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--color-bg-elevated);
 }
 
 /* OptionList 的容器：同时是药丸的定位父级，列表内滚动时高亮跟着内容走 */
