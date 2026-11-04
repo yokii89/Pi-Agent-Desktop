@@ -1,4 +1,4 @@
-/* 变更文件列表行：状态字母章（VS Code SCM 风格）+ 文件名/目录 + 增删统计，
+/* 变更文件列表行：状态字母章（VS Code SCM 风格）+ 文件名（完整路径靠行 title 悬浮）+ 增删统计，
    hover 浮现暂存/丢弃操作簇（复用侧栏审查面板的既有交互语法）。 */
 
 .list {
@@ -90,31 +90,14 @@
   flex-direction: column;
 }
 
-.fileLine {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
-}
-
 .fileName {
-  flex-shrink: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--font-size-md);
   font-weight: 500;
   color: var(--color-text);
-}
-
-.filePath {
-  flex-shrink: 2;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
 }
 
 .stats {

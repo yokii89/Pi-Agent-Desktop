@@ -16,11 +16,10 @@ const STATUS_BADGES: Record<GitChange["status"], { letter: string; toneClass: st
   untracked: { letter: "U", toneClass: styles.badgeUntracked },
 };
 
-function splitPath(repoPath: string): { name: string; dir: string } {
+/** 列表行只展示文件名（避免目录段挤占宽度），完整路径靠行 title 悬浮查看。 */
+function baseName(repoPath: string): string {
   const idx = repoPath.lastIndexOf("/");
-  return idx === -1
-    ? { name: repoPath, dir: "" }
-    : { name: repoPath.slice(idx + 1), dir: repoPath.slice(0, idx) };
+  return idx === -1 ? repoPath : repoPath.slice(idx + 1);
 }
 
 interface ChangeListProps {
@@ -65,7 +64,7 @@ export function ChangeList({
       <ul className={styles.list}>
         {changes.map((change) => {
           const key = `${change.layer}|${change.path}`;
-          const { name, dir } = splitPath(change.path);
+          const name = baseName(change.path);
           const badge = STATUS_BADGES[change.status];
           const hasCounts = change.additions !== null || change.deletions !== null;
           const totalDelta = (change.additions ?? 0) + (change.deletions ?? 0);
@@ -86,10 +85,7 @@ export function ChangeList({
                     {badge.letter}
                   </span>
                   <span className={styles.fileCol}>
-                    <span className={styles.fileLine}>
-                      <span className={styles.fileName}>{name}</span>
-                      {dir && <span className={styles.filePath}>{dir}</span>}
-                    </span>
+                    <span className={styles.fileName}>{name}</span>
                   </span>
                   <span className={styles.stats}>
                     {hasCounts && totalDelta > 0 ? (
