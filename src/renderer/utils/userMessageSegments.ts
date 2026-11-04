@@ -6,6 +6,7 @@ import {
   type PositionedFileMention,
   readFileMentionMetadata,
 } from "./fileMentionFormat";
+import { PAGE_CONTEXT_PREFIX, PAGE_CONTEXT_USER_HEADING } from "./pageContext";
 
 export type UserMessagePart =
   | { kind: "text"; text: string }
@@ -76,10 +77,8 @@ export function parseUserMessageSegments(text: string): UserMessageSegment[] {
     const value = body.slice(metadataStart + FILE_MENTION_PREFIX.length, -4);
     body = body.slice(0, metadataStart).trimEnd();
     // buildPageContext prepends browser details in persisted pi messages; offsets belong to 用户说明.
-    const userHeading = "\n## 用户说明\n";
-    const headingAt = body.startsWith("[页面上下文 · 来自 PiDesk 浏览器面板]\n")
-      ? body.indexOf(userHeading)
-      : -1;
+    const userHeading = `\n${PAGE_CONTEXT_USER_HEADING}\n`;
+    const headingAt = body.startsWith(`${PAGE_CONTEXT_PREFIX}\n`) ? body.indexOf(userHeading) : -1;
     const bodyStart = headingAt < 0 ? 0 : headingAt + userHeading.length;
     mentions =
       readFileMentionMetadata(value, body.slice(bodyStart), paths)?.map((mention) => ({

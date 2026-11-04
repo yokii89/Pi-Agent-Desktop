@@ -10,6 +10,11 @@ const PAYLOAD_HTML_LIMIT = 1200;
 /** 随上下文发送的最近控制台错误条数。 */
 const PAYLOAD_ERROR_LIMIT = 5;
 
+/** payload 首行：历史召回等消费方据此识别「整块是页面上下文，不是用户那句话」。 */
+export const PAGE_CONTEXT_PREFIX = "[页面上下文 · 来自 PiDesk 浏览器面板]";
+/** 用户原话所在小节的标题（payload 的最后一段）。 */
+export const PAGE_CONTEXT_USER_HEADING = "## 用户说明";
+
 function formatConsoleError(error: BrowserConsoleError): string {
   const location = error.source
     ? ` (${error.source.split("/").at(-1) ?? error.source}${error.line !== null ? `:${error.line}` : ""})`
@@ -54,7 +59,7 @@ export function buildPageContext(input: {
   const { items, consoleErrors } = input;
   const first = items[0];
   const lines: string[] = [];
-  lines.push("[页面上下文 · 来自 PiDesk 浏览器面板]");
+  lines.push(PAGE_CONTEXT_PREFIX);
   if (first) {
     lines.push(`页面 URL: ${first.url}`);
     lines.push(
@@ -73,7 +78,7 @@ export function buildPageContext(input: {
   }
   const text = input.text.trim();
   if (text) {
-    lines.push("", "## 用户说明", text);
+    lines.push("", PAGE_CONTEXT_USER_HEADING, text);
   }
   return lines.join("\n");
 }

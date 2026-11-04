@@ -32,6 +32,7 @@ import { sessionService } from "../services/sessionService";
 import { settingsService } from "../services/settingsService";
 import { readSlashCommandCache, writeSlashCommandCache } from "../services/slashCommandCache";
 import { prefetchService } from "../services/workerService";
+import { buildUserHistory } from "../utils/composerHistory";
 import { piImageFromDisplay, type UserMessageImage } from "../utils/imageAttach";
 import { buildPageContext } from "../utils/pageContext";
 import { getComposerThinkingLevel, useComposerStore } from "./composerStore";
@@ -184,6 +185,11 @@ interface SessionMetaValue {
   stop: () => void;
   canRetryLastUser: boolean;
   retryLastUserMessage: () => Promise<void>;
+  /**
+   * 输入栏 ↑ / ↓ 历史召回的读数：当前会话的用户输入，最新在前、重复只留最近一次。
+   * 按键时即时读桶，不做订阅——流式 delta 每帧换 entries，订阅会把整个输入栏重渲染。
+   */
+  readUserHistory: () => string[];
   addSnapshot: (snapshot: { base64: string; url: string }) => void;
   /** 恢复 / 切换历史会话（setActive + 读盘展示；无进程不 spawn，发送才拉起）。 */
   openSessionFile: (file: string, cwd?: string) => Promise<void>;
@@ -1876,6 +1882,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
   }, [phase, send]);
 
+  /** 历史召回读数：只读 ref，零依赖，因此 meta context 的身份不随流式 delta 变化。 */
+  const readUserHistory = useCallback((): string[] => {
+    const id = activeKeyRef.current;
+    const bucket = id ? bucketsStateRef.current.buckets.get(id) : null;
+    return bucket ? buildUserHistory(bucket.entries) : [];
+  }, []);
+
   /**
    * 打开 / 切换历史会话（docs/会话进程懒加载方案 Phase 1）：
    * - 目标已有存活进程 → 瞬时 setActive，兜底 transcript 加载
@@ -2149,6 +2162,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       stop,
       canRetryLastUser,
       retryLastUserMessage,
+      readUserHistory,
       addSnapshot,
       openSessionFile,
       refreshSidebarSessions: refreshSessions,
@@ -2203,6 +2217,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       stop,
       canRetryLastUser,
       retryLastUserMessage,
+      readUserHistory,
       addSnapshot,
       openSessionFile,
       getSessionFileById,

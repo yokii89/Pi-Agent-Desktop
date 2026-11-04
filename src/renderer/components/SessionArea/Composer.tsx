@@ -53,6 +53,13 @@ export interface ComposerHandle {
   /** 清空编辑器。 */
   clear: () => void;
   focus: () => void;
+  /** 编辑器是否真空（无文字也无芯片）：决定 ↑ 是否接管为历史召回。 */
+  isBlank: () => boolean;
+  /**
+   * 整体替换草稿文本（历史召回）：纯文本写入、光标落到末尾。
+   * 只回写空/非空，不走 onTextChange——召回不是敲字，不该顺手弹出 @ / 建议面板。
+   */
+  setDraftText: (text: string) => void;
   /** 原子替换光标前的 @token；同一路径只保留一枚芯片。 */
   insertFileMention: (item: FileMention) => boolean;
   /** 原子替换光标前的 /token 为斜杠命令芯片（视觉与 @ 引用一致；技能带 PuzzlePiece 且不截断）。 */
@@ -85,6 +92,11 @@ interface ComposerProps {
   onEnterIntercept?: () => boolean;
   /** 建议列表方向键 / Esc；返回 true 表示已处理（应 preventDefault）。 */
   onSuggestKey?: (key: "ArrowUp" | "ArrowDown" | "Escape") => boolean;
+  /**
+   * 建议列表未消费的 ↑ / ↓ 落到这里问一次历史召回（docs/design/127）。
+   * 返回 true 表示已处理（应 preventDefault）；纯文本编辑期间只会返回 false。
+   */
+  onHistoryKey?: (key: "ArrowUp" | "ArrowDown") => boolean;
   /** 建议列表未消费的 Esc（面板已收或未打开）落到这里；队列编辑用它取消。 */
   onEscape?: () => void;
   placeholder?: string;
@@ -140,6 +152,7 @@ export function Composer({
   insertTrigger,
   onEnterIntercept,
   onSuggestKey,
+  onHistoryKey,
   onEscape,
   placeholder = "",
   disabled = false,
@@ -399,6 +412,35 @@ export function Composer({
         onTextChange?.("");
       },
       focus: () => rootRef.current?.focus(),
+      isBlank: () => {
+        const root = rootRef.current;
+        return !root || !hasVisibleContent(root);
+      },
+      setDraftText: (text) => {
+        const root = rootRef.current;
+        if (!root) return;
+        root.replaceChildren();
+        // 与 appendQuote 同一约定：逻辑换行拆成 BR + 文本节点
+        text
+          .replace(/\r\n/g, "\n")
+          .split("\n")
+          .forEach((part, index) => {
+            if (index > 0) root.appendChild(document.createElement("br"));
+            if (part) root.appendChild(document.createTextNode(part));
+          });
+        // 只回写空/非空：走 onTextChange 会让以 @token 结尾的历史顺手弹出建议面板
+        const empty = !text.trim();
+        setIsEmpty(empty);
+        onContentChange?.(!empty);
+        root.focus();
+        const selection = window.getSelection();
+        if (!selection) return;
+        const range = document.createRange();
+        range.selectNodeContents(root);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      },
       insertFileMention: (item) => {
         const root = rootRef.current;
         if (!root) return false;
@@ -525,6 +567,18 @@ export function Composer({
       if (event.key === "Escape") {
         onEscape?.();
         return;
+      }
+      // 建议面板没接的 ↑ / ↓ 问一次历史召回（docs/design/127）。
+      // 带任何修饰键都不接管：Shift+↑ 是扩展选区，Ctrl+↑ 是跨段跳行
+      if (
+        (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+        !event.shiftKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        onHistoryKey?.(event.key)
+      ) {
+        event.preventDefault();
       }
       return;
     }

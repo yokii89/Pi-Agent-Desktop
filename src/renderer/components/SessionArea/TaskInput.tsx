@@ -57,8 +57,16 @@ interface TaskInputProps {
  */
 export function TaskInput({ variant }: TaskInputProps) {
   const t = useT();
-  const { phase, send, stop, getSlashCommands, switchingTo, modelInput, modelLabel } =
-    useSessionMeta();
+  const {
+    phase,
+    send,
+    stop,
+    getSlashCommands,
+    switchingTo,
+    modelInput,
+    modelLabel,
+    readUserHistory,
+  } = useSessionMeta();
   const { showToast, inputBuddy } = useUiStore();
   const browser = useBrowserStore();
   const { currentProject } = useProjectStore();
@@ -316,6 +324,74 @@ export function TaskInput({ variant }: TaskInputProps) {
   }, [pendingInsert, consumePendingInsert]);
 
   /**
+   * ↑ / ↓ 历史召回（docs/design/127）：进入召回时快照一份当前会话的用户输入（最新在前），
+   * 之后只要编辑器内容与召回那条逐字相同就继续翻页；一旦被手动改动即作废、交还原生光标移动。
+   * 存 ref 不存 state：召回文字本来就在 contenteditable 里，再存一份只会多一次重渲染。
+   */
+  const historyNavRef = useRef<{ entries: string[]; index: number; recalled: string } | null>(null);
+  // 换会话 = 换历史：手上这份快照作废
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeSessionId 是重置信号，不在闭包内读取
+  useEffect(() => {
+    historyNavRef.current = null;
+  }, [activeSessionId]);
+
+  const showHistoryEntry = useCallback((entries: string[], index: number): void => {
+    const text = entries[index] ?? "";
+    historyNavRef.current = { entries, index, recalled: text };
+    composerRef.current?.setDraftText(text);
+  }, []);
+
+  const onHistoryKey = useCallback(
+    (key: "ArrowUp" | "ArrowDown"): boolean => {
+      const composer = composerRef.current;
+      if (!composer) return false;
+      // 阻断浮层 / 会话切换 / 模式门禁连发送都拦，不该再往里灌召回文字
+      if (hasBlockingView || switching || modeTransitioning) return false;
+
+      const nav = historyNavRef.current;
+      // 逐字比对（trim 会把 Shift+Enter 加出的空行判成「未编辑」，下一条就把它覆盖了）
+      if (nav && composer.read().text !== nav.recalled) {
+        historyNavRef.current = null;
+        return false;
+      }
+      if (!nav) {
+        if (key !== "ArrowUp") return false;
+        // 编辑器真空才接管。附件条不在编辑器 DOM 里：挂着旧附件召回会把
+        // 它们和召回文字一起发出去，所以也算「不是真空」
+        if (!composer.isBlank() || imageAttachments.length > 0 || fileAttachments.length > 0) {
+          return false;
+        }
+        const entries = readUserHistory();
+        if (entries.length === 0) return false;
+        showHistoryEntry(entries, 0);
+        return true;
+      }
+      if (key === "ArrowDown") {
+        if (nav.index === 0) {
+          // 退回空栏走 clear（不是 setDraftText("")）：顺带把建议面板与 lastSuggestKey 记账复位
+          historyNavRef.current = null;
+          composer.clear();
+          return true;
+        }
+        showHistoryEntry(nav.entries, nav.index - 1);
+        return true;
+      }
+      // 已到最早一条就停在原地，不让光标跳到首行
+      showHistoryEntry(nav.entries, Math.min(nav.index + 1, nav.entries.length - 1));
+      return true;
+    },
+    [
+      hasBlockingView,
+      switching,
+      modeTransitioning,
+      imageAttachments.length,
+      fileAttachments.length,
+      readUserHistory,
+      showHistoryEntry,
+    ],
+  );
+
+  /**
    * 建议列表的进出场（docs/design/51）。面板是父级条件渲染的，收起要演完动画再卸载，
    * 所以这里**延迟置空** `suggest`：动画期间行内容原样保留，不动任何数据流；
    * 用户在淡出过程中继续打字就中止收起、从当前值演回展开。
@@ -463,6 +539,7 @@ export function TaskInput({ variant }: TaskInputProps) {
     };
     const clearAfterSend = (): void => {
       composer.clear();
+      historyNavRef.current = null;
       setStaleConfirm(false);
       hideSuggestNow();
       clearFileMentions();
@@ -821,6 +898,7 @@ export function TaskInput({ variant }: TaskInputProps) {
             insertTrigger={insertTrigger}
             onEnterIntercept={onEnterIntercept}
             onSuggestKey={onSuggestKey}
+            onHistoryKey={onHistoryKey}
             placeholder={placeholder}
             // 编辑锁定与发送解锁分离（docs/design/12 P1-1）：running 期间可编辑草稿，
             // 发送由 canSend / doSend 拦截，只有阻断浮层与会话切换锁编辑
