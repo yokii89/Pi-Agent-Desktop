@@ -11,7 +11,8 @@
   gap: var(--spacing-sm);
   width: 100%;
   min-height: 28px;
-  padding: 2px 6px;
+  /* 同工具行：左侧不内缩，折叠头与文档流正文齐左 */
+  padding: 2px 6px 2px 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -69,7 +70,8 @@
 }
 
 .body {
-  padding: 2px 8px 8px 28px;
+  /* 原 28px = 折叠头左内边距 6 + 图标槽 16 + 2；折叠头去掉左侧 6px 后同值左移 */
+  padding: 2px 8px 8px 22px;
   color: var(--color-text-muted);
   font-size: var(--session-stream-font-sm);
   line-height: 1.7;

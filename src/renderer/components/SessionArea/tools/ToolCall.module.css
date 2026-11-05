@@ -24,7 +24,9 @@
   gap: var(--spacing-sm);
   width: 100%;
   min-height: 30px;
-  padding: 4px 8px;
+  /* 左内边距必须是 0：工具行图标要和文档流正文同一左缘起笔（8px 内缩会让整行
+     比 Markdown 段落偏右一截，截图里肉眼可见地没对齐）。右侧内边距留给 caret 呼吸。 */
+  padding: 4px 8px 4px 0;
   border-radius: 6px;
   font-size: var(--session-stream-font-md);
   text-align: left;
@@ -163,7 +165,9 @@
 }
 
 .detail {
-  padding: 2px 8px 8px 26px;
+  /* 原 26px = 行内左内边距 8 + 图标 16 + 2；行去掉左侧 8px 内缩后同值左移，
+     展开结果与图标列的相对关系不变 */
+  padding: 2px 8px 8px 18px;
   /* 展开区统一走「比正文流小一号」；子结果组件不再各自写死 sm */
   font-size: var(--session-tool-detail-font);
 }

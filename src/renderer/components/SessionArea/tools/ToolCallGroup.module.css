@@ -13,7 +13,8 @@
   gap: var(--spacing-sm);
   width: 100%;
   min-height: 30px;
-  padding: 4px 8px;
+  /* 同单条工具行：左侧不内缩，摘要头图标与文档流正文齐左 */
+  padding: 4px 8px 4px 0;
   border: 0;
   border-radius: 6px;
   background: transparent;
