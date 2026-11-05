@@ -130,6 +130,11 @@ export interface PideskSettings {
   wallpaperPath: string | null;
   /** 壁纸遮罩强度（0–100）：数值越高背景越淡、正文越清晰；见 shared/wallpaper。 */
   wallpaperDim: number;
+  /**
+   * 应用界面缩放（整个主窗口页面的 zoomFactor，1 = 100%）。
+   * Ctrl+= / Ctrl+- / Ctrl+0 调整，见 shared/uiZoom 与 main/window/windowZoom。
+   */
+  uiZoom: number;
   /** 界面语言；system 跟随 OS，否则固定 zh-CN / en-US。 */
   locale: LocalePreference;
   /** 侧边栏默认折叠。 */

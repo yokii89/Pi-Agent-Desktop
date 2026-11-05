@@ -19,6 +19,7 @@ import {
   DEFAULT_SPLASH_TEXT_SUB,
   DEFAULT_SPLASH_TEXT_ZH,
 } from "../../shared/splash";
+import { UI_ZOOM_DEFAULT } from "../../shared/uiZoom";
 import { DEFAULT_WALLPAPER_DIM } from "../../shared/wallpaper";
 
 /** 设置 schema 当前版本；未来字段迁移时递增并编写迁移逻辑。 */
@@ -39,6 +40,8 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   // 本地背景壁纸（docs/design/111）；null = 主题纯色背景
   wallpaperPath: null,
   wallpaperDim: DEFAULT_WALLPAPER_DIM,
+  // 应用界面缩放（Ctrl+= / Ctrl+- / Ctrl+0）；见 shared/uiZoom
+  uiZoom: UI_ZOOM_DEFAULT,
   locale: "system",
   navCollapsed: false,
   pinnedSessions: [],

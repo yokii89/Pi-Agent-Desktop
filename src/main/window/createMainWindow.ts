@@ -3,6 +3,7 @@ import { app, BrowserWindow } from "electron";
 import { resolveAppIconPath } from "../appIcon";
 import { getSettings } from "../settings/settings";
 import { isQuittingApp } from "./tray";
+import { attachWindowZoom } from "./windowZoom";
 
 // dist 产物根目录（package.json main 位于 dist/main/index.js），
 // 用应用根定位而不是 __dirname，避免随源码目录层级变化
@@ -62,6 +63,8 @@ export function createMainWindow(): BrowserWindow {
   });
 
   win.once("ready-to-show", () => win.show());
+  // 界面缩放（Ctrl+= / Ctrl+- / Ctrl+0）自己接管，见 windowZoom
+  attachWindowZoom(win);
   win.on("maximize", () => notifyWindowState(win));
   win.on("unmaximize", () => notifyWindowState(win));
   // 托盘开启时关闭 = 隐藏到托盘；托盘菜单「退出」或未开托盘时才真正销毁

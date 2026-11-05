@@ -19,6 +19,7 @@ function fakeSettings(): PideskSettings {
     accentColor: null,
     wallpaperPath: null,
     wallpaperDim: 70,
+    uiZoom: 1,
     locale: "zh-CN",
     navCollapsed: true,
     pinnedSessions: ["C:/s/a.jsonl"],

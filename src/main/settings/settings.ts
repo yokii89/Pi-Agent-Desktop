@@ -19,6 +19,7 @@ import {
   normalizeSplashLogoImage,
   normalizeSplashText,
 } from "../../shared/splash";
+import { normalizeUiZoom } from "../../shared/uiZoom";
 import { clampWallpaperDim, normalizeWallpaperPath } from "../../shared/wallpaper";
 import {
   clampSessionStreamFontPx,
@@ -138,6 +139,8 @@ export function getSettings(): PideskSettings {
     // 壁纸路径 / 遮罩强度同样归一：不支持的文件类型与非法强度都回退默认（docs/design/111）
     wallpaperPath: normalizeWallpaperPath(loaded.wallpaperPath),
     wallpaperDim: clampWallpaperDim(loaded.wallpaperDim),
+    // 手改设置文件时把界面缩放夹回 50%–200% 并对齐步进
+    uiZoom: normalizeUiZoom(loaded.uiZoom),
     // 手改设置文件时把未知形象 id 回退默认，避免渲染层拿着空值不画
     inputBuddy: normalizeInputBuddy(loaded.inputBuddy),
     // 快捷键只做结构校验：合法清单由渲染层注册表归一（hydrate 必经，兜底等价前移）
@@ -167,6 +170,7 @@ export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   next.accentColor = normalizeAccentColor(next.accentColor);
   next.wallpaperPath = normalizeWallpaperPath(next.wallpaperPath);
   next.wallpaperDim = clampWallpaperDim(next.wallpaperDim);
+  next.uiZoom = normalizeUiZoom(next.uiZoom);
   next.shortcuts = sanitizeShortcutsRecord(next.shortcuts);
   next.sessionOrder = sanitizeSessionOrder(next.sessionOrder) ?? DEFAULT_SETTINGS.sessionOrder;
   next.splashEnabled = next.splashEnabled !== false;
