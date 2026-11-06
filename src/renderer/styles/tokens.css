@@ -69,6 +69,17 @@
   --color-accent-hover: #6aa3ff;
   --color-accent-text: #0b1a2b;
   --color-accent-soft: rgba(74, 140, 255, 0.16);
+  /* 用户气泡专用（docs/design/130 §6）：底色 = 主题色加白 50%。
+     前景不能沿用 --color-accent-text——亮色主题那份是纯白，贴在加白的浅底上只有
+     2.03:1，14px 正文读不出；这里从浅底自身往黑压一档（两主题实测 8.6–10.1:1）。
+     两条都留在 applyAccentColor 的覆盖表之外（它只写 4 个 accent 令牌），
+     自定义主题色时才会跟着 var(--color-accent) 一起变——同 --color-selection 那条规矩。 */
+  --color-accent-bubble: color-mix(in srgb, var(--color-accent) 50%, white);
+  --color-accent-bubble-text: color-mix(in oklab, var(--color-accent-bubble) 22%, black);
+  /* 草稿区链接字色（docs/design/130 §6）：暗色直接用主题色压在输入栏卡片上是 5.01:1，
+     亮色同值只有 3.98:1（14px 正文要 4.5），所以亮色往黑里压一档——与 applyAccentColor
+     的 hover 推导同一条配方，自定义主题色时同样跟着走。 */
+  --color-accent-link: var(--color-accent);
   /* 划选高亮（中间栏对话流，docs/design/81）：比 accent-soft 实一档——0.16 在深底上
      只剩"有一片字被涂了色"，选区本身恰恰是要看清边界的东西。
      从 accent 推导而不是写死 rgba，且不进 applyAccentColor 的覆盖表，否则换主题色会被屏蔽。 */
@@ -371,6 +382,9 @@
   --color-accent-hover: #1f5ecb;
   --color-accent-text: #ffffff;
   --color-accent-soft: rgba(47, 111, 224, 0.12);
+  /* 亮色主题的链接档：原值压在 #ececef 卡片上只有 3.98:1，往黑里压一档到 5.1:1，
+     配方与 applyAccentColor 覆盖自定义主题色时的 hover 一致 */
+  --color-accent-link: color-mix(in oklab, var(--color-accent) 84%, black);
   /* 划选高亮：与暗色档同一推导（34% 在浅底上会压住正文，浅底本身对比高，26% 已足够看清边界） */
   --color-selection: color-mix(in oklab, var(--color-accent) 26%, transparent);
   /* 顶档特效色：浅底上往黑里压一档，同时与 accent 描边拉开（暗色主题往白里提，同一个配比） */

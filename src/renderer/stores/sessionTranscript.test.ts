@@ -1119,3 +1119,59 @@ describe("nested tool calls (codemode MCP, docs/design/105)", () => {
     ]);
   });
 });
+
+/**
+ * 扩展通知（docs/design/129 §8.4 D7）：`pi.sendMessage({customType:"bash-job"})` 产生
+ * `role: "custom"` 的消息。它必须变成文档流里一条可回看的通知条目——
+ * 否则用户只看到模型突然"自己"继续下一步，历史里查不到是哪个作业结束了。
+ */
+describe("extension custom messages (docs/design/129 D7)", () => {
+  function apply(entries: SessionEntry[], event: PiAgentEvent): SessionEntry[] {
+    return sessionEntriesReducer(entries, { type: "event", event });
+  }
+
+  const customMessage = {
+    role: "custom",
+    customType: "bash-job",
+    display: true,
+    content: [
+      {
+        type: "text",
+        text: 'Bash job J-7 finished: exit 0 after 2h03m.\nCommand: curl -o isubs.tar.zst https://x\n\nRead the rest: tool_execution_inspect_output({ job: "J-7" }).',
+      },
+    ],
+  } as unknown as PiChatMessage;
+
+  it("live: message_start of a custom message becomes a custom entry, not an assistant one", () => {
+    const entries = apply([], { type: "message_start", message: customMessage });
+    expect(entries).toHaveLength(1);
+    const entry = entries[0];
+    expect(entry?.kind).toBe("custom");
+    if (entry?.kind !== "custom") throw new Error("expected custom entry");
+    expect(entry.customType).toBe("bash-job");
+    expect(entry.text).toContain("Bash job J-7 finished");
+  });
+
+  it("live: message_end does not duplicate the entry message_start created", () => {
+    let entries = apply([], { type: "message_start", message: customMessage });
+    entries = apply(entries, { type: "message_end", message: customMessage });
+    expect(entries.filter((entry) => entry.kind === "custom")).toHaveLength(1);
+  });
+
+  it("live: display:false messages stay out of the transcript", () => {
+    const hidden = { ...customMessage, display: false } as unknown as PiChatMessage;
+    expect(apply([], { type: "message_start", message: hidden })).toHaveLength(0);
+  });
+
+  it("history: a reopened session still shows past job notices", () => {
+    const entries = sessionEntriesReducer([], {
+      type: "loadMessages",
+      messages: [
+        { role: "user", content: [{ type: "text", text: "下载" }] },
+        customMessage,
+        { role: "assistant", content: [{ type: "text", text: "下载完成，继续下一步。" }] },
+      ],
+    });
+    expect(entries.map((entry) => entry.kind)).toEqual(["user", "run", "custom", "assistant"]);
+  });
+});

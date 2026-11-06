@@ -91,3 +91,15 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* 草稿区识别出的 http(s) 链接：字色走链接档（暗 = 主题色 5.01:1，亮 = 主题色压一档 5.1:1，
+   直接吃 --color-accent 在亮色只有 3.98:1），仅下划线示意「识别到了」，
+   不加底色、不做点击导航（那属于已发送气泡的外链），避免读成芯片 */
+.composerLink {
+  color: var(--color-accent-link);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 2px;
+}
+
+/* 草稿区链接的图标壳吃公共配方 styles/linkIcon.module.css（三处同源，docs/design/131） */

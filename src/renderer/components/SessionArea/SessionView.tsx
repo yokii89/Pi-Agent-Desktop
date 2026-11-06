@@ -18,6 +18,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { StreamMount } from "../ExtensionView/StreamMount";
 import { AgentRunHeader } from "./AgentRunHeader";
 import { AssistantMessage } from "./AssistantMessage";
+import { CustomNotice } from "./CustomNotice";
 import { FileEditsSummary } from "./FileEditsSummary";
 import { FirstTokenWaiter } from "./FirstTokenWaiter";
 import { QuestionRail } from "./QuestionRail";
@@ -317,6 +318,8 @@ const EntryRow = memo(function EntryRow({
         />
       ) : entry.kind === "run" ? (
         <AgentRunHeader entry={entry} showRetry={showRetry} />
+      ) : entry.kind === "custom" ? (
+        <CustomNotice entry={entry} />
       ) : entry.kind === "notice" ? (
         <p className={styles.notice}>{entry.text}</p>
       ) : entry.kind === "error" ? (

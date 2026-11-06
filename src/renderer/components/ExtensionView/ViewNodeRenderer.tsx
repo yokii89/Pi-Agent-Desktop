@@ -14,7 +14,12 @@ import {
   truncationLabel,
   windowTableRows,
 } from "./table-node";
-import { type ActiveTabState, reconcileActiveTab, wrappedStep } from "./tabs-node";
+import {
+  type ActiveTabState,
+  reconcileActiveTab,
+  tabSwitchActionId,
+  wrappedStep,
+} from "./tabs-node";
 import styles from "./ViewNodeRenderer.module.css";
 
 export interface ViewFormBridge {
@@ -377,7 +382,8 @@ function activePanelOf(root: HTMLElement | null | undefined): HTMLElement | null
 /**
  * tabs 挂载（docs/design/08 §5.1）：
  * - 全部页签常驻挂载、非激活仅 hidden——切页签不丢输入法/焦点/值；
- * - 本地切换（点击 chip / ←→）不产生事件；扩展 update 携带新的 activeTab 时
+ * - 本地切换（点击 chip / ←→）立刻改渲染，并经 `tab:<id>` action 回报落点（零协议字段
+ *   新增，理由见 tabs-node）；扩展 update 携带新的 activeTab 时
  *   才显式接管（reconcileActiveTab），答完自动前进即走这条路径；
  * - 键盘：页签条上的 ←→/Home/End 由 Segmented 原语负责；这一层只保留原语覆盖不到的
  *   部分——面板内 ←→ 切页、↑↓ 在 listbox 选项间环绕、↓ 从页签条进入面板、
@@ -422,7 +428,12 @@ function TabsView({ node, bridge }: { node: TabsViewNode; bridge: ViewFormBridge
   }, [activeId]);
 
   const switchTo = (tabId: string): void => {
+    // 本地切页先改渲染（不等扩展回包），再把落点回报出去：扩展的 footer 主按钮目标
+    // 与自动前进起点要按「用户实际看到的那一页」算账，光靠 change 的 nodeId 反推
+    // 在「只切页、没碰控件」时拿不到证据。上报走既有 action 信封，见 tabs-node。
+    if (tabState.activeId === tabId) return;
     setTabState((prev) => (prev.activeId === tabId ? prev : { ...prev, activeId: tabId }));
+    bridge.onButtonAction(tabSwitchActionId(tabId));
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {

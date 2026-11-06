@@ -81,6 +81,29 @@ function isoToUnixMs(value: unknown): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+/**
+ * 磁盘 `custom_message` 行 → PiChatMessage（docs/design/129 §8.4）。
+ * pi 的自定义消息在 JSONL 里不是 `type: "message"`，而是独立的一行：
+ * `{type:"custom_message", customType, content, display, details}`。
+ * 不映射它，历史会话里就查不到「哪个作业结束了」。
+ */
+function mapDiskCustomMessage(raw: Record<string, unknown>): PiChatMessage | null {
+  const customType = typeof raw.customType === "string" ? raw.customType : "";
+  if (customType.length === 0) return null;
+  const content = raw.content;
+  if (typeof content !== "string" && !Array.isArray(content)) return null;
+  const message: PiChatMessage & { timestamp?: number } = {
+    role: "custom",
+    content: typeof content === "string" ? [{ type: "text", text: content }] : content,
+    customType,
+  };
+  // display:false = 进上下文但界面不显示；字段必须带出来，否则隐藏消息会被翻出来
+  if (typeof raw.display === "boolean") message.display = raw.display;
+  const ts = isoToUnixMs(raw.timestamp);
+  if (ts !== null) message.timestamp = ts;
+  return message;
+}
+
 /** 磁盘 message 行 → PiChatMessage；结构不对返回 null。 */
 function mapDiskMessage(raw: unknown): PiChatMessage | null {
   if (typeof raw !== "object" || raw === null) return null;
@@ -100,6 +123,13 @@ function mapDiskMessage(raw: unknown): PiChatMessage | null {
   if (typeof body.toolCallId === "string") message.toolCallId = body.toolCallId;
   if (typeof body.toolName === "string") message.toolName = body.toolName;
   if (typeof body.isError === "boolean") message.isError = body.isError;
+  // 运行时事件里的自定义消息也是 role:"custom" + 这两个字段；带上它们才能选对标签
+  if (typeof (body as { customType?: unknown }).customType === "string") {
+    message.customType = (body as { customType: string }).customType;
+  }
+  if (typeof (body as { display?: unknown }).display === "boolean") {
+    message.display = (body as { display: boolean }).display;
+  }
   const nestedCalls = sanitizeNestedToolCalls(body.nestedCalls);
   if (nestedCalls) message.nestedCalls = nestedCalls;
   const ts = isoToUnixMs(body.timestamp);
@@ -162,6 +192,11 @@ export async function readSessionTranscript(file: string): Promise<SessionTransc
       if (startedAt === null && record.type === "session") {
         const header = parsed as { timestamp?: unknown };
         startedAt = isoToUnixMs(header.timestamp);
+        continue;
+      }
+      if (record.type === "custom_message") {
+        const custom = mapDiskCustomMessage(parsed as Record<string, unknown>);
+        if (custom) messages.push(custom);
         continue;
       }
       if (record.type !== "message") continue;

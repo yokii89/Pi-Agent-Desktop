@@ -88,6 +88,12 @@
   margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-xs));
 }
 
+/* run 头 → 作业通知 → 文档流：通知是这一轮的由头，别用 24px 空档把它和正文撕开 */
+.entry[data-kind="run"] + .entry[data-kind="custom"],
+.entry[data-kind="custom"] + .entry[data-kind="assistant"] {
+  margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-xs));
+}
+
 /* run 头 / 文档流后紧跟错误行：同样收紧，避免 24px 空档把状态和原因撕开 */
 .entry[data-kind="run"] + .entry[data-kind="error"],
 .entry[data-kind="assistant"] + .entry[data-kind="error"] {

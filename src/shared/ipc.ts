@@ -247,6 +247,11 @@ export const WALLPAPER_IPC = {
   pick: "pidesk:wallpaper:pick",
 } as const;
 
+export const FAVICON_IPC = {
+  /** 主进程代为抓取站点 favicon（按 origin 落盘缓存），返回 data URL；失败为 null。 */
+  get: "pidesk:favicon:get",
+} as const;
+
 export const PROJECT_IPC = {
   /** 打开系统文件夹选择器，返回所选目录；取消时返回 null。 */
   pick: "pidesk:project:pick",
@@ -1089,6 +1094,13 @@ export interface PiChatMessage {
   nestedCalls?: PiNestedToolCalls;
   /** 磁盘 JSONL 解析出的 unix ms 时间戳（历史装载合成 run 边界用）。 */
   timestamp?: number;
+  /**
+   * 自定义消息专用（`role: "custom"`，docs/design/129 §8.4）：扩展定义的消息类型
+   * （如 `bash-job`），渲染层据此选择标签与图标；未知类型按通用通知渲染。
+   */
+  customType?: string;
+  /** 自定义消息专用：`false` = 进上下文但界面不显示（pi 的 display 语义）。 */
+  display?: boolean;
 }
 
 /** 嵌套调用记录里监控卡用得到的字段（arguments / durationMs 不跨层保留）。 */

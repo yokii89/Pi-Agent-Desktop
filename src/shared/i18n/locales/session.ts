@@ -277,6 +277,8 @@ export const sessionMessages = defineMessages({
     "zh-CN": "已跳过压缩（网关响应异常，历史已保留）",
     "en-US": "Compaction skipped (abnormal gateway response; history kept)",
   },
+  "session.custom.bashJob": { "zh-CN": "后台作业", "en-US": "Background job" },
+  "session.custom.generic": { "zh-CN": "扩展通知", "en-US": "Extension notice" },
   "session.access.mode": { "zh-CN": "访问模式", "en-US": "Access mode" },
   "session.access.activating": {
     "zh-CN": "正在切换：{title}",

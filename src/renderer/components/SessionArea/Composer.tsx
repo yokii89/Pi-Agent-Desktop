@@ -1,4 +1,4 @@
-import { Folder, PuzzlePiece } from "@phosphor-icons/react";
+import { Folder, Globe, PuzzlePiece } from "@phosphor-icons/react";
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { t as translate } from "../../../shared/i18n";
 import { getFileIconUrl } from "../../fileIcons";
@@ -21,6 +21,7 @@ import { NAV_MOTION } from "../../utils/motionTokens";
 import { formatQuoteBlock } from "../../utils/quoteFormat";
 import styles from "./Composer.module.css";
 import { createFileChip } from "./composerFileChip";
+import { LINKIFY_DEBOUNCE_MS, relayoutComposerLinks } from "./composerLinks";
 import {
   createSkillIconShell,
   createSlashChip,
@@ -169,6 +170,30 @@ export function Composer({
     null,
   );
   const [dragOver, setDragOver] = useState(false);
+
+  const globeIconRef = useRef<HTMLSpanElement>(null);
+  const linkifyTimerRef = useRef<number | null>(null);
+  // 输入法组合期绝不重排 URL 装饰：组合中改写 DOM 会把组词拆断（doc 127 同款教训）
+  const composingRef = useRef(false);
+
+  /** 输入静默后重排 URL 装饰；组合中静默到期的这一趟直接跳过，等 compositionend 再排。 */
+  const scheduleLinkify = useCallback((delay = LINKIFY_DEBOUNCE_MS) => {
+    if (linkifyTimerRef.current !== null) window.clearTimeout(linkifyTimerRef.current);
+    linkifyTimerRef.current = window.setTimeout(() => {
+      linkifyTimerRef.current = null;
+      if (composingRef.current) return;
+      const root = rootRef.current;
+      if (!root?.isConnected || !root.isContentEditable) return;
+      relayoutComposerLinks(root, { fallbackIcon: pickSvgIconNode(globeIconRef.current) });
+    }, delay);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (linkifyTimerRef.current !== null) window.clearTimeout(linkifyTimerRef.current);
+    },
+    [],
+  );
 
   const reportContent = useCallback(() => {
     const root = rootRef.current;
@@ -440,6 +465,8 @@ export function Composer({
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
+        // 整块写完也要跑一次 URL 重排；逐字读出不变，召回的「未编辑」判据不受影响
+        scheduleLinkify(0);
       },
       insertFileMention: (item) => {
         const root = rootRef.current;
@@ -504,6 +531,7 @@ export function Composer({
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
+        scheduleLinkify(0);
       },
       appendText: (text) => {
         const root = rootRef.current;
@@ -527,9 +555,10 @@ export function Composer({
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
+        scheduleLinkify(0);
       },
     });
-  }, [onReady, onContentChange, onTextChange, paintFileChip, reportContent]);
+  }, [onReady, onContentChange, onTextChange, paintFileChip, reportContent, scheduleLinkify]);
 
   // + 菜单插入 @ / / 触发符（仅 seq 变化时插入一次）
   const lastTriggerSeqRef = useRef(0);
@@ -696,6 +725,10 @@ export function Composer({
       <span hidden aria-hidden="true" ref={skillIconRef}>
         <PuzzlePiece size={16} weight="regular" />
       </span>
+      {/* URL 装饰的兜底图标（favicon 未命中时占位），同一条克隆库路数。 */}
+      <span hidden aria-hidden="true" ref={globeIconRef}>
+        <Globe size={14} weight="regular" />
+      </span>
       {/* contenteditable 必须用 div 才能嵌原子芯片，不能换成 textarea */}
       {/* biome-ignore lint/a11y/useSemanticElements: 内联芯片需要 contenteditable，textarea 做不到 */}
       <div
@@ -715,6 +748,13 @@ export function Composer({
         onKeyDown={onKeyDown}
         onPaste={onPaste}
         onDrop={onDrop}
+        onCompositionStart={() => {
+          composingRef.current = true;
+        }}
+        onCompositionEnd={() => {
+          composingRef.current = false;
+          scheduleLinkify();
+        }}
         onDragOver={(event) => {
           if (event.dataTransfer?.types?.includes("Files")) {
             event.preventDefault();
@@ -726,7 +766,9 @@ export function Composer({
             setDragOver(false);
           }
         }}
-        onInput={() => {
+        onInput={(event) => {
+          // 组合期的 input 不排 URL 装饰：compositionend 统一补排
+          if (!event.nativeEvent.isComposing) scheduleLinkify();
           const root = rootRef.current;
           if (root) {
             const { filePaths, itemIds } = readComposerDom(root);

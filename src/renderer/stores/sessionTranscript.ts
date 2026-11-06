@@ -10,6 +10,7 @@ import { sanitizeNestedToolCalls } from "../../shared/nestedCalls";
 import { addPiUsage, isZeroPiUsage } from "../../shared/usage";
 import type { BrowserContextItem } from "../services/browserService";
 import { imagesFromMessageContent, type UserMessageImage } from "../utils/imageAttach";
+import { customNoticeFromMessage } from "./customMessage";
 import {
   actionLabel,
   buildToolResult,
@@ -170,8 +171,22 @@ export interface EditsSummaryEntry {
   at: number;
 }
 
+/**
+ * 扩展自定义消息条目（`role: "custom"`，docs/design/129 §8.4）：
+ * 后台作业结束等由扩展发起、需要留痕的通知。文档流里是紧凑通知行，不是气泡也不是助手回复。
+ */
+export interface CustomEntry {
+  kind: "custom";
+  id: string;
+  /** 发送方扩展的消息类型（如 `bash-job`），渲染层据此选标签与图标。 */
+  customType: string;
+  text: string;
+  at: number;
+}
+
 export type SessionEntry =
   | UserEntry
+  | CustomEntry
   | SnapshotEntry
   | RunEntry
   | NoticeEntry
@@ -297,13 +312,20 @@ function applyEvent(entries: SessionEntry[], event: PiAgentEvent): SessionEntry[
       }
       return finalizeRun(entries, statusFromLastError(entries));
     }
-    case "message_start":
+    case "message_start": {
+      // 扩展自定义消息（pi.sendMessage）：不套气泡、不参与 run 的 usage 统计
+      if (event.message.role === "custom") {
+        const notice = customNoticeFromMessage(event.message);
+        if (!notice) return entries;
+        return [...entries, { kind: "custom", id: uid(), ...notice, at: Date.now() }];
+      }
       // 用户角色消息由渲染层发送时乐观插入，忽略 pi 的回显，避免重复
       if (event.message.role !== "assistant") return entries;
       return [
         ...entries,
         { kind: "assistant", id: uid(), blocks: blocksFromContent(event.message.content, null) },
       ];
+    }
     case "message_update":
       return applyDelta(entries, event.assistantMessageEvent);
     case "message_end":
@@ -1537,6 +1559,17 @@ function entriesFromMessages(messages: PiChatMessage[], sessionStartedAt?: numbe
       }
       pendingRunStart = ts;
       runOpened = false;
+      continue;
+    }
+
+    if (message.role === "custom") {
+      const notice = customNoticeFromMessage(message);
+      if (notice) {
+        // 与实时同序：run 头在前、通知在后（实时里 agent_start 先于 message_start）。
+        // 唤醒触发的轮次没有用户消息，run 头就落在上一条用户消息的 pendingRunStart 上。
+        if (pendingRunStart !== null && !runOpened) openSyntheticRun(pendingRunStart);
+        entries.push({ kind: "custom", id: uid(), ...notice, at: ts });
+      }
       continue;
     }
 

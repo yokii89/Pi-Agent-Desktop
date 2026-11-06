@@ -10,9 +10,11 @@ import { useT } from "../../hooks/useT";
 import { fsService } from "../../services/fsService";
 import { useBrowserStore } from "../../stores/browserStore";
 import { useUiStore } from "../../stores/uiStore";
+import { isExternalHttpUrl } from "../../utils/linkify";
 import { normalizeFenceLang, resolveMarkdownRef } from "../../utils/markdownRefs";
 import { FileLink, looksLikeFilePath } from "../SessionArea/FileLink";
 import { CodeHighlight, countCodeLines } from "../ui/CodeHighlight";
+import { UrlLink } from "../ui/UrlLink";
 import { MermaidBlock } from "./MermaidBlock";
 import styles from "./markdown.module.css";
 
@@ -226,18 +228,20 @@ function MarkdownImg({ sourcePath, src, alt }: { sourcePath: string; src?: strin
 
 /** Markdown 内链接：有源文件语境时本地路径在面板内跳转；http(s) 一律交系统浏览器；
  * 其余协议降级死链。会话区（无 sourcePath）同样必须接管——默认 <a> 会把整个应用导航走
- * （docs/design/13 P0-1）。 */
+ * （docs/design/13 P0-1）。外链形态与输入栏、用户气泡同源（docs/design/131）。 */
 function MarkdownLink({
   sourcePath,
   href,
+  imageContent,
   children,
 }: {
   sourcePath: string | null;
   href?: string;
+  imageContent: boolean;
   children?: ReactNode;
 }) {
   const t = useT();
-  const { dispatch, showToast } = useUiStore();
+  const { dispatch } = useUiStore();
   const browser = useBrowserStore();
 
   if (typeof href !== "string" || href === "") {
@@ -275,26 +279,28 @@ function MarkdownLink({
       );
     }
   }
-  if (/^https?:\/\//i.test(href)) {
+  if (isExternalHttpUrl(href)) {
+    // 徽标型链接 `[![CI](shield.png)](https://…)` 不加图标：图本身已是标识，
+    // 再补一枚站点图标会让 README 里成排的徽章左边多出一列小图（docs/design/131）。
     return (
-      <a
-        href={href}
-        onClick={(event) => {
-          event.preventDefault();
-          // IPC 统一信封：失败以 ok:false 返回而非 reject，两路都要报
-          void window.pidesk?.window
-            .openExternal(href)
-            .then((result) => {
-              if (!result.ok) showToast(result.error ?? t("common.openFailed"));
-            })
-            .catch(() => showToast(t("common.openFailed")));
-        }}
-      >
+      <UrlLink url={href} withIcon={!imageContent}>
         {children}
-      </a>
+      </UrlLink>
     );
   }
   return <span className={styles.mdLinkDead}>{children}</span>;
+}
+
+/**
+ * hast 子树里是否出现 img（即徽标型链接）。认 AST 而不是认 React 元素：文件面板把 img
+ * 换成了组件映射里的匿名组件，按组件身份比会漏，连带多发一次 favicon 抓取
+ * （docs/design/131 探针抓到的一条真缺陷）。
+ */
+function hastHasImage(node: unknown): boolean {
+  if (!node || typeof node !== "object") return false;
+  const el = node as { tagName?: string; children?: unknown[] };
+  if (el.tagName === "img") return true;
+  return (el.children ?? []).some(hastHasImage);
 }
 
 function buildComponents(opts: {
@@ -320,7 +326,11 @@ function buildComponents(opts: {
     // a 无条件接管（docs/design/13 P0-1）：有源文件语境解析本地路径，
     // 会话区至少拦下 http(s) 外链，其余协议降级死链，禁止应用内导航
     a: (props) => (
-      <MarkdownLink sourcePath={opts.sourcePath ?? null} href={props.href}>
+      <MarkdownLink
+        sourcePath={opts.sourcePath ?? null}
+        href={props.href}
+        imageContent={hastHasImage(props.node)}
+      >
         {props.children}
       </MarkdownLink>
     ),

@@ -79,7 +79,13 @@ export function sessionUpdatedAt(
     if (entry.kind === "run") {
       return entry.endedAt || entry.startedAt || null;
     }
-    if (entry.kind === "notice" || entry.kind === "error" || entry.kind === "snapshot") {
+    if (
+      entry.kind === "notice" ||
+      entry.kind === "error" ||
+      entry.kind === "snapshot" ||
+      // 扩展通知也有时间：作业结束往往是会话最近的活动
+      entry.kind === "custom"
+    ) {
       return entry.at || null;
     }
     if (entry.kind === "editsSummary") return entry.at || null;

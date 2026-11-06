@@ -140,6 +140,11 @@ import { Play } from "@phosphor-icons/react";
   - AI 回复：**一律文档流渲染**（Markdown 全宽排版），**禁止气泡**；AI 输出是"文档"，不是聊天气泡。
   - 工具调用：单条为紧凑状态行（图标 + 主体 + 状态，可展开结果）；连续 ≥2 条收成可折叠摘要头（「已读取 4 个文件 · 已搜索 2 次」）。默认一律收起，不跟随 running 自动展开，避免对话流跳动。
   - 思考（thinking）内容：默认折叠成一行（「思考中 / 思考过程」），点开才渲染 muted Markdown，不套卡片壳。
+  - 扩展通知（`role: "custom"`，如 `customType:"bash-job"` 的作业结束回执）：文档流里**一行紧凑通知**
+    （图标 + 类型标签 + 首行摘要，默认收起看全文），不套气泡、不计入助手回复与「本轮概述」。
+    **未知 `customType` 一律按通用「扩展通知」渲染，不得静默丢弃**；`display: false` 才不显示。
+    历史装载必须认 pi 的 `custom_message` 行——**pi 不把它写成 `type:"message"`**，
+    只按 `type === "message"` 读盘会让通知在重开会话后消失（docs/design/129 §8.4）。
 - **流式渲染数据源**：`message_update`（text/thinking/toolcall delta，按 `contentIndex` 组装）做增量显示；`message_end` 与 `get_messages` 为权威数据，用于对账与会话恢复。用户消息由渲染层发送时乐观插入，忽略 pi 回显的用户角色消息事件，避免重复。
 - 会话历史仍以 pi 原生 JSONL 为准（`~/.pi/agent/sessions/`），恢复会话用 `--session <file>` 启动参数；PiDesk 不自建会话存储。
 

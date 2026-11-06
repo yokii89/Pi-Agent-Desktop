@@ -1,0 +1,25 @@
+/* 「站点图标 + 链接文本」里那一格图标的公共配方（docs/design/131）。
+   favicon <img> 与兜底 Phosphor Globe 同占一档，两者互换时盒子不变，
+   链接文字不会跟着抖。三处消费方共用：输入栏草稿（composerLinks，imperative 孪生）、
+   用户气泡与 AI 回复文档流（ui/UrlLink）。
+   字色、下划线、字号属各站点自己的皮肤，不在这里写。 */
+.linkIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  margin-right: 3px;
+  vertical-align: -2px;
+  line-height: 0;
+}
+
+.linkIcon img,
+.linkIcon svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  border-radius: 3px;
+}

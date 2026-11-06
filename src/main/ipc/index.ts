@@ -3,6 +3,7 @@ import { registerBrowserIpc } from "../browser/browserIpc";
 import { registerCatalogIpc } from "../extension/catalogIpc";
 import { registerExtensionIpc } from "../extension/extensionIpc";
 import { registerWorkerIpc } from "../extension/workerIpc";
+import { registerFaviconIpc } from "../favicon/faviconIpc";
 import { registerFsIpc } from "../fs/fsIpc";
 import { registerGitIpc } from "../git/gitIpc";
 import { registerGitHubIpc } from "../github/githubIpc";
@@ -50,6 +51,7 @@ export function registerIpc(): void {
     registerExtensionIpc,
     registerCatalogIpc,
     registerWorkerIpc,
+    registerFaviconIpc,
     registerViewIpc,
     registerViewActivateIpc,
     registerWallpaperIpc,

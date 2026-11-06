@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reconcileActiveTab, wrappedStep } from "./tabs-node";
+import { reconcileActiveTab, tabSwitchActionId, wrappedStep } from "./tabs-node";
 
 describe("reconcileActiveTab", () => {
   it("ignores an absent activeTab prop (pure local switching)", () => {
@@ -27,6 +27,21 @@ describe("reconcileActiveTab", () => {
       activeId: "review",
       lastExplicit: "review",
     });
+  });
+});
+
+describe("tabSwitchActionId", () => {
+  it("carries the tab id, including the non-numeric review tab", () => {
+    expect(tabSwitchActionId("q2")).toBe("tab:q2");
+    expect(tabSwitchActionId("review")).toBe("tab:review");
+  });
+
+  it("stays in its own id family so extensions can tell a local switch from a button press", () => {
+    // 扩展把「推进/跳回」按钮声明成 goto:<裸下标> 与 goto:review；本地切页回报带的是
+    // ViewTab.id（q<i>），两族不会撞：扩展把 `tab:` 只当页签观测，不当按钮动作。
+    expect(tabSwitchActionId("q0")).not.toBe("goto:0");
+    expect(tabSwitchActionId("review")).not.toBe("goto:review");
+    expect(tabSwitchActionId("review")).not.toBe("submit");
   });
 });
 

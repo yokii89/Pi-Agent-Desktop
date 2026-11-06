@@ -15,6 +15,7 @@ export default defineConfig({
       "session/**/*.test.ts",
       "proc/**/*.test.ts",
       "extension/**/*.test.ts",
+      "favicon/**/*.test.ts",
       "git/**/*.test.ts",
       "fs/**/*.test.ts",
       "mcp/**/*.test.ts",

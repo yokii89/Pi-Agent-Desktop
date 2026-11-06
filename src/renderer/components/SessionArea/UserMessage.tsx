@@ -6,11 +6,13 @@ import type { BrowserContextItem } from "../../services/browserService";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
 import type { UserMessageImage } from "../../utils/imageAttach";
+import { splitMessageUrls } from "../../utils/linkify";
 import {
   parseUserMessageSegments,
   readableUserMessageWithImages,
   type UserMessagePart,
 } from "../../utils/userMessageSegments";
+import { UrlLink } from "../ui/UrlLink";
 import { ContextChip } from "./ContextChip";
 import { FileMentionChip } from "./FileMentionChip";
 import { MessageActionBar } from "./MessageActionBar";
@@ -36,6 +38,22 @@ function renderSlashTokens(text: string): ReactNode[] {
   }
   if (last < text.length) nodes.push(text.slice(last));
   return nodes;
+}
+
+/**
+ * 正文 linkify（docs/design/13）：http(s) URL 渲染为外链（站点 favicon + 链接文本，
+ * 形态见 ui/UrlLink），其余仍走 / 命令芯片——两者互不干扰，URL 内不会被 SLASH_TOKEN_RE 命中。
+ */
+function renderRichText(text: string): ReactNode[] {
+  return splitMessageUrls(text).map((part, index) =>
+    part.kind === "url" ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: immutable message fragments
+      <UrlLink key={index} url={part.value} className={styles.link} />
+    ) : (
+      // biome-ignore lint/suspicious/noArrayIndexKey: immutable message fragments
+      <span key={index}>{renderSlashTokens(part.value)}</span>
+    ),
+  );
 }
 
 interface UserMessageProps {
@@ -136,22 +154,20 @@ function renderSegments(
         if (item) return <ContextChip key={item.id} item={item} />;
       }
       // biome-ignore lint/suspicious/noArrayIndexKey: immutable message fragments
-      return <span key={index}>{renderSlashTokens(part)}</span>;
+      return <span key={index}>{renderRichText(part)}</span>;
     });
   const renderParts = (
     parts: UserMessagePart[] | undefined,
     content: string,
     contextChips = true,
   ): ReactNode => {
-    if (!parts) return contextChips ? renderText(content) : renderSlashTokens(content);
+    if (!parts) return contextChips ? renderText(content) : renderRichText(content);
     return parts.map((part, index) =>
       part.kind === "file" ? (
         <FileMentionChip key={part.mention.path} {...part.mention} />
       ) : (
         // biome-ignore lint/suspicious/noArrayIndexKey: immutable message fragments
-        <span key={index}>
-          {contextChips ? renderText(part.text) : renderSlashTokens(part.text)}
-        </span>
+        <span key={index}>{contextChips ? renderText(part.text) : renderRichText(part.text)}</span>
       ),
     );
   };

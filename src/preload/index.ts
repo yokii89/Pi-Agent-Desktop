@@ -139,6 +139,7 @@ import {
   AUTH_IPC,
   BROWSER_IPC,
   EXTENSION_IPC,
+  FAVICON_IPC,
   FS_IPC,
   GIT_IPC,
   INSPECTOR_FLOAT_IPC,
@@ -252,6 +253,11 @@ contextBridge.exposeInMainWorld("pidesk", {
   wallpaper: {
     /** 打开系统文件选择器挑选本地壁纸（图片 / 视频）；取消返回 null。 */
     pick: (): Promise<IpcResult<string | null>> => ipcRenderer.invoke(WALLPAPER_IPC.pick),
+  },
+  favicon: {
+    /** 主进程代为抓取站点 favicon（按 origin 落盘缓存），返回 data URL；失败为 null。 */
+    get: (url: string): Promise<IpcResult<{ dataUrl: string | null }>> =>
+      ipcRenderer.invoke(FAVICON_IPC.get, { url }),
   },
   notification: {
     /** 订阅主进程推送的提示音播放请求（扩展 SDK notify，docs/design/18）。 */

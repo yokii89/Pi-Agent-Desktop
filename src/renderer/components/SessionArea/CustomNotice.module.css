@@ -1,0 +1,83 @@
+/* 扩展通知：文档流里的一行（默认收起），不是气泡、不是助手回复 */
+.notice {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-sm);
+}
+
+/* 与思考折叠头同一档：左侧不内缩，右缘留一点点击区 */
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  min-height: 28px;
+  padding: 2px 6px 2px 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--session-stream-font-sm);
+  text-align: left;
+  cursor: default;
+}
+
+button.head {
+  cursor: pointer;
+  transition: color 120ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+button.head:hover {
+  color: var(--color-accent);
+}
+
+button.head:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-muted);
+  flex: none;
+}
+
+/* 类型标签：比正文更弱的一层，区分「谁在说话」 */
+.label {
+  flex: none;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.summary {
+  /* 摘要是可截断的一段，不是必须读全的信息：原文可展开 */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+.caret {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  flex: none;
+}
+
+/* 高度补间由 useCollapseAnimation 接管；内容元素不得带外边距（会漏测） */
+.bodyWrap {
+  overflow: hidden;
+}
+
+.body {
+  margin: 0;
+  padding: 6px 8px 8px 24px;
+  font-family: var(--font-family-mono);
+  font-size: var(--session-tool-detail-font);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
