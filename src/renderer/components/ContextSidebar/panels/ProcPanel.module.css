@@ -241,6 +241,37 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 实时跟随芯片（方案 B）：job 档日志 tail 中；结束态弱化为 muted */
+.liveChip {
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.liveChipEnded {
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.logLink {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
 .output {
   max-height: 220px;
   margin: 0;

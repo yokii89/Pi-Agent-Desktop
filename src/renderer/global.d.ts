@@ -105,6 +105,8 @@ import type {
   PiSlashCommand,
   ProcDetail,
   ProcDetailRequest,
+  ProcOutputPushMessage,
+  ProcOutputStartResult,
   ProcPushMessage,
   ProcStopAllResult,
   ProcStopResult,
@@ -288,6 +290,9 @@ export interface PideskGlobalApi {
     stopAll(sessionId: SessionId): Promise<IpcResult<ProcStopAllResult>>;
     onChanged(callback: (message: ProcPushMessage) => void): () => void;
     residualNotice(): Promise<IpcResult<boolean>>;
+    outputStart(id: string): Promise<IpcResult<ProcOutputStartResult>>;
+    outputStop(id: string): Promise<IpcResult<null>>;
+    onOutput(callback: (message: ProcOutputPushMessage) => void): () => void;
   };
   terminal: {
     create(req: TerminalCreateRequest): Promise<IpcResult<string>>;

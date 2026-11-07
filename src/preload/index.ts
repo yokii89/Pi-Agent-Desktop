@@ -108,6 +108,8 @@ import type {
   PiSlashCommand,
   ProcDetail,
   ProcDetailRequest,
+  ProcOutputPushMessage,
+  ProcOutputStartResult,
   ProcPushMessage,
   ProcStopAllResult,
   ProcStopResult,
@@ -451,6 +453,15 @@ contextBridge.exposeInMainWorld("pidesk", {
       subscribe<ProcPushMessage>(PROC_IPC.changed, callback),
     /** 消费上次非正常退出的残留提示（一次即 false）。 */
     residualNotice: (): Promise<IpcResult<boolean>> => ipcRenderer.invoke(PROC_IPC.residualNotice),
+    /** 开始 tail 作业日志（方案 B）；无作业日志时 logPath 为 null。 */
+    outputStart: (id: string): Promise<IpcResult<ProcOutputStartResult>> =>
+      ipcRenderer.invoke(PROC_IPC.outputStart, { id }),
+    /** 停止 tail（页签隐藏 / 切换选中 / 卸载都要调）。 */
+    outputStop: (id: string): Promise<IpcResult<null>> =>
+      ipcRenderer.invoke(PROC_IPC.outputStop, { id }),
+    /** 订阅作业日志增量（约 300ms 合批；type "ended" 表示跟随终止）。 */
+    onOutput: (callback: (message: ProcOutputPushMessage) => void): (() => void) =>
+      subscribe<ProcOutputPushMessage>(PROC_IPC.output, callback),
   },
 
   terminal: {

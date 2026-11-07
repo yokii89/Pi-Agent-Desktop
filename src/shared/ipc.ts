@@ -1390,6 +1390,12 @@ export const PROC_IPC = {
   changed: "pidesk:proc:changed",
   /** 上次非正常退出的残留提示（§5.4 P0）；消费一次即 false。 */
   residualNotice: "pidesk:proc:residualNotice",
+  /** 开始 tail 作业日志（方案 B）；返回 { logPath }，无作业日志时 logPath 为 null。 */
+  outputStart: "pidesk:proc:outputStart",
+  /** 停止 tail 作业日志（页签隐藏 / 切换选中 / 卸载都要调）。 */
+  outputStop: "pidesk:proc:outputStop",
+  /** 主进程推送：作业日志增量（约 300ms 合批）。走 proc 独立域，不进会话事件白名单。 */
+  output: "pidesk:proc:output",
 } as const;
 
 export interface ProcListRequest {
@@ -1413,6 +1419,31 @@ export interface ProcPushMessage {
   sessionId: SessionId;
   processes: ManagedProcess[];
 }
+
+/** 实时输出跟随启动请求（方案 B）。 */
+export interface ProcOutputStartRequest {
+  id: string;
+}
+
+/** 跟随启动结果：logPath 供「打开日志文件」；无 pi-bash-jobs 作业日志时为 null。 */
+export interface ProcOutputStartResult {
+  logPath: string | null;
+}
+
+/**
+ * 作业日志增量推送（proc 独立域）。id 是登记项 id（与 detail 请求一致）；
+ * data 的 payload 是自上次推送以来的增量文本（首帧可能从文件尾部 64KB 起步）；
+ * ended 表示作业已结束、跟随终止，渲染层收到后不再续订。
+ */
+export interface ProcOutputPushMessage {
+  sessionId: SessionId;
+  id: string;
+  type: "data" | "ended";
+  payload: string;
+}
+
+/** 实时输出通道的字节口径：主进程单帧读入上限 = 渲染层展示保留的尾部（两侧同一契约）。 */
+export const PROC_OUTPUT_TAIL_CAP = 64 * 1024;
 
 // ---------------------------------------------------------------------------
 // 独立终端（node-pty）

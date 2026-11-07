@@ -200,4 +200,28 @@ export const procMessages = defineMessages({
     "zh-CN": "已运行 {elapsed} · 内存 {memory} · CPU {cpu}",
     "en-US": "Up {elapsed} · Memory {memory} · CPU {cpu}",
   },
+  "proc.panel.liveFollow": {
+    "zh-CN": "实时跟随",
+    "en-US": "Following",
+  },
+  "proc.panel.followEnded": {
+    "zh-CN": "跟随已结束",
+    "en-US": "Follow ended",
+  },
+  "proc.panel.source.liveNote": {
+    "zh-CN": "作业日志增量跟随（仅保留尾部 64KB，向上滚动暂停跟随）",
+    "en-US": "Tailing the job log (last 64KB kept; scroll up to pause following)",
+  },
+  "proc.panel.source.endedNote": {
+    "zh-CN": "作业已结束，展示日志尾部",
+    "en-US": "Job ended; showing the log tail",
+  },
+  "proc.panel.openLog": {
+    "zh-CN": "打开日志文件",
+    "en-US": "Open log file",
+  },
+  "proc.panel.openLogFailed": {
+    "zh-CN": "打开日志失败",
+    "en-US": "Couldn't open the log",
+  },
 });

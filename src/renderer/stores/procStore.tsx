@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { t } from "../../shared/i18n";
 import type { ManagedProcess, SessionId } from "../../shared/ipc";
+import { PROC_OUTPUT_TAIL_CAP } from "../../shared/ipc";
 import { procService } from "../services/procService";
 
 /**
@@ -48,6 +49,7 @@ export const procStore = {
     const next = new Map(state);
     next.set(sessionId, processes);
     setState(next);
+    pruneOutputs(processes);
   },
 };
 
@@ -207,6 +209,127 @@ export async function ignoreManagedProcess(proc: ManagedProcess): Promise<void> 
   } catch {
     // 忽略失败不打扰
   }
+}
+
+/** 登记表是 feed 的生命周期来源：行消失（忽略/清理/换代出旧行）时同步丢弃对应 feed。 */
+function pruneOutputs(processes: readonly ManagedProcess[]): void {
+  if (outputState.feeds.size === 0) return;
+  const known = new Set(processes.map((proc) => proc.id));
+  let removed = false;
+  const next = new Map(outputState.feeds);
+  for (const id of next.keys()) {
+    if (!known.has(id)) {
+      next.delete(id);
+      removed = true;
+    }
+  }
+  if (removed) {
+    outputState = { feeds: next };
+    emitOutput();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 实时输出跟随（方案 B）：详情页签对 job 档登记项开一条作业日志 tail
+// ---------------------------------------------------------------------------
+
+/** 展示层保留的尾部字符数（与主进程单帧读入口径同一契约）。 */
+const OUTPUT_TAIL_CHARS = PROC_OUTPUT_TAIL_CAP;
+
+export interface ProcOutputFeed {
+  /** 累计文本的尾部；主进程首帧从日志尾部起步，渲染层只保留最后 64KB。 */
+  text: string;
+  /** 已收到 ended（作业结束、跟随终止），不再有新数据。 */
+  ended: boolean;
+  /** feed 已启动（start 与 stop 之间）；stop 保留文本供已结束展示。 */
+  active: boolean;
+  /** 作业日志路径（「打开日志文件」用）；无日志（竞态）为 null。 */
+  logPath: string | null;
+}
+
+let outputState: { feeds: ReadonlyMap<string, ProcOutputFeed> } = { feeds: new Map() };
+const outputListeners = new Set<() => void>();
+
+function emitOutput(): void {
+  for (const listener of outputListeners) listener();
+}
+
+function subscribeOutput(listener: () => void): () => void {
+  outputListeners.add(listener);
+  return () => {
+    outputListeners.delete(listener);
+  };
+}
+
+function getOutputState(): { feeds: ReadonlyMap<string, ProcOutputFeed> } {
+  return outputState;
+}
+
+function setFeed(id: string, feed: ProcOutputFeed): void {
+  outputState = { feeds: new Map(outputState.feeds).set(id, feed) };
+  emitOutput();
+}
+
+/** 某登记项的实时输出；未开过 feed 返回 null（store 层 getter，测试与 hook 共用）。 */
+export function getProcOutput(procId: string | null | undefined): ProcOutputFeed | null {
+  return procId ? (outputState.feeds.get(procId) ?? null) : null;
+}
+
+/** 某登记项的实时输出；未开过 feed 返回 null。 */
+export function useProcOutput(procId: string | null | undefined): ProcOutputFeed | null {
+  useSyncExternalStore(subscribeOutput, getOutputState);
+  return getProcOutput(procId);
+}
+
+/** 订阅作业日志增量推送；在应用根挂载一次（与 bindProcStream 平级）。 */
+export function bindProcOutputStream(): () => void {
+  return procService.onOutput((message) => {
+    const prev = outputState.feeds.get(message.id);
+    if (message.type === "ended") {
+      if (!prev || prev.ended) return;
+      setFeed(message.id, { ...prev, ended: true, active: false });
+      return;
+    }
+    if (message.payload.length === 0) return;
+    let text = prev ? prev.text + message.payload : message.payload;
+    if (text.length > OUTPUT_TAIL_CHARS) text = text.slice(-OUTPUT_TAIL_CHARS);
+    setFeed(message.id, {
+      text,
+      ended: false,
+      active: true,
+      logPath: prev?.logPath ?? null,
+    });
+  });
+}
+
+/**
+ * 开始跟随一个登记项的作业日志；重复调用幂等。返回日志路径（「打开日志文件」用），
+ * 无 pi-bash-jobs 作业日志时为 null。
+ */
+export async function startOutputFeed(id: string): Promise<string | null> {
+  const current = outputState.feeds.get(id);
+  if (current?.active) return current.logPath;
+  // 新开 feed 清掉旧文本：主进程首帧会从日志尾部 64KB 重发
+  setFeed(id, { text: "", ended: false, active: true, logPath: null });
+  try {
+    const { logPath } = await procService.outputStart(id);
+    setFeed(id, { text: "", ended: false, active: true, logPath });
+    return logPath;
+  } catch {
+    // 主进程拒绝（登记项已消失等）：feed 留空态，UI 不展示跟随
+    setFeed(id, { text: "", ended: true, active: false, logPath: null });
+    return null;
+  }
+}
+
+/** 停止跟随；文本保留（已结束的行继续展示尾部），只是不再有新数据。 */
+export function stopOutputFeed(id: string): void {
+  const current = outputState.feeds.get(id);
+  void procService.outputStop(id).catch(() => {
+    // 未启动 / 主进程竞态：幂等，不打扰
+  });
+  if (!current?.active) return;
+  setFeed(id, { ...current, active: false });
 }
 
 // ---------------------------------------------------------------------------

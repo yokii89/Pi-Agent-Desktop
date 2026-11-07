@@ -2,6 +2,8 @@ import type {
   ManagedProcess,
   ProcDetail,
   ProcDetailRequest,
+  ProcOutputPushMessage,
+  ProcOutputStartResult,
   ProcPushMessage,
   ProcStopAllResult,
   ProcStopResult,
@@ -42,5 +44,16 @@ export const procService = {
   },
   residualNotice(): Promise<boolean> {
     return unwrap(requireProc().residualNotice());
+  },
+  /** 开始 tail 作业日志（方案 B）；无 pi-bash-jobs 作业日志时 logPath 为 null。 */
+  outputStart(id: string): Promise<ProcOutputStartResult> {
+    return unwrap(requireProc().outputStart(id));
+  },
+  /** 停止 tail；未启动的 id 幂等。 */
+  outputStop(id: string): Promise<null> {
+    return unwrap(requireProc().outputStop(id));
+  },
+  onOutput(callback: (message: ProcOutputPushMessage) => void): () => void {
+    return requireProc().onOutput(callback);
   },
 };

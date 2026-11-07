@@ -3,8 +3,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ManagedProcess, ProcDetail, SessionId } from "../../../../shared/ipc";
 import { summarizeCommand, useProcActions } from "../../../hooks/useProcActions";
 import { useT } from "../../../hooks/useT";
+import { fsService } from "../../../services/fsService";
 import { procService } from "../../../services/procService";
-import { selectProc, useSelectedProcId, useSessionProcesses } from "../../../stores/procStore";
+import {
+  selectProc,
+  startOutputFeed,
+  stopOutputFeed,
+  useProcOutput,
+  useSelectedProcId,
+  useSessionProcesses,
+} from "../../../stores/procStore";
 import { useSessionEntries, useSessionMeta } from "../../../stores/sessionStore";
 import type { ToolAssistantBlock } from "../../../stores/sessionTranscript";
 import { useUiStore } from "../../../stores/uiStore";
@@ -176,6 +184,46 @@ export function ProcPanel() {
       showToast(err instanceof Error ? err.message : String(err));
     });
   };
+  const openLog = (path: string | null): void => {
+    if (!path) return;
+    void fsService.openPath(path).catch(() => {
+      showToast(t("proc.panel.openLogFailed"));
+    });
+  };
+
+  // 实时输出跟随（方案 B）：job 档且有日志时随详情轮询启停 feed；ended 由主进程
+  // 判定（作业 settled + 文件静默）。跟随到底部才自动滚动，用户上滚即暂停
+  const feedProcId = selected?.id ?? null;
+  const jobLogAvailable = detail?.jobLogAvailable === true;
+  const output = useProcOutput(feedProcId);
+  useEffect(() => {
+    if (!feedProcId || !runtimeAlive || !jobLogAvailable) return;
+    void startOutputFeed(feedProcId);
+    return () => {
+      stopOutputFeed(feedProcId);
+    };
+  }, [feedProcId, runtimeAlive, jobLogAvailable]);
+
+  const liveText = output?.text ?? "";
+  const followActive = output?.active === true && !output.ended;
+  const followEnded = !followActive && liveText.length > 0;
+  const followRef = useRef(true);
+  const livePreRef = useRef<HTMLPreElement | null>(null);
+  const handleLiveScroll = (): void => {
+    const el = livePreRef.current;
+    if (!el) return;
+    followRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: text 是滚动时机信号，effect 体只碰 DOM
+  useEffect(() => {
+    if (!followRef.current) return;
+    const el = livePreRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [output?.text]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 换选中项即恢复跟随，feedProcId 只是信号
+  useEffect(() => {
+    followRef.current = true;
+  }, [feedProcId]);
 
   if (!selected) {
     return (
@@ -293,9 +341,17 @@ export function ProcPanel() {
           <h3 className={styles.sectionTitle}>{t("proc.panel.source")}</h3>
           {sourceBlock ? (
             <>
-              <code className={styles.command}>
-                {terminal?.command || sourceBlock.subject || "—"}
-              </code>
+              <div className={styles.commandRow}>
+                <code className={styles.command}>
+                  {terminal?.command || sourceBlock.subject || "—"}
+                </code>
+                <IconButton
+                  title={t("proc.panel.copyCommand")}
+                  onClick={() => copyText(terminal?.command || sourceBlock.subject || "")}
+                >
+                  <Copy size={14} weight="regular" />
+                </IconButton>
+              </div>
               <div className={styles.sourceMeta}>
                 <span className={styles.exitChip}>{exitLabel}</span>
                 {timeoutSeconds !== null ? (
@@ -303,18 +359,46 @@ export function ProcPanel() {
                     {t("proc.panel.timeout", { seconds: timeoutSeconds })}
                   </span>
                 ) : null}
+                {followActive ? (
+                  <span className={styles.liveChip}>{t("proc.panel.liveFollow")}</span>
+                ) : null}
+                {followEnded ? (
+                  <span className={styles.liveChipEnded}>{t("proc.panel.followEnded")}</span>
+                ) : null}
               </div>
-              {shownOutput ? (
-                <pre className={styles.output}>{shownOutput}</pre>
+              {liveText.length > 0 || shownOutput ? (
+                <pre ref={livePreRef} onScroll={handleLiveScroll} className={styles.output}>
+                  {liveText.length > 0 ? liveText : shownOutput}
+                </pre>
               ) : (
                 <p className={styles.muted}>{t("proc.panel.source.empty")}</p>
               )}
-              {outputCapped ? (
+              {!liveText && outputCapped ? (
                 <p className={styles.note}>
                   {t("proc.panel.source.capped", { chars: OUTPUT_DISPLAY_LIMIT })}
                 </p>
               ) : null}
-              <p className={styles.note}>{t("proc.panel.source.note")}</p>
+              {followActive || followEnded ? (
+                <p className={styles.note}>
+                  {followActive
+                    ? t("proc.panel.source.liveNote")
+                    : t("proc.panel.source.endedNote")}
+                  {output?.logPath ? (
+                    <>
+                      {" "}
+                      <button
+                        type="button"
+                        className={styles.logLink}
+                        onClick={() => openLog(output.logPath)}
+                      >
+                        {t("proc.panel.openLog")}
+                      </button>
+                    </>
+                  ) : null}
+                </p>
+              ) : (
+                <p className={styles.note}>{t("proc.panel.source.note")}</p>
+              )}
             </>
           ) : (
             <p className={styles.muted}>{t("proc.panel.source.missing")}</p>

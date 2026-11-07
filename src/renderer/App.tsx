@@ -28,7 +28,7 @@ import { BrowserProvider } from "./stores/browserStore";
 import { ComposerProvider } from "./stores/composerStore";
 import { ExtensionViewProvider, useExtensionViewStore } from "./stores/extensionViewStore";
 import { InspectorProvider } from "./stores/inspectorStore";
-import { bindProcStream } from "./stores/procStore";
+import { bindProcOutputStream, bindProcStream } from "./stores/procStore";
 import { ProjectProvider } from "./stores/projectStore";
 import { ReviewProvider } from "./stores/reviewStore";
 import { SchedulerProvider, useSchedulerStore } from "./stores/schedulerStore";
@@ -100,11 +100,16 @@ function ProcStreamBridge() {
   const { showToast } = useUiStore();
   useEffect(() => {
     const off = bindProcStream();
+    // 方案 B：作业日志增量推送（pidesk:proc:output，proc 独立域）
+    const offOutput = bindProcOutputStream();
     // §5.4 P0：上次非正常退出时提示可能残留服务
     void procService.residualNotice().then((hit) => {
       if (hit) showToast(t("proc.residual.warning"));
     });
-    return off;
+    return () => {
+      off();
+      offOutput();
+    };
   }, [showToast]);
   return null;
 }

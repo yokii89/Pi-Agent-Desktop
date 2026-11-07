@@ -15,6 +15,7 @@ import {
   saveProcRegistry,
 } from "../settings/procRegistryStore";
 import { getMainWindow } from "../window/createMainWindow";
+import { resolveJobInfo } from "./jobLogs";
 import { readProcessDetail } from "./processDetail";
 import {
   enumerateProcesses,
@@ -101,6 +102,11 @@ class ProcService {
     return this.registry.listAliveBySession(sessionId);
   }
 
+  /** 按 id 取登记项（outputStart / isJobLogLive 用）。 */
+  get(id: string): ManagedProcess | null {
+    return this.registry.get(id);
+  }
+
   listAllAlive(): ManagedProcess[] {
     return this.registry.listAllAlive();
   }
@@ -170,7 +176,20 @@ class ProcService {
   async detail(sessionId: SessionId, id: string): Promise<ProcDetail> {
     const proc = this.registry.get(id);
     if (!proc || proc.sessionId !== sessionId) throw new Error("进程登记项不存在");
-    return readProcessDetail(proc);
+    const detail = await readProcessDetail(proc);
+    // 方案 B：job 档日志可用性随详情轮询带回，渲染层据此决定是否开实时跟随
+    detail.jobLogAvailable = resolveJobInfo(proc) !== null;
+    return detail;
+  }
+
+  /**
+   * 登记项对应的作业是否仍在 running / orphaned（tail 的 ended 判定用）；
+   * 登记项不存在返回 null——tail 不能据此误判结束。
+   */
+  isJobLogLive(id: string): boolean | null {
+    const proc = this.registry.get(id);
+    if (!proc) return null;
+    return resolveJobInfo(proc)?.live ?? null;
   }
 
   async stopAll(sessionId: SessionId): Promise<ProcStopAllResult> {
