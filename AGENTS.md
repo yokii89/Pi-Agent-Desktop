@@ -27,6 +27,12 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 - **端口不写死**：从 Vite 的 `resolvedUrls.local[0]` 取实际地址传给 Electron，5173 被占用自增端口也能工作。
 - **开发态 CSP**：`src/renderer/index.html` 里的 CSP 是生产用的严格策略，由 `vite.config.ts` 的 `pidesk:dev-csp` 插件（`apply: "serve"`）在开发态替换为放宽版本——React Refresh 需要内联脚本，HMR 需要 `ws:`。**新增/收紧 CSP 指令时两边都要改**，否则开发态白屏、生产态放水。
 - **主进程编译失败不重启**：保留当前实例并在终端报错，避免陷入「一改动就打开即崩」的循环。
+- **watch 事件必须过 mtime 校验，不得直接信任**：Windows 递归 `fs.watch` 会在无任何源码写入时连发事件
+  （`filename` 常为 `null`，杀软 / 索引器 / 目录元数据变动都可能触发）。`scripts/dev.mjs` 维护受监听
+  目录 `.ts` 文件的 mtime 基线（`scripts/sourceChangeVerifier.mjs`），事件防抖后重扫比对，无差异一律
+  忽略——**不要**拆掉校验回到「宁可多编译一次」，误重启会把运行中的会话连着 pi 子进程一起杀掉。
+  编译 / 重启期间到达的变更先排队，编译结束后重新校验；基线只在确认要编译时前移，防止已确认的
+  变更被新基线吞掉。
 - **DevTools 自身报错在启动器层过滤**：自动打开的 detached DevTools 每次 attach 都会让 DevTools 前端报
   `Request Autofill.enable / Autofill.setAddresses failed`（Electron 未实现该 CDP 域，electron#41614 官方 wontfix）。
   这类日志由 Chromium 直接写 stderr，**不经过 `webContents` 的 `console-message`**，应用侧拦不住，

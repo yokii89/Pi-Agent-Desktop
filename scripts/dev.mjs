@@ -11,7 +11,8 @@
  * 2. 用 Vite 的 Node API 启动 dev server，拿 resolvedUrls 里的真实地址
  *    （首选端口见 vite.config.ts server.port；被占用时 Vite 会自增，所以不写死）
  * 3. 以 PIDESK_DEV_SERVER_URL 拉起 Electron，主进程据此 loadURL 而非 loadFile
- * 4. 监听 src/main、src/preload、src/shared：变更 → 重新 tsc → 重启 Electron
+ * 4. 监听 src/main、src/preload、src/shared：事件先与 mtime 基线比对，确认真有源码变更
+ *    才重新 tsc → 重启 Electron（Windows 递归 watch 会无写入误报，直接重启会杀掉运行中的会话）
  * 5. 不监听 src/renderer：Vite 原生 HMR 已覆盖，改组件/样式只热替换模块，不重启窗口
  * 6. 过滤 Electron stderr 里 DevTools 自身的报错（见 devtools-noise-filter.mjs），
  *    其余日志一律原样透传
@@ -26,6 +27,7 @@ import path from "node:path";
 import process from "node:process";
 import { createServer } from "vite";
 import { createDevtoolsNoiseFilter } from "./devtools-noise-filter.mjs";
+import { changedSourceFiles, scanSourceMtimes } from "./sourceChangeVerifier.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -53,6 +55,8 @@ const passthroughArgs = process.argv.slice(2).filter((arg) => arg !== "--");
 const defaultElectronArgs = ["--lang=en-US"];
 /** 合并短时间内的连续文件事件（编辑器保存常触发多次 rename/change）。 */
 const REBUILD_DEBOUNCE_MS = 150;
+/** 无源码变更的误报被忽略时，聚合计数日志的最小间隔，避免外部噪声源（杀软 / 索引器）刷屏。 */
+const WATCH_NOISE_LOG_INTERVAL_MS = 60_000;
 /** 重启前等待旧进程退出的上限，超时就不再等，防止卡住整条链路。 */
 const EXIT_TIMEOUT_MS = 3000;
 
@@ -68,6 +72,14 @@ const watchers = [];
 let quitting = false;
 /** 当前这次子进程退出是否由我们主动重启触发。 */
 let restarting = false;
+/** 受监听目录 .ts 文件的 mtime 基线：watch 事件与它比对出差异才算真实变更。 */
+let sourceBaseline = null;
+/** 自上次误报日志 / 上次确认变更以来收到的 watch 事件数，用于把误报聚合成一条日志。 */
+let watchNoiseEvents = 0;
+let lastWatchNoiseLogAt = 0;
+/** tsc 同一时刻只跑一次：编译 / 重启期间到达的变更先排队，结束后重新校验。 */
+let compiling = false;
+let recompileQueued = false;
 
 const log = (message) => console.log(`\u001b[36m[dev]\u001b[0m ${message}`);
 
@@ -160,26 +172,64 @@ async function restartElectron(rendererUrl) {
   spawnElectron(rendererUrl);
 }
 
-/** 防抖后重编译主进程；编译失败则保留当前实例，避免陷入「打开即报错」的重启循环。 */
+/**
+ * 防抖窗口结束后先做 mtime 校验再决定是否重编译：
+ * 与基线无差异 → 判定为 Windows 递归 watch 的误报，忽略（误重启会把运行中的会话连着
+ * pi 子进程一起杀掉）；有差异且空闲 → 基线前移并重编译重启；正在编译 / 重启 → 只排队、
+ * 基线不动，留给编译结束后的下一轮校验，否则已确认的变更会被新基线吞掉、丢一次重启。
+ */
+async function verifyAndRebuild(rendererUrl) {
+  const current = await scanSourceMtimes(projectRoot, MAIN_WATCH_DIRS);
+  const changed = changedSourceFiles(sourceBaseline, current);
+  if (changed.length === 0) {
+    if (Date.now() - lastWatchNoiseLogAt >= WATCH_NOISE_LOG_INTERVAL_MS) {
+      lastWatchNoiseLogAt = Date.now();
+      log(`忽略 ${watchNoiseEvents} 个无对应源码变更的 watch 事件（mtime 校验，防误重启）`);
+      watchNoiseEvents = 0;
+    }
+    return;
+  }
+  if (compiling) {
+    recompileQueued = true;
+    return;
+  }
+  sourceBaseline = current;
+  watchNoiseEvents = 0;
+  const preview = changed.slice(0, 3).join("、");
+  const detail = changed.length > 3 ? `${preview} 等 ${changed.length} 个文件` : preview;
+  log(`主进程侧代码变更（${detail}），重新编译…`);
+  compiling = true;
+  try {
+    const ok = await compileMain();
+    if (ok) {
+      await restartElectron(rendererUrl);
+    } else {
+      console.error("[dev] 编译失败，已保留当前运行中的 Electron 实例");
+    }
+  } finally {
+    compiling = false;
+  }
+  if (recompileQueued) {
+    recompileQueued = false;
+    scheduleRebuild(rendererUrl);
+  }
+}
+
+/** 防抖收集同一批事件，窗口结束后交 mtime 校验裁决。 */
 function scheduleRebuild(rendererUrl) {
   if (rebuildTimer) clearTimeout(rebuildTimer);
-  rebuildTimer = setTimeout(async () => {
+  rebuildTimer = setTimeout(() => {
     rebuildTimer = null;
-    log("主进程侧代码变更，重新编译…");
-    const ok = await compileMain();
-    if (!ok) {
-      console.error("[dev] 编译失败，已保留当前运行中的 Electron 实例");
-      return;
-    }
-    await restartElectron(rendererUrl);
+    void verifyAndRebuild(rendererUrl);
   }, REBUILD_DEBOUNCE_MS);
 }
 
 function startWatching(rendererUrl) {
   for (const dir of MAIN_WATCH_DIRS) {
-    const watcher = watch(path.join(projectRoot, dir), { recursive: true }, (_event, filename) => {
-      // filename 为 null 时（Windows 偶发）宁可多编译一次也不漏更新
-      if (filename && !filename.endsWith(".ts")) return;
+    const watcher = watch(path.join(projectRoot, dir), { recursive: true }, () => {
+      // 事件本身不可信：Windows 递归 watch 会无写入误报，且 filename 常为 null，
+      // 无从按文件过滤。一律交给防抖后的 mtime 校验裁决，不再「宁可多编译一次」。
+      watchNoiseEvents += 1;
       scheduleRebuild(rendererUrl);
     });
     watchers.push(watcher);
@@ -224,6 +274,9 @@ async function main() {
   log(`渲染层 HMR：${rendererUrl}`);
 
   spawnElectron(rendererUrl);
+
+  // 先建 mtime 基线再挂 watcher：watch 事件的真伪全靠与基线比对，基线必须先于事件存在
+  sourceBaseline = await scanSourceMtimes(projectRoot, MAIN_WATCH_DIRS);
   startWatching(rendererUrl);
 
   log(
