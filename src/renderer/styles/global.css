@@ -66,13 +66,31 @@ a:hover {
   height: var(--scrollbar-size);
 }
 
+/* 三栏滚动条淡入淡出（--sb-alpha，消费方：SideNav / App.main / ContextSidebar）。
+   Chromium 的 ::-webkit-scrollbar-thumb 不支持 transition/@keyframes——伪元素样式
+   直接跳终值不插值（2026-11 于 Electron 41 实测）；标准属性 scrollbar-color 虽可
+   transition，但一旦设置就会整体接管并退回 UA 默认条宽，精确槽宽保不住。
+   唯一兼顾两者的通道：@property 注册 <number> 自定义属性逐帧插值，滑条背景用
+   color-mix 引用继承值——实测伪元素每帧都重算出动画中的 alpha（含淡出方向）。
+   默认 1（全应用滚动条照常可见）；三栏根元素置 0、:hover 过渡到 1，portal 到
+   body 的浮层（菜单/弹窗）不在栏子树内，不受影响。 */
+@property --sb-alpha {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border-strong);
+  background: color-mix(
+    in srgb,
+    var(--color-border-strong) calc(var(--sb-alpha) * 100%),
+    transparent
+  );
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-text-muted) calc(var(--sb-alpha) * 100%), transparent);
 }
 
 ::-webkit-scrollbar-track {

@@ -670,11 +670,12 @@
   max-height: 180px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
+  /* 不设 scrollbar-width 标准属性：Chromium 121+ 上它会整体接管并退回 UA 条宽，
+     下面的 ::-webkit-scrollbar 精确槽宽就失效了（宽度统一走 --scrollbar-size） */
 }
 
 .suggestList::-webkit-scrollbar {
-  width: 8px;
+  width: var(--scrollbar-size);
 }
 
 .suggestList::-webkit-scrollbar-thumb {

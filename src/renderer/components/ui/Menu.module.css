@@ -9,11 +9,12 @@
   max-height: min(360px, calc(100vh - 96px));
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
+  /* 不设 scrollbar-width 标准属性：Chromium 121+ 上它会整体接管并退回 UA 条宽，
+     下面的 ::-webkit-scrollbar 精确槽宽就失效了（宽度统一走 --scrollbar-size） */
 }
 
 .list::-webkit-scrollbar {
-  width: 8px;
+  width: var(--scrollbar-size);
 }
 
 .list::-webkit-scrollbar-thumb {
@@ -26,7 +27,7 @@
 }
 
 /* 站点级开关：列表仍可滚动，但不画滚动条（右侧栏「添加功能」等动作菜单）。
-   两条覆盖必须放在上面的滚动条声明之后，否则同权重会被 thin/8px 抢回去。 */
+   两条覆盖必须放在上面的滚动条声明之后，否则同权重会被槽宽声明抢回去。 */
 .listNoScrollbar {
   scrollbar-width: none;
 }

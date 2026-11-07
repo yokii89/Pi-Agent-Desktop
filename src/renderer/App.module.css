@@ -45,6 +45,21 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  /* 三栏滚动条淡出（机制见 global.css 的 --sb-alpha）：SessionView 对话流、悬浮输入栏
+     等栏内滚动容器的滑条默认全透明，指针进入中栏才淡入；终端面板的 xterm 滑条由
+     xterm 主题色接管，不随此变量 */
+  --sb-alpha: 0;
+  transition: --sb-alpha var(--scrollbar-fade-duration) linear;
+}
+
+.main:hover {
+  --sb-alpha: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main {
+    transition: none;
+  }
 }
 
 .pageArea {

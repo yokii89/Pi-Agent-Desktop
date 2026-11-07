@@ -15,6 +15,20 @@
   border-right: 1px solid var(--glass-border);
   overflow-y: auto;
   overflow-x: hidden;
+  /* 三栏滚动条淡出（机制见 global.css 的 --sb-alpha）：指针不在本栏时滑条全透明，
+     进入本栏才淡入；.extSlots 等栏内滚动容器沿继承拿到同一份插值 */
+  --sb-alpha: 0;
+  transition: --sb-alpha var(--scrollbar-fade-duration) linear;
+}
+
+.nav:hover {
+  --sb-alpha: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav {
+    transition: none;
+  }
 }
 
 /* 收起态：图标列水平居中，与顶栏开关同一中轴（TitleBar .leftCollapsed） */

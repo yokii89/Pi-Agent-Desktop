@@ -13,7 +13,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  /* 常驻滚动条槽：内容不溢出时也保留这 8px，文档流中轴才稳定，
+  /* 常驻滚动条槽：内容不溢出时也保留一个 --scrollbar-size 槽宽，文档流中轴才稳定，
      悬浮输入栏按 --scrollbar-size 右内缩后与它同轴（见 SessionArea.dockedInput） */
   scrollbar-gutter: stable;
   /* 会话监控卡（docs/design/96）出现时，正文靠这里让位：滚动盒仍占满中央区，

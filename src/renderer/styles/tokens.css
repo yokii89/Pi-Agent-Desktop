@@ -248,8 +248,11 @@
    * 从 md 推导而不是复用 sm——sm 是独立档位，改 md 时不会跟，展开区会和正文同号。
    */
   --session-tool-detail-font: calc(var(--session-stream-font-md) - 2px);
-  /** 细滚动条尺寸：global.css 的 ::-webkit-scrollbar 与悬浮输入栏的右内缩共用它（两者必须同值才能对齐中轴）。 */
-  --scrollbar-size: 8px;
+  /** 细滚动条尺寸（全项目统一窄槽）：global.css 的 ::-webkit-scrollbar、PtyTerminal 半宽胶囊
+   *  与悬浮输入栏的右内缩共用它（各处必须同值才能对齐中轴）。 */
+  --scrollbar-size: 6px;
+  /** 三栏滚动条淡入淡出时长：SideNav / App.main / ContextSidebar 对 --sb-alpha 的过渡（机制见 global.css）。 */
+  --scrollbar-fade-duration: 150ms;
 
   /* 层级 */
   --z-input-overlay: 10;

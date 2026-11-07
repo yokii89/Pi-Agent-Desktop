@@ -13,6 +13,20 @@
   min-height: 0;
   overflow: hidden;
   border-left: 1px solid var(--glass-border);
+  /* 三栏滚动条淡出（机制见 global.css 的 --sb-alpha）：各面板滚动容器的滑条
+     默认全透明，指针进入右栏才淡入，面板子元素沿继承拿到同一份插值 */
+  --sb-alpha: 0;
+  transition: --sb-alpha var(--scrollbar-fade-duration) linear;
+}
+
+.sidebar:hover {
+  --sb-alpha: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
 }
 
 /* 拖拽把手：侧栏左缘，向左拖增宽、向右拖变窄。
