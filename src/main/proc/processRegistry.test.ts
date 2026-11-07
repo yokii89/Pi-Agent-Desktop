@@ -61,6 +61,23 @@ describe("ProcessRegistry", () => {
     expect(onChange).toHaveBeenCalledTimes(2);
   });
 
+  it("endedAt：exited/killed 记录观测时刻，ignored 不冒充结束时间", () => {
+    const reg = new ProcessRegistry();
+    const p = reg.register(input(10));
+    expect(p).not.toBeNull();
+    const id = (p as { id: string }).id;
+    reg.setStatus(id, "exited");
+    const exited = reg.listBySession("s1")[0];
+    expect(exited.endedAt).toBeGreaterThan(0);
+    // 已结束再置 killed：保留首次的 endedAt，不被覆盖
+    reg.setStatus(id, "killed");
+    expect(reg.listBySession("s1")[0].endedAt).toBe(exited.endedAt);
+
+    const q = reg.register(input(20));
+    reg.setStatus((q as { id: string }).id, "ignored");
+    expect(reg.listBySession("s1")[1].endedAt).toBeUndefined();
+  });
+
   it("clearSession drops bucket and abandonAll empties", () => {
     const reg = new ProcessRegistry();
     reg.register(input(10));

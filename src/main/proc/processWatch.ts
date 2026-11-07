@@ -13,6 +13,8 @@ export interface ProcessSnapshotRow {
   startedAt: number;
   /** 工作集（字节）；详情页签的内存合计用，watcher 不看。 */
   workingSet?: number;
+  /** UserModeTime + KernelModeTime（100ns ticks）；详情页签的 CPU 差值采样用，watcher 不看。 */
+  cpuTicks?: number;
 }
 
 export type ProcessSnapshot = ReadonlyMap<number, ProcessSnapshotRow>;

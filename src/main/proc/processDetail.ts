@@ -23,10 +23,36 @@ interface DescendantScan {
   rows: ProcDetailRow[];
   /** 全部子孙数（不受展示上限影响）。 */
   count: number;
-  /** 全部子孙工作集合计（不受展示上限影响）。 */
+  /** 全部子孙工作集合计（字节）（不受展示上限影响）。 */
   memoryBytes: number;
+  /** 全部子孙 CPU ticks 合计（当前采样；CPU 差值用，不受展示上限影响）。 */
+  cpuTicks: number;
   /** 全部子孙 pid（端口过滤用，不受展示上限影响）。 */
   pids: Set<number>;
+}
+
+/** CPU 采样：pid → ticks（100ns）与采样时刻；两次轮询的差值才是使用率。 */
+export interface CpuSample {
+  ticks: number;
+  at: number;
+}
+
+/**
+ * 两次采样间的 CPU 使用率（%）。Win32_Process 的 ticks 是 100ns 累计值，
+ * percent = Δticks / (Δms × 100)；进程可用多核，超过 100% 是真实情况，
+ * 只把负值（采样窗口异常）与四位数量级的野值截掉。首采样没有差值，返回 null。
+ */
+export function cpuPercentBetween(
+  prevTicks: number,
+  currTicks: number,
+  prevAt: number,
+  now: number,
+): number | null {
+  const deltaMs = now - prevAt;
+  if (!Number.isFinite(prevTicks) || !Number.isFinite(currTicks) || deltaMs <= 0) return null;
+  const percent = (currTicks - prevTicks) / (deltaMs * 100);
+  if (!Number.isFinite(percent) || percent < 0) return null;
+  return Math.min(Math.round(percent * 10) / 10, 999);
 }
 
 /** 一次遍历同时产出展示行、总数、内存与端口过滤集合；上限只截展示行，不影响统计。 */
@@ -34,6 +60,8 @@ function scanDescendants(
   snapshot: ProcessSnapshot,
   rootPid: number,
   limit: number,
+  prevCpu?: ReadonlyMap<number, CpuSample>,
+  now?: number,
 ): DescendantScan {
   const children = new Map<number, ProcessSnapshotRow[]>();
   for (const row of snapshot.values()) {
@@ -47,6 +75,7 @@ function scanDescendants(
   const pids = new Set<number>();
   let count = 0;
   let memoryBytes = 0;
+  let cpuTicks = 0;
   const visited = new Set<number>([rootPid]);
   const queue: number[] = [rootPid];
   while (queue.length > 0) {
@@ -57,19 +86,26 @@ function scanDescendants(
       count += 1;
       pids.add(child.pid);
       memoryBytes += child.workingSet ?? 0;
+      cpuTicks += child.cpuTicks ?? 0;
       if (rows.length < limit) {
+        const prev = prevCpu?.get(child.pid);
         rows.push({
           pid: child.pid,
           ppid: child.ppid,
           name: child.name,
           commandLine: child.commandLine,
           startedAt: child.startedAt,
+          workingSet: child.workingSet ?? 0,
+          cpuPercent:
+            prev && now !== undefined
+              ? cpuPercentBetween(prev.ticks, child.cpuTicks ?? 0, prev.at, now)
+              : null,
         });
       }
       queue.push(child.pid);
     }
   }
-  return { rows, count, memoryBytes, pids };
+  return { rows, count, memoryBytes, cpuTicks, pids };
 }
 
 /**
@@ -150,6 +186,8 @@ export interface BuildProcDetailInput {
   /** 端口查询是否成功；false 时 ports 为空不代表「没有端点」。 */
   portsReadable?: boolean;
   now?: number;
+  /** 上一次详情轮询的 CPU 采样；缺省（首轮）时 cpuPercent 为 null。 */
+  prevCpu?: ReadonlyMap<number, CpuSample>;
 }
 
 /** 汇总一次详情快照（纯函数，便于不启 PowerShell 直接断言）。 */
@@ -158,12 +196,34 @@ export function buildProcDetail(input: BuildProcDetailInput): ProcDetail {
   const root = snapshot.get(proc.pid) ?? null;
   const alive = root !== null && !isPidReuse(proc, root);
   const scan = alive
-    ? scanDescendants(snapshot, proc.pid, DETAIL_LIMITS.descendants)
-    : { rows: [], count: 0, memoryBytes: 0, pids: new Set<number>() };
+    ? scanDescendants(snapshot, proc.pid, DETAIL_LIMITS.descendants, input.prevCpu, input.now)
+    : { rows: [], count: 0, memoryBytes: 0, cpuTicks: 0, pids: new Set<number>() };
 
   // 根已消失 / PID 被别的进程复用时，那份内存不属于登记项，按 0 计
   const memoryBytes = alive ? (root?.workingSet ?? 0) + scan.memoryBytes : 0;
   const pids = new Set<number>([proc.pid, ...scan.pids]);
+
+  // 树合计 CPU：根 + 子孙的 ticks 差值（任一成员缺上一轮采样则整树按 null 处理，
+  // 否则新拉起的子进程会把「它没跑的那段墙钟」全算进使用率）
+  let cpuPercent: number | null = null;
+  if (alive && root && input.prevCpu && input.now !== undefined) {
+    const prevRoot = input.prevCpu.get(proc.pid);
+    if (prevRoot) {
+      let allKnown = true;
+      let prevTicks = prevRoot.ticks;
+      let currTicks = root.cpuTicks ?? 0;
+      for (const pid of scan.pids) {
+        const prev = input.prevCpu.get(pid);
+        if (!prev) {
+          allKnown = false;
+          break;
+        }
+        prevTicks += prev.ticks;
+        currTicks += snapshot.get(pid)?.cpuTicks ?? 0;
+      }
+      if (allKnown) cpuPercent = cpuPercentBetween(prevTicks, currTicks, prevRoot.at, input.now);
+    }
+  }
 
   return {
     at: input.now ?? Date.now(),
@@ -173,7 +233,26 @@ export function buildProcDetail(input: BuildProcDetailInput): ProcDetail {
     memoryBytes,
     processCount: alive ? 1 + scan.count : 0,
     portsReadable: input.portsReadable ?? true,
+    cpuPercent,
   };
+}
+
+/** 当前采样下树内全部 pid 的 CPU 样本（含根）；readProcessDetail 用它滚动 prevCpuTicks。 */
+export function collectTreeCpuSamples(
+  snapshot: ProcessSnapshot,
+  procPid: number,
+  now: number,
+): Map<number, CpuSample> {
+  // limit=0 只为拿完整子孙 pid 集（pids 不受展示上限影响），展示行不需要
+  const scan = scanDescendants(snapshot, procPid, 0);
+  const samples = new Map<number, CpuSample>();
+  const root = snapshot.get(procPid);
+  if (root) samples.set(procPid, { ticks: root.cpuTicks ?? 0, at: now });
+  for (const pid of scan.pids) {
+    const row = snapshot.get(pid);
+    if (row) samples.set(pid, { ticks: row.cpuTicks ?? 0, at: now });
+  }
+  return samples;
 }
 
 /** 查询全部 TCP 端点（netstat）；失败返回 null（与「没有端点」区分）。 */
@@ -205,11 +284,21 @@ export async function readProcessDetail(proc: ManagedProcess): Promise<ProcDetai
   const root = snapshot.get(proc.pid) ?? null;
   const alive = root !== null && !isPidReuse(proc, root);
   const ports = alive ? await queryTcpEndpoints() : [];
-  return buildProcDetail({
+  const now = Date.now();
+  const prevCpu = alive ? prevCpuTicks : undefined;
+  const detail = buildProcDetail({
     proc,
     snapshot,
     ports: ports ?? [],
     portsReadable: ports !== null,
-    now: Date.now(),
+    now,
+    prevCpu,
   });
+  // 滚动采样基线：只保留当前树的 pid（换树/进程消失自然淘汰，防 Map 无界增长）；
+  // PID 复用（alive=false）时清空，避免把上一个占用者的 ticks 算进新进程
+  prevCpuTicks = alive ? collectTreeCpuSamples(snapshot, proc.pid, now) : new Map();
+  return detail;
 }
+
+/** 详情轮询间的 CPU 采样基线（pid → 上次 ticks/时刻）；只存当前查看进程的树。 */
+let prevCpuTicks: Map<number, CpuSample> = new Map();

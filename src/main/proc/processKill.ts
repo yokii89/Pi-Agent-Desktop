@@ -36,6 +36,9 @@ Get-CimInstance Win32_Process | ForEach-Object {
   if ($_.CreationDate) {
     try { $ms = [DateTimeOffset]::new($_.CreationDate).ToUnixTimeMilliseconds() } catch { $ms = 0 }
   }
+  $ticks = 0
+  if ($_.UserModeTime) { $ticks += [long]$_.UserModeTime }
+  if ($_.KernelModeTime) { $ticks += [long]$_.KernelModeTime }
   [pscustomobject]@{
     pid = [int]$_.ProcessId
     ppid = [int]$_.ParentProcessId
@@ -43,6 +46,7 @@ Get-CimInstance Win32_Process | ForEach-Object {
     commandLine = [string]$_.CommandLine
     startedAt = [long]$ms
     workingSet = [long]$_.WorkingSetSize
+    cpuTicks = [long]$ticks
   }
 } | ConvertTo-Json -Compress
 `;
@@ -100,6 +104,7 @@ export function parseProcessJson(stdout: string): ProcessSnapshot | null {
         commandLine: typeof r.commandLine === "string" ? r.commandLine : "",
         startedAt: Number(r.startedAt) || 0,
         workingSet: Number(r.workingSet) || 0,
+        cpuTicks: Number(r.cpuTicks) || 0,
       });
     }
     return map.size > 0 ? map : null;

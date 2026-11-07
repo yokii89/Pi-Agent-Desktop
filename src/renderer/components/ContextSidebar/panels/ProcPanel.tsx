@@ -1,4 +1,4 @@
-import { ArrowClockwise, Terminal } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowUpRight, Copy, Terminal } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ManagedProcess, ProcDetail, SessionId } from "../../../../shared/ipc";
 import { summarizeCommand, useProcActions } from "../../../hooks/useProcActions";
@@ -7,18 +7,24 @@ import { procService } from "../../../services/procService";
 import { selectProc, useSelectedProcId, useSessionProcesses } from "../../../stores/procStore";
 import { useSessionEntries, useSessionMeta } from "../../../stores/sessionStore";
 import type { ToolAssistantBlock } from "../../../stores/sessionTranscript";
+import { useUiStore } from "../../../stores/uiStore";
 import { orderProcesses, procRowTitle } from "../../../utils/procRows";
-import { formatAbsoluteTime, formatElapsed } from "../../../utils/time";
+import { formatAbsoluteTime, formatClockTime, formatElapsed } from "../../../utils/time";
 import { IconButton } from "../../ui/IconButton";
 import styles from "./ProcPanel.module.css";
 import {
   descendantDepth,
   findSourceToolBlock,
   formatBytes,
+  formatCpuPercent,
   formatEndpointAddress,
   formatStartTime,
+  isDevServerPort,
+  localPortUrl,
+  portOwnerName,
   readTimeoutSeconds,
   resolveSelectedProc,
+  sparklinePoints,
 } from "./procPanelData";
 
 /** 可见时的系统信息刷新间隔（docs/design/101）；主进程侧复用 5s 对账的进程快照。 */
@@ -98,6 +104,7 @@ function useProcDetail(sessionId: SessionId | null, proc: ManagedProcess | null,
  */
 export function ProcPanel() {
   const t = useT();
+  const { showToast } = useUiStore();
   const { activeSessionId } = useSessionMeta();
   const processes = useSessionProcesses(activeSessionId);
   const { now, pendingIds, errors, stop, ignore } = useProcActions(activeSessionId);
@@ -141,6 +148,35 @@ export function ProcPanel() {
   const stopError = runtimeAlive ? (selected ? errors.get(selected.id) : null) : null;
   const selectedPending = selected ? pendingIds.has(selected.id) : false;
 
+  // 内存走势样本（#16）：详情 3s 轮询顺带累计，近 10 个样本 ≈ 30s 窗口；
+  // 换选中项即重置。effect 每次轮询只跑一遍，重复值（StrictMode 双跑）被相等守卫挡住
+  const memoryProcRef = useRef<string>("");
+  const [memorySamples, setMemorySamples] = useState<number[]>([]);
+  useEffect(() => {
+    if (!detail || !selected || !runtimeAlive) return;
+    setMemorySamples((prev) => {
+      if (memoryProcRef.current !== selected.id) {
+        memoryProcRef.current = selected.id;
+        return [detail.memoryBytes];
+      }
+      if (prev.length > 0 && prev[prev.length - 1] === detail.memoryBytes) return prev;
+      const next = [...prev, detail.memoryBytes];
+      return next.length > 10 ? next.slice(next.length - 10) : next;
+    });
+  }, [detail, selected, runtimeAlive]);
+
+  const copyText = (text: string): void => {
+    void navigator.clipboard.writeText(text).then(
+      () => showToast(t("common.copied")),
+      () => showToast(t("session.copyFailed")),
+    );
+  };
+  const openExternal = (url: string): void => {
+    void window.pidesk?.window.openExternal(url).catch((err: unknown) => {
+      showToast(err instanceof Error ? err.message : String(err));
+    });
+  };
+
   if (!selected) {
     return (
       <div className={styles.empty}>
@@ -183,7 +219,9 @@ export function ProcPanel() {
                   <span className={styles.rowMeta}>
                     {proc.status === "alive"
                       ? formatElapsed(now - proc.startedAt)
-                      : t(`proc.panel.status.${proc.status}`)}
+                      : proc.endedAt
+                        ? t("proc.panel.endedAt", { time: formatClockTime(proc.endedAt) })
+                        : t(`proc.panel.status.${proc.status}`)}
                   </span>
                 </button>
               </li>
@@ -199,9 +237,17 @@ export function ProcPanel() {
 
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>{t("proc.panel.overview")}</h3>
-          <code className={styles.command} title={selected.commandLine}>
-            {selected.commandLine || selected.name}
-          </code>
+          <div className={styles.commandRow}>
+            <code className={styles.command} title={selected.commandLine}>
+              {selected.commandLine || selected.name}
+            </code>
+            <IconButton
+              title={t("proc.panel.copyCommand")}
+              onClick={() => copyText(selected.commandLine || selected.name)}
+            >
+              <Copy size={14} weight="regular" />
+            </IconButton>
+          </div>
           <dl className={styles.metaGrid}>
             <div>
               <dt>{t("proc.panel.pid")}</dt>
@@ -302,38 +348,103 @@ export function ProcPanel() {
           ) : (
             <>
               <div className={styles.stats}>
-                <span>{t("proc.panel.runtime.processCount", { count: detail.processCount })}</span>
-                <span>
+                <span className={styles.statChip}>
+                  {t("proc.panel.runtime.processCount", { count: detail.processCount })}
+                </span>
+                <span className={styles.statChip}>
+                  {t("proc.panel.runtime.cpu", {
+                    percent: formatCpuPercent(detail.cpuPercent ?? null),
+                  })}
+                </span>
+                <span className={styles.statChip}>
                   {t("proc.panel.runtime.memory", { size: formatBytes(detail.memoryBytes) })}
+                  {memorySamples.length >= 2 ? (
+                    <svg
+                      className={styles.spark}
+                      width={56}
+                      height={16}
+                      viewBox="0 0 56 16"
+                      role="img"
+                      aria-label={t("proc.panel.runtime.memoryTrend")}
+                    >
+                      <polyline
+                        points={sparklinePoints(memorySamples, 56, 16)}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  ) : null}
                 </span>
               </div>
 
               <h4 className={styles.subTitle}>{t("proc.panel.runtime.ports")}</h4>
               {detail.ports.length > 0 ? (
                 <ul className={styles.ports}>
-                  {detail.ports.map((port) => (
-                    <li
-                      key={`${port.pid}:${port.localAddress}:${port.localPort}:${port.state}:${port.remoteAddress ?? ""}:${port.remotePort ?? 0}`}
-                      className={styles.port}
-                      title={
-                        port.remoteAddress && port.remotePort
-                          ? `${formatEndpointAddress(port.localAddress, port.localPort)} → ${formatEndpointAddress(port.remoteAddress, port.remotePort)} · ${port.state}`
-                          : `${formatEndpointAddress(port.localAddress, port.localPort)} · ${port.state}`
-                      }
-                    >
-                      <span className={styles.portAddress}>
-                        {formatEndpointAddress(port.localAddress, port.localPort)}
-                      </span>
-                      <span
-                        className={styles.portState}
-                        data-listen={
-                          port.state.toLowerCase().startsWith("listen") ? "true" : undefined
+                  {detail.ports.map((port) => {
+                    const isListen = port.state.toLowerCase().startsWith("listen");
+                    const url = localPortUrl(port.localPort);
+                    return (
+                      <li
+                        key={`${port.pid}:${port.localAddress}:${port.localPort}:${port.state}:${port.remoteAddress ?? ""}:${port.remotePort ?? 0}`}
+                        className={styles.port}
+                        title={
+                          port.remoteAddress && port.remotePort
+                            ? `${formatEndpointAddress(port.localAddress, port.localPort)} → ${formatEndpointAddress(port.remoteAddress, port.remotePort)} · ${port.state}`
+                            : `${formatEndpointAddress(port.localAddress, port.localPort)} · ${port.state}`
                         }
                       >
-                        {port.state}
-                      </span>
-                    </li>
-                  ))}
+                        <div className={styles.portLine}>
+                          <span className={styles.portAddress}>
+                            {formatEndpointAddress(port.localAddress, port.localPort)}
+                          </span>
+                          <span
+                            className={styles.portState}
+                            data-listen={isListen ? "true" : undefined}
+                          >
+                            {port.state}
+                          </span>
+                        </div>
+                        <div className={styles.portMeta}>
+                          <span
+                            className={styles.portOwner}
+                            title={t("proc.panel.portOwnerTitle", {
+                              name: portOwnerName(port.pid, selected, detail.descendants),
+                            })}
+                          >
+                            {portOwnerName(port.pid, selected, detail.descendants)}
+                          </span>
+                          {isListen && isDevServerPort(port.localPort) ? (
+                            <span className={styles.devTag}>{t("proc.panel.devServerTag")}</span>
+                          ) : null}
+                          {isListen ? (
+                            <span className={styles.portActions}>
+                              <button
+                                type="button"
+                                className={styles.iconBtn}
+                                title={t("proc.panel.openUrl", { url })}
+                                aria-label={t("proc.panel.openUrl", { url })}
+                                onClick={() => openExternal(url)}
+                              >
+                                <ArrowUpRight size={12} weight="regular" />
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.iconBtn}
+                                title={t("proc.panel.copyUrl", { url })}
+                                aria-label={t("proc.panel.copyUrl", { url })}
+                                onClick={() => copyText(url)}
+                              >
+                                <Copy size={12} weight="regular" />
+                              </button>
+                            </span>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <p className={styles.muted}>
@@ -353,11 +464,20 @@ export function ProcPanel() {
                       style={{ paddingLeft: `${(depths?.get(row.pid) ?? 1) * 12}px` }}
                       title={row.commandLine}
                     >
-                      <span className={styles.childName}>{row.name || `PID ${row.pid}`}</span>
-                      <span className={styles.childMeta}>#{row.pid}</span>
-                      <span className={styles.childCmd}>
-                        {summarizeCommand(row.commandLine, 28)}
-                      </span>
+                      <div className={styles.childLine}>
+                        <span className={styles.childName}>{row.name || `PID ${row.pid}`}</span>
+                        <span className={styles.childMeta}>#{row.pid}</span>
+                        <span className={styles.childCmd}>
+                          {summarizeCommand(row.commandLine, 28)}
+                        </span>
+                      </div>
+                      <div className={styles.childMetrics}>
+                        {t("proc.panel.childMetrics", {
+                          elapsed: formatElapsed(now - row.startedAt),
+                          memory: formatBytes(row.workingSet ?? 0),
+                          cpu: formatCpuPercent(row.cpuPercent ?? null),
+                        })}
+                      </div>
                     </li>
                   ))}
                 </ul>

@@ -5,10 +5,15 @@ import {
   descendantDepth,
   findSourceToolBlock,
   formatBytes,
+  formatCpuPercent,
   formatEndpointAddress,
   formatStartTime,
+  isDevServerPort,
+  localPortUrl,
+  portOwnerName,
   readTimeoutSeconds,
   resolveSelectedProc,
+  sparklinePoints,
 } from "./procPanelData";
 
 function proc(partial: Partial<ManagedProcess> & { id: string }): ManagedProcess {
@@ -154,5 +159,54 @@ describe("descendantDepth", () => {
     expect(depth.get(100)).toBe(0);
     expect(depth.get(101)).toBe(1);
     expect(depth.get(102)).toBe(2);
+  });
+});
+
+describe("isDevServerPort", () => {
+  it("命中常见 dev server 端口，其余不命中", () => {
+    expect(isDevServerPort(5173)).toBe(true);
+    expect(isDevServerPort(3000)).toBe(true);
+    expect(isDevServerPort(8080)).toBe(true);
+    expect(isDevServerPort(80)).toBe(false);
+    expect(isDevServerPort(12345)).toBe(false);
+  });
+});
+
+describe("portOwnerName", () => {
+  const descendants: ProcDetailRow[] = [
+    { pid: 101, ppid: 100, name: "vite.exe", commandLine: "", startedAt: 1 },
+  ];
+
+  it("根与子孙按 `name #pid` 呈现，树外退回 #pid", () => {
+    const root = { pid: 100, name: "node.exe" };
+    expect(portOwnerName(100, root, descendants)).toBe("node.exe #100");
+    expect(portOwnerName(101, root, descendants)).toBe("vite.exe #101");
+    expect(portOwnerName(999, root, descendants)).toBe("#999");
+  });
+});
+
+describe("localPortUrl", () => {
+  it("绑定到通配或回环都走 localhost", () => {
+    expect(localPortUrl(5173)).toBe("http://localhost:5173");
+  });
+});
+
+describe("formatCpuPercent", () => {
+  it("null/undefined/非法 → —，数值保留一位小数", () => {
+    expect(formatCpuPercent(null)).toBe("—");
+    expect(formatCpuPercent(undefined)).toBe("—");
+    expect(formatCpuPercent(Number.NaN)).toBe("—");
+    expect(formatCpuPercent(6)).toBe("6%");
+    expect(formatCpuPercent(6.8)).toBe("6.8%");
+  });
+});
+
+describe("sparklinePoints", () => {
+  it("按范围拉伸成 polyline 点串，全相等压成中位线，样本不足为空", () => {
+    const points = sparklinePoints([0, 10], 100, 20, 2);
+    expect(points).toBe("0.0,18.0 100.0,2.0");
+    const flat = sparklinePoints([5, 5, 5], 100, 20, 2);
+    expect(flat).toBe("0.0,10.0 50.0,10.0 100.0,10.0");
+    expect(sparklinePoints([1], 100, 20)).toBe("");
   });
 });

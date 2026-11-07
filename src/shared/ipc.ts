@@ -1308,6 +1308,8 @@ export interface ManagedProcess {
   /** 为什么被登记（service / job），决定界面标签与文案。 */
   origin: ProcessOrigin;
   status: ManagedProcessStatus;
+  /** 观测到进程消失的时间（Unix ms）；仅 exited / killed 翻转时记录，ignored 与 alive 不带。 */
+  endedAt?: number;
 }
 
 /** 停止单个登记项的结果。 */
@@ -1325,6 +1327,10 @@ export interface ProcDetailRow {
   name: string;
   commandLine: string;
   startedAt: number;
+  /** 该子进程工作集合（字节）；枚举缺失时为 0。 */
+  workingSet?: number;
+  /** 轮询窗口内的 CPU 使用率（%）；首轮采样无差值时为 null。 */
+  cpuPercent?: number | null;
 }
 
 /** 进程详情里的 TCP 端点（Get-NetTCPConnection 子集）。 */
@@ -1363,6 +1369,10 @@ export interface ProcDetail {
   memoryBytes: number;
   /** 根 + 子孙的进程数。 */
   processCount: number;
+  /** 轮询窗口内的 CPU 使用率合计（%，根 + 子孙）；首轮采样无差值时为 null。 */
+  cpuPercent?: number | null;
+  /** 该登记项有 pi-bash-jobs 作业日志（job 档），详情页签可开实时输出跟随。 */
+  jobLogAvailable?: boolean;
 }
 
 export const PROC_IPC = {

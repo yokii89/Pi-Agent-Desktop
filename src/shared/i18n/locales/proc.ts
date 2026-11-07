@@ -164,4 +164,40 @@ export const procMessages = defineMessages({
     "zh-CN": "该进程已退出",
     "en-US": "This process has exited",
   },
+  "proc.panel.endedAt": {
+    "zh-CN": "{time} 退出",
+    "en-US": "Ended {time}",
+  },
+  "proc.panel.copyCommand": {
+    "zh-CN": "复制命令全文",
+    "en-US": "Copy full command",
+  },
+  "proc.panel.runtime.cpu": {
+    "zh-CN": "CPU {percent}",
+    "en-US": "CPU {percent}",
+  },
+  "proc.panel.runtime.memoryTrend": {
+    "zh-CN": "近 30 秒内存走势",
+    "en-US": "Memory over the last 30 seconds",
+  },
+  "proc.panel.portOwnerTitle": {
+    "zh-CN": "端口归属：{name}",
+    "en-US": "Owned by {name}",
+  },
+  "proc.panel.devServerTag": {
+    "zh-CN": "像 dev server",
+    "en-US": "Looks like a dev server",
+  },
+  "proc.panel.openUrl": {
+    "zh-CN": "打开 {url}",
+    "en-US": "Open {url}",
+  },
+  "proc.panel.copyUrl": {
+    "zh-CN": "复制 {url}",
+    "en-US": "Copy {url}",
+  },
+  "proc.panel.childMetrics": {
+    "zh-CN": "已运行 {elapsed} · 内存 {memory} · CPU {cpu}",
+    "en-US": "Up {elapsed} · Memory {memory} · CPU {cpu}",
+  },
 });

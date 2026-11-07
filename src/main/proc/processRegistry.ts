@@ -78,7 +78,11 @@ export class ProcessRegistry {
       const proc = bucket.get(id);
       if (!proc) continue;
       if (proc.status === status) return proc;
-      const next: ManagedProcess = { ...proc, status };
+      // 观测到消失的时刻只属于 exited / killed（自然退出或用户停止）；
+      // ignored 是展示过滤，进程多半还活着，不冒充结束时间
+      const endedAt =
+        status === "exited" || status === "killed" ? (proc.endedAt ?? Date.now()) : undefined;
+      const next: ManagedProcess = { ...proc, status, endedAt };
       bucket.set(id, next);
       this.emit(sessionId);
       return next;
