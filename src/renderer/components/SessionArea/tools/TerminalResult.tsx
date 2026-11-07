@@ -30,7 +30,9 @@ export function TerminalResult({
   const long = useMemo(() => plain.length > 800 || plain.split("\n").length > 14, [plain]);
   const clamped = long && !expanded;
   const exitFailed = !running && payload.exitCode !== null && payload.exitCode !== 0;
-  const showMeta = exitFailed || (payload.truncated && !running) || (long && !running);
+  const backgrounded = !running && Boolean(payload.job);
+  const showMeta =
+    exitFailed || (payload.truncated && !running) || (long && !running) || backgrounded;
 
   return (
     <div className={styles.card}>
@@ -65,6 +67,11 @@ export function TerminalResult({
 
       {showMeta && (
         <div className={styles.foot}>
+          {backgrounded && payload.job && (
+            <span className={`${styles.pill} ${styles.bg}`}>
+              {t("session.tool.bgRunning", { id: payload.job.id })}
+            </span>
+          )}
           {exitFailed && (
             <span className={`${styles.pill} ${styles.err}`}>exit {payload.exitCode}</span>
           )}

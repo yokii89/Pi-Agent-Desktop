@@ -34,6 +34,7 @@ function managed(partial: Partial<ManagedProcess> = {}): ManagedProcess {
     name: "node.exe",
     startedAt: 1000,
     registeredAt: 2000,
+    origin: "service",
     status: "alive",
     ...partial,
   };

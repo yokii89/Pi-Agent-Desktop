@@ -11,6 +11,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { useOpenProcPanel } from "../../hooks/useOpenProcPanel";
+import { useProcActions } from "../../hooks/useProcActions";
 import { useT } from "../../hooks/useT";
 import { fsService } from "../../services/fsService";
 import { useReviewStore } from "../../stores/reviewStore";
@@ -19,7 +20,6 @@ import { useUiStore } from "../../stores/uiStore";
 import { pathBasename } from "../../utils/paths";
 import { formatClockTime } from "../../utils/time";
 import { CommitDialog } from "../CommitDialog/CommitDialog";
-import { useProcActions } from "../SessionArea/BackgroundProcs/useProcActions";
 import { MonitorProcs } from "./MonitorProcs";
 import { MonitorRow, MonitorSection } from "./MonitorRow";
 import styles from "./SessionMonitor.module.css";
@@ -228,6 +228,7 @@ export function SessionMonitor({ active }: SessionMonitorProps) {
             <MonitorSection title={t("monitor.section.procs")}>
               <MonitorProcs
                 procs={procs}
+                processAlive={meta.processAlive}
                 onOpen={openProcPanel}
                 onOpenAll={() => openSidebarTab("procs")}
               />

@@ -8,6 +8,7 @@ import {
   mergeSnapshots,
   type ProcessSnapshot,
   type ProcessSnapshotRow,
+  pickJobCandidates,
   pickServiceCandidates,
   summarizeCommand,
 } from "./processWatch";
@@ -120,5 +121,49 @@ describe("pickServiceCandidates", () => {
       row({ pid: 21, ppid: 1, name: "python.exe", commandLine: "uvicorn app:app" }),
     ]);
     expect(picked.map((r) => r.pid).sort()).toEqual([20, 21]);
+  });
+});
+
+/**
+ * 第二档候选（docs/design/133 §2）：pi-bash-jobs 把长下载/转码转成后台作业时工具调用已返回，
+ * 命令行里没有服务字样，只能靠「活满复核窗」进列表；同时不能把一个 dev server 裂成好几行。
+ */
+describe("pickJobCandidates", () => {
+  it("收下单调命中不了服务启发式的长任务", () => {
+    const rows = [
+      row({ pid: 2, ppid: 1, name: "bash.exe" }),
+      row({ pid: 3, ppid: 2, name: "curl.exe", commandLine: "curl -o isubs.tar https://…" }),
+    ];
+    expect(pickJobCandidates(rows, pickServiceCandidates(rows)).map((r) => r.pid)).toEqual([3]);
+  });
+
+  it("服务进程自己派生的助手不另起一行", () => {
+    const rows = [
+      row({ pid: 2, ppid: 1, name: "bash.exe" }),
+      row({ pid: 3, ppid: 2, commandLine: "node vite" }),
+      row({ pid: 4, ppid: 3, name: "esbuild.exe", commandLine: "esbuild --service=0.21" }),
+    ];
+    expect(pickJobCandidates(rows, pickServiceCandidates(rows))).toEqual([]);
+  });
+
+  it("服务行的祖先链（pnpm → node vite）已由最深那一行代表", () => {
+    const rows = [
+      row({ pid: 2, ppid: 1, name: "bash.exe" }),
+      row({ pid: 3, ppid: 2, commandLine: "pnpm dev" }),
+      row({ pid: 4, ppid: 3, commandLine: "node vite" }),
+    ];
+    const services = pickServiceCandidates(rows);
+    expect(services.map((r) => r.pid)).toEqual([4]);
+    expect(pickJobCandidates(rows, services)).toEqual([]);
+  });
+
+  it("与服务分支无关的旁支进程仍然收", () => {
+    const rows = [
+      row({ pid: 2, ppid: 1, name: "bash.exe" }),
+      row({ pid: 3, ppid: 2, commandLine: "node vite" }),
+      row({ pid: 5, ppid: 2, name: "ffmpeg.exe", commandLine: "ffmpeg -i a.mp4 b.mkv" }),
+    ];
+    const services = pickServiceCandidates(rows);
+    expect(pickJobCandidates(rows, services).map((r) => r.pid)).toEqual([5]);
   });
 });

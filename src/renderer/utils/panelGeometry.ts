@@ -28,7 +28,6 @@ const TARGETS = {
   scroll: '[data-panel-geo="monitor-scroll"]',
   input: '[data-panel-geo="monitor-input"]',
   jump: '[data-panel-geo="monitor-jump"]',
-  procs: '[data-panel-geo="monitor-procs"]',
 } as const;
 
 type TargetName = keyof typeof TARGETS;
@@ -80,7 +79,7 @@ export function writePanelGeometry(root: HTMLElement | null, next: Partial<Panel
     if (dock) dock.style.width = px(current.monitor);
     const scroll = target("scroll");
     if (scroll) writeMonitorOffset(scroll, current.monitor, "paddingRight");
-    for (const name of ["input", "jump", "procs"] as const) {
+    for (const name of ["input", "jump"] as const) {
       const el = target(name);
       if (el) writeMonitorOffset(el, current.monitor, "right");
     }

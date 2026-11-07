@@ -102,6 +102,11 @@
   color: var(--color-danger);
 }
 
+/* pi-bash-jobs 转后台徽标（docs/design/129 P2）：与运行态同属 accent 族，但无扫光跟随 */
+.statBg {
+  color: var(--color-accent);
+}
+
 .statAdd {
   color: var(--color-success);
 }

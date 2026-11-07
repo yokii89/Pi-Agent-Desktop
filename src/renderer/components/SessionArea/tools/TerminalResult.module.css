@@ -101,6 +101,14 @@
   background: var(--color-danger-soft);
 }
 
+/* pi-bash-jobs 转后台（docs/design/129 P2）：与 .err 同配方、accent 取色——
+   进程还在跑不是失败，但也不能读成「这条命令已经完了」 */
+.bg {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+  background: var(--color-accent-soft);
+}
+
 .truncated {
   font-size: 11px;
   color: var(--color-text-muted);

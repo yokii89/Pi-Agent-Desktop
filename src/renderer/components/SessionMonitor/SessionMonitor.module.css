@@ -289,9 +289,10 @@
   color: var(--color-text);
 }
 
-/* 停止按钮的可见性交给 CSS（:hover / :focus-within），animation 中断也不会
+/* 停止/忽略按钮的可见性交给 CSS（:hover / :focus-within），animation 中断也不会
    让键盘用户聚焦到一个透明元素上；行内紧凑，不占常驻宽度以外的空间 */
-.stopButton {
+.stopButton,
+.ignoreButton {
   padding: 1px 6px;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
@@ -303,18 +304,30 @@
 }
 
 .row:hover .stopButton,
-.row:focus-within .stopButton {
+.row:hover .ignoreButton,
+.row:focus-within .stopButton,
+.row:focus-within .ignoreButton {
   visibility: visible;
 }
 
-.stopButton:hover:not(:disabled) {
+.stopButton:hover:not(:disabled),
+.ignoreButton:hover:not(:disabled) {
   background: var(--color-bg-hover);
   color: var(--color-text-strong);
 }
 
-.stopButton:disabled {
+.stopButton:disabled,
+.ignoreButton:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+/* 会话进程结束但仍有登记项时的区顶提示：整行弱化，不做动作 */
+.hintRow {
+  margin: 0 calc(-1 * var(--spacing-xs) - 2px);
+  padding: 3px calc(var(--spacing-xs) + 2px);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
 }
 
 .rowError {

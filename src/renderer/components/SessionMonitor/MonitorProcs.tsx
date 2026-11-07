@@ -1,17 +1,20 @@
 import { Terminal, XCircle } from "@phosphor-icons/react";
 import type { ManagedProcess } from "../../../shared/ipc";
+import { type ProcActions, summarizeCommand } from "../../hooks/useProcActions";
 import { useT } from "../../hooks/useT";
+import { procRowTitle } from "../../utils/procRows";
 import { formatElapsed } from "../../utils/time";
-import { type ProcActions, summarizeCommand } from "../SessionArea/BackgroundProcs/useProcActions";
 import styles from "./SessionMonitor.module.css";
 
 /** 监控卡里的行数上限：存活优先，其余进详情页签看。 */
 const MONITOR_PROC_LIMIT = 5;
 
 interface MonitorProcsProps {
-  /** 与中央区浮卡共用的登记表（useProcActions 在卡片外壳里取一次，两处不各订阅一份）。 */
+  /** 与详情页签共用的登记表（useProcActions 在卡片外壳里取一次，两处不各订阅一份）。 */
   procs: ProcActions;
-  /** 行内命令摘要长度：监控卡比浮卡窄，截得更短。 */
+  /** 会话的 pi 进程是否存活：结束后登记项还在，顶部提示可以手动停止。 */
+  processAlive: boolean;
+  /** 行内命令摘要长度：监控卡窄，截得更短。 */
   maxCommandChars?: number;
   /** 点击进程行 → 右侧栏「后台进程」详情。 */
   onOpen: (proc: ManagedProcess) => void;
@@ -21,21 +24,24 @@ interface MonitorProcsProps {
 
 /**
  * 「后台进程」区：存活在前、已结束在后，右缘显示状态（运行中 / 已停止 / 已退出）。
- * 行可点开右侧栏详情；存活行的停止按钮悬停揭示，已结束行不再提供动作。
+ * 行可点开右侧栏详情；动作悬停揭示——存活行 忽略/停止，已结束行 忽略
+ * （登记表支持对任意状态置 ignored，docs/104 F9）。
  */
 export function MonitorProcs({
   procs,
+  processAlive,
   maxCommandChars = 24,
   onOpen,
   onOpenAll,
 }: MonitorProcsProps) {
   const t = useT();
-  const { all, now, pendingIds, errors, stop } = procs;
+  const { all, now, pendingIds, errors, stop, ignore } = procs;
   const rows = all.slice(0, MONITOR_PROC_LIMIT);
   const hidden = all.length - rows.length;
 
   return (
     <>
+      {!processAlive ? <li className={styles.hintRow}>{t("proc.card.sessionEndedHint")}</li> : null}
       {rows.map((proc) => {
         const label = proc.commandLine || proc.name;
         const alive = proc.status === "alive";
@@ -47,7 +53,11 @@ export function MonitorProcs({
             <button
               type="button"
               className={styles.procOpen}
-              title={alive ? `${label}\n${formatElapsed(now - proc.startedAt)}` : label}
+              title={
+                alive
+                  ? procRowTitle(t, proc, [formatElapsed(now - proc.startedAt)])
+                  : procRowTitle(t, proc)
+              }
               aria-label={t("proc.panel.openLabel", { name: summarizeCommand(label) })}
               onClick={() => onOpen(proc)}
             >
@@ -75,7 +85,20 @@ export function MonitorProcs({
                   <span className={styles.ended}>{t(`proc.panel.status.${proc.status}`)}</span>
                 </>
               )}
-              {/* 停止失败后错误与按钮并列：错误不能把重试入口换掉 */}
+              {/* 忽略/停止与状态并列，可见性交给 CSS（:hover / :focus-within）：
+                  停止失败后错误与按钮同列，错误不能把重试入口换掉 */}
+              <button
+                type="button"
+                className={styles.ignoreButton}
+                disabled={pending}
+                title={t("proc.card.ignoreLabel", { name: summarizeCommand(label) })}
+                aria-label={t("proc.card.ignoreLabel", { name: summarizeCommand(label) })}
+                onClick={() => {
+                  ignore(proc);
+                }}
+              >
+                {t("proc.card.ignore")}
+              </button>
               {alive ? (
                 <button
                   type="button"

@@ -20,6 +20,7 @@ function proc(partial: Partial<ManagedProcess> & { id: string }): ManagedProcess
     name: "node.exe",
     startedAt: 1000,
     registeredAt: 2000,
+    origin: "service",
     status: "alive",
     ...partial,
   };

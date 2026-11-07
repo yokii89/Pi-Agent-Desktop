@@ -9,6 +9,7 @@ function input(pid: number, startedAt = 1000) {
     commandLine: "node vite",
     name: "node.exe",
     startedAt,
+    origin: "service" as const,
   };
 }
 

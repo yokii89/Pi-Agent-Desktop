@@ -188,6 +188,31 @@
   white-space: nowrap;
 }
 
+/* 登记类型徽标（docs/design/133 §4）：纯 muted 文字在真机截图里几乎读不出；
+   job 档要一眼与「服务」区分，配方对齐 TerminalResult 的后台 pill（accent 族） */
+.originService,
+.originJob {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.originService {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+}
+
+.originJob {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
 .sourceMeta {
   display: flex;
   align-items: center;

@@ -49,6 +49,7 @@ describe("readProcessDetail（真实子进程）", () => {
         name: row?.name ?? "node.exe",
         startedAt: row?.startedAt ?? 0,
         registeredAt: Date.now(),
+        origin: "service",
         status: "alive",
       };
 

@@ -1,11 +1,6 @@
 import { defineMessages } from "../types";
 
 export const procMessages = defineMessages({
-  "proc.card.title": { "zh-CN": "终端", "en-US": "Terminal" },
-  "proc.card.count": {
-    "zh-CN": "{count} 个后台运行",
-    "en-US": "{count} running in background",
-  },
   "proc.card.stop": { "zh-CN": "停止", "en-US": "Stop" },
   "proc.card.stopLabel": {
     "zh-CN": "停止：{name}",
@@ -65,10 +60,6 @@ export const procMessages = defineMessages({
     "zh-CN": "会话已结束，可手动停止后台进程",
     "en-US": "Session ended — stop background processes manually",
   },
-  "proc.card.header": {
-    "zh-CN": "终端 · {count} 个后台运行",
-    "en-US": "Terminal · {count} running in background",
-  },
   "proc.card.viewAll": {
     "zh-CN": "查看全部 {count} 个",
     "en-US": "View all {count}",
@@ -99,6 +90,14 @@ export const procMessages = defineMessages({
   "proc.panel.startedAt": { "zh-CN": "启动时间", "en-US": "Started" },
   "proc.panel.elapsed": { "zh-CN": "运行时长", "en-US": "Uptime" },
   "proc.panel.statusLabel": { "zh-CN": "状态", "en-US": "Status" },
+  "proc.panel.originLabel": { "zh-CN": "登记类型", "en-US": "Listed as" },
+  "proc.origin.service": { "zh-CN": "后台服务", "en-US": "Background service" },
+  "proc.origin.job": { "zh-CN": "后台作业", "en-US": "Background job" },
+  "proc.origin.job.hint": {
+    "zh-CN": "命令还没退出，但工具调用已经让路（不是起错了服务，是长任务转了后台）",
+    "en-US":
+      "The command is still running; the tool call already yielded (a long task moved to the background)",
+  },
   "proc.panel.refresh": { "zh-CN": "刷新", "en-US": "Refresh" },
   "proc.panel.source": { "zh-CN": "来源 bash 调用", "en-US": "Source bash call" },
   "proc.panel.source.missing": {

@@ -1,14 +1,14 @@
 import { ArrowClockwise, Terminal } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ManagedProcess, ProcDetail, SessionId } from "../../../../shared/ipc";
+import { summarizeCommand, useProcActions } from "../../../hooks/useProcActions";
 import { useT } from "../../../hooks/useT";
 import { procService } from "../../../services/procService";
 import { selectProc, useSelectedProcId, useSessionProcesses } from "../../../stores/procStore";
 import { useSessionEntries, useSessionMeta } from "../../../stores/sessionStore";
 import type { ToolAssistantBlock } from "../../../stores/sessionTranscript";
-import { orderProcesses } from "../../../utils/procRows";
+import { orderProcesses, procRowTitle } from "../../../utils/procRows";
 import { formatAbsoluteTime, formatElapsed } from "../../../utils/time";
-import { summarizeCommand, useProcActions } from "../../SessionArea/BackgroundProcs/useProcActions";
 import { IconButton } from "../../ui/IconButton";
 import styles from "./ProcPanel.module.css";
 import {
@@ -169,7 +169,7 @@ export function ProcPanel() {
                   className={[styles.row, selected.id === proc.id ? styles.rowSelected : ""]
                     .filter(Boolean)
                     .join(" ")}
-                  title={proc.commandLine || proc.name}
+                  title={procRowTitle(t, proc)}
                   aria-label={proc.commandLine || proc.name}
                   onClick={() => selectProc(proc.id)}
                 >
@@ -218,6 +218,17 @@ export function ProcPanel() {
             <div>
               <dt>{t("proc.panel.statusLabel")}</dt>
               <dd>{t(`proc.panel.status.${detailDead ? "exited" : selected.status}`)}</dd>
+            </div>
+            <div>
+              <dt>{t("proc.panel.originLabel")}</dt>
+              <dd>
+                <span
+                  className={selected.origin === "job" ? styles.originJob : styles.originService}
+                  title={selected.origin === "job" ? t("proc.origin.job.hint") : undefined}
+                >
+                  {t(`proc.origin.${selected.origin}`)}
+                </span>
+              </dd>
             </div>
             <div>
               <dt>{t("proc.panel.startedAt")}</dt>
@@ -359,11 +370,12 @@ export function ProcPanel() {
 
         {stopError ? <p className={styles.error}>{stopError}</p> : null}
 
-        {runtimeAlive ? (
-          <div className={styles.actions}>
-            <button type="button" className={styles.ignoreBtn} onClick={() => ignore(selected)}>
-              {t("proc.card.ignore")}
-            </button>
+        {/* 忽略对任意登记状态都可用（docs/104 F9：已结束项也要有移除入口）；停止只在运行态出现 */}
+        <div className={styles.actions}>
+          <button type="button" className={styles.ignoreBtn} onClick={() => ignore(selected)}>
+            {t("proc.card.ignore")}
+          </button>
+          {runtimeAlive ? (
             <button
               type="button"
               className={styles.stopBtn}
@@ -372,8 +384,8 @@ export function ProcPanel() {
             >
               {selectedPending ? t("proc.card.stopping") : t("proc.card.stop")}
             </button>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </div>
   );

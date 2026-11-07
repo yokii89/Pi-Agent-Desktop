@@ -162,6 +162,52 @@ export function detectCommandBrand(command: string): CommandBrand | null {
   return null;
 }
 
+/**
+ * 进程行的可读主体：Win32 枚举出的命令行常是带引号的绝对路径
+ * （`"C:\Program Files\Git\usr\bin\tail.exe" -f x`），照抄进行只会截成 `"C:\Program Fil…`；
+ * 这里把第一个真正的可执行主体换成去后缀的 basename，其余参数原样保留（含空格的参数补回引号）。
+ * 展示用途：完整命令行仍在 tooltip（procRowTitle）与详情页签里。
+ */
+export function readableCommand(command: string): string {
+  const trimmed = command.trim();
+  if (!trimmed) return "";
+  return splitSegments(trimmed)
+    .map(renderSegment)
+    .filter((part) => part.length > 0)
+    .join(" && ");
+}
+
+/** 与 detectSegmentBrand 同一套跳过规则；只替换「绝对路径」或「裸 .exe 名」的主体——相对路径本来就够读。 */
+const ABSOLUTE_PATH_TOKEN = /^[a-zA-Z]:[\\/]|^\\\\/;
+
+function renderSegment(segment: string): string {
+  const tokens = tokenize(segment);
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index] ?? "";
+    if (!token || ASSIGNMENT.test(token) || NUMERIC.test(token) || token.startsWith("-")) continue;
+    const name = executableName(token);
+    if (!name) continue;
+    const lower = name.toLowerCase();
+    if (SHELL_KEYWORDS.has(lower) || WRAPPERS.has(lower)) continue;
+    if (NAVIGATION.has(lower)) return segment.trim();
+    const absolute = ABSOLUTE_PATH_TOKEN.test(token);
+    const bareExecutable = !/[\\/]/.test(token) && EXECUTABLE_EXT.test(token);
+    if (!absolute && !bareExecutable) return segment.trim();
+    const parts = [
+      ...tokens.slice(0, index),
+      name.replace(EXECUTABLE_EXT, "") || name,
+      ...tokens.slice(index + 1),
+    ];
+    return parts.map(quoteIfNeeded).join(" ");
+  }
+  return segment.trim();
+}
+
+/** 参数里含空格的补回引号（tokenize 只做分组，空格参数不带引号会改变语义）。 */
+function quoteIfNeeded(token: string): string {
+  return /\s/.test(token) ? `"${token}"` : token;
+}
+
 /** 按 `&&` / `||` / `;` / `|` / 换行切段；引号内的分隔符不算。 */
 function splitSegments(input: string): string[] {
   const segments: string[] = [];

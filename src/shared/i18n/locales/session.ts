@@ -493,6 +493,25 @@ export const sessionMessages = defineMessages({
     "zh-CN": "已执行命令",
     "en-US": "Ran command",
   },
+  // pi-bash-jobs 的两个作业工具（docs/design/129 §8.2）：归 terminal 计数，行文案各说各的
+  "session.tool.past.jobInspect": {
+    "zh-CN": "已读取作业输出",
+    "en-US": "Read job output",
+  },
+  "session.tool.past.jobStop": {
+    "zh-CN": "已停止作业",
+    "en-US": "Stopped job",
+  },
+  // pi-bash-jobs 转后台（docs/design/129 P2）：行内徽标 + 结果卡 pill。
+  // pill 用时态中立的「转入」——回执是历史事实，作业结束后回看历史不能读成假话
+  "session.tool.bgBadge": {
+    "zh-CN": "后台 {id}",
+    "en-US": "bg {id}",
+  },
+  "session.tool.bgRunning": {
+    "zh-CN": "作业 {id} 转入后台运行",
+    "en-US": "Job {id} moved to the background",
+  },
   "session.tool.past.search": { "zh-CN": "已搜索", "en-US": "Searched" },
   "session.tool.past.diff": {
     "zh-CN": "已查看变更",

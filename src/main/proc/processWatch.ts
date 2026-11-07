@@ -1,4 +1,4 @@
-import type { SessionId } from "../../shared/ipc";
+import type { ProcessOrigin, SessionId } from "../../shared/ipc";
 
 /**
  * 进程枚举快照的单行（Win32_Process 子集）。
@@ -192,12 +192,57 @@ export function pickServiceCandidates(rows: ProcessSnapshotRow[]): ProcessSnapsh
   return eligible.filter((r) => !suppressed.has(r.pid));
 }
 
+/**
+ * 第二档候选：同一 bash 边界里「不像服务，但确实没退」的进程（docs/design/133 §2）。
+ * pi-bash-jobs 把长下载 / 转码 / clone 转成后台作业时，工具调用已经返回，而这类命令行里
+ * 没有 vite、`pnpm dev` 之类的字样，命中不了服务启发式——只能靠「活满复核窗」兜住。
+ * 三条抑制条件防止一个 dev server 裂成好几行：
+ *  1. 服务候选自身与它上下整条祖先链已经代表这棵子树；
+ *  2. shell / 宿主包装层不单独成行；
+ *  3. 命中服务启发式的行归第一档（没进候选只可能是被「最深」规则抑制的中间层）。
+ */
+export function pickJobCandidates(
+  rows: ProcessSnapshotRow[],
+  services: readonly ProcessSnapshotRow[],
+): ProcessSnapshotRow[] {
+  const byPid = new Map(rows.map((r) => [r.pid, r]));
+  const servicePids = new Set(services.map((r) => r.pid));
+  const covered = new Set<number>();
+  for (const svc of services) {
+    let cur = svc.ppid;
+    for (let hop = 0; hop < 64; hop += 1) {
+      const parent = byPid.get(cur);
+      if (!parent || covered.has(cur)) break;
+      covered.add(cur);
+      cur = parent.ppid;
+    }
+  }
+  return rows.filter((row) => {
+    if (servicePids.has(row.pid) || covered.has(row.pid)) return false;
+    if (isShellWrapper(row.name) || matchesServicePattern(row.name, row.commandLine)) return false;
+    // 祖先里已有服务行 → 那是服务进程自己派生的助手，并进那一行读更干净
+    let cur = row.ppid;
+    for (let hop = 0; hop < 64; hop += 1) {
+      if (servicePids.has(cur)) return false;
+      const parent = byPid.get(cur);
+      if (!parent) break;
+      cur = parent.ppid;
+    }
+    return true;
+  });
+}
+
+/** 存活复核三档（相对边界收口的累计时刻）。 */
+const RECHECK_MS = [1000, 5000, 15000] as const;
+
 /** bash 边界快照窗口参数（docs/design/37 §3.1）。 */
 export const WATCH_TIMING = {
   /** tool_execution_end 后延迟再快照 S1，等 spawn 稳定。 */
   settleMs: 800,
   /** 存活复核三次，丢掉短命 helper。 */
-  recheckMs: [1000, 5000, 15000] as const,
+  recheckMs: RECHECK_MS,
+  /** 第二档（后台作业）的门槛：活满整个复核窗才登记，只有一个真值即 recheckMs 末档。 */
+  jobSurviveMs: RECHECK_MS[RECHECK_MS.length - 1],
   /** 第 0 档复核遇到枚举失败时的重试间隔（失败 ≠ 进程消失）。 */
   recheckRetryMs: 1000,
   /** 登记/状态变化合批推送。 */
@@ -228,6 +273,7 @@ export interface ProcessWatcherDeps {
     name: string;
     startedAt: number;
     sourceToolCallId?: string;
+    origin: ProcessOrigin;
   }) => void;
   /** PID 消失时标记 exited。 */
   markExited: (pid: number, sessionId: SessionId) => void;
@@ -337,6 +383,64 @@ export class ProcessWatcher {
       // 先活过 1s 复核再登记（设计 §3.1）：短命 helper 直接丢
       this.scheduleRecheck(sessionId, row, entry.state.toolCallId, 0);
     }
+    for (const row of pickJobCandidates(rows, candidates)) {
+      this.scheduleJobCheck(sessionId, row, entry.state.toolCallId);
+    }
+  }
+
+  /**
+   * 第二档：活满 `jobSurviveMs` 才登记。不复用复核链——链上的 step 间隔是相对的
+   * （1s → +4s → +10s），从末档起算只有 10s，与「活满整个窗」不是同一件事。
+   */
+  private scheduleJobCheck(
+    sessionId: SessionId,
+    row: ProcessSnapshotRow,
+    toolCallId: string,
+    retry = false,
+  ): void {
+    if (this.disposed) return;
+    const delay = retry ? WATCH_TIMING.recheckRetryMs : WATCH_TIMING.jobSurviveMs;
+    const timer = setTimeout(() => {
+      this.recheckTimers.delete(timer);
+      void this.runJobCheck(sessionId, row, toolCallId, retry);
+    }, delay);
+    this.recheckTimers.add(timer);
+  }
+
+  private async runJobCheck(
+    sessionId: SessionId,
+    row: ProcessSnapshotRow,
+    toolCallId: string,
+    retry: boolean,
+  ): Promise<void> {
+    if (this.disposed) return;
+    const snapshot = await this.deps.enumerate();
+    if (this.disposed) return;
+    // 枚举失败 ≠ 进程消失；第二档重试一次后放弃（多一档误报比少一档更伤列表可信度）
+    if (!snapshot) {
+      if (!retry) this.scheduleJobCheck(sessionId, row, toolCallId, true);
+      return;
+    }
+    const alive = snapshot.get(row.pid);
+    if (!alive) return;
+    const name = alive.name || row.name;
+    const commandLine = alive.commandLine || row.commandLine;
+    if (isShellWrapper(name)) return;
+    // 防 PID 复用：创建时间漂移过大就不是当初那个进程（对齐 procService.revalidate）
+    const startedAt = alive.startedAt || row.startedAt;
+    if (row.startedAt && alive.startedAt && Math.abs(alive.startedAt - row.startedAt) > 2000)
+      return;
+    this.deps.register({
+      sessionId,
+      pid: row.pid,
+      ppid: alive.ppid,
+      commandLine,
+      name,
+      startedAt,
+      sourceToolCallId: toolCallId,
+      // 到这会儿才命中服务启发式，说明第一档收口时它还没长出来，按第一档口径记
+      origin: matchesServicePattern(name, commandLine) ? "service" : "job",
+    });
   }
 
   /** 按 recheckMs 逐级复核；第 0 档通过才登记，后续档消失标 exited。 */
@@ -396,6 +500,7 @@ export class ProcessWatcher {
         name: alive.name || row.name,
         startedAt: alive.startedAt || row.startedAt,
         sourceToolCallId: toolCallId,
+        origin: "service",
       });
     }
     if (step + 1 < WATCH_TIMING.recheckMs.length) {

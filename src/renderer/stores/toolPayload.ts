@@ -34,6 +34,30 @@ export interface TerminalPayload {
   output: string;
   exitCode: number | null;
   truncated: boolean;
+  /** 结果是 pi-bash-jobs 的「转后台」回执时给出作业身份，工具行据此打后台徽标。 */
+  job?: BackgroundJobRef;
+}
+
+/** pi-bash-jobs 回执里的作业身份（doc 129 §6：`J-<n>`，label 可选）。 */
+export interface BackgroundJobRef {
+  id: string;
+  label?: string;
+}
+
+/**
+ * 只认 pi-bash-jobs 的两种「转后台」回执开头（format.ts 的 formatDetachReceipt /
+ * formatAttachReceipt）：`Job J-2 moved to the background after …`（finish 让路）与
+ * `Job J-2 started in the background (mode=detach).`（显式 detach / long）。
+ * 结束通知（`Bash job J-1 finished`）、停止回执（`Stopped job J-1`）与普通输出都不得命中——
+ * 那些情况下行就该是普通完成态，打后台徽标反而是假消息。
+ */
+const BACKGROUND_RECEIPT =
+  /^Job (J-\d+)(?: \(([^)\n]+)\))? (?:moved to|started in) the background/m;
+
+export function parseBackgroundJob(text: string): BackgroundJobRef | null {
+  const match = BACKGROUND_RECEIPT.exec(text);
+  if (!match?.[1]) return null;
+  return { id: match[1], label: match[2] || undefined };
 }
 
 export interface FileReadPayload {
@@ -96,7 +120,18 @@ export type ToolResultPayload =
   | DiffPayload
   | GenericPayload;
 
-const TERMINAL_TOOLS = new Set(["bash", "shell", "pwsh", "sh", "zsh", "cmd"]);
+// 后两个是 pi-bash-jobs 的作业工具（docs/design/129 §8.2）：读作业输出、停作业进程，
+// 本质都是对命令行的操作，落 generic 会丢「已运行 N 条命令」的摘要口径。
+const TERMINAL_TOOLS = new Set([
+  "bash",
+  "shell",
+  "pwsh",
+  "sh",
+  "zsh",
+  "cmd",
+  "tool_execution_inspect_output",
+  "bash_job_stop",
+]);
 const READ_TOOLS = new Set(["read", "cat", "view", "ls", "list"]);
 const WRITE_TOOLS = new Set(["write", "create", "new"]);
 const EDIT_TOOLS = new Set(["edit", "apply_patch", "patch", "str_replace"]);
@@ -599,6 +634,7 @@ export function buildToolResult(
       exitCode: extractExitCode(text, isError),
       truncated:
         capped.truncated || (details?.truncation !== undefined && details?.truncation !== null),
+      job: parseBackgroundJob(text) ?? undefined,
     };
   }
 

@@ -48,7 +48,7 @@ export function ToolGlyph({ kind }: { kind: ToolKind }) {
 }
 
 /** 完成态动作（Codex「已读取 / 已编辑 / 已执行命令」）。 */
-function pastAction(t: TranslateFn, kind: ToolKind): string {
+function pastAction(t: TranslateFn, kind: ToolKind, name = ""): string {
   switch (kind) {
     case "read":
       return t("session.tool.past.read");
@@ -57,6 +57,10 @@ function pastAction(t: TranslateFn, kind: ToolKind): string {
     case "edit":
       return t("session.tool.past.edit");
     case "terminal":
+      // pi-bash-jobs 的两个作业工具（docs/design/129 §8.2）：归 terminal 保住摘要口径，
+      // 行文案各说各的——「已执行命令 J-3」读不出是读输出还是停进程
+      if (name === "tool_execution_inspect_output") return t("session.tool.past.jobInspect");
+      if (name === "bash_job_stop") return t("session.tool.past.jobStop");
       return t("session.tool.past.terminal");
     case "search":
       return t("session.tool.past.search");
@@ -119,7 +123,7 @@ function rowAction(t: TranslateFn, block: ToolAssistantBlock): { text: string; t
       tone: styles.actionMuted,
     };
   }
-  return { text: pastAction(t, block.toolKind), tone: "" };
+  return { text: pastAction(t, block.toolKind, block.name), tone: "" };
 }
 
 interface ToolCallProps {
@@ -149,8 +153,16 @@ export const ToolCall = memo(function ToolCall({ block, railed, defaultOpen }: T
   const fallbackStats = elapsedStats || changeStats ? null : statusStats(t, block);
   // 完成态 execute 耗时（pi durationMs 或墙钟回退）；cancelled / pending 行不显示
   const finished = block.status === "ok" || block.status === "error";
+  // pi-bash-jobs 把命令转了后台（docs/design/129 P2）：徽标替掉耗时——
+  // 「阻塞了多久」回执里已写，此刻用户要的是「进程还活着、job id 是几」
+  const bgStats =
+    finished && block.toolKind === "terminal" && block.result?.kind === "terminal"
+      ? block.result.job
+        ? { text: t("session.tool.bgBadge", { id: block.result.job.id }), tone: styles.statBg }
+        : null
+      : null;
   const durationStats =
-    finished && block.durationMs != null
+    finished && !bgStats && block.durationMs != null
       ? { text: formatToolDuration(block.durationMs), tone: "" }
       : null;
 
@@ -206,6 +218,11 @@ export const ToolCall = memo(function ToolCall({ block, railed, defaultOpen }: T
         {fallbackStats && (
           <span className={`${styles.stats} ${fallbackStats.tone}`} aria-hidden="true">
             {fallbackStats.text}
+          </span>
+        )}
+        {bgStats && (
+          <span className={`${styles.stats} ${bgStats.tone}`} aria-hidden="true">
+            {bgStats.text}
           </span>
         )}
         {durationStats && (

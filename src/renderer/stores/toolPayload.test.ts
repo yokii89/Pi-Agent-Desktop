@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildToolResult, type FileChangePayload, parseUnifiedDiff } from "./toolPayload";
+import {
+  buildToolResult,
+  classifyTool,
+  type FileChangePayload,
+  parseBackgroundJob,
+  parseToolArgs,
+  parseUnifiedDiff,
+} from "./toolPayload";
 
 /**
  * 变更行统计（汇总卡与工具行共用）：pi 的 edit 结果只有「Successfully replaced N block(s)」文案、
@@ -135,5 +142,59 @@ describe("parseUnifiedDiff 同时认标准 unified 与 pi 展示型", () => {
 
   it("纯成功文案不解析出 hunk", () => {
     expect(parseUnifiedDiff("Successfully wrote to a.ts")).toEqual([]);
+  });
+});
+
+/**
+ * pi-bash-jobs 的两个作业工具（docs/design/129 §8.2）：名字不在任何集合里时落 generic，
+ * 摘要头按「次」计、与 bash 不同口径；归入 terminal 后两者口径一致。
+ */
+describe("作业工具的归类", () => {
+  it("inspect / stop 与 bash 同为 terminal", () => {
+    expect(classifyTool("tool_execution_inspect_output")).toBe("terminal");
+    expect(classifyTool("bash_job_stop")).toBe("terminal");
+    expect(classifyTool("bash")).toBe("terminal");
+  });
+
+  it("没有 command 参数时主体取作业 id", () => {
+    expect(parseToolArgs("terminal", { job: "J-3", tailLines: 80 }).subject).toBe("J-3");
+    expect(parseToolArgs("terminal", { command: "pnpm dev" }).subject).toBe("pnpm dev");
+  });
+});
+
+/**
+ * 转后台回执的识别（docs/design/129 P2 工具行徽标）：只认两种回执开头；
+ * 结束通知 / 停止回执 / 普通输出不得命中——那些行就该是普通完成态。
+ */
+describe("parseBackgroundJob", () => {
+  it("finish 让路的回执带出作业 id 与 label", () => {
+    const receipt = [
+      "Job J-2 (dev server) moved to the background after 5m12s (no output for a while).",
+      "Command: pnpm dev",
+    ].join("\n");
+    expect(parseBackgroundJob(receipt)).toEqual({ id: "J-2", label: "dev server" });
+  });
+
+  it("显式 detach 的回执没有 label", () => {
+    expect(parseBackgroundJob("Job J-1 started in the background (mode=detach).")).toEqual({
+      id: "J-1",
+      label: undefined,
+    });
+  });
+
+  it("结束通知 / 停止回执 / 普通输出不命中", () => {
+    expect(parseBackgroundJob("Bash job J-1 finished: exit 0 after 5m.")).toBeNull();
+    expect(parseBackgroundJob("Stopped job J-1: killed the whole process tree.")).toBeNull();
+    expect(parseBackgroundJob("Job started\nsome output")).toBeNull();
+  });
+
+  it("buildToolResult 把作业身份带进 terminal 载荷", () => {
+    const result = buildToolResult(
+      "terminal",
+      { command: "pnpm dev" },
+      "Job J-3 moved to the background after 3m (soft budget reached).",
+      false,
+    );
+    expect(result).toMatchObject({ kind: "terminal", job: { id: "J-3" } });
   });
 });

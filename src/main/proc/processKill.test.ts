@@ -52,6 +52,7 @@ describe("selectSyncKillTargets", () => {
     name: "node.exe",
     startedAt: 10_000,
     registeredAt: 12_000,
+    origin: "service",
     status: "alive",
   };
 

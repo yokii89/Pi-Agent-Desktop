@@ -1279,7 +1279,14 @@ export interface SessionSummary {
 /** 登记项状态：alive 可停止；ignored 本 session 不再展示。 */
 export type ManagedProcessStatus = "alive" | "exited" | "killed" | "ignored";
 
-/** 会话启动后仍存活的后台项目进程登记项（主进程内存态，不持久化）。 */
+/**
+ * 登记口径（docs/design/133）：`service` = 命令行命中服务启发式，1s 复核即登记；
+ * `job` = 同一 bash 边界里没命中启发式、但活过整个复核窗的进程（长下载 / 转码 / clone）。
+ * 后者是「扩展把命令转了后台」而不是「用户起了个服务」，界面要分开说。
+ */
+export type ProcessOrigin = "service" | "job";
+
+/** 会话启动后仍存活的后台项目进程登记项（落盘与启动收养见 docs/design/133 §3）。 */
 export interface ManagedProcess {
   /** 登记主键：`${sessionId}:${pid}:${startMs}`。 */
   id: string;
@@ -1298,6 +1305,8 @@ export interface ManagedProcess {
   registeredAt: number;
   /** 触发登记的 bash toolCallId（追溯用）。 */
   sourceToolCallId?: string;
+  /** 为什么被登记（service / job），决定界面标签与文案。 */
+  origin: ProcessOrigin;
   status: ManagedProcessStatus;
 }
 

@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from "react";
-import type { ManagedProcess, SessionId } from "../../../../shared/ipc";
-import { useNowTick } from "../../../hooks/useNowTick";
+import type { ManagedProcess, SessionId } from "../../shared/ipc";
 import {
   acquireProcReconcile,
   ignoreManagedProcess,
@@ -8,13 +7,13 @@ import {
   stopManagedProcess,
   useProcActionFeedback,
   useSessionProcesses,
-} from "../../../stores/procStore";
-import { orderProcesses } from "../../../utils/procRows";
+} from "../stores/procStore";
+import { readableCommand } from "../utils/commandIcon";
+import { orderProcesses } from "../utils/procRows";
+import { useNowTick } from "./useNowTick";
 
-/** 后台进程区的取数与动作：中央会话区浮卡、右侧会话监控卡与详情页签共用（docs/design/37 / 96）。 */
+/** 后台进程区的取数与动作：右侧会话监控卡与「后台进程」详情页签共用（docs/design/37 / 96）。 */
 export interface ProcActions {
-  /** 存活进程（exited 不再展示）。 */
-  alive: ManagedProcess[];
   /** 全部登记项（存活在前、已结束在后、忽略已剔除），带状态的列表用。 */
   all: ManagedProcess[];
   /** 秒级心跳（运行时长展示用）。 */
@@ -36,8 +35,7 @@ export interface ProcActions {
  */
 export function useProcActions(sessionId: SessionId | null): ProcActions {
   const processes = useSessionProcesses(sessionId);
-  const alive = processes.filter((proc) => proc.status === "alive");
-  const hasAlive = alive.length > 0;
+  const hasAlive = processes.some((proc) => proc.status === "alive");
   const all = useMemo(() => orderProcesses(processes), [processes]);
   const now = useNowTick(hasAlive, 1000);
   const { pendingIds, errors } = useProcActionFeedback();
@@ -53,7 +51,6 @@ export function useProcActions(sessionId: SessionId | null): ProcActions {
   }, [sessionId, hasAlive]);
 
   return {
-    alive,
     all,
     now,
     pendingIds,
@@ -67,9 +64,9 @@ export function useProcActions(sessionId: SessionId | null): ProcActions {
   };
 }
 
-/** 命令摘要：折叠空白并截断（标题/aria 里用完整命令行）。 */
+/** 命令摘要：可执行主体换 basename（Win32 枚举出的是带引号绝对路径），折叠空白并截断；标题/aria 里用完整命令行。 */
 export function summarizeCommand(commandLine: string, max = 36): string {
-  const raw = commandLine.trim().replace(/\s+/g, " ");
+  const raw = readableCommand(commandLine).trim().replace(/\s+/g, " ");
   if (raw.length <= max) return raw;
   return `${raw.slice(0, max - 1)}…`;
 }

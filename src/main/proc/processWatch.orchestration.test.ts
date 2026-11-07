@@ -168,3 +168,113 @@ describe("ProcessWatcher 边界编排", () => {
     watcher.dispose();
   });
 });
+
+/**
+ * 第二档「后台作业」（docs/design/133 §2）：命中不了服务启发式的长任务要活满整个复核窗才登记。
+ * 这一档存在的理由是 pi-bash-jobs 会让工具调用早退——命令还在跑，turn 已经让开了。
+ */
+describe("ProcessWatcher 后台作业档", () => {
+  const withJob = snap(
+    row({ pid: 1, ppid: 0 }),
+    row({ pid: 2, ppid: 1, name: "bash.exe", startedAt: 900 }),
+    row({
+      pid: 400,
+      ppid: 2,
+      name: "curl.exe",
+      commandLine: "curl -o isubs.tar https://x",
+      startedAt: 1100,
+    }),
+  );
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1000);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("活满复核窗才登记，且记为 job 而不是 service", async () => {
+    const enumerate = vi
+      .fn<() => Promise<ProcessSnapshot | null>>()
+      .mockResolvedValueOnce(baselineWithoutService) // baseline
+      .mockResolvedValueOnce(withJob) // 边界快照
+      .mockResolvedValue(withJob); // 15s 复核
+    const register = vi.fn();
+    const watcher = new ProcessWatcher({ enumerate, register, markExited: vi.fn() });
+
+    await watcher.noteBashStart("s1", 1, "t1");
+    watcher.noteBashEnd("s1", "t1");
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs + WATCH_TIMING.recheckMs[1]);
+    expect(register).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.jobSurviveMs);
+    expect(register).toHaveBeenCalledTimes(1);
+    expect(register.mock.calls[0]?.[0]).toMatchObject({ pid: 400, origin: "job" });
+    watcher.dispose();
+  });
+
+  it("15s 内自己退出就不进列表", async () => {
+    const enumerate = vi
+      .fn<() => Promise<ProcessSnapshot | null>>()
+      .mockResolvedValueOnce(baselineWithoutService)
+      .mockResolvedValueOnce(withJob)
+      .mockResolvedValue(baselineWithoutService); // 15s：已经没了
+    const register = vi.fn();
+    const watcher = new ProcessWatcher({ enumerate, register, markExited: vi.fn() });
+
+    await watcher.noteBashStart("s1", 1, "t1");
+    watcher.noteBashEnd("s1", "t1");
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs + WATCH_TIMING.jobSurviveMs + 2000);
+    expect(register).not.toHaveBeenCalled();
+    watcher.dispose();
+  });
+
+  it("第二档枚举失败重试一次后登记（失败 ≠ 进程消失）", async () => {
+    const enumerate = vi
+      .fn<() => Promise<ProcessSnapshot | null>>()
+      .mockResolvedValueOnce(baselineWithoutService)
+      .mockResolvedValueOnce(withJob)
+      .mockResolvedValueOnce(null) // 15s：枚举失败
+      .mockResolvedValue(withJob); // 重试
+    const register = vi.fn();
+    const watcher = new ProcessWatcher({ enumerate, register, markExited: vi.fn() });
+
+    await watcher.noteBashStart("s1", 1, "t1");
+    watcher.noteBashEnd("s1", "t1");
+    await vi.advanceTimersByTimeAsync(
+      WATCH_TIMING.settleMs + WATCH_TIMING.jobSurviveMs + WATCH_TIMING.recheckRetryMs,
+    );
+    expect(register).toHaveBeenCalledTimes(1);
+    watcher.dispose();
+  });
+
+  it("15s 时同 pid 已被复用则不登记", async () => {
+    const reused = snap(
+      ...[
+        row({ pid: 1, ppid: 0 }),
+        row({ pid: 2, ppid: 1, name: "bash.exe", startedAt: 900 }),
+        row({
+          pid: 400,
+          ppid: 2,
+          name: "curl.exe",
+          commandLine: "curl -o isubs.tar https://x",
+          startedAt: 9000,
+        }),
+      ],
+    );
+    const enumerate = vi
+      .fn<() => Promise<ProcessSnapshot | null>>()
+      .mockResolvedValueOnce(baselineWithoutService)
+      .mockResolvedValueOnce(withJob)
+      .mockResolvedValue(reused);
+    const register = vi.fn();
+    const watcher = new ProcessWatcher({ enumerate, register, markExited: vi.fn() });
+
+    await watcher.noteBashStart("s1", 1, "t1");
+    watcher.noteBashEnd("s1", "t1");
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs + WATCH_TIMING.jobSurviveMs + 2000);
+    expect(register).not.toHaveBeenCalled();
+    watcher.dispose();
+  });
+});

@@ -1,8 +1,14 @@
-import type { ManagedProcess, ManagedProcessStatus, SessionId } from "../../shared/ipc";
+import type {
+  ManagedProcess,
+  ManagedProcessStatus,
+  ProcessOrigin,
+  SessionId,
+} from "../../shared/ipc";
 
 /**
- * ManagedProcess 登记表（内存态，不持久化——重启后按存活扫描自愈见设计 §5.4 P0）。
- * 按 sessionId 分桶；状态流转只经本模块，便于合批 push 与单测。
+ * ManagedProcess 登记表（按 sessionId 分桶的内存态；重启收养靠 procService 落盘的条目，
+ * 见 docs/design/133 §3——这里不直接读写文件，保持纯状态机可单测）。
+ * 状态流转只经本模块，便于合批 push 与单测。
  */
 export type ProcessRegistrySnapshot = ReadonlyMap<SessionId, readonly ManagedProcess[]>;
 
@@ -32,6 +38,7 @@ export class ProcessRegistry {
     name: string;
     startedAt: number;
     sourceToolCallId?: string;
+    origin: ProcessOrigin;
   }): ManagedProcess | null {
     const bucket = this.ensureBucket(input.sessionId);
     const id = makeId(input.sessionId, input.pid, input.startedAt || Date.now());
@@ -57,6 +64,7 @@ export class ProcessRegistry {
       startedAt: input.startedAt || now,
       registeredAt: now,
       sourceToolCallId: input.sourceToolCallId,
+      origin: input.origin,
       status: "alive",
     };
     bucket.set(id, proc);
@@ -99,6 +107,15 @@ export class ProcessRegistry {
     const out: ManagedProcess[] = [];
     for (const sessionId of this.bySession.keys()) {
       out.push(...this.listAliveBySession(sessionId));
+    }
+    return out;
+  }
+
+  /** 跨会话的全部登记项（含 ended/ignored），落盘用。 */
+  listAll(): ManagedProcess[] {
+    const out: ManagedProcess[] = [];
+    for (const bucket of this.bySession.values()) {
+      out.push(...bucket.values());
     }
     return out;
   }

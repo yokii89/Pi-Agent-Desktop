@@ -364,6 +364,8 @@ async function spawnInstance(
   const child = spawn(file, args, { cwd, env, windowsHide: true });
   inst.child = child;
   noteSessionCwd(sessionId, cwd);
+  // 后台进程登记以 JSONL 路径为跨重启锚点：SessionId 每次都换，sessionFile 不换
+  procService.noteSessionFile(sessionId, sessionFile);
   noteSessionSpawned({
     sessionId,
     sessionFile,

@@ -30,8 +30,8 @@ registerWallpaperScheme();
 
 /**
  * 后台进程残留锁（docs/design/37 §5.4 P0）：
- * 启动时若锁仍在 = 上次非正常退出，登记表已丢、可能残留服务；
- * 干净 will-quit 删除锁。不扫系统全局，只提示用户自查。
+ * 启动时若锁仍在 = 上次非正常退出；登记项本身已落盘收养（docs/design/133 §3），
+ * 这条提示针对的是登记之外没人认识的进程。干净 will-quit 删除锁。
  */
 function residualLockPath(): string {
   return path.join(app.getPath("userData"), "proc-clean-exit.lock");
@@ -91,6 +91,8 @@ app.whenReady().then(async () => {
   createMainWindow();
   bootstrapEnvironmentProbe();
   bootstrapResidualNotice();
+  // 上次运行留下的后台进程先验存活收进待认领池，用户打开对应会话时才成行（docs/design/133 §3）
+  void procService.adoptSurvivors();
   // 预热扩展 View 旁路：首次 spawn 前 endpoint 就绪；失败不阻塞启动
   ensureViewHost().catch(() => {});
   // 托盘依赖主窗口存在（点击托盘要能 show），放在 createMainWindow 之后

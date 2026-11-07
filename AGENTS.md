@@ -304,14 +304,16 @@ import { Play } from "@phosphor-icons/react";
   加 role），点击先 `setFilterMode("all")` 对齐口径、再走 `uiStore.openReviewDocked()`
   （浮窗形态先收回停靠，不要在侧栏留一个空白审阅页签）。无改动时行保持只读；
   别改成 `openReview()`，那会按用户当前形态开到浮窗、不进右侧栏。
-- **后台进程只有一份实现**：`SessionArea/BackgroundProcs/useProcActions` 被中央浮卡与监控卡共用；
-  侧栏收起时中央浮卡让位（`SessionArea` 按 `rightSidebarOpen` 条件渲染），避免两块卡同时挂同一份登记表。
+- **后台进程只有一份实现**：`hooks/useProcActions` 被监控卡与右侧栏「后台进程」页签共用，
+  后台进程**统一**由监控卡的「后台进程」区管理（原中央对话流右上角浮卡已移除，2026-11-07）；
+  右侧栏展开时监控卡隐藏，进程在右侧栏 `procs` 页签查看（不加别的提示）。
   存活对账（5s）与停止 pending/error 收在 `procStore` 的引用计数里，**不要**在每处 UI 各起一条轮询。
 - **后台进程行是详情入口**（docs/design/101）：点击打开右侧栏内置页签 `procs`（上列表 + 下详情，
   含来源 bash 调用、子进程树、TCP 端点、内存）。列表按登记状态展示运行中 / 已停止 / 已退出
-  （忽略项不展示）；**孤儿进程没有退出码，不要伪造「失败」状态**。**实时 stdout 读不到**
-  （doc 37 §1.3），来源调用只展示启动阶段捕获的输出；端口用 `netstat`（~60ms）而不是
-  `Get-NetTCPConnection`（~2.6s），进程快照复用 5s 对账（10s 窗口），3s 轮询不要改成每次全量枚举。
+  （忽略项不展示，忽略动作对已结束行也可用）；**孤儿进程没有退出码，不要伪造「失败」状态**。
+  **实时 stdout 读不到**（doc 37 §1.3），来源调用只展示启动阶段捕获的输出；端口用
+  `netstat`（~60ms）而不是 `Get-NetTCPConnection`（~2.6s），进程快照复用 5s 对账（10s 窗口），
+  3s 轮询不要改成每次全量枚举。
 
 ### 导航列表选中高亮：一块选中药丸（docs/design/54 / 56）
 

@@ -3,7 +3,6 @@ import { useInputClearance } from "../../hooks/useInputClearance";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
 import { WidgetMountAbove, WidgetMountBelow } from "../ExtensionView/ExtensionViewHost";
-import { BackgroundProcsCard } from "./BackgroundProcs/BackgroundProcsCard";
 import { QueueTray } from "./QueueTray";
 import styles from "./SessionArea.module.css";
 import { SessionView } from "./SessionView";
@@ -19,7 +18,7 @@ import { WelcomeSplash } from "./WelcomeSplash";
  */
 export function SessionArea() {
   const { phase } = useSessionMeta();
-  const { terminalPanelVisible, rightSidebarOpen } = useUiStore();
+  const { terminalPanelVisible } = useUiStore();
   const isEmpty = phase === "empty";
   const runningRef = useRef<HTMLDivElement>(null);
   const inputStackRef = useRef<HTMLDivElement>(null);
@@ -42,8 +41,6 @@ export function SessionArea() {
         </div>
       ) : (
         <div className={styles.running} ref={runningRef}>
-          {/* 右侧栏收起时后台进程由会话监控卡接管（同一份登记表，避免两块卡同时挂进程列表） */}
-          {rightSidebarOpen ? <BackgroundProcsCard /> : null}
           <SessionView />
           <div className={styles.dockedInput} data-panel-geo="monitor-input">
             <div className={styles.inputStack} ref={inputStackRef}>

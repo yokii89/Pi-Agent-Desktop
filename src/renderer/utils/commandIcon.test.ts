@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getNamedIconUrl } from "../fileIcons/resolve";
-import { COMMAND_BRAND_ICONS, detectCommandBrand } from "./commandIcon";
+import { COMMAND_BRAND_ICONS, detectCommandBrand, readableCommand } from "./commandIcon";
 
 function icon(command: string): string | null {
   return detectCommandBrand(command)?.icon ?? null;
@@ -47,5 +47,40 @@ describe("detectCommandBrand", () => {
       expect(getNamedIconUrl(name, "light"), name).not.toBeNull();
       expect(getNamedIconUrl(name, "dark"), name).not.toBeNull();
     }
+  });
+});
+
+/**
+ * 进程行的可读主体（真机测试发现：Win32 枚举的命令行照抄进行，截成 `"C:\Program Fil…`）。
+ * 可执行主体换 basename，参数原样保留；完整命令行仍在 tooltip 与详情里。
+ */
+describe("readableCommand", () => {
+  it("带引号的绝对路径主体换成去后缀的 basename", () => {
+    expect(readableCommand('"C:\\Program Files\\Git\\usr\\bin\\tail.exe" -f app.log')).toBe(
+      "tail -f app.log",
+    );
+  });
+
+  it("普通命令与相对路径原样保留", () => {
+    expect(readableCommand("pnpm dev")).toBe("pnpm dev");
+    expect(readableCommand("./scripts/build.sh --watch")).toBe("./scripts/build.sh --watch");
+  });
+
+  it("跳过包装层与赋值，命中真正的主体", () => {
+    expect(readableCommand("FOO=1 timeout 10 tail.exe -f app.log")).toBe(
+      "FOO=1 timeout 10 tail -f app.log",
+    );
+  });
+
+  it("cd 段不乱改，后续段正常替换", () => {
+    expect(readableCommand('cd /d/work && "C:\\tools\\curl.exe" -o x.bin https://x')).toBe(
+      "cd /d/work && curl -o x.bin https://x",
+    );
+  });
+
+  it("含空格的参数补回引号", () => {
+    expect(readableCommand('node "C:\\my app\\serv.js" --port 1')).toBe(
+      'node "C:\\my app\\serv.js" --port 1',
+    );
   });
 });
