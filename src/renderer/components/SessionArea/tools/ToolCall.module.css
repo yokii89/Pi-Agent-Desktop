@@ -16,8 +16,9 @@
 
 .row {
   /* 悬浮反馈走「整行文字转主题色」，不铺灰底：底色令牌留给真正需要色块的行。
+     静息态与「思考过程」折叠头同用 muted（行头是导航性摘要，正文才是重点）；
      语义色（失败红 / +N -M / 运行态扫光）各自直写 color，按继承优先级天然保留。 */
-  --tool-row-ink: var(--color-text);
+  --tool-row-ink: var(--color-text-muted);
   --tool-row-ink-muted: var(--color-text-muted);
   display: flex;
   align-items: center;
