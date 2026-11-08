@@ -20,6 +20,7 @@
     "check:view-types": "node scripts/sync-view-sdk-types.mjs --check",
     "gen:file-icons": "node scripts/generate-file-icons.mjs",
     "gen:app-icon": "node scripts/generate-app-icon.mjs",
+    "gen:installer-art": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-installer-art.ps1",
     "rebuild:native": "electron-rebuild -f -w node-pty",
     "start": "pnpm run build && electron .",
     "dist": "node scripts/package.mjs",

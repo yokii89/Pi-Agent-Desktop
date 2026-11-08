@@ -50,6 +50,12 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   artifactName: PiDesk-Setup-${version}.${ext}
+  # 安装器品牌位图（方案二「晴空 · 浅色向导」），由 scripts/generate-installer-art.ps1 生成
+  # （pnpm run gen:installer-art）。NSIS 只收 BMP 且尺寸硬性：侧栏 164×314、页眉 150×57；
+  # 改美术先改脚本常量再重生成，产物随仓库提交。卸载向导复用同一张侧栏图。
+  installerSidebar: build/installerSidebar.bmp
+  installerHeader: build/installerHeader.bmp
+  uninstallerSidebar: build/installerSidebar.bmp
 # 显式 GitHub 发布源：electron-updater 读 app-update.yml / latest.yml（docs/design/35）。
 # 必须与 src/shared/update.ts 的 PIDESK_RELEASE_REPO 保持一致——updaterService 启动时会用该常量
 # setFeedURL 运行时兜底，覆盖 0.2.x 旧包 app-update.yml 里指向已停用 repo 的发布源。

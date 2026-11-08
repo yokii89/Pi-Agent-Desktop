@@ -13,14 +13,33 @@
 不同尺寸（16/32/48…）。只提供单尺寸 PNG 时，小尺寸档会被降采样得模糊，或直接判为不合格而
 回退到宿主进程（开发态即 `electron.exe`）的默认图标 —— **表现为任务栏始终是 Electron 原子图标**。
 
+## installerSidebar.bmp / installerHeader.bmp
+
+NSIS 安装向导的品牌位图（方案二「晴空 · 浅色向导」，2026-11-08 设计确认），
+由 `electron-builder.yml` 的 `nsis.installerSidebar` / `nsis.installerHeader` /
+`nsis.uninstallerSidebar` 引用（卸载向导复用侧栏图）。
+
+| 文件 | 尺寸 | 出现位置 |
+|------|------|---------|
+| `installerSidebar.bmp` | **164×314** | 欢迎页 / 完成页左栏大图 |
+| `installerHeader.bmp` | **150×57** | 选目录等中间页右上角横幅 |
+
+**尺寸是 NSIS 硬性要求**，electron-builder 也只收 BMP 格式；尺寸不对时 NSIS 编译直接失败。
+胶囊文案刻意不写版本号，避免每次发版都要重生成美术。
+
 ## 重新生成
 
 ```bash
 pnpm run gen:app-icon
+pnpm run gen:installer-art
 ```
 
-该脚本（`scripts/generate-app-icon.mjs`）把 PNG 母版拷贝为 `build/icon.png`，
-再用 Electron `nativeImage` 缩放并打包成多尺寸 ICO。**仅在更换图标时手动运行**，日常构建不依赖它。
+- `scripts/generate-app-icon.mjs` 把 PNG 母版拷贝为 `build/icon.png`，
+  再用 Electron `nativeImage` 缩放并打包成多尺寸 ICO。
+- `scripts/generate-installer-art.ps1` 用 GDI+（零新增依赖）按脚本内登记的色板 / 文案
+  重画两张 BMP；改美术先改脚本常量再运行。
+
+两个脚本都**仅在更换图标 / 调整安装器美术时手动运行**，日常构建不依赖它们。
 
 ## 注意
 
