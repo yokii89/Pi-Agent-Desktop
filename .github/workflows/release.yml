@@ -35,6 +35,25 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # electron-builder 打包时会从 github.com 拉 Electron 发行包与 NSIS / 7zip 等辅助二进制；
+      # runner 每次冷缓存都要全量重下，网关偶发 504 会直接打断构建（v0.5.4 首次构建即因此失败）。
+      # 缓存键取 package.json 的 Electron 版本（发版 bump 只改 lockfile，不能拿 lockfile 做键）；
+      # restore-keys 前缀兜底，Electron 升级后仍可复用 NSIS 等不变的部分。
+      - name: 读取 Electron 版本（缓存键）
+        id: electron-version
+        shell: bash
+        run: echo "version=$(node -p 'require("./package.json").devDependencies.electron')" >> "$GITHUB_OUTPUT"
+
+      - name: 缓存 Electron 与 electron-builder 二进制
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: ci-binaries-electron-${{ steps.electron-version.outputs.version }}
+          restore-keys: |
+            ci-binaries-electron-
+
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
