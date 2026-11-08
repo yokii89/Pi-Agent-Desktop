@@ -538,6 +538,11 @@ export const sessionMessages = defineMessages({
     "zh-CN": "{count} 次失败",
     "en-US": "{count} failed",
   },
+  // 活动组聚合头（AssistantMessage 两层折叠）：工具段末尾追加的思考次数
+  "session.activity.thinkingCount": {
+    "zh-CN": "思考 {count} 次",
+    "en-US": "Thought {count} times",
+  },
   "session.tool.readFailed": { "zh-CN": "读取失败", "en-US": "Read failed" },
   "session.tool.writeFailed": { "zh-CN": "写入失败", "en-US": "Write failed" },
   "session.tool.editFailed": { "zh-CN": "修改失败", "en-US": "Edit failed" },
