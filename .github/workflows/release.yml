@@ -27,8 +27,11 @@ jobs:
     # Electron 发行包直连 github.com（~118MB 长传输）在 runner 出口网关上反复 504
     # （v0.5.4 重建连续两次在同一点失败，zip 到 100% 后网关超时）。改走 npmmirror 的
     # CDN——@electron/get / electron-builder 都认这个变量，zip 与 SHASUMS256 一并换源。
+    # electron-builder 自家的 NSIS 辅助二进制同样从 github.com 拉、同样 504（第三次失败点），
+    # 用对应镜像变量一并换源（7zip@1.0.0 来自 npm registry，不受影响）。
     env:
       ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+      ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
     steps:
       - uses: actions/checkout@v4
 
