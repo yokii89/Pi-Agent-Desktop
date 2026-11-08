@@ -1,3 +1,5 @@
+import { copyFile, stat } from "node:fs/promises";
+import path from "node:path";
 import { app } from "electron";
 import { autoUpdater } from "electron-updater";
 import {
@@ -8,9 +10,18 @@ import {
   type UpdateStatus,
 } from "../../shared/update";
 import { getMainWindow } from "../window/createMainWindow";
+import { updaterLogger } from "./updaterLogger";
 
 /** 启动静默检查的延迟：避开启动高峰，失败不打扰用户。 */
 const STARTUP_CHECK_DELAY_MS = 8_000;
+
+/**
+ * electron-updater 差量基准文件名（缓存根下的 installer.exe 与 current.blockmap）。
+ * builder-util-runtime 是传递依赖（pnpm 布局下主进程解析不到），不能 import 其常量，
+ * 按值对齐：CURRENT_APP_INSTALLER_FILE_NAME 与 AppUpdater.saveBlockMapToCacheDir 的硬编码。
+ */
+const DIFFERENTIAL_BASE_INSTALLER_NAME = "installer.exe";
+const DIFFERENTIAL_BASE_BLOCKMAP_NAME = "current.blockmap";
 
 let status: UpdateStatus = { state: "idle" };
 let wired = false;
@@ -66,6 +77,11 @@ export function initUpdater(): void {
 
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+
+  // 默认 logger 是 console：打包环境 GUI 无控制台，差量回退全量等关键链路日志全部丢失
+  //（0.5.5→0.5.6 排障只能靠缓存目录取证）。接上文件日志（userData/updater.log），
+  // console 镜像保留给 dev 终端。
+  autoUpdater.logger = updaterLogger;
 
   // 运行时强制覆盖发布源：0.2.x 旧包内的 app-update.yml 指向已停用的 yokii89/PiDesk，
   // 不覆盖则那些客户端的自动检查永远失败。与 electron-builder.yml publish 同源（PIDESK_RELEASE_REPO）。
@@ -205,6 +221,43 @@ export function checkForUpdates(options?: { silent?: boolean }): Promise<UpdateS
   return checkInFlight;
 }
 
+/**
+ * 下载成功后补齐差量基准对（缓存根下的 installer.exe + current.blockmap）。
+ * electron-updater 6.8.9 只把下载产物留在 pending/（带版本号文件名）、只把 blockmap 拷到缓存根，
+ * 从不写基准 installer.exe——基准缺失时差量直接回退全量，基准陈旧时按旧 blockmap 复制错块、
+ * sha512 校验失败后回退全量（0.5.5→0.5.6 实测：基准停在 0.5.3，白下 17.5MB 差量后回退 103MB 全量）。
+ * 这里补上 exe 那一半，下次更新才能按真实差量下载。
+ */
+async function refreshDifferentialBase(downloadedInstaller: string | undefined): Promise<void> {
+  if (!downloadedInstaller) {
+    updaterLogger.warn("[updater] downloadUpdate 未返回产物路径，跳过差量基准刷新");
+    return;
+  }
+  // executeDownload 把产物固定放在 <缓存根>/pending/<文件名>，向上两级即缓存根
+  const pendingDir = path.dirname(downloadedInstaller);
+  const cacheRoot = path.dirname(pendingDir);
+  const hasNewBlockmap = await stat(path.join(pendingDir, DIFFERENTIAL_BASE_BLOCKMAP_NAME)).then(
+    () => true,
+    () => false,
+  );
+  if (!hasNewBlockmap) {
+    // pending 里没有新版 blockmap = 差量阶段早期失败（连新版 blockmap 都没存下）走的全量兜底。
+    // 此时只换 exe 会造出 (新 exe, 旧 blockmap) 错配对：下次差量按旧 blockmap 复制新 exe 的块，
+    // sha512 必挂再回退——比陈旧但自洽的基准更糟，保持不动，等下次成功下载一起刷新。
+    updaterLogger.warn("[updater] pending 中无新版 blockmap，保持旧差量基准不动");
+    return;
+  }
+  const baseInstallerPath = path.join(cacheRoot, DIFFERENTIAL_BASE_INSTALLER_NAME);
+  try {
+    await copyFile(downloadedInstaller, baseInstallerPath);
+    updaterLogger.info(`[updater] 差量基准已刷新: ${baseInstallerPath}`);
+  } catch (err) {
+    // 复制失败不影响本次安装（产物 sha512 已校验），代价只是下次更新继续回退全量；
+    // 即使半途留下损坏的基准，下次差量自身的 sha512 末校验也会拦住并回退，不会装出坏包。
+    updaterLogger.warn("[updater] 差量基准刷新失败:", err);
+  }
+}
+
 /** 下载更新安装包；仅打包环境可用。 */
 export async function downloadUpdate(): Promise<UpdateStatus> {
   initUpdater();
@@ -228,7 +281,9 @@ export async function downloadUpdate(): Promise<UpdateStatus> {
   downloading = true;
   pushStatus({ state: "downloading", percent: 0 });
   try {
-    await autoUpdater.downloadUpdate();
+    // downloadUpdate 返回下载产物路径（<缓存根>/pending/<安装包>），据此维护差量基准
+    const [downloadedInstaller] = await autoUpdater.downloadUpdate();
+    await refreshDifferentialBase(downloadedInstaller);
     return status;
   } catch (err) {
     downloading = false;
