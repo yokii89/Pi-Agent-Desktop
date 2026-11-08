@@ -55,6 +55,12 @@ jobs:
             ci-binaries-electron-
 
       - name: 安装依赖
+        env:
+          # electron 的 postinstall 会下载 Electron 发行包（~110MB），是 CI 网络抖动的重灾区；
+          # 打包链路用的是 electron-builder 自己经 @electron/get 的下载（见上一步缓存覆盖），
+          # 不读 node_modules/electron/dist，tsc / vite 构建同样不需要二进制——CI 直接跳过。
+          # 代价：pnpm start / pnpm dev 在 CI 环境不可用，但发版流程没有这一步。
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: pnpm install --frozen-lockfile
 
       - name: 打包（NSIS 安装包）
