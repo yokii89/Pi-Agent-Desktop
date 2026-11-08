@@ -10,6 +10,7 @@ import {
 } from "../../stores/extensionViewStore";
 import { useSessionEntries, useSessionMeta } from "../../stores/sessionStore";
 import {
+  type AssistantBlock,
   findRetrySurfaceId,
   type SessionEntry,
   type SnapshotEntry,
@@ -33,6 +34,55 @@ const EMPTY_STREAMS: ExtensionViewEntry[] = [];
 
 /** 未读条数超过该值时按钮只显示条数，不再估算行数。 */
 const UNREAD_LINE_PX = 24;
+
+/**
+ * 渲染单元：非 assistant 条目原样；连续 assistant 消息合并为一个单元。
+ * pi 的 agent 循环每轮模型响应（thinking + toolcall）都是独立消息，逐条渲染会让
+ * 活动组折叠粒度细碎到「每轮一组」——折叠边界必须提升到「正文段落」（docs 会话
+ * 折叠设计），而正文段落天然允许跨消息：text 块在 groupFlow 里打断段落。
+ */
+interface AssistantRenderUnit {
+  type: "assistant";
+  /** 首条消息 id：流式期间稳定，作 React key 与 data-entry-id。 */
+  id: string;
+  /** 参与合并的消息 id：扩展视图 afterStreams 锚点并集按它收集。 */
+  entryIds: string[];
+  blocks: AssistantBlock[];
+}
+
+type RenderUnit = { type: "entry"; entry: SessionEntry } | AssistantRenderUnit;
+
+function coalesceAssistantRuns(entries: SessionEntry[]): RenderUnit[] {
+  const units: RenderUnit[] = [];
+  let pending: AssistantRenderUnit | null = null;
+  const flush = (): void => {
+    if (pending) {
+      units.push(pending);
+      pending = null;
+    }
+  };
+  for (const entry of entries) {
+    if (entry.kind === "assistant") {
+      if (pending) {
+        pending.entryIds.push(entry.id);
+        pending.blocks.push(...entry.blocks);
+      } else {
+        pending = {
+          type: "assistant",
+          id: entry.id,
+          entryIds: [entry.id],
+          blocks: [...entry.blocks],
+        };
+      }
+      continue;
+    }
+    // 任何非 assistant 条目（run 头 / 通知 / 快照 / 汇总卡…）都是流上的独立条目，打断合并
+    flush();
+    units.push({ type: "entry", entry });
+  }
+  flush();
+  return units;
+}
 
 /**
  * 自研会话视图（docs/design/03 §3.3 + docs/design/13）：
@@ -216,6 +266,8 @@ export function SessionView() {
           })
         : undefined;
 
+  const renderUnits = coalesceAssistantRuns(entries);
+
   return (
     <div className={styles.view}>
       {showRestoreHint && (
@@ -242,7 +294,21 @@ export function SessionView() {
             </div>
           ) : (
             <>
-              {entries.map((entry) => {
+              {renderUnits.map((unit) => {
+                if (unit.type === "assistant") {
+                  return (
+                    <EntryRow
+                      key={unit.id}
+                      entry={{ kind: "assistant", id: unit.id, blocks: unit.blocks }}
+                      isLatestEdits={false}
+                      isLastUser={false}
+                      coldStart={false}
+                      showRetry={unit.entryIds.some((id) => id === retrySurfaceId)}
+                      afterStreams={unit.entryIds.flatMap((id) => streamsAfter.get(id) ?? [])}
+                    />
+                  );
+                }
+                const entry = unit.entry;
                 const entryIsLastUser = entry.kind === "user" && entry.id === lastUserId;
                 return (
                   <EntryRow
