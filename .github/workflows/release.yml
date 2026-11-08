@@ -24,6 +24,11 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
+    # Electron 发行包直连 github.com（~118MB 长传输）在 runner 出口网关上反复 504
+    # （v0.5.4 重建连续两次在同一点失败，zip 到 100% 后网关超时）。改走 npmmirror 的
+    # CDN——@electron/get / electron-builder 都认这个变量，zip 与 SHASUMS256 一并换源。
+    env:
+      ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
     steps:
       - uses: actions/checkout@v4
 
