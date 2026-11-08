@@ -2,6 +2,7 @@ import { app } from "electron";
 import { autoUpdater } from "electron-updater";
 import {
   isVersionNewer,
+  PIDESK_RELEASE_REPO,
   UPDATE_GITHUB_LATEST_URL,
   UPDATE_IPC,
   type UpdateStatus,
@@ -48,6 +49,12 @@ function clampPercent(raw: number): number {
   return Math.max(0, Math.min(100, Math.round(raw)));
 }
 
+/** 字节数兜底：事件缺字段 / 非法值时返回 undefined，不让 NaN 进状态机。 */
+function clampBytes(raw: number | undefined): number | undefined {
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) return undefined;
+  return Math.round(raw);
+}
+
 /**
  * 接线 electron-updater 事件（幂等）。
  * `autoDownload=false`：下载由用户点「下载并安装」触发，符合手动检查语义。
@@ -59,6 +66,12 @@ export function initUpdater(): void {
 
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+
+  // 运行时强制覆盖发布源：0.2.x 旧包内的 app-update.yml 指向已停用的 yokii89/PiDesk，
+  // 不覆盖则那些客户端的自动检查永远失败。与 electron-builder.yml publish 同源（PIDESK_RELEASE_REPO）。
+  if (app.isPackaged) {
+    autoUpdater.setFeedURL({ provider: "github", ...PIDESK_RELEASE_REPO });
+  }
 
   autoUpdater.on("checking-for-update", () => {
     if (!checking) pushStatus({ state: "checking" });
@@ -78,7 +91,12 @@ export function initUpdater(): void {
     pushStatus({ state: "not-available" });
   });
   autoUpdater.on("download-progress", (progress) => {
-    pushStatus({ state: "downloading", percent: clampPercent(progress.percent) });
+    pushStatus({
+      state: "downloading",
+      percent: clampPercent(progress.percent),
+      bytesTransferred: clampBytes(progress.transferred),
+      totalBytes: clampBytes(progress.total),
+    });
   });
   autoUpdater.on("update-downloaded", () => {
     downloading = false;

@@ -1,11 +1,12 @@
 /* 全局基础样式：重置 + 应用级外观。业务组件样式请跟随组件的 *.module.css。 */
 
-/* OPPO Sans 4.0：可变字体（Light→Bold 多字重，wght 轴 0–200）。
+/* OPPO Sans 4.0：可变字体（Light→Bold 多字重，fvar wght 轴 100–700）。
    文件从 src/shared/font 迁入 src/renderer/assets/fonts —— Vite 资源管线只覆盖 src/renderer，
-   故不能留在 src/shared。font-weight 声明为 1 1000 以映射整条可变轴，bold 为真实粗体而非合成。 */
+   故不能留在 src/shared。font-weight 声明为 1 1000 以映射整条可变轴，bold 为真实粗体而非合成。
+   采用 WOFF2（brotli 无损压缩，轮廓级校验与原 TTF 逐字形一致；22.7MB→13.6MB，安装包体积敏感）。 */
 @font-face {
   font-family: "OPPO Sans";
-  src: url(../assets/fonts/OPPO-Sans-4.0.ttf) format("truetype");
+  src: url(../assets/fonts/OPPO-Sans-4.0.woff2) format("woff2");
   font-weight: 1 1000;
   font-style: normal;
   font-display: swap;

@@ -17,7 +17,14 @@ export type UpdateStatus =
       /** false = 未打包，只能打开下载页。 */
       canInstall: boolean;
     }
-  | { state: "downloading"; percent: number }
+  | {
+      state: "downloading";
+      percent: number;
+      /** 已传输字节（差分下载时远小于安装包体积——差分生效的直接证据）。 */
+      bytesTransferred?: number;
+      /** 本次下载总字节；未知为 undefined。 */
+      totalBytes?: number;
+    }
   | { state: "downloaded" }
   | { state: "error"; message: string };
 
@@ -36,8 +43,19 @@ export const UPDATE_IPC = {
   status: "pidesk:update:status",
 } as const;
 
-/** PiDesk 开源仓库（设置 →「开源」展示，与下面的发布通道同源）。 */
-export const PIDESK_REPO_URL = "https://github.com/yokii89/Pi-Agent-Desktop";
+/**
+ * GitHub 发布仓库（owner/repo）。单一真值源：
+ * - electron-builder.yml 的 publish 块与之保持一致（构建期写入 app-update.yml）；
+ * - updaterService 在打包环境用它 setFeedURL 运行时兜底——0.2.x 旧包内的 app-update.yml
+ *   指向已停用的 yokii89/PiDesk，覆盖后旧客户端才能恢复自动更新。
+ */
+export const PIDESK_RELEASE_REPO = {
+  owner: "yokii89",
+  repo: "Pi-Agent-Desktop",
+} as const;
+
+/** PiDesk 开源仓库（设置 →「开源」展示，与上面的发布通道同源）。 */
+export const PIDESK_REPO_URL = `https://github.com/${PIDESK_RELEASE_REPO.owner}/${PIDESK_RELEASE_REPO.repo}`;
 
 /** 发布页 URL（开发模式降级「打开下载页」、错误兜底）。 */
 export const UPDATE_RELEASES_URL = `${PIDESK_REPO_URL}/releases`;

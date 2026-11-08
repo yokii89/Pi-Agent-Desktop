@@ -437,6 +437,13 @@ export function ProjectsPanel() {
   );
 }
 
+/** 字节数 → "12.3 MB"；不足 1MB 保留 KB，防止差分下载初期显示 "0.0 MB"。 */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function updateStatusText(t: TranslateFn, status: UpdateStatus): string {
   switch (status.state) {
     case "checking":
@@ -445,8 +452,17 @@ function updateStatusText(t: TranslateFn, status: UpdateStatus): string {
       return t("settings.about.update.upToDate");
     case "available":
       return t("settings.about.update.available", { version: status.version });
-    case "downloading":
+    case "downloading": {
+      // totalBytes 出现即透传字节进度：差分下载生效时 total 会远小于完整安装包，
+      // 这是用户可直接观测到「增量更新在生效」的地方
+      if (status.totalBytes !== undefined && status.bytesTransferred !== undefined) {
+        return t("settings.about.update.downloadingBytes", {
+          percent: status.percent,
+          bytes: `${formatBytes(status.bytesTransferred)} / ${formatBytes(status.totalBytes)}`,
+        });
+      }
       return t("settings.about.update.downloading", { percent: status.percent });
+    }
     case "downloaded":
       return t("settings.about.update.downloaded");
     case "error":

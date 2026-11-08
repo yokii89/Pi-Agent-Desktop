@@ -63,21 +63,28 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 
 任何新增依赖（运行时或开发时）必须先在此处登记用途，再安装。
 
+**依赖分类契约（安装包体积基线，2026-11-08 瘦身确立）**：`dependencies` 只放**主进程运行时需要
+node_modules 解析**的包（当前仅 `electron-updater` / `node-pty` / `sql.js`——主进程走 tsc 编译不打包）；
+渲染层依赖（react、gsap、mermaid、shiki、@phosphor-icons/react、@lobehub/icons、@xterm/* 等）一律
+`devDependencies`——它们已被 vite 打进 `dist/`，electron-builder 只打包 `dependencies`，放错分类
+会把整包源码塞进 asar（曾致安装包虚胖 ~70MB）。新增主进程外部依赖 → 进 `dependencies` 并补登记；
+新增渲染层依赖 → 进 `devDependencies`。
+
 已登记依赖补充说明：
 
 - `@types/node`（dev）：主进程 / 预加载的 Node API 类型，TypeScript strict 必需。
-- `@phosphor-icons/react`（runtime）：UI 图标唯一图标库，见上文图标规范。
-- `@lobehub/icons`（runtime）：AI / 模型厂商品牌 logo（设置 →「模型」的 provider 图标），见「第三方 AI 品牌 logo」一节；**只允许深引单图标组件**（`@lobehub/icons/es/<Icon>/components/Mono` / `Color`），禁止整包 `import … from "@lobehub/icons"`——主入口会把 @lobehub/ui、lucide-react 等 peer 一并拉进依赖图。
-- `@xterm/addon-fit`（runtime）：xterm 终端的容器尺寸自适应插件，与 `@xterm/xterm` 配套使用（仅中央工作区底部的终端面板）。
-- `react-markdown` + `remark-gfm`（runtime）：会话区 AI 回复的 Markdown 文档流渲染（GFM 表格/任务列表/删除线）。
-- `remark-breaks`（runtime）：会话正文与思考流的软换行渲染为 `<br>`（模型输出的单换行是段内换行语义）；仅 `MarkdownDoc` 的 `breaks` surface 使用，文件面板预览与 ExtensionView 不开。
-- `gsap`（runtime）：左侧边栏的展开/折叠、悬浮揭示等交互动效；**必须动态 `import()` 使用**（见下文"动效规范"），不得静态引入。
+- `@phosphor-icons/react`（devDep，渲染层构建期打包）：UI 图标唯一图标库，见上文图标规范。
+- `@lobehub/icons`（devDep，渲染层构建期打包）：AI / 模型厂商品牌 logo（设置 →「模型」的 provider 图标），见「第三方 AI 品牌 logo」一节；**只允许深引单图标组件**（`@lobehub/icons/es/<Icon>/components/Mono` / `Color`），禁止整包 `import … from "@lobehub/icons"`——主入口会把 @lobehub/ui、lucide-react 等 peer 一并拉进依赖图。
+- `@xterm/addon-fit`（devDep，渲染层构建期打包）：xterm 终端的容器尺寸自适应插件，与 `@xterm/xterm` 配套使用（仅中央工作区底部的终端面板）。
+- `react-markdown` + `remark-gfm`（devDep，渲染层构建期打包）：会话区 AI 回复的 Markdown 文档流渲染（GFM 表格/任务列表/删除线）。
+- `remark-breaks`（devDep，渲染层构建期打包）：会话正文与思考流的软换行渲染为 `<br>`（模型输出的单换行是段内换行语义）；仅 `MarkdownDoc` 的 `breaks` surface 使用，文件面板预览与 ExtensionView 不开。
+- `gsap`（devDep，渲染层构建期打包）：左侧边栏的展开/折叠、悬浮揭示等交互动效；**必须动态 `import()` 使用**（见下文"动效规范"），不得静态引入。
 - `@electron/rebuild`（dev）：`node-pty` 原生模块针对 Electron ABI 的重编译（`pnpm run rebuild:native`）。
-- `sql.js`（runtime）：主进程用 WASM SQLite 读取本机 Chromium Cookie 库副本（浏览器登录态导入）；不引入 native SQLite。
-- `shiki`（runtime）：右侧「文件」面板只读预览的代码语法高亮（TextMate 文法 + 双主题 CSS 变量）；经 `shiki/core` 细粒度动态加载，禁止整包 `import "shiki"` 静态引入。
+- `sql.js`（runtime，主进程运行时依赖）：主进程用 WASM SQLite 读取本机 Chromium Cookie 库副本（浏览器登录态导入）；不引入 native SQLite。electron-builder 只保留 `dist/sql-wasm.js` + `dist/sql-wasm.wasm`（见 electron-builder.yml files 规则）。
+- `shiki`（devDep，渲染层构建期打包）：右侧「文件」面板只读预览的代码语法高亮（TextMate 文法 + 双主题 CSS 变量）；经 `shiki/core` 细粒度动态加载，禁止整包 `import "shiki"` 静态引入。
 - `@vitest/coverage-v8`（dev）：`packages/view-sdk` 的行/分支覆盖率口径（`pnpm test:sdk:coverage`）。版本必须与 `vitest` 主版本配对；**仅 SDK 测试用**，不扩展到主进程 / 渲染层（后者仍按本文件"测试"条款只跑断言）。`NODE_V8_COVERAGE` 对 vitest worker 无效，不要再试。
-- `electron-updater`（runtime）：设置 →「应用更新」的检查/下载/安装。GitHub Releases + NSIS `latest.yml`/blockmap；发布流程见 `scripts/release.mjs` 与 `.github/workflows/release.yml`。
-- `mermaid`（runtime）：会话区 / 文件面板 / ExtensionView 的 ` ```mermaid ` 围栏出图。**只能经 `src/renderer/utils/mermaidLoader.ts` 动态 `import()`**（同 GSAP 条款）——它自带 60+ 个按图表类型切分的惰性 chunk（含 elk 布局引擎），静态引入会把它们全部塞进主 bundle。**不写 `manualChunks` 规则**：mermaid 内部已是动态 import，强行归组反而废掉惰性分块。CSP 无需放宽（`securityLevel: "strict"` 下生产策略实测可跑）。
+- `electron-updater`（runtime，主进程运行时依赖）：设置 →「应用更新」的检查/下载/安装。GitHub Releases + NSIS `latest.yml`/blockmap（差分更新：本地缓存有旧安装包时自动差分下载）；发布流程见 `scripts/release.mjs` 与 `.github/workflows/release.yml`。
+- `mermaid`（devDep，渲染层构建期打包）：会话区 / 文件面板 / ExtensionView 的 ` ```mermaid ` 围栏出图。**只能经 `src/renderer/utils/mermaidLoader.ts` 动态 `import()`**（同 GSAP 条款）——它自带 60+ 个按图表类型切分的惰性 chunk（含 elk 布局引擎），静态引入会把它们全部塞进主 bundle。**不写 `manualChunks` 规则**：mermaid 内部已是动态 import，强行归组反而废掉惰性分块。CSP 无需放宽（`securityLevel: "strict"` 下生产策略实测可跑）。
 
 多模态图片附件**零新依赖**：解码/缩放用浏览器 `createImageBitmap` + `canvas`，不引入 sharp / jimp 等图像库。
 

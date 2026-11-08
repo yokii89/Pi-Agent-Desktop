@@ -978,6 +978,10 @@ export const settingsMessages = defineMessages({
     "zh-CN": "正在下载… {percent}%",
     "en-US": "Downloading… {percent}%",
   },
+  "settings.about.update.downloadingBytes": {
+    "zh-CN": "正在下载… {percent}% · {bytes}",
+    "en-US": "Downloading… {percent}% · {bytes}",
+  },
   "settings.about.update.downloaded": {
     "zh-CN": "安装包已就绪，重启后完成更新",
     "en-US": "Installer ready — restart to finish updating",

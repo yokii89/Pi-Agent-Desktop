@@ -12,13 +12,35 @@ files:
   # 窗口/任务栏/安装包图标的实际来源是上面的 icon 字段（由 electron-builder 编译进 EXE 资源）。
   - build/icon.ico
   - build/icon.png
-# node-pty 的 win32 prebuilds 含 .node / winpty.dll / winpty-agent.exe 等 PE 文件：
-# Windows 无法从 asar 归档内加载原生模块、也无法拉起归档内的 agent 进程，必须整体解包成真实文件。
+  # 打包进 asar 的 node_modules 仅限主进程运行时依赖（package.json "dependencies"，当前仅
+  # electron-updater / node-pty / sql.js 及其传递依赖）；渲染层依赖已被 vite 打进 dist，
+  # 一律放 devDependencies，electron-builder 默认不打包它们。
+  # sql.js 全量 22MB，运行时只经 locateFile/require.resolve 加载两个文件，其余全部剔除。
+  - "!**/node_modules/sql.js/dist/**"
+  - "node_modules/sql.js/dist/sql-wasm.js"
+  - "node_modules/sql.js/dist/sql-wasm.wasm"
+  # node-pty 剔除调试符号、非目标平台 prebuilds（只发 win32-x64）与运行时死重：
+  # build/Release、deps/、third_party/ 是 node-gyp 构建产物与 winpty/conpty 源码镜像——
+  # packaged 环境的 .node 一定来自 prebuilds/（loadNativeModule 依次尝试 build/Release →
+  # build/Debug → prebuilds/，而 build/Release 内并无 .node），conpty 配套 dll/exe 与 .node
+  # 同目录互找，prebuilds/win32-x64/conpty/ 已自带；src/、scripts/ 为 TS 源码与构建脚本。
+  - "!**/*.pdb"
+  - "!**/node_modules/node-pty/prebuilds/{darwin-*,win32-arm64}/**"
+  - "!**/node_modules/node-pty/{build,deps,third_party,src,scripts}/**"
+# node-pty 的 prebuilds 含 .node / winpty.dll / winpty-agent.exe / conpty/OpenConsole.exe 等 PE 文件：
+# Windows 无法从 asar 归档内加载原生模块、也无法拉起归档内的 agent 进程，必须解包成真实文件。
+# 仅解包 prebuilds（Electron 会把归档内已解包路径的 dlopen / 子进程启动透明重定向到 app.asar.unpacked）；
+# node-pty 的 JS 仍留在 asar。整包解包（旧配置）会把 ~55MB 的 pdb 与非目标平台文件也摊到磁盘上。
 asarUnpack:
-  - "**/node_modules/node-pty/**"
+  - "**/node_modules/node-pty/prebuilds/**"
 # node-pty 1.1.0 自带的 prebuilds 是 N-API（跨 Node / Electron ABI 通用，打包前由 scripts/package.mjs 预检在位），
 # 不需要 electron-builder 再按 Electron ABI 重编 node-gyp——那一步在 pnpm 布局下既慢又容易失败。
 npmRebuild: false
+# Chromium 的 locales .pak 有 50+ 种语言（win-unpacked 实测 47MB），应用 UI 只有 zh-CN / en-US；
+# electron-updater 的错误文案也只做这两语。裁掉其余语言可直接砍安装包体积。
+electronLanguages:
+  - en-US
+  - zh-CN
 win:
   target:
     - target: nsis
@@ -29,6 +51,8 @@ nsis:
   allowToChangeInstallationDirectory: true
   artifactName: PiDesk-Setup-${version}.${ext}
 # 显式 GitHub 发布源：electron-updater 读 app-update.yml / latest.yml（docs/design/35）。
+# 必须与 src/shared/update.ts 的 PIDESK_RELEASE_REPO 保持一致——updaterService 启动时会用该常量
+# setFeedURL 运行时兜底，覆盖 0.2.x 旧包 app-update.yml 里指向已停用 repo 的发布源。
 # 构建仍用 --publish=never，发布统一由 CI 的 gh release 完成。
 publish:
   provider: github
