@@ -34,6 +34,19 @@ export const WINDOW_IPC = {
   openExternal: "pidesk:window:openExternal",
 } as const;
 
+/**
+ * 系统剪贴板（docs/design/135）：渲染层把后台渲染好的 PNG dataURL 递过来写入剪贴板。
+ * 写剪贴板必须走主进程（渲染层拿不到 Electron clipboard），文本仍走 navigator.clipboard。
+ */
+export const CLIPBOARD_IPC = {
+  writeImage: "pidesk:clipboard:writeImage",
+} as const;
+
+/** 写入 clipboard.writeImage 的请求体：只接受 PNG dataURL。 */
+export interface ClipboardWriteImageRequest {
+  dataUrl: string;
+}
+
 /** 检查器系统级浮窗（docs/design/38）：停靠 ⇄ 浮窗单一宿主 + 状态移交。 */
 export const INSPECTOR_FLOAT_IPC = {
   /** 主窗请求打开浮窗，并暂存 handoff 快照。 */

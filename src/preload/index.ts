@@ -41,6 +41,7 @@ import type {
   BrowserSetActiveInstanceRequest,
   BrowserViewportRequest,
   BrowserZoomRequest,
+  ClipboardWriteImageRequest,
   ExtensionPushMessage,
   FsListResult,
   FsReadResult,
@@ -140,6 +141,7 @@ import type {
 import {
   AUTH_IPC,
   BROWSER_IPC,
+  CLIPBOARD_IPC,
   EXTENSION_IPC,
   FAVICON_IPC,
   FS_IPC,
@@ -207,6 +209,14 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 用系统默认浏览器打开 http(s) 外链。 */
     openExternal: (url: string): Promise<IpcResult<null>> =>
       ipcRenderer.invoke(WINDOW_IPC.openExternal, { url }),
+  },
+
+  clipboard: {
+    /** 把 PNG dataURL 写入系统剪贴板（表格「复制为图片」）。 */
+    writeImage: (dataUrl: string): Promise<IpcResult<null>> => {
+      const request: ClipboardWriteImageRequest = { dataUrl };
+      return ipcRenderer.invoke(CLIPBOARD_IPC.writeImage, request);
+    },
   },
 
   inspectorFloat: {

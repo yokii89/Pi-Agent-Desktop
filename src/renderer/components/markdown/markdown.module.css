@@ -113,24 +113,99 @@
 }
 
 /* 宽表格在自身容器内横向滚动，不撑破会话列宽（docs/design/13 P0-3）：
-   table 无法直接 overflow，升级为块级滚动容器 */
-.md table {
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-  border-collapse: collapse;
+   table 无法直接 overflow，由外层滚动容器承担。
+   圆角落在容器上（`overflow-x: auto` 自带裁剪，docs/design/135）：表格只画内部网格线，
+   表头底色才能跟着卡片一起被裁成圆角；`border-collapse: collapse` 下外框线会被
+   弧线切成毛边，所以改用 separate + 逐格右/下边框。 */
+.tableWrap {
+  position: relative;
   margin: 0 0 var(--spacing-sm);
+}
+
+.tableScroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.md table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .md th,
 .md td {
-  border: 1px solid var(--color-border);
+  border: none;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
   padding: var(--spacing-xs) var(--spacing-sm);
   text-align: left;
 }
 
+.md tr > :last-child {
+  border-right: none;
+}
+
+.md tr:last-child > :is(th, td) {
+  border-bottom: none;
+}
+
 .md th {
   background: var(--color-bg-surface);
+}
+
+/* 表格右上角工具条（docs/design/135）：悬停 / 聚焦淡入，静止时不遮挡表头文字。
+   可见性靠 CSS（:hover / :focus-within）而不是 JS——动画中断时键盘用户仍能聚焦到它。 */
+.tableTools {
+  position: absolute;
+  top: var(--spacing-xs);
+  right: var(--spacing-xs);
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.tableWrap:hover .tableTools,
+.tableWrap:focus-within .tableTools {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tableTool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.tableTool:hover:not(:disabled) {
+  color: var(--color-text-strong);
+  background: var(--color-bg-hover);
+}
+
+.tableTool:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tableTool:focus-visible {
+  outline: 1px solid var(--color-accent);
 }
 
 .md a {
@@ -181,6 +256,14 @@
   user-select: none;
 }
 
+/* 围栏动作组（docs/design/136）：复制为图片 / 复制为文本，两枚图标按钮横排。
+   与表格工具条同一口径——可见性交给使用方（围栏头部常显，不遮挡语言标签）。 */
+.fenceActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .fenceCopy {
   display: inline-flex;
   align-items: center;
@@ -193,8 +276,15 @@
   transition: color 0.12s ease;
 }
 
-.fenceCopy:hover {
+.fenceCopy:hover:not(:disabled) {
   color: var(--color-text-strong);
+}
+
+/* 成像期间禁用再点：一张图几帧才出来，连点会叠着渲染 */
+.fenceCopy:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  cursor: default;
 }
 
 .fenceCopy:focus-visible {
@@ -231,7 +321,7 @@
   line-height: 1.4;
 }
 
-.fenceCompact .fenceCopy {
+.fenceCompact .fenceActions {
   flex: 0 0 auto;
 }
 

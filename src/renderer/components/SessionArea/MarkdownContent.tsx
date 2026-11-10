@@ -62,6 +62,7 @@ const StaticMarkdown = memo(function StaticMarkdown({
       codeCopy
       codeHighlight
       mermaid
+      tableTools
       streaming={streaming}
       breaks={breaks}
       className={[styles.session, className].filter(Boolean).join(" ")}

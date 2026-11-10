@@ -1,20 +1,23 @@
-import { Copy } from "@phosphor-icons/react";
+import { Copy, ImageSquare } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { isValidElement, memo, useEffect, useState } from "react";
+import { isValidElement, memo, useEffect, useRef, useState } from "react";
 import type { Components } from "react-markdown";
 import Markdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { isHtmlPath } from "../../../shared/fileKinds";
 import { useT } from "../../hooks/useT";
+import { clipboardService } from "../../services/clipboardService";
 import { fsService } from "../../services/fsService";
 import { useBrowserStore } from "../../stores/browserStore";
 import { useUiStore } from "../../stores/uiStore";
+import { elementToPng } from "../../utils/elementToPng";
 import { isExternalHttpUrl } from "../../utils/linkify";
 import { normalizeFenceLang, resolveMarkdownRef } from "../../utils/markdownRefs";
 import { FileLink, looksLikeFilePath } from "../SessionArea/FileLink";
 import { CodeHighlight, countCodeLines } from "../ui/CodeHighlight";
 import { UrlLink } from "../ui/UrlLink";
+import { MarkdownTable } from "./MarkdownTable";
 import { MermaidBlock } from "./MermaidBlock";
 import styles from "./markdown.module.css";
 
@@ -68,7 +71,7 @@ interface MarkdownDocProps {
   sourcePath?: string | null;
   /** 块级围栏代码用 shiki 高亮（文件面板预览开，会话区维持现状关）。 */
   codeHighlight?: boolean;
-  /** 块级代码块外壳加悬浮「复制」按钮（会话区开，docs/design/12 P1-4）；与 codeHighlight 互斥使用。 */
+  /** 块级代码块外壳右上角加「复制为图片 / 复制为文本」（会话区开，docs/design/136）。 */
   codeCopy?: boolean;
   /**
    * 软换行渲染为 <br>（docs/design/29 缺陷 E）：模型输出的「序号行 + 单换行 + 正文」
@@ -77,6 +80,11 @@ interface MarkdownDocProps {
   breaks?: boolean;
   /** ` ```mermaid ` 围栏渲染成图表（docs/design/125）。关闭时维持普通源码围栏。 */
   mermaid?: boolean;
+  /**
+   * 表格右上角工具条（docs/design/135）：会话区开「复制为图片 / 复制 Markdown」。
+   * 与 codeCopy 同一口径——文件面板预览与 ExtensionView 只保留表格本体。
+   */
+  tableTools?: boolean;
   /**
    * 流式态：mermaid 只在块定型后出图，半途只走源码分支（docs/design/125）。
    * 半截围栏必然解析失败，逐 delta 试错会让图反复闪并重排整段对话。
@@ -93,13 +101,14 @@ function flattenText(node: ReactNode): string {
 }
 
 /**
- * 块级围栏统一外壳（docs/design/13 P1-5）：语言标签 + 可选「复制」按钮 + 可选 shiki 高亮。
- * - 单行走紧凑态（docs/design/85）：不出头部行，代码与复制按钮同一行、垂直居中，
+ * 块级围栏统一外壳（docs/design/13 P1-5、136）：语言标签 + 右上角动作组 + 可选 shiki 高亮。
+ * - 单行走紧凑态（docs/design/85）：不出头部行，代码与动作组同一行、垂直居中，
  *   语言标签与高亮都不出现，无语言 / 有语言的单行长得完全一样；
  * - mermaid 围栏整块交给 MermaidBlock（外壳与头部由它自己按同一套类渲染）；
  * - 有语言且未超护栏 → CodeHighlight（shiki，双主题）；
  * - 无语言 / 超护栏 / 未开高亮 → 纯 <pre>；
- * - 复制按钮随 codeCopy 开关（会话区开），语言标签有语言即显示。
+ * - 动作组随 codeCopy 开关（会话区开）：复制为图片 / 复制为文本；
+ *   容器带 `data-capture-skip`，成像时连按钮一起摘掉，图片里不会出现自己。
  * 挂在 components.pre 上，CodeHighlight 自带 <pre>，避免嵌套。
  */
 function FenceShell({
@@ -117,6 +126,8 @@ function FenceShell({
 }) {
   const { showToast } = useUiStore();
   const t = useT();
+  const fenceRef = useRef<HTMLDivElement>(null);
+  const [rendering, setRendering] = useState(false);
   const child = isValidElement(children)
     ? (children.props as { className?: string; children?: ReactNode })
     : null;
@@ -142,30 +153,54 @@ function FenceShell({
     knownLang &&
     code.length <= MAX_HIGHLIGHT_CHARS &&
     countCodeLines(code) <= MAX_HIGHLIGHT_LINES;
-  const copyButton = codeCopy ? (
-    <button
-      type="button"
-      className={styles.fenceCopy}
-      title={t("common.copyCode")}
-      aria-label={t("common.copyCode")}
-      onClick={() => {
-        void navigator.clipboard
-          .writeText(code)
-          .then(() => showToast(t("common.copied")))
-          .catch(() => showToast(t("common.copyFailed")));
-      }}
-    >
-      <Copy size={14} weight="regular" />
-    </button>
+  const copyText = (): void => {
+    void navigator.clipboard
+      .writeText(code)
+      .then(() => showToast(t("common.copied")))
+      .catch(() => showToast(t("common.copyFailed")));
+  };
+  const copyImage = (): void => {
+    const el = fenceRef.current;
+    if (!el || rendering) return;
+    setRendering(true);
+    void elementToPng(el, { expandWidth: true })
+      .then((png) => clipboardService.writeImageDataUrl(png.dataUrl))
+      .then(() => showToast(t("common.codeImageCopied")))
+      .catch(() => showToast(t("common.copyFailed")))
+      .finally(() => setRendering(false));
+  };
+  const tools = codeCopy ? (
+    <div className={styles.fenceActions} data-capture-skip="">
+      <button
+        type="button"
+        className={styles.fenceCopy}
+        title={t("common.copyCodeImage")}
+        aria-label={t("common.copyCodeImage")}
+        disabled={rendering}
+        onClick={copyImage}
+      >
+        <ImageSquare size={14} weight="regular" />
+      </button>
+      <button
+        type="button"
+        className={styles.fenceCopy}
+        title={t("common.copyCodeText")}
+        aria-label={t("common.copyCodeText")}
+        onClick={copyText}
+      >
+        <Copy size={14} weight="regular" />
+      </button>
+    </div>
   ) : null;
   return (
     <div
+      ref={fenceRef}
       className={[styles.fence, singleLine ? styles.fenceCompact : ""].filter(Boolean).join(" ")}
     >
       {!singleLine && (knownLang || codeCopy) && (
         <div className={styles.fenceHeader}>
           <span className={styles.fenceLang}>{knownLang ? lang : ""}</span>
-          {copyButton}
+          {tools}
         </div>
       )}
       {highlightable ? (
@@ -173,7 +208,7 @@ function FenceShell({
       ) : (
         <pre>{children}</pre>
       )}
-      {singleLine && copyButton}
+      {singleLine && tools}
     </div>
   );
 }
@@ -308,6 +343,7 @@ function buildComponents(opts: {
   codeHighlight?: boolean;
   codeCopy?: boolean;
   mermaid?: boolean;
+  tableTools?: boolean;
   streaming?: boolean;
 }): Components {
   const components: Components = {
@@ -333,6 +369,13 @@ function buildComponents(opts: {
       >
         {props.children}
       </MarkdownLink>
+    ),
+    // 表格一律套外壳：圆角卡片 + 横向滚动容器（docs/design/135）。
+    // 工具条只在会话区开，组件始终复用同一条渲染路径。
+    table: (props) => (
+      <MarkdownTable node={props.node} tools={opts.tableTools ?? false}>
+        {props.children}
+      </MarkdownTable>
     ),
   };
   if (opts.codeHighlight || opts.codeCopy || opts.mermaid) {
@@ -368,13 +411,21 @@ export const MarkdownDoc = memo(function MarkdownDoc({
   codeCopy,
   breaks = false,
   mermaid = false,
+  tableTools = false,
   streaming = false,
 }: MarkdownDocProps) {
   return (
     <div className={[styles.md, className].filter(Boolean).join(" ")}>
       <Markdown
         remarkPlugins={breaks ? remarkPluginsWithBreaks : remarkPlugins}
-        components={buildComponents({ sourcePath, codeHighlight, codeCopy, mermaid, streaming })}
+        components={buildComponents({
+          sourcePath,
+          codeHighlight,
+          codeCopy,
+          mermaid,
+          tableTools,
+          streaming,
+        })}
       >
         {text}
       </Markdown>

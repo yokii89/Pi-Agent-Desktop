@@ -1,5 +1,6 @@
 import type { IpcResult } from "../../shared/ipc";
 import { registerBrowserIpc } from "../browser/browserIpc";
+import { registerClipboardIpc } from "../clipboard/clipboardIpc";
 import { registerCatalogIpc } from "../extension/catalogIpc";
 import { registerExtensionIpc } from "../extension/extensionIpc";
 import { registerWorkerIpc } from "../extension/workerIpc";
@@ -31,6 +32,7 @@ import { registerWindowIpc } from "../window/windowIpc";
 export function registerIpc(): void {
   const registrars = [
     registerWindowIpc,
+    registerClipboardIpc,
     registerSettingsIpc,
     registerNotificationIpc,
     registerProjectIpc,

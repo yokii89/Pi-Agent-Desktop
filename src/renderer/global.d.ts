@@ -159,6 +159,10 @@ export interface PideskGlobalApi {
     onWindowStateChange(callback: (isMaximized: boolean) => void): () => void;
     openExternal(url: string): Promise<IpcResult<null>>;
   };
+  clipboard: {
+    /** 把 PNG dataURL 写入系统剪贴板（表格「复制为图片」）。 */
+    writeImage(dataUrl: string): Promise<IpcResult<null>>;
+  };
   inspectorFloat: {
     open(handoff?: InspectorFloatHandoff | null): Promise<IpcResult<boolean>>;
     dock(handoff?: InspectorFloatHandoff | null): Promise<IpcResult<null>>;
