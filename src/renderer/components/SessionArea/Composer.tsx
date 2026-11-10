@@ -120,6 +120,20 @@ function createChipElement(item: BrowserContextItem): HTMLElement {
   return chip;
 }
 
+/** 输入区封顶后可内部滚动；Chromium 不会为程序化选区变化（历史召回 / 引用 / 粘贴）
+ *  自动滚动光标，长草稿下要手动把它挪回可视区。 */
+function scrollCaretIntoView(root: HTMLElement): void {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+  const range = selection.getRangeAt(0).cloneRange();
+  if (!root.contains(range.startContainer)) return;
+  range.collapse(true);
+  const caret = range.getBoundingClientRect();
+  const box = root.getBoundingClientRect();
+  if (caret.bottom > box.bottom) root.scrollTop += caret.bottom - box.bottom + 4;
+  else if (caret.top < box.top) root.scrollTop -= box.top - caret.top + 4;
+}
+
 /** 引用块落点高亮（docs/design/12 P1-2）：accent-soft 背景闪现后淡出，结束清内联样式；
  *  reduced-motion 直接不加高亮（终态即无高亮，无残留）。 */
 function flashQuoteBlock(span: HTMLSpanElement): void {
@@ -465,6 +479,7 @@ export function Composer({
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
+        scrollCaretIntoView(root);
         // 整块写完也要跑一次 URL 重排；逐字读出不变，召回的「未编辑」判据不受影响
         scheduleLinkify(0);
       },
@@ -531,6 +546,7 @@ export function Composer({
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
+        scrollCaretIntoView(root);
         scheduleLinkify(0);
       },
       appendText: (text) => {
@@ -555,6 +571,7 @@ export function Composer({
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
+        scrollCaretIntoView(root);
         scheduleLinkify(0);
       },
     });
@@ -782,11 +799,17 @@ export function Composer({
             }
           }
           reportContent();
+          // 输入/粘贴/输入法把光标推到封顶线以下时，浏览器不会替内容区滚动（实测），手动跟上
+          if (root) scrollCaretIntoView(root);
         }}
         onKeyUp={(event) => {
           if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) reportContent();
         }}
         onMouseUp={reportContent}
+        // 浮窗按芯片视口坐标定位：输入区内部滚动后锚点会漂移，直接收起
+        onScroll={() => {
+          if (detail) setDetail(null);
+        }}
       />
       {detail && (
         <ElementDetailPopover

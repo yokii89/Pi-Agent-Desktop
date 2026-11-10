@@ -11,6 +11,10 @@
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
+  /* 草稿超长时在输入区内滚动，而不是把卡片一路撑高遮住对话流：
+     封顶与 @ / 建议面板同档，短窗按视口高度收窄；滚动条沿用全局细槽（--scrollbar-size） */
+  max-height: min(280px, 40vh);
+  overflow-y: auto;
 }
 
 /* 拖放文件悬停高亮（docs/design/21 P1）：纯 CSS，不依赖 JS 动画 */
