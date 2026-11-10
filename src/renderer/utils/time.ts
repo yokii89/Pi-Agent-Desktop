@@ -40,6 +40,12 @@ export function formatClockTime(timestampMs: number): string {
   return `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
 }
 
+/** 消息页脚的时间（回复完成时间）：本地时区 2026-11-10 12:24，不带秒。 */
+export function formatMessageTime(timestampMs: number): string {
+  if (!timestampMs) return "";
+  return formatAbsoluteTime(timestampMs).slice(0, 16);
+}
+
 /** 紧凑用时（run 头 / 工具行）：`12s` / `1m 04s` / `3h 23m 33s`。 */
 export function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));

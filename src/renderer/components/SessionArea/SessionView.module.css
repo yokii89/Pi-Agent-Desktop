@@ -105,6 +105,11 @@
   user-select: none;
 }
 
+/* 回复页脚顺延到编辑汇总卡下方时贴住卡片：抵消条目级大间距，只留一小口气 */
+.footerRow {
+  margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-xs));
+}
+
 /* 图片默认可拖，会打断跨行文本选取 */
 .inner img {
   -webkit-user-drag: none;

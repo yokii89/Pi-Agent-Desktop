@@ -1,5 +1,5 @@
 import { Camera } from "@phosphor-icons/react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useRef, useState } from "react";
 import { useStickToBottom } from "../../hooks/useStickToBottom";
 import { useT } from "../../hooks/useT";
 import { useComposerStore } from "../../stores/composerStore";
@@ -12,13 +12,16 @@ import { useSessionEntries, useSessionMeta } from "../../stores/sessionStore";
 import {
   type AssistantBlock,
   findRetrySurfaceId,
+  type RunStatus,
   type SessionEntry,
   type SnapshotEntry,
 } from "../../stores/sessionTranscript";
 import { useUiStore } from "../../stores/uiStore";
 import { StreamMount } from "../ExtensionView/StreamMount";
 import { AgentRunHeader } from "./AgentRunHeader";
+import { AssistantFooter } from "./AssistantFooter";
 import { AssistantMessage } from "./AssistantMessage";
+import { hasAssistantReplyText } from "./assistantReplyText";
 import { CustomNotice } from "./CustomNotice";
 import { FileEditsSummary } from "./FileEditsSummary";
 import { FirstTokenWaiter } from "./FirstTokenWaiter";
@@ -48,6 +51,10 @@ interface AssistantRenderUnit {
   /** 参与合并的消息 id：扩展视图 afterStreams 锚点并集按它收集。 */
   entryIds: string[];
   blocks: AssistantBlock[];
+  /** 最后一条消息的结束时间：回复页脚的时间。 */
+  at: number | null;
+  /** 所属 run 已收口（不是 running）：输出结束才显示回复页脚。 */
+  settled: boolean;
 }
 
 type RenderUnit = { type: "entry"; entry: SessionEntry } | AssistantRenderUnit;
@@ -55,6 +62,8 @@ type RenderUnit = { type: "entry"; entry: SessionEntry } | AssistantRenderUnit;
 function coalesceAssistantRuns(entries: SessionEntry[]): RenderUnit[] {
   const units: RenderUnit[] = [];
   let pending: AssistantRenderUnit | null = null;
+  // 合并单元归属最近一条 run 头：run 还在跑时页脚不出现，否则每个工具间歇都会闪一次
+  let runStatus: RunStatus | null = null;
   const flush = (): void => {
     if (pending) {
       units.push(pending);
@@ -62,16 +71,20 @@ function coalesceAssistantRuns(entries: SessionEntry[]): RenderUnit[] {
     }
   };
   for (const entry of entries) {
+    if (entry.kind === "run") runStatus = entry.status;
     if (entry.kind === "assistant") {
       if (pending) {
         pending.entryIds.push(entry.id);
         pending.blocks.push(...entry.blocks);
+        pending.at = entry.at ?? pending.at;
       } else {
         pending = {
           type: "assistant",
           id: entry.id,
           entryIds: [entry.id],
           blocks: [...entry.blocks],
+          at: entry.at ?? null,
+          settled: runStatus !== "running",
         };
       }
       continue;
@@ -294,32 +307,60 @@ export function SessionView() {
             </div>
           ) : (
             <>
-              {renderUnits.map((unit) => {
+              {renderUnits.map((unit, index) => {
                 if (unit.type === "assistant") {
+                  // 本轮以编辑汇总卡收尾：页脚顺延到卡片下方（卡片是回复的一部分）
+                  const next = renderUnits[index + 1];
+                  const footerDeferred =
+                    next?.type === "entry" && next.entry.kind === "editsSummary";
                   return (
                     <EntryRow
                       key={unit.id}
-                      entry={{ kind: "assistant", id: unit.id, blocks: unit.blocks }}
+                      entry={{
+                        kind: "assistant",
+                        id: unit.id,
+                        blocks: unit.blocks,
+                        at: unit.at,
+                      }}
                       isLatestEdits={false}
                       isLastUser={false}
                       coldStart={false}
                       showRetry={unit.entryIds.some((id) => id === retrySurfaceId)}
+                      assistantSettled={unit.settled}
+                      assistantFooterDeferred={footerDeferred}
                       afterStreams={unit.entryIds.flatMap((id) => streamsAfter.get(id) ?? [])}
                     />
                   );
                 }
                 const entry = unit.entry;
                 const entryIsLastUser = entry.kind === "user" && entry.id === lastUserId;
+                // 顺延的页脚挂在编辑汇总卡下方：只认紧跟卡片的助手单元，避免重复
+                const prev = index > 0 ? renderUnits[index - 1] : null;
+                const footerOwner =
+                  entry.kind === "editsSummary" &&
+                  prev?.type === "assistant" &&
+                  prev.settled &&
+                  hasAssistantReplyText(prev.blocks)
+                    ? prev
+                    : null;
                 return (
-                  <EntryRow
-                    key={entry.id}
-                    entry={entry}
-                    isLatestEdits={entry.kind === "editsSummary" && entry.id === latestEditsId}
-                    isLastUser={entryIsLastUser}
-                    coldStart={startPending && entryIsLastUser}
-                    showRetry={entry.id === retrySurfaceId}
-                    afterStreams={streamsAfter.get(entry.id) ?? EMPTY_STREAMS}
-                  />
+                  <Fragment key={entry.id}>
+                    <EntryRow
+                      entry={entry}
+                      isLatestEdits={entry.kind === "editsSummary" && entry.id === latestEditsId}
+                      isLastUser={entryIsLastUser}
+                      coldStart={startPending && entryIsLastUser}
+                      showRetry={entry.id === retrySurfaceId}
+                      assistantSettled={false}
+                      assistantFooterDeferred={false}
+                      afterStreams={streamsAfter.get(entry.id) ?? EMPTY_STREAMS}
+                    />
+                    {footerOwner && (
+                      <div className={styles.footerRow} data-kind="assistantFooter">
+                        <AssistantFooter blocks={footerOwner.blocks} at={footerOwner.at} />
+                      </div>
+                    )}
+                  </Fragment>
                 );
               })}
               {trailingStreams.map((stream) => (
@@ -361,6 +402,8 @@ const EntryRow = memo(function EntryRow({
   isLastUser,
   coldStart,
   showRetry,
+  assistantSettled,
+  assistantFooterDeferred,
   afterStreams,
 }: {
   entry: SessionEntry;
@@ -370,6 +413,10 @@ const EntryRow = memo(function EntryRow({
   coldStart: boolean;
   /** 当前轮唯一「重试」落点（findRetrySurfaceId）；中间失败 attempt 为 false。 */
   showRetry: boolean;
+  /** 合并后的助手单元所属 run 已收口：输出结束才显示回复页脚。 */
+  assistantSettled: boolean;
+  /** 页脚顺延到本轮编辑汇总卡下方（由 SessionView 单独渲染）。 */
+  assistantFooterDeferred: boolean;
   afterStreams: ExtensionViewEntry[];
 }) {
   return (
@@ -395,7 +442,12 @@ const EntryRow = memo(function EntryRow({
       ) : entry.kind === "editsSummary" ? (
         <FileEditsSummary entry={entry} isLatest={isLatestEdits} />
       ) : (
-        <AssistantMessage blocks={entry.blocks} />
+        <AssistantMessage
+          blocks={entry.blocks}
+          at={entry.at ?? null}
+          settled={assistantSettled}
+          footerDeferred={assistantFooterDeferred}
+        />
       )}
       {afterStreams.map((stream) => (
         <StreamMount key={stream.id} entry={stream} />

@@ -1,7 +1,9 @@
 import { memo, useMemo } from "react";
 import type { AssistantBlock, ToolAssistantBlock } from "../../stores/sessionTranscript";
 import { ActivityGroup } from "./ActivityGroup";
+import { AssistantFooter } from "./AssistantFooter";
 import styles from "./AssistantMessage.module.css";
+import { hasAssistantReplyText } from "./assistantReplyText";
 import { MarkdownContent } from "./MarkdownContent";
 import { ReasoningBlock } from "./ReasoningBlock";
 import { ToolCall } from "./tools/ToolCall";
@@ -13,11 +15,26 @@ import { isToolOnlyGroup, ToolCallGroup } from "./tools/ToolCallGroup";
  * 同时含工具与思考的收成「活动组」（默认收起一行聚合头，展开回到现状渲染）；
  * 纯工具段 / 纯思考段 / 单条工具行保持原渲染（ToolCallGroup 与思考折叠行的既有规则）。
  * 历史块经 BlockView memo 在 text_delta 时跳过重渲染。
- * 不提供尾部 hover 操作条：整条取用走划选工具条（docs/design/81）。
+ * 尾部页脚（复制 Markdown / 复制为纯文本 / 时间）只在所属 run 收口后出现，
+ * 复制只取正文 text 块，思考与工具调用不参与；划选工具条（docs/design/81）照旧可用。
  */
-export function AssistantMessage({ blocks }: { blocks: AssistantBlock[] }) {
+export function AssistantMessage({
+  blocks,
+  at = null,
+  settled = false,
+  footerDeferred = false,
+}: {
+  blocks: AssistantBlock[];
+  /** 回复结束时间（页脚「时间」）；未知时不显示时间。 */
+  at?: number | null;
+  /** 所属 run 已收口：只有输出结束才显示页脚。 */
+  settled?: boolean;
+  /** 页脚由外层挂到编辑汇总卡下方（本组件不再渲染，避免出现两次）。 */
+  footerDeferred?: boolean;
+}) {
   const units = useMemo(() => groupFlow(blocks), [blocks]);
   const hasStreaming = blocks.some((block) => block.kind !== "tool" && block.streaming === true);
+  const showFooter = settled && !footerDeferred && hasAssistantReplyText(blocks);
 
   return (
     <article className={styles.message} aria-busy={hasStreaming || undefined}>
@@ -38,6 +55,7 @@ export function AssistantMessage({ blocks }: { blocks: AssistantBlock[] }) {
         // biome-ignore lint/suspicious/noArrayIndexKey: 同上
         return <MixedFallback key={`g-${index}`} group={inner} />;
       })}
+      {showFooter && <AssistantFooter blocks={blocks} at={at} />}
     </article>
   );
 }

@@ -141,6 +141,15 @@ export type AssistantBlock =
   | { kind: "thinking"; text: string; streaming?: boolean; contentIndex: number }
   | ToolAssistantBlock;
 
+/** 一次模型响应的渲染条目；`at` 为结束时刻，供回复页脚的时间展示。 */
+export interface AssistantEntry {
+  kind: "assistant";
+  id: string;
+  blocks: AssistantBlock[];
+  /** 消息结束时刻（历史装载取 JSONL 时间戳；实时在 message_end / run 收口时落值）。 */
+  at?: number | null;
+}
+
 /** "刷新并截图"验证快照（docs/design/05 P1-3：截图以卡片回到会话流）。 */
 export interface SnapshotEntry {
   kind: "snapshot";
@@ -192,7 +201,7 @@ export type SessionEntry =
   | NoticeEntry
   | ErrorEntry
   | EditsSummaryEntry
-  | { kind: "assistant"; id: string; blocks: AssistantBlock[] };
+  | AssistantEntry;
 
 export type SessionAction =
   | { type: "clear" }
@@ -323,7 +332,12 @@ function applyEvent(entries: SessionEntry[], event: PiAgentEvent): SessionEntry[
       if (event.message.role !== "assistant") return entries;
       return [
         ...entries,
-        { kind: "assistant", id: uid(), blocks: blocksFromContent(event.message.content, null) },
+        {
+          kind: "assistant",
+          id: uid(),
+          blocks: blocksFromContent(event.message.content, null),
+          at: null,
+        },
       ];
     }
     case "message_update":
@@ -978,7 +992,8 @@ function closeOpenRuns(
         endedAt,
       );
       const closedStreams = markAssistantStreamsClosed(closedTools);
-      return emitEdits ? upsertTurnEditsSummary(closedStreams) : closedStreams;
+      const stamped = stampRunEnd(closedStreams, i, endedAt);
+      return emitEdits ? upsertTurnEditsSummary(stamped) : stamped;
     }
     if (entry.kind === "run") break;
   }
@@ -1123,6 +1138,17 @@ function markAssistantStreamsClosed(entries: SessionEntry[]): SessionEntry[] {
   return touched ? next : entries;
 }
 
+/** run 收口时给它名下的 assistant 补结束时间：message_end 缺失（中断 / 进程被杀）时页脚时间仍有落点。 */
+function stampRunEnd(entries: SessionEntry[], runIndex: number, endedAt: number): SessionEntry[] {
+  let changed = false;
+  const next = entries.map((entry, index) => {
+    if (index <= runIndex || entry.kind !== "assistant" || entry.at != null) return entry;
+    changed = true;
+    return { ...entry, at: endedAt };
+  });
+  return changed ? next : entries;
+}
+
 /** 对最后一个 assistant 条目做块级变更；不存在时兜底创建（message_start 缺失场景）。 */
 function mutateLastAssistant(
   entries: SessionEntry[],
@@ -1131,7 +1157,7 @@ function mutateLastAssistant(
   const last = entries.at(-1);
   if (last?.kind !== "assistant") {
     const blocks = mutate([]) ?? [];
-    return [...entries, { kind: "assistant", id: uid(), blocks }];
+    return [...entries, { kind: "assistant", id: uid(), blocks, at: null }];
   }
   const mutated = mutate([...last.blocks]);
   if (!mutated) return entries;
@@ -1394,7 +1420,11 @@ function applyMessageEnd(entries: SessionEntry[], message: PiChatMessage): Sessi
     return entries;
   }
   if (rebuilt.length > 0 || last.blocks.length > 0) {
-    next[next.length - 1] = { ...last, blocks: rebuilt.length > 0 ? rebuilt : last.blocks };
+    next[next.length - 1] = {
+      ...last,
+      blocks: rebuilt.length > 0 ? rebuilt : last.blocks,
+      at: Date.now(),
+    };
   } else {
     next.pop();
   }
@@ -1468,7 +1498,7 @@ function upsertToolBlock(
     nextContentIndex(baseBlocks),
   );
   if (last?.kind !== "assistant") {
-    return [...entries, { kind: "assistant", id: uid(), blocks: [patch(fresh)] }];
+    return [...entries, { kind: "assistant", id: uid(), blocks: [patch(fresh)], at: null }];
   }
   const next = [...entries];
   next[next.length - 1] = { ...last, blocks: [...last.blocks, patch(fresh)] };
@@ -1583,6 +1613,7 @@ function entriesFromMessages(messages: PiChatMessage[], sessionStartedAt?: numbe
           kind: "assistant",
           id: uid(),
           blocks,
+          at: ts,
         });
       }
       accumulateSyntheticUsage(entries, message.usage);

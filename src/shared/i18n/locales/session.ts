@@ -625,6 +625,8 @@ export const sessionMessages = defineMessages({
 
   "session.copyMessage": { "zh-CN": "复制", "en-US": "Copy" },
   "session.copyMessage.title": { "zh-CN": "复制消息", "en-US": "Copy message" },
+  "session.copyMarkdown": { "zh-CN": "复制 Markdown", "en-US": "Copy Markdown" },
+  "session.copyPlainText": { "zh-CN": "复制为纯文本", "en-US": "Copy as plain text" },
   "session.quoteMessage": {
     "zh-CN": "添加到对话栏",
     "en-US": "Add to composer",
