@@ -1,18 +1,37 @@
-.nav {
-  /* 磨砂玻璃：半透明底 + 背景模糊 + 颗粒（配方与令牌见 styles/glass.module.css） */
+.shell {
+  /* 左栏外壳：网格第一列的 grid item。玻璃与右缘描边都挂在它身上，
+     面板（.nav）退成透明滚动层——只有这样，右缘的拖拽把手才不会盖住滚动条：
+     把手与滑条都贴右缘，若让 .nav 自己既是滚动盒又是玻璃，把手必然压在滑条上
+     （滑条就点不到、也看不到）。现在 .shell 让出 8px 让位带，.nav 的滚动盒
+     止于让位带左侧，滑条在让位带外面，把手在让位带里面。 */
   composes: glass from "../../styles/glass.module.css";
+  position: relative;
   grid-area: nav;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  /* 让位带：把手宽度（与右侧栏把手同源令牌），.nav 不占这条带 */
+  padding-right: var(--context-sidebar-resize-gutter);
+  /* 玻璃面板与中央区之间只留一线描边，靠材质而非重色块区分两栏 */
+  border-right: 1px solid var(--glass-border);
+}
+
+/* 折叠态渲染不到把手（icon 列宽度固定），让位带一并取消：
+   否则图标列会在 56px 里偏左 4px，与顶栏开关不在同一条中轴上 */
+.shellCollapsed {
+  padding-right: 0;
+}
+
+.nav {
   /* 选中药丸（.selectionPill）的定位父级：绝对定位子元素随滚动内容一起移动 */
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  /* 填满网格轨道（--nav-track）；收起/展开瞬时切换轨道宽 */
+  /* 填满外壳内容盒（拖拽宽度由网格轨道承担） */
   width: 100%;
   min-width: 0;
   padding: var(--spacing-sm);
-  /* 玻璃面板与中央区之间只留一线描边，靠材质而非重色块区分两栏 */
-  border-right: 1px solid var(--glass-border);
   overflow-y: auto;
   overflow-x: hidden;
   /* 三栏滚动条淡出（机制见 global.css 的 --sb-alpha）：指针不在本栏时滑条全透明，
@@ -27,6 +46,58 @@
 
 @media (prefers-reduced-motion: reduce) {
   .nav {
+    transition: none;
+  }
+}
+
+/* 拖拽把手（docs/design/137）：贴在左栏右缘，向右拖增宽。
+   刮削区 8px（与右侧栏把手同宽，--context-sidebar-resize-gutter），
+   视觉提示只有居中 2px 上下渐隐的强调色竖线——与右栏把手同一形态（docs/design/65 方案 E），
+   两栏的把手读成同一种东西，而不是一侧厚边框一侧细线。 */
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 2;
+  width: var(--context-sidebar-resize-gutter);
+  cursor: col-resize;
+  background: transparent;
+}
+
+.resizeHandle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-accent);
+  opacity: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 20%,
+    #000 80%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 20%, #000 80%, transparent 100%);
+}
+
+.resizeHandle:hover::before {
+  opacity: 0.78;
+}
+
+.resizeHandle.resizeHandleDragging::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resizeHandle::before {
     transition: none;
   }
 }

@@ -6,6 +6,7 @@ import { normalizeFontMonoPreset, normalizeFontUiPreset } from "../../shared/fon
 import { normalizeLocalePreference, resolveLocale, setI18nLocale } from "../../shared/i18n";
 import { normalizeInputBuddy } from "../../shared/inputBuddy";
 import type { PideskSettings } from "../../shared/ipc";
+import { clampNavWidth } from "../../shared/navWidth";
 import { normalizeNotificationSettings } from "../../shared/notification";
 import { normalizeRailStyle } from "../../shared/railStyles";
 import { sanitizeShortcutsRecord } from "../../shared/shortcuts";
@@ -129,6 +130,8 @@ export function getSettings(): PideskSettings {
         ? Math.floor(loaded.maxParallelSessions)
         : DEFAULT_SETTINGS.maxParallelSessions,
     notification: normalizeNotificationSettings(loaded.notification),
+    // 手改设置文件时把侧栏宽度夹回合法区间（它同时是持久化值与设置同步项）
+    navWidth: clampNavWidth(loaded.navWidth),
     // 手改设置文件时把字号夹回合法范围，非法值回退默认
     sessionStreamFontPx: clampSessionStreamFontPx(loaded.sessionStreamFontPx),
     fontUiPreset: normalizeFontUiPreset(loaded.fontUiPreset),
@@ -170,6 +173,7 @@ export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   next.accentColor = normalizeAccentColor(next.accentColor);
   next.wallpaperPath = normalizeWallpaperPath(next.wallpaperPath);
   next.wallpaperDim = clampWallpaperDim(next.wallpaperDim);
+  next.navWidth = clampNavWidth(next.navWidth);
   next.uiZoom = normalizeUiZoom(next.uiZoom);
   next.shortcuts = sanitizeShortcutsRecord(next.shortcuts);
   next.sessionOrder = sanitizeSessionOrder(next.sessionOrder) ?? DEFAULT_SETTINGS.sessionOrder;

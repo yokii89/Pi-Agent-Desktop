@@ -31,6 +31,7 @@ import {
   normalizeInputBuddy,
 } from "../../shared/inputBuddy";
 import { clampSessionStreamFontPx, DEFAULT_SESSION_STREAM_FONT_PX } from "../../shared/ipc";
+import { clampNavWidth, NAV_WIDTH_DEFAULT } from "../../shared/navWidth";
 import { DEFAULT_RAIL_STYLE, normalizeRailStyle, type RailStyle } from "../../shared/railStyles";
 import { normalizeShortcutsMap, type ShortcutsMap } from "../../shared/shortcuts";
 import {
@@ -158,6 +159,8 @@ interface UiState {
   backStack: PageId[];
   forwardStack: PageId[];
   navCollapsed: boolean;
+  /** 左侧导航栏展开态宽度（px），拖拽右缘把手调整并持久化（docs/design/137）。 */
+  navWidth: number;
   theme: Theme;
   /** 设置里的语言偏好（system / 固定语言）。 */
   localePreference: LocalePreference;
@@ -240,6 +243,7 @@ type UiAction =
   | { type: "back" }
   | { type: "forward" }
   | { type: "toggleNavCollapsed" }
+  | { type: "setNavWidth"; width: number }
   | { type: "setTheme"; theme: Theme }
   | { type: "setLocalePreference"; preference: LocalePreference }
   | { type: "setRightSidebar"; open: boolean; tab?: RightSidebarTab }
@@ -282,6 +286,7 @@ type UiAction =
       type: "hydrate";
       theme: Theme;
       navCollapsed: boolean;
+      navWidth: number;
       browserEnabled: boolean;
       welcomeRecentsEnabled: boolean;
       sessionStreamFontPx: number;
@@ -301,6 +306,7 @@ const initialState: UiState = {
   backStack: [],
   forwardStack: [],
   navCollapsed: false,
+  navWidth: NAV_WIDTH_DEFAULT,
   theme: "dark",
   localePreference: "system",
   locale: resolveLocale("system", navigator.language),
@@ -380,6 +386,10 @@ function uiReducer(state: UiState, action: UiAction): UiState {
     }
     case "toggleNavCollapsed":
       return { ...state, navCollapsed: !state.navCollapsed };
+    case "setNavWidth": {
+      const width = clampNavWidth(action.width);
+      return state.navWidth === width ? state : { ...state, navWidth: width };
+    }
     case "setTheme":
       return { ...state, theme: action.theme };
     case "setLocalePreference": {
@@ -559,6 +569,7 @@ function uiReducer(state: UiState, action: UiAction): UiState {
         ...state,
         theme: action.theme,
         navCollapsed: action.navCollapsed,
+        navWidth: clampNavWidth(action.navWidth),
         browserEnabled: action.browserEnabled,
         welcomeRecentsEnabled: action.welcomeRecentsEnabled,
         sessionStreamFontPx: clampSessionStreamFontPx(action.sessionStreamFontPx),
@@ -620,6 +631,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
         type: "hydrate",
         theme: settings.theme === "light" ? "light" : "dark",
         navCollapsed: settings.navCollapsed,
+        navWidth: settings.navWidth ?? NAV_WIDTH_DEFAULT,
         browserEnabled: settings.browserEnabled,
         welcomeRecentsEnabled: settings.welcomeRecentsEnabled === true,
         sessionStreamFontPx: settings.sessionStreamFontPx ?? DEFAULT_SESSION_STREAM_FONT_PX,
@@ -645,6 +657,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     settingsService.set({
       theme: state.theme,
       navCollapsed: state.navCollapsed,
+      navWidth: state.navWidth,
       browserEnabled: state.browserEnabled,
       welcomeRecentsEnabled: state.welcomeRecentsEnabled,
       sessionStreamFontPx: state.sessionStreamFontPx,
@@ -661,6 +674,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     state.hydrated,
     state.theme,
     state.navCollapsed,
+    state.navWidth,
     state.browserEnabled,
     state.welcomeRecentsEnabled,
     state.sessionStreamFontPx,

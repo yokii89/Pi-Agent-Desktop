@@ -17,6 +17,7 @@ import {
   SESSION_STREAM_FONT_MIN_PX,
   SETTINGS_IPC,
 } from "../../shared/ipc";
+import { clampNavWidth } from "../../shared/navWidth";
 import {
   type NotificationSettings,
   normalizeNotificationSettings,
@@ -180,6 +181,14 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         if (isLocalePreference(value)) clean.locale = value;
         break;
       case "navCollapsed":
+        if (typeof value === "boolean") clean.navCollapsed = value;
+        break;
+      case "navWidth":
+        // 非法值整项丢弃（保留用户现有宽度）；合法值夹到 shared/navWidth 的区间
+        if (typeof value === "number" && Number.isFinite(value)) {
+          clean.navWidth = clampNavWidth(value);
+        }
+        break;
       case "showInTray":
       case "browserEnabled":
       case "browserLoginImportConsent":

@@ -18,6 +18,7 @@ import {
 import { prefersReducedMotion } from "../../utils/animation";
 import { type GlideCancel, glide, mix } from "../../utils/glideMotion";
 import { NAV_MOTION } from "../../utils/motionTokens";
+import { readGridTracks } from "../../utils/navGeometry";
 import { panelGeometry, writePanelGeometry } from "../../utils/panelGeometry";
 import { PanelMount } from "../ExtensionView/PanelMount";
 import { ReviewPanel } from "../ReviewWindow/ReviewPanel";
@@ -68,9 +69,8 @@ interface ResizeSession {
  */
 function computeMaxWidth(grid: HTMLElement): number {
   // 网格的实际列宽（如 "248px 892px 300px"）里第 0 列就是左导航，比读令牌更可靠（含折叠态）
-  const [navTrack] = getComputedStyle(grid).gridTemplateColumns.split(" ");
-  const navWidth = Number.parseFloat(navTrack ?? "");
-  const available = grid.clientWidth - (Number.isFinite(navWidth) ? navWidth : 0) - MIN_MAIN_WIDTH;
+  const [navTrack] = readGridTracks(grid);
+  const available = grid.clientWidth - navTrack - MIN_MAIN_WIDTH;
   return Math.max(MIN_WIDTH, available);
 }
 

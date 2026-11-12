@@ -5,6 +5,7 @@ import {
   DEFAULT_SESSION_STREAM_FONT_PX,
   type PideskSettings,
 } from "../../shared/ipc";
+import { NAV_WIDTH_DEFAULT } from "../../shared/navWidth";
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   normalizeNotificationSettings,
@@ -44,6 +45,7 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   uiZoom: UI_ZOOM_DEFAULT,
   locale: "system",
   navCollapsed: false,
+  navWidth: NAV_WIDTH_DEFAULT,
   pinnedSessions: [],
   globalPinnedSessions: [],
   archivedSessions: {},
@@ -144,6 +146,7 @@ export const SETTABLE_KEYS = [
   "wallpaperDim",
   "locale",
   "navCollapsed",
+  "navWidth",
   "pinnedSessions",
   "globalPinnedSessions",
   "archivedSessions",

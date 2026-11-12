@@ -22,6 +22,7 @@ function fakeSettings(): PideskSettings {
     uiZoom: 1,
     locale: "zh-CN",
     navCollapsed: true,
+    navWidth: 248,
     pinnedSessions: ["C:/s/a.jsonl"],
     globalPinnedSessions: ["C:/s/c.jsonl"],
     archivedSessions: { "C:/s/b.jsonl": 1 },
@@ -72,6 +73,8 @@ describe("settingsSync whitelist", () => {
     expect(picked).not.toHaveProperty("wallpaperDim");
     expect(picked.splashTextZh).toBe("求知 · 探索");
     expect(picked.theme).toBe("dark");
+    // 侧栏宽度是用户偏好（docs/design/137）：跨端同步，不是本机机器状态
+    expect(picked.navWidth).toBe(248);
     expect(picked.welcomeRecentsEnabled).toBe(true);
   });
 
@@ -101,9 +104,18 @@ describe("settingsSync whitelist", () => {
       ...local,
       theme: "light" as const,
       welcomeRecentsEnabled: false,
+      navWidth: 320,
     };
     const changes = diffSyncableSettings(local, remote);
-    expect(changes.map((c) => c.key).sort()).toEqual(["theme", "welcomeRecentsEnabled"]);
+    expect(changes.map((c) => c.key).sort()).toEqual([
+      "navWidth",
+      "theme",
+      "welcomeRecentsEnabled",
+    ]);
+    expect(changes.find((c) => c.key === "navWidth")).toMatchObject({
+      local: "248",
+      remote: "320",
+    });
     expect(changes.find((c) => c.key === "theme")).toMatchObject({
       local: "dark",
       remote: "light",

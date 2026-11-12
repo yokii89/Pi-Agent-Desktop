@@ -152,6 +152,11 @@ export interface PideskSettings {
   locale: LocalePreference;
   /** 侧边栏默认折叠。 */
   navCollapsed: boolean;
+  /**
+   * 左侧导航栏展开态宽度（px），拖拽右缘把手调整；见 shared/navWidth 的合法区间。
+   * 属于用户偏好（与主题、折叠态同层），进设置同步白名单。
+   */
+  navWidth: number;
   /** 「在工作区内置顶」的会话（JSONL 绝对路径，数组顺序即置顶顺序）；条目固定在其所属列表最前。 */
   pinnedSessions: string[];
   /**

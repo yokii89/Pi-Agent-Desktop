@@ -12,6 +12,7 @@ export const sidenavMessages = defineMessages({
   "sidenav.projects": { "zh-CN": "项目", "en-US": "Projects" },
   "sidenav.tasks": { "zh-CN": "任务", "en-US": "Tasks" },
   "sidenav.settings": { "zh-CN": "设置", "en-US": "Settings" },
+  "sidenav.resizeWidth": { "zh-CN": "拖拽调整宽度", "en-US": "Drag to resize width" },
   "sidenav.update.action": { "zh-CN": "更新", "en-US": "Update" },
   "sidenav.update.restart": { "zh-CN": "重启", "en-US": "Restart" },
   "sidenav.update.retry": { "zh-CN": "重试", "en-US": "Retry" },

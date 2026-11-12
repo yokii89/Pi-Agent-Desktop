@@ -279,6 +279,30 @@ import { Play } from "@phosphor-icons/react";
 - 两者都遵守：首次挂载不播动画、`prefers-reduced-motion` 直接落终态（`glide()` 内建）、
   补间的中间产物（inline overflow、动画高度 state）落定后清干净。
 
+### 左侧边栏拖拽调宽（docs/design/137）
+
+左栏展开态宽度是**用户偏好**（`settings.navWidth`，进设置同步白名单），把手贴右缘：
+
+- **玻璃 + 把手都在外壳 `.shell` 上，`.nav` 退成透明滚动层**：`.nav` 是滚动盒
+  （`overflow-y: auto`），把手的悬停竖线是 `::before`，画在里面会被裁掉；更关键的是
+  把手与滑条都贴右缘，若 `.nav` 仍是玻璃滚动盒，把手（`z-index: 2`）会整条压住滑条
+  （滑条看不见也点不到）。现在 `.shell`（`grid-area: nav`）承担玻璃与右描边并让出
+  `--context-sidebar-resize-gutter` 让位带，**滑条在带外、把手在带内**。
+  折叠态取消让位带（`.shellCollapsed`），否则 56px 图标列会偏左 4px、与顶栏开关不同轴。
+- **写网格轨道只有一个地方**：`utils/panelGeometry.ts`（`nav` / `sidebar` / `monitor` 三个字段）。
+  左栏「能有多宽」的判定在独立的 `utils/navGeometry.ts`（`navMaxWidth` / `clampNavWidthToGrid` /
+  `readGridTracks`），但落盘必须调 `writePanelGeometry(grid, { nav })`。
+  **不要**给左栏单独拼一次 `grid-template-columns`：该属性是整体替换的普通属性，只写一列会把
+  右栏正在补间/拖拽的内联宽度打回 CSS 兜底值（两侧把手各写一次就互相覆盖）。
+- 合法区间只认 `shared/navWidth`：**下限 180px 是硬下限**（行内「图标 + 标题 + 状态槽 + ⋯」的可读底线），
+  上限 = `网格宽 - 右栏宽 - NAV_MAIN_MIN_WIDTH(560)`，与起始宽度无关（用「中央区左缘 x」推导会越拖越松）。
+  主进程写入校验、读盘归一、渲染层水合共用同一份 `clampNavWidth`。
+- **折叠态不放把手**：`--nav-width-collapsed`（56px）是图标列的固定宽度，拖它没有可表达的结果。
+- 语义与右栏把手逐条对齐：4px 阈值内是点击（不提交）、拖拽帧直写轨道不 setState、
+  松手一次性 `dispatch` → 设置回写、`pointerup` / `pointercancel` / `blur` 三路兜底收尾。
+- 空间变化（窗口变窄、右栏展开、折叠期间变窄后再展开）夹回后必须**先写 DOM 再提交 store**，
+  只改 store 不会改变视觉，只改 DOM 会让设置与画面不一致。
+
 ### 右侧会话监控卡：停靠位，不是浮层（docs/design/96）
 
 右侧上下文侧栏收起后，中央区右缘出现「会话监控卡」（`components/SessionMonitor/`）。硬约束：

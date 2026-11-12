@@ -156,6 +156,7 @@ function TerminalPanelHost() {
 function AppLayout() {
   const {
     navCollapsed,
+    navWidth,
     rightSidebarOpen,
     rightSidebarWidth,
     reviewWindowOpen,
@@ -185,9 +186,16 @@ function AppLayout() {
       ]
         .filter(Boolean)
         .join(" ")}
-      // 侧栏宽度的静态真值（CSS 默认 + 首帧兜底）；收展补间/拖拽经 utils/panelGeometry
-      // 直写网格轨道与各消费元素，不逐帧改这个继承型变量（见该文件头）
-      style={{ "--context-sidebar-width": `${rightSidebarWidth}px` } as CSSProperties}
+      // 两侧栏宽度的静态真值（CSS 兜底 + 首帧）：网格轨道在运行时由 utils/panelGeometry
+      // 直写（左栏拖拽 / 右栏收展补间 / 窗口夹取），不逐帧改这些继承型变量（见该文件头）。
+      // 折叠宽度不在这里重复声明：--nav-track 由 .navCollapsed 切到 --nav-width-collapsed，
+      // 而网格轨道在运行时被内联值接管，所以折叠宽度同样经 writePanelGeometry 写数值。
+      style={
+        {
+          "--nav-width": `${navWidth}px`,
+          "--context-sidebar-width": `${rightSidebarWidth}px`,
+        } as CSSProperties
+      }
     >
       {wallpaperPath ? <WallpaperBackground path={wallpaperPath} dim={wallpaperDim} /> : null}
       <TitleBar />
