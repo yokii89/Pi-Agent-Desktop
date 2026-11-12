@@ -1796,6 +1796,12 @@ export type GitChangeStatus =
   | "conflicted"
   | "untracked";
 
+/** 本轮差异的两端快照；详情读取同一对 tree，避免退回 HEAD/暂存区基线。 */
+export interface GitSnapshotRange {
+  before: string;
+  after: string;
+}
+
 /**
  * 单个文件的变更条目。
  * 同一文件可同时具有 staged 与 unstaged 变更，会各生成一条（不合并，避免丢层）。
@@ -1810,12 +1816,16 @@ export interface GitChange {
   /** 新增行数；二进制或无法统计时为 null。 */
   additions: number | null;
   deletions: number | null;
+  /** 仅快照差异条目携带；普通工作区条目仍按 layer 读取 diff。 */
+  snapshot?: GitSnapshotRange;
 }
 
 export interface GitStatusResult {
   /** 仓库根目录（绝对路径）；cwd 不是 git 仓库时为 null 且 changes 为空。 */
   repoRoot: string | null;
   changes: GitChange[];
+  /** 请求指定轮前 tree 时返回内容差异（含当前已恢复到 HEAD 的路径）。 */
+  snapshotChanges?: GitChange[];
   /** 当前 HEAD commit OID；空仓库或非仓库为 null。用于识别提交后作废回滚快照。 */
   headOid: string | null;
 }
@@ -1828,6 +1838,8 @@ export interface GitDiffRequest {
   /** rename/copy 的原路径；rename diff 需要同时传入新旧路径才能配对。 */
   oldPath?: string | null;
   layer: GitChangeLayer;
+  /** 指定时读取两个快照之间的 diff；省略时沿用 layer 基线。 */
+  snapshot?: GitSnapshotRange;
 }
 
 export interface GitDiffLine {

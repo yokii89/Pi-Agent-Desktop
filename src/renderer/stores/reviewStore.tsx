@@ -22,6 +22,7 @@ import {
   emptyRollbackInspect,
   type RollbackBlockReason,
   type RollbackInspect,
+  rollbackBlockReasonText,
   rollbackTargetPaths,
 } from "../utils/rollbackLastRound";
 import { useSessionMeta } from "./sessionStore";
@@ -64,16 +65,6 @@ function changesToPaths(changes: GitChange[], includeOld: boolean): string[] {
     if (includeOld && change.oldPath) set.add(change.oldPath);
   }
   return [...set];
-}
-
-/** 变更内容指纹：用于识别「上一轮」中新增或统计变化的条目。 */
-function changeFingerprint(change: GitChange): string {
-  return [
-    change.status,
-    change.oldPath ?? "",
-    String(change.additions ?? "?"),
-    String(change.deletions ?? "?"),
-  ].join("|");
 }
 
 interface ReviewSummary {
@@ -158,7 +149,7 @@ interface ReviewStoreValue {
   stageChanges: (targets: GitChange[]) => Promise<void>;
   /** 取消暂存指定变更。 */
   unstageChanges: (targets: GitChange[]) => Promise<void>;
-  /** 丢弃指定变更的本地改动（破坏性）；返回还原/删除计数。 */
+  /** 丢弃指定变更；快照条目只还原本轮，普通条目丢弃工作区改动。 */
   discardChanges: (targets: GitChange[]) => Promise<GitDiscardResult>;
   /** 提交已暂存改动（手写提交信息）。 */
   commit: (message: string) => Promise<GitCommitResult>;
@@ -187,11 +178,13 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   /** agent 一轮开始前的工作区快照 tree OID；null = 本轮无法回滚。 */
   const [preRoundTreeOid, setPreRoundTreeOid] = useState<string | null>(null);
+  const preRoundTreeOidRef = useRef<string | null>(null);
   const [rollingBack, setRollingBack] = useState(false);
   const [rollbackPromptOpen, setRollbackPromptOpen] = useState(false);
   const [rollbackPromptInspect, setRollbackPromptInspect] = useState<RollbackInspect | null>(null);
   /** 弹窗打开时归属的会话：确认前校验，防止弹窗打开期间切换会话后回滚错仓库。 */
   const rollbackPromptSessionIdRef = useRef<string | null>(null);
+  const rollbackPromptRoundSeqRef = useRef(0);
   /** Git 写操作进行中（暂存/取消暂存/丢弃/提交/推送）。 */
   const [writing, setWriting] = useState(false);
   /** clearRollbackState 记录的原因；canRollback 时覆盖为 ready。 */
@@ -199,14 +192,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const cwdRef = useRef<string | null>(sessionWorkingDir);
   cwdRef.current = sessionWorkingDir;
-  const changesRef = useRef<GitChange[]>(changes);
-  changesRef.current = changes;
-  /** agent 一轮开始前的变更指纹基线；refresh 后与新列表求差得到 lastRound。 */
-  const lastRoundBaselineRef = useRef<Map<string, string>>(new Map());
-  /** 最近一次 status 读到的 HEAD（agent_start 时同步锚定用）。 */
-  const lastHeadOidRef = useRef<string | null>(null);
   /** 本轮是否已锚定（agent_start 后、清理前）。 */
   const roundActiveRef = useRef(false);
+  const roundSettledRef = useRef(false);
   /** 锚定时的 HEAD；与当前 HEAD 不同说明已提交。 */
   const roundHeadRef = useRef<string | null>(null);
   /** 本轮 agent 结束时的工作区快照；用于撤销前冲突检测（轮末后手工修改）。 */
@@ -218,14 +206,15 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const seqRef = useRef(0);
   const timerRef = useRef<number | null>(null);
 
-  /** 作废「上一轮」回滚能力：丢掉 tree OID / HEAD 锚点 / 差集 / 指纹基线 / 轮末快照。 */
+  /** 作废「上一轮」回滚能力：丢掉快照、HEAD 锚点与本轮差异。 */
   const clearRollbackState = useCallback((reason: RollbackBlockReason = "empty"): void => {
     roundActiveRef.current = false;
+    roundSettledRef.current = false;
     roundHeadRef.current = null;
     roundEndTreeOidRef.current = null;
+    preRoundTreeOidRef.current = null;
     setPreRoundTreeOid(null);
     setLastRound([]);
-    lastRoundBaselineRef.current = new Map();
     setStoredBlockReason(reason);
   }, []);
 
@@ -233,7 +222,6 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     (result: Awaited<ReturnType<typeof gitService.status>>) => {
       setLastUpdated(Date.now());
       lastUpdatedRef.current = Date.now();
-      lastHeadOidRef.current = result.headOid;
       setRefreshing(false);
       setError(null);
       if (result.repoRoot === null) {
@@ -250,20 +238,22 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       setChangesVersion((v) => v + 1);
 
       // 用户（或 agent）已提交：HEAD 相对本轮锚点变了 → 回滚语义失效，立刻清理
-      if (roundActiveRef.current && result.headOid !== roundHeadRef.current) {
+      if (
+        roundActiveRef.current &&
+        preRoundTreeOidRef.current !== null &&
+        result.headOid !== roundHeadRef.current
+      ) {
         clearRollbackState("committed");
       } else if (roundActiveRef.current) {
-        // 空仓库/干净工作区基线为空时，当前全部变更都算本轮（不能用 baseline.size 跳过）
-        const baseline = lastRoundBaselineRef.current;
-        const round = result.changes.filter(
-          (c) => baseline.get(changeKey(c)) !== changeFingerprint(c),
-        );
-        setLastRound(round);
+        setLastRound(result.snapshotChanges ?? []);
       }
 
-      // 刷新后原选中项可能已无变更（如文件被提交），使其失效
+      // 本轮可能把文件改回 HEAD；这类条目仅存在于快照差异中，仍须保留选中详情。
       setSelectedKey((prev) =>
-        prev && result.changes.some((c) => changeKey(c) === prev) ? prev : null,
+        prev &&
+        [...result.changes, ...(result.snapshotChanges ?? [])].some((c) => changeKey(c) === prev)
+          ? prev
+          : null,
       );
     },
     [clearRollbackState],
@@ -273,16 +263,22 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     const cwd = cwdRef.current;
     if (!cwd) return;
     const seq = ++seqRef.current;
+    const roundSeq = snapshotSeqRef.current;
+    const beforeTreeOid = preRoundTreeOidRef.current;
     setRefreshing(true);
     setPhase((prev) =>
       prev === "ready" || prev === "notRepo" || prev === "error" ? prev : "loading",
     );
     try {
-      const result = await gitService.status(cwd);
-      if (seqRef.current !== seq) return;
+      const result = await gitService.status(cwd, beforeTreeOid ?? undefined);
+      if (seqRef.current !== seq || snapshotSeqRef.current !== roundSeq) return;
+      if (preRoundTreeOidRef.current !== beforeTreeOid) {
+        setRefreshing(false);
+        return;
+      }
       applyResult(result);
     } catch (err) {
-      if (seqRef.current !== seq) return;
+      if (seqRef.current !== seq || snapshotSeqRef.current !== roundSeq) return;
       setPhase("error");
       setRefreshing(false);
       setError(err instanceof Error ? err.message : String(err));
@@ -300,24 +296,30 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     [refresh],
   );
 
-  // 工作目录变化（切换项目 / 恢复其他目录的会话）→ 立即重读
+  // 目录或会话变化都切换回滚域；同一仓库的其他会话不能继承本轮快照。
   useEffect(() => {
+    seqRef.current += 1;
+    snapshotSeqRef.current += 1;
+    roundEndSeqRef.current += 1;
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+    lastUpdatedRef.current = null;
+    setLastUpdated(null);
+    setRepoRoot(null);
+    setChanges([]);
+    setSelectedKey(null);
+    setError(null);
+    setRefreshing(false);
+    setRollbackPromptOpen(false);
+    setRollbackPromptInspect(null);
     if (!sessionWorkingDir) {
-      seqRef.current += 1; // 使在途请求失效
-      snapshotSeqRef.current += 1;
-      roundEndSeqRef.current += 1;
       setPhase("noWorkspace");
-      setRepoRoot(null);
-      setChanges([]);
-      setSelectedKey(null);
-      setError(null);
-      setRefreshing(false);
       clearRollbackState("noSession");
       return;
     }
-    clearRollbackState("noSnapshot");
+    clearRollbackState(activeSessionId ? "noSnapshot" : "noSession");
     void refresh();
-  }, [sessionWorkingDir, refresh, clearRollbackState]);
+  }, [sessionWorkingDir, activeSessionId, refresh, clearRollbackState]);
 
   // agent 一轮：开始时拍快照（供回滚），结束时防抖刷新 + 锁定轮末快照（冲突检测）
   // 仅 active 会话的事件驱动回滚域（多会话：后台 agent 不改变 A 的 canRollback）
@@ -326,37 +328,42 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return sessionService.subscribe((message) => {
       if (message.type !== "event") return;
-      if (
-        message.sessionId &&
-        activeSessionIdRef.current &&
-        message.sessionId !== activeSessionIdRef.current
-      ) {
-        return;
-      }
+      if (message.sessionId !== activeSessionIdRef.current) return;
       const event = message.payload;
       const { type } = event;
       if (type === "agent_start") {
         const cwd = cwdRef.current;
         if (!cwd) return;
         const seq = ++snapshotSeqRef.current;
-        // 同步锚定本轮 HEAD（status 最近一次读到的），避免快照未完成时被误判为「已提交」
+        roundEndSeqRef.current += 1;
+        seqRef.current += 1;
+        if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+        setRefreshing(false);
+        setRollbackPromptOpen(false);
         roundActiveRef.current = true;
-        roundHeadRef.current = lastHeadOidRef.current;
+        roundSettledRef.current = false;
+        roundHeadRef.current = null;
         roundEndTreeOidRef.current = null;
+        preRoundTreeOidRef.current = null;
         setPreRoundTreeOid(null);
         setLastRound([]);
         setStoredBlockReason("noSnapshot");
-        lastRoundBaselineRef.current = new Map(
-          changesRef.current.map((c) => [changeKey(c), changeFingerprint(c)]),
-        );
-        void gitService.snapshot(cwd).then((result) => {
-          if (snapshotSeqRef.current !== seq) return;
-          setPreRoundTreeOid(result.treeOid);
-          // 尚未 refresh 过时 lastHead 可能为空，用快照读到的 HEAD 补锚
-          if (roundActiveRef.current && lastHeadOidRef.current === null && result.headOid) {
+        void gitService
+          .snapshot(cwd)
+          .then((result) => {
+            if (snapshotSeqRef.current !== seq || !roundActiveRef.current) return;
+            preRoundTreeOidRef.current = result.treeOid;
+            setPreRoundTreeOid(result.treeOid);
             roundHeadRef.current = result.headOid;
-          }
-        });
+            // 极短轮次可能先收口、后拍完轮前快照，补刷才能得到本轮内容差异。
+            if (roundSettledRef.current) scheduleRefresh(0);
+          })
+          .catch((err: unknown) => {
+            if (snapshotSeqRef.current !== seq) return;
+            clearRollbackState("noSnapshot");
+            console.warn("[review] Failed to capture turn snapshot", err);
+          });
         return;
       }
       if (type === "agent_settled") {
@@ -364,28 +371,27 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         // 在它上面切轮会把同一轮的文件编辑截成两段（docs/design/76 §6.3）。
         // 中断轮仍出卡与撤销资格（docs/design/11），不因 aborted 跳过。
         const cwd = cwdRef.current;
+        roundSettledRef.current = true;
         if (cwd && roundActiveRef.current && !roundEndTreeOidRef.current) {
           const endSeq = ++roundEndSeqRef.current;
-          void gitService.snapshot(cwd).then((result) => {
-            if (roundEndSeqRef.current !== endSeq) return;
-            if (!roundActiveRef.current) return;
-            if (!result.treeOid) return;
-            // 轮内/轮末已提交则不作冲突基线
-            if (
-              result.headOid !== null &&
-              roundHeadRef.current !== null &&
-              result.headOid !== roundHeadRef.current
-            ) {
-              return;
-            }
-            roundEndTreeOidRef.current = result.treeOid;
-          });
+          void gitService
+            .snapshot(cwd)
+            .then((result) => {
+              if (roundEndSeqRef.current !== endSeq || !roundActiveRef.current) return;
+              if (!result.treeOid) return;
+              if (preRoundTreeOidRef.current !== null && result.headOid !== roundHeadRef.current) {
+                return;
+              }
+              roundEndTreeOidRef.current = result.treeOid;
+            })
+            .catch((err: unknown) => {
+              console.warn("[review] Failed to capture settled snapshot", err);
+            });
         }
-        // store 仍是任务前状态；refresh 后与指纹基线求差得到 lastRound
         scheduleRefresh(AGENT_REFRESH_DELAY_MS);
       }
     });
-  }, [scheduleRefresh]);
+  }, [scheduleRefresh, clearRollbackState]);
 
   useEffect(
     () => () => {
@@ -461,9 +467,31 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       if (!cwd) throw new Error("没有可用的工作目录");
       const paths = changesToPaths(targets, true);
       if (paths.length === 0) throw new Error("没有需要丢弃的路径");
+      const snapshot = targets[0]?.snapshot;
+      if (
+        targets.some((change) => change.snapshot?.before !== snapshot?.before) ||
+        (snapshot &&
+          (snapshot.before !== preRoundTreeOidRef.current ||
+            targets.some(
+              (change) =>
+                !lastRound.some(
+                  (current) =>
+                    changeKey(current) === changeKey(change) &&
+                    current.snapshot?.after === change.snapshot?.after,
+                ),
+            )))
+      ) {
+        throw new Error(rollbackBlockReasonText("noSnapshot"));
+      }
       setWriting(true);
       try {
-        const result = await gitService.discard({ cwd, paths });
+        let result: GitDiscardResult;
+        if (snapshot) {
+          const rollback = await gitService.rollback({ cwd, treeOid: snapshot.before, paths });
+          result = { restored: rollback.restored, removed: rollback.deleted };
+        } else {
+          result = await gitService.discard({ cwd, paths });
+        }
         setSelectedKey(null);
         await refresh();
         return result;
@@ -471,7 +499,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
         setWriting(false);
       }
     },
-    [refresh],
+    [refresh, lastRound],
   );
 
   const commit = useCallback(
@@ -599,12 +627,20 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const requestRollbackPrompt = useCallback((): void => {
     if (preRoundTreeOid === null || lastRound.length === 0 || rollingBack) return;
     rollbackPromptSessionIdRef.current = activeSessionId;
+    const roundSeq = snapshotSeqRef.current;
+    rollbackPromptRoundSeqRef.current = roundSeq;
     const total = rollbackTargetPaths(lastRound).length;
     setRollbackPromptInspect(emptyRollbackInspect(total, true));
     setRollbackPromptOpen(true);
     void inspectRollback()
-      .then((result) => setRollbackPromptInspect(result))
-      .catch(() => setRollbackPromptInspect(emptyRollbackInspect(total, false)));
+      .then((result) => {
+        if (snapshotSeqRef.current === roundSeq) setRollbackPromptInspect(result);
+      })
+      .catch(() => {
+        if (snapshotSeqRef.current === roundSeq) {
+          setRollbackPromptInspect(emptyRollbackInspect(total, false));
+        }
+      });
   }, [preRoundTreeOid, lastRound, rollingBack, inspectRollback, activeSessionId]);
 
   const dismissRollbackPrompt = useCallback((): void => {
@@ -617,7 +653,12 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   } | null> => {
     setRollbackPromptOpen(false);
     // 弹窗打开期间会话已切换：cwd/快照已换域，核对数据失真，放弃本次回滚而不是错删
-    if (activeSessionId !== rollbackPromptSessionIdRef.current) return null;
+    if (
+      activeSessionId !== rollbackPromptSessionIdRef.current ||
+      snapshotSeqRef.current !== rollbackPromptRoundSeqRef.current
+    ) {
+      return null;
+    }
     return rollbackLastRound();
   }, [rollbackLastRound, activeSessionId]);
 
@@ -676,7 +717,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
       visibleChanges,
       selectedKey,
       selectedChange: selectedKey
-        ? (changes.find((c) => changeKey(c) === selectedKey) ?? null)
+        ? ((filterMode === "lastRound" ? lastRound : changes).find(
+            (c) => changeKey(c) === selectedKey,
+          ) ?? null)
         : null,
       selectChange,
       clearSelection,

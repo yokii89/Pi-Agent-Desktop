@@ -11,7 +11,10 @@ import type { GitChange, GitPushPlan } from "../../../shared/ipc";
 import { useT } from "../../hooks/useT";
 import { changeKey, type ReviewFilterMode, useReviewStore } from "../../stores/reviewStore";
 import { useUiStore } from "../../stores/uiStore";
-import { ROLLBACK_BLOCK_REASON_TEXT } from "../../utils/rollbackLastRound";
+import {
+  buildRollbackSuccessToast,
+  ROLLBACK_BLOCK_REASON_TEXT,
+} from "../../utils/rollbackLastRound";
 import { type CacheEntry, FileDiffInline } from "../Review/FileDiffInline";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Segmented } from "../ui/Segmented";
@@ -159,10 +162,12 @@ function ChangesPaneImpl() {
       .then((result) => {
         setDiscardTargets(null);
         showToast(
-          t("panels.review.discardedToast", {
-            restored: result.restored,
-            removed: result.removed,
-          }),
+          targets[0]?.snapshot
+            ? buildRollbackSuccessToast({ restored: result.restored, deleted: result.removed })
+            : t("panels.review.discardedToast", {
+                restored: result.restored,
+                removed: result.removed,
+              }),
         );
       })
       .catch((err: unknown) => {
@@ -401,11 +406,18 @@ function ChangesPaneImpl() {
       <ConfirmDialog
         open={discardTargets !== null}
         tone="danger"
-        title={t("panels.review.discardConfirmTitle")}
-        message={t("panels.review.discardConfirmMessage", {
-          count: discardTargets?.length ?? 0,
-        })}
-        confirmLabel={t("panels.review.discardConfirm")}
+        title={t(
+          discardTargets?.[0]?.snapshot ? "ui.rollback.title" : "panels.review.discardConfirmTitle",
+        )}
+        message={t(
+          discardTargets?.[0]?.snapshot
+            ? "panels.review.discardRoundMessage"
+            : "panels.review.discardConfirmMessage",
+          { count: discardTargets?.length ?? 0 },
+        )}
+        confirmLabel={t(
+          discardTargets?.[0]?.snapshot ? "ui.rollback.confirm" : "panels.review.discardConfirm",
+        )}
         busy={writing}
         onConfirm={handleConfirmDiscard}
         onCancel={() => setDiscardTargets(null)}

@@ -26,10 +26,10 @@ import { pideskApi } from "./pideskApi";
 
 /** Git 审查数据服务（主进程 git 模块）：仓库状态总览 + 单文件 diff + 快照回滚 + 分支 + 提交图。 */
 export const gitService = {
-  status(cwd: string): Promise<GitStatusResult> {
+  status(cwd: string, beforeTreeOid?: string): Promise<GitStatusResult> {
     const api = pideskApi();
     if (!api) return Promise.resolve({ repoRoot: null, changes: [], headOid: null });
-    return unwrap(api.git.status(cwd));
+    return unwrap(api.git.status(cwd, beforeTreeOid));
   },
   diff(req: GitDiffRequest): Promise<GitFileDiff> {
     const api = pideskApi();

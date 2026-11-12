@@ -322,7 +322,7 @@ export interface PideskGlobalApi {
     pathForFile(file: File): string;
   };
   git: {
-    status(cwd: string): Promise<IpcResult<GitStatusResult>>;
+    status(cwd: string, beforeTreeOid?: string): Promise<IpcResult<GitStatusResult>>;
     diff(req: GitDiffRequest): Promise<IpcResult<GitFileDiff>>;
     snapshot(cwd: string): Promise<IpcResult<GitSnapshotResult>>;
     rollback(req: GitRollbackRequest): Promise<IpcResult<GitRollbackResult>>;

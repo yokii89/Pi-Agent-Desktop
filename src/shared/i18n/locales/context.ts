@@ -276,6 +276,12 @@ export const contextMessages = defineMessages({
     "en-US":
       "This permanently discards local changes in {count} file(s); untracked new files will be deleted. This cannot be undone.",
   },
+  "panels.review.discardRoundMessage": {
+    "zh-CN":
+      "将撤销所选 {count} 个文件的本轮改动，还原到本轮开始前；本轮新建文件会被删除。更早的修改和暂存内容会保留。",
+    "en-US":
+      "Undo this turn's changes in {count} selected file(s), restoring their contents from before the turn. Files created this turn will be deleted. Earlier edits and staged content will be preserved.",
+  },
   "panels.review.discardConfirm": { "zh-CN": "丢弃", "en-US": "Discard" },
   "panels.review.discardedToast": {
     "zh-CN": "已丢弃：还原 {restored} 个、删除 {removed} 个",

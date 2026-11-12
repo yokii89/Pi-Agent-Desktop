@@ -38,7 +38,7 @@ export function FileDiffInline({
   useEffect(() => {
     if (!cwd) return;
     // 缓存键含仓库与变更列表版本：刷新后旧条目自然失效，避免读到过期 diff
-    const key = `${repoRoot ?? ""}:${changesVersion}:${change.layer}|${change.path}`;
+    const key = `${repoRoot ?? ""}:${changesVersion}:${change.snapshot?.before ?? ""}:${change.snapshot?.after ?? ""}:${change.layer}|${change.path}`;
     const cached = cache.current?.get(key);
     if (cached) {
       setState(
@@ -56,6 +56,7 @@ export function FileDiffInline({
         path: change.path,
         oldPath: change.oldPath,
         layer: change.layer,
+        snapshot: change.snapshot,
       })
       .then((diff) => {
         cache.current?.set(key, { ok: true, diff });

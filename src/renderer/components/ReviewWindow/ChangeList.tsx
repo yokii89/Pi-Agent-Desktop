@@ -132,8 +132,10 @@ export function ChangeList({
                     type="button"
                     className={[styles.rowAction, styles.rowActionDanger].join(" ")}
                     disabled={busy}
-                    title={t("panels.review.discardFile")}
-                    aria-label={t("panels.review.discardFile")}
+                    title={t(change.snapshot ? "ui.rollback.confirm" : "panels.review.discardFile")}
+                    aria-label={t(
+                      change.snapshot ? "ui.rollback.confirm" : "panels.review.discardFile",
+                    )}
                     onClick={() => onDiscard(change)}
                   >
                     <Trash size={14} weight="regular" />

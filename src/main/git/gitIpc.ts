@@ -66,6 +66,7 @@ function normalizeDiffRequest(req: GitDiffRequest): GitDiffRequest {
     path: req.path,
     oldPath: typeof req.oldPath === "string" && req.oldPath ? req.oldPath : null,
     layer: req.layer,
+    snapshot: req.snapshot,
   };
 }
 
@@ -73,10 +74,13 @@ function normalizeDiffRequest(req: GitDiffRequest): GitDiffRequest {
 export function registerGitIpc(): void {
   ipcMain.handle(
     GIT_IPC.status,
-    (_event, req: { cwd: string }): Promise<IpcResult<GitStatusResult>> =>
+    (_event, req: { cwd: string; beforeTreeOid?: string }): Promise<IpcResult<GitStatusResult>> =>
       envelopeAsync(async () => {
         if (typeof req?.cwd !== "string" || !req.cwd) throw new Error("参数不完整");
-        return getChanges(req.cwd);
+        if (req.beforeTreeOid !== undefined && typeof req.beforeTreeOid !== "string") {
+          throw new Error("无效的快照标识");
+        }
+        return getChanges(req.cwd, req.beforeTreeOid);
       }),
   );
 

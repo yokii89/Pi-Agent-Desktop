@@ -62,6 +62,8 @@ interface GitRunOptions {
   env?: NodeJS.ProcessEnv;
   /** 以 Buffer 返回 stdout（二进制文件内容）。 */
   encoding?: "buffer";
+  /** 通过 stdin 传递 NUL 分隔路径，避免 Windows 命令行长度限制。 */
+  input?: string;
 }
 
 /** 以参数数组方式执行 git（不经 shell，天然规避空格/引号/注入问题）。 */
@@ -71,7 +73,7 @@ function runGit(
   options: Omit<GitRunOptions, "encoding"> = {},
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(
+    const child = execFile(
       "git",
       args,
       {
@@ -100,6 +102,10 @@ function runGit(
         reject(new GitError(firstLine || `git ${args[0]} 执行失败（exit ${exitCode ?? "?"}）`));
       },
     );
+    if (options.input !== undefined) {
+      child.stdin?.on("error", reject);
+      child.stdin?.end(options.input, "utf8");
+    }
   });
 }
 
@@ -331,11 +337,50 @@ async function resolveHeadOid(repoRoot: string): Promise<string | null> {
   }
 }
 
+/** 以真实内容比较两端工作区快照；不依赖相对 HEAD 的状态或增删行数指纹。 */
+async function getSnapshotChanges(
+  repoRoot: string,
+  before: string,
+  after: string,
+  worktreeChanges: GitChange[],
+): Promise<GitChange[]> {
+  const [names, numstat] = await Promise.all([
+    runGit(repoRoot, ["diff", "--name-status", "-z", "--find-renames", before, after, "--"]),
+    runGit(repoRoot, ["diff", "--numstat", "-z", "--find-renames", before, after, "--"]),
+  ]);
+  const counts = parseNumstatZ(numstat);
+  const tokens = names.split("\0");
+  const changes: GitChange[] = [];
+  for (let i = 0; i < tokens.length; i += 1) {
+    const code = tokens[i]?.[0];
+    if (!code) continue;
+    const oldPath = code === "R" || code === "C" ? (tokens[++i] ?? null) : null;
+    const filePath = tokens[++i];
+    if (!filePath) continue;
+    const stat = counts.get(`${oldPath ?? ""}\0${filePath}`);
+    const current =
+      worktreeChanges.find((change) => change.path === filePath && change.layer !== "staged") ??
+      worktreeChanges.find((change) => change.path === filePath);
+    changes.push({
+      path: filePath,
+      oldPath,
+      status: mapStatusCode(code),
+      layer: current?.layer ?? "unstaged",
+      additions: stat?.additions ?? null,
+      deletions: stat?.deletions ?? null,
+      snapshot: { before, after },
+    });
+  }
+  return changes;
+}
+
 /**
  * 读取工作区变更总览：仓库探测 + status + staged/unstaged numstat + untracked 行数统计。
+ * 指定轮前 tree 时附带两端工作区快照之间的差异，真实 index / HEAD 全程不变。
  * cwd 不是 git 仓库时返回 repoRoot=null（非错误）。
  */
-export async function getChanges(cwd: string): Promise<GitStatusResult> {
+export async function getChanges(cwd: string, beforeTreeOid?: string): Promise<GitStatusResult> {
+  if (beforeTreeOid !== undefined) assertTreeOid(beforeTreeOid);
   const repoRoot = await resolveRepoRoot(cwd);
   if (!repoRoot) return { repoRoot: null, changes: [], headOid: null };
 
@@ -380,6 +425,16 @@ export async function getChanges(cwd: string): Promise<GitStatusResult> {
     }),
   );
 
+  if (beforeTreeOid !== undefined) {
+    const snapshot = await createSnapshot(repoRoot);
+    if (!snapshot.treeOid) throw new GitError("工作区快照不可用");
+    return {
+      repoRoot,
+      changes,
+      headOid: snapshot.headOid,
+      snapshotChanges: await getSnapshotChanges(repoRoot, beforeTreeOid, snapshot.treeOid, changes),
+    };
+  }
   return { repoRoot, changes, headOid };
 }
 
@@ -393,7 +448,23 @@ export async function getFileDiff(cwd: string, req: GitDiffRequest): Promise<Git
 
   const pathspecs = req.oldPath ? [req.path, req.oldPath] : [req.path];
   let output: string;
-  if (req.layer === "untracked") {
+  if (req.snapshot) {
+    assertTreeOid(req.snapshot.before);
+    assertTreeOid(req.snapshot.after);
+    output = await runGit(repoRoot, [
+      "--literal-pathspecs",
+      "diff",
+      "--no-color",
+      "--no-ext-diff",
+      "--no-textconv",
+      "--unified=3",
+      "--find-renames",
+      req.snapshot.before,
+      req.snapshot.after,
+      "--",
+      ...pathspecs,
+    ]);
+  } else if (req.layer === "untracked") {
     output = await runGit(
       repoRoot,
       [
@@ -556,6 +627,29 @@ export async function createSnapshot(cwd: string): Promise<GitSnapshotResult> {
       await runGit(repoRoot, ["read-tree", "--empty"], { env });
     }
     await runGit(repoRoot, ["add", "-A", "--"], { env });
+    // 真实 index 可能通过 add -f 跟踪了忽略文件，临时 index 从 HEAD 起步会漏掉它们。
+    const ignored = await runGit(repoRoot, [
+      "ls-files",
+      "--cached",
+      "--ignored",
+      "--exclude-standard",
+      "-z",
+    ]);
+    const forcedPaths: string[] = [];
+    for (const relPath of new Set(ignored.split("\0").filter(Boolean))) {
+      const stat = await fs.promises.lstat(path.join(repoRoot, relPath)).catch(() => null);
+      if (stat?.isFile() || stat?.isSymbolicLink()) forcedPaths.push(relPath);
+    }
+    if (forcedPaths.length > 0) {
+      await runGit(
+        repoRoot,
+        ["--literal-pathspecs", "add", "-f", "--pathspec-from-file=-", "--pathspec-file-nul"],
+        {
+          env,
+          input: `${forcedPaths.join("\0")}\0`,
+        },
+      );
+    }
     const treeOid = (await runGit(repoRoot, ["write-tree"], { env })).trim();
     return { treeOid: treeOid || null, headOid };
   } finally {
@@ -581,17 +675,31 @@ export async function rollbackToSnapshot(
   let deleted = 0;
   // 去重：rename 新旧路径、同文件多层变更只处理一次
   const uniquePaths = [...new Set(req.paths.filter((p) => typeof p === "string" && p.length > 0))];
+  const targets = uniquePaths.map((relPath) => ({
+    relPath,
+    abs: resolveRepoPath(repoRoot, relPath),
+  }));
+  // 一次确认 tree 与路径存在性。读取 blob 失败必须报错，不能被误判为「本轮新建」而删除。
+  const entries = await runGit(repoRoot, [
+    "--literal-pathspecs",
+    "ls-tree",
+    "-r",
+    "-z",
+    "--full-tree",
+    req.treeOid,
+    "--",
+    ...uniquePaths,
+  ]);
+  const blobs = new Map<string, string>();
+  for (const entry of entries.split("\0")) {
+    const match = /^\d+ blob ([0-9a-f]+)\t([\s\S]+)$/.exec(entry);
+    if (match) blobs.set(match[2], match[1]);
+  }
 
-  for (const relPath of uniquePaths) {
-    const abs = resolveRepoPath(repoRoot, relPath);
-    let blob: Buffer | null = null;
-    try {
-      blob = await runGitBuffer(repoRoot, ["show", `${req.treeOid}:${relPath}`]);
-    } catch {
-      blob = null; // 快照中不存在
-    }
-
-    if (blob) {
+  for (const { relPath, abs } of targets) {
+    const oid = blobs.get(relPath);
+    if (oid) {
+      const blob = await runGitBuffer(repoRoot, ["cat-file", "blob", oid]);
       await fs.promises.mkdir(path.dirname(abs), { recursive: true });
       await fs.promises.writeFile(abs, blob);
       restored += 1;

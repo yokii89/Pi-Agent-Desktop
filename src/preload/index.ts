@@ -519,9 +519,9 @@ contextBridge.exposeInMainWorld("pidesk", {
   },
 
   git: {
-    /** 读取仓库状态与变更列表（staged / unstaged / untracked）。 */
-    status: (cwd: string): Promise<IpcResult<GitStatusResult>> =>
-      ipcRenderer.invoke(GIT_IPC.status, { cwd }),
+    /** 读取仓库状态；指定轮前 tree 时附带本轮内容差异，不改动真实暂存区。 */
+    status: (cwd: string, beforeTreeOid?: string): Promise<IpcResult<GitStatusResult>> =>
+      ipcRenderer.invoke(GIT_IPC.status, { cwd, beforeTreeOid }),
     /** 读取单个文件 diff（按 layer 决定基线）。 */
     diff: (req: GitDiffRequest): Promise<IpcResult<GitFileDiff>> =>
       ipcRenderer.invoke(GIT_IPC.diff, req),
