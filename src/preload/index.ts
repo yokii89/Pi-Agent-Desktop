@@ -19,22 +19,13 @@ import type {
 } from "../shared/github";
 import { GITHUB_IPC } from "../shared/github";
 import type {
-  BrowserApplyLoginCookiesRequest,
-  BrowserApplyLoginCookiesResult,
-  BrowserApplyPastedCookiesRequest,
-  BrowserApplyPastedCookiesResult,
   BrowserBoundsRequest,
   BrowserCloseInstanceRequest,
-  BrowserImportLoginDataRequest,
-  BrowserImportLoginDataResult,
   BrowserInstanceInfo,
-  BrowserLoginSource,
   BrowserNavigateRequest,
   BrowserOpenLocalFileRequest,
   BrowserOverlaySuppressedRequest,
   BrowserPickModeRequest,
-  BrowserPreviewLoginCookiesRequest,
-  BrowserPreviewLoginCookiesResult,
   BrowserPushMessage,
   BrowserSaveScreenshotRequest,
   BrowserScreenshotResult,
@@ -623,29 +614,6 @@ contextBridge.exposeInMainWorld("pidesk", {
     clearCookies: (): Promise<IpcResult<null>> => ipcRenderer.invoke(BROWSER_IPC.clearCookies),
     /** 清除 persist:browser 分区 HTTP 缓存。 */
     clearCache: (): Promise<IpcResult<null>> => ipcRenderer.invoke(BROWSER_IPC.clearCache),
-    /** 手动粘贴 Cookie 导入 persist:browser（docs/design/09 M1）。 */
-    applyPastedCookies: (
-      req: BrowserApplyPastedCookiesRequest,
-    ): Promise<IpcResult<BrowserApplyPastedCookiesResult>> =>
-      ipcRenderer.invoke(BROWSER_IPC.applyPastedCookies, req),
-    /** 列出本机 Chromium Profile（docs/design/09 M2）。 */
-    listLoginSources: (): Promise<IpcResult<BrowserLoginSource[]>> =>
-      ipcRenderer.invoke(BROWSER_IPC.listLoginSources),
-    /** 预览将导入的 Cookie 名称（不含 value）。 */
-    previewLoginCookies: (
-      req: BrowserPreviewLoginCookiesRequest,
-    ): Promise<IpcResult<BrowserPreviewLoginCookiesResult>> =>
-      ipcRenderer.invoke(BROWSER_IPC.previewLoginCookies, req),
-    /** 从本机浏览器读取并写入 persist:browser。 */
-    applyLoginCookies: (
-      req: BrowserApplyLoginCookiesRequest,
-    ): Promise<IpcResult<BrowserApplyLoginCookiesResult>> =>
-      ipcRenderer.invoke(BROWSER_IPC.applyLoginCookies, req),
-    /** 全量导入本机浏览器数据（Cookie + 可选 LocalStorage，docs/design/42 §6.6）。 */
-    importLoginData: (
-      req: BrowserImportLoginDataRequest,
-    ): Promise<IpcResult<BrowserImportLoginDataResult>> =>
-      ipcRenderer.invoke(BROWSER_IPC.importLoginData, req),
     /** 仅截取当前页冻结帧（视图仍可见）。 */
     captureOverlayFreeze: (): Promise<IpcResult<{ freeze: string | null }>> =>
       ipcRenderer.invoke(BROWSER_IPC.captureOverlayFreeze),

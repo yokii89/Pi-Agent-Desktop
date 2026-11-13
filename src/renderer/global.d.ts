@@ -16,22 +16,13 @@ import type {
   GitHubSyncResult,
 } from "../shared/github";
 import type {
-  BrowserApplyLoginCookiesRequest,
-  BrowserApplyLoginCookiesResult,
-  BrowserApplyPastedCookiesRequest,
-  BrowserApplyPastedCookiesResult,
   BrowserBoundsRequest,
   BrowserCloseInstanceRequest,
-  BrowserImportLoginDataRequest,
-  BrowserImportLoginDataResult,
   BrowserInstanceInfo,
-  BrowserLoginSource,
   BrowserNavigateRequest,
   BrowserOpenLocalFileRequest,
   BrowserOverlaySuppressedRequest,
   BrowserPickModeRequest,
-  BrowserPreviewLoginCookiesRequest,
-  BrowserPreviewLoginCookiesResult,
   BrowserPushMessage,
   BrowserSaveScreenshotRequest,
   BrowserScreenshotResult,
@@ -364,19 +355,6 @@ export interface PideskGlobalApi {
     setZoom(req: BrowserZoomRequest): Promise<IpcResult<null>>;
     clearCookies(): Promise<IpcResult<null>>;
     clearCache(): Promise<IpcResult<null>>;
-    applyPastedCookies(
-      req: BrowserApplyPastedCookiesRequest,
-    ): Promise<IpcResult<BrowserApplyPastedCookiesResult>>;
-    listLoginSources(): Promise<IpcResult<BrowserLoginSource[]>>;
-    previewLoginCookies(
-      req: BrowserPreviewLoginCookiesRequest,
-    ): Promise<IpcResult<BrowserPreviewLoginCookiesResult>>;
-    applyLoginCookies(
-      req: BrowserApplyLoginCookiesRequest,
-    ): Promise<IpcResult<BrowserApplyLoginCookiesResult>>;
-    importLoginData(
-      req: BrowserImportLoginDataRequest,
-    ): Promise<IpcResult<BrowserImportLoginDataResult>>;
     captureOverlayFreeze(): Promise<IpcResult<{ freeze: string | null }>>;
     setOverlaySuppressed(req: BrowserOverlaySuppressedRequest): Promise<IpcResult<null>>;
     saveScreenshot(req: BrowserSaveScreenshotRequest): Promise<IpcResult<{ path: string }>>;

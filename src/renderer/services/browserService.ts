@@ -1,18 +1,9 @@
 import type {
-  BrowserApplyLoginCookiesRequest,
-  BrowserApplyLoginCookiesResult,
-  BrowserApplyPastedCookiesRequest,
-  BrowserApplyPastedCookiesResult,
   BrowserBoundsRequest,
   BrowserConsoleError,
-  BrowserImportLoginDataRequest,
-  BrowserImportLoginDataResult,
   BrowserInstanceInfo,
-  BrowserLoginSource,
   BrowserPickedElement,
   BrowserPickMode,
-  BrowserPreviewLoginCookiesRequest,
-  BrowserPreviewLoginCookiesResult,
   BrowserPushMessage,
   BrowserScreenshotResult,
   InspectorBoxModel,
@@ -199,45 +190,6 @@ export const browserService = {
     const api = pideskApi();
     if (!api) return Promise.resolve();
     return unwrap(api.browser.clearCache()).then(() => undefined);
-  },
-
-  /** 手动粘贴 Cookie 导入 persist:browser（docs/design/09 M1）。 */
-  applyPastedCookies(
-    req: BrowserApplyPastedCookiesRequest,
-  ): Promise<BrowserApplyPastedCookiesResult> {
-    const api = pideskApi();
-    if (!api) return Promise.reject(new Error("预加载 API 不可用"));
-    return unwrap(api.browser.applyPastedCookies(req));
-  },
-
-  /** 列出本机 Chromium Profile（docs/design/09 M2）。 */
-  listLoginSources(): Promise<BrowserLoginSource[]> {
-    const api = pideskApi();
-    if (!api) return Promise.resolve([]);
-    return unwrap(api.browser.listLoginSources()).catch(() => []);
-  },
-
-  /** 预览将导入的 Cookie 名称（不含 value）。 */
-  previewLoginCookies(
-    req: BrowserPreviewLoginCookiesRequest,
-  ): Promise<BrowserPreviewLoginCookiesResult> {
-    const api = pideskApi();
-    if (!api) return Promise.reject(new Error("预加载 API 不可用"));
-    return unwrap(api.browser.previewLoginCookies(req));
-  },
-
-  /** 从本机浏览器读取并写入 persist:browser。 */
-  applyLoginCookies(req: BrowserApplyLoginCookiesRequest): Promise<BrowserApplyLoginCookiesResult> {
-    const api = pideskApi();
-    if (!api) return Promise.reject(new Error("预加载 API 不可用"));
-    return unwrap(api.browser.applyLoginCookies(req));
-  },
-
-  /** 全量导入本机浏览器数据（docs/design/42 §6.6）。 */
-  importLoginData(req: BrowserImportLoginDataRequest): Promise<BrowserImportLoginDataResult> {
-    const api = pideskApi();
-    if (!api) return Promise.reject(new Error("预加载 API 不可用"));
-    return unwrap(api.browser.importLoginData(req));
   },
 
   /** 仅截取当前页冻结帧（视图仍可见）。 */

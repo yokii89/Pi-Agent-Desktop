@@ -32,8 +32,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
-    "node-pty": "^1.1.0",
-    "sql.js": "^1.14.2"
+    "node-pty": "^1.1.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",

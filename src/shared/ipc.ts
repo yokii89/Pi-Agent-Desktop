@@ -199,11 +199,6 @@ export interface PideskSettings {
   /** 是否启用内置浏览器面板；关闭后右栏不再显示 Browser Tab。 */
   browserEnabled: boolean;
   /**
-   * 是否已同意「导入登录状态」用户须知（docs/design/09）。
-   * 同意一次后，再次打开导入对话框不再展示须知首页。
-   */
-  browserLoginImportConsent: boolean;
-  /**
    * 并行 pi 会话上限（docs/多会话并行架构方案 决策 #7）。
    * 超限时 start 失败并提示，不自动杀最旧会话。
    */
@@ -2103,16 +2098,6 @@ export const BROWSER_IPC = {
   clearCookies: "pidesk:browser:clearCookies",
   /** 清除 persist:browser 分区 HTTP 缓存。 */
   clearCache: "pidesk:browser:clearCache",
-  /** 手动粘贴 Cookie 导入 persist:browser（docs/design/09 M1）。 */
-  applyPastedCookies: "pidesk:browser:applyPastedCookies",
-  /** 列出本机 Chromium 浏览器 Profile（docs/design/09 M2）。 */
-  listLoginSources: "pidesk:browser:listLoginSources",
-  /** 预览某来源下匹配 host 的 Cookie 名称（不含 value）。 */
-  previewLoginCookies: "pidesk:browser:previewLoginCookies",
-  /** 从本机浏览器读取并写入 persist:browser。 */
-  applyLoginCookies: "pidesk:browser:applyLoginCookies",
-  /** 全量导入本机浏览器数据（Cookie + 可选 LocalStorage，docs/design/42 §6.6）。 */
-  importLoginData: "pidesk:browser:importLoginData",
   /** 仅截取当前页冻结帧（不隐藏视图）；供浮层先垫底再抑制，避免闪黑。 */
   captureOverlayFreeze: "pidesk:browser:captureOverlayFreeze",
   /** 临时隐藏页面视图（区域截图选区 / 设置浮窗等与宿主区重叠的渲染层浮层）。 */
@@ -2200,90 +2185,6 @@ export interface BrowserCaptureOverlayFreezeResult {
 export interface BrowserSaveScreenshotRequest {
   /** PNG base64（不含 data: 前缀）。 */
   base64: string;
-}
-
-/** 手动粘贴 Cookie 导入（docs/design/09 M1；表格格式见 docs/design/42 §6.7）。 */
-export interface BrowserApplyPastedCookiesRequest {
-  /**
-   * 目标站点 host 或 URL（主进程会收成 hostname）。
-   *
-   * 粘贴 DevTools Cookie 表格时可留空：表格自带 Domain，每条按自己的域写回；
-   * 仅当粘贴的是 `name=value`（无域信息）时才必填。
-   */
-  host: string;
-  /** 粘贴文本：DevTools Cookie 表格（TSV）或 `name=value; name2=value2`（允许换行）。 */
-  raw: string;
-  /** 强制 https；缺省时本地 host 用 http、其余 https（仅影响 `name=value` 粘贴）。 */
-  secure?: boolean;
-}
-
-export interface BrowserApplyPastedCookiesResult {
-  applied: number;
-  /** 写入成功的 Cookie 名称（不含 value）。 */
-  names: string[];
-  /** 部分写入失败时的可读告警（中文文案，由主进程给出）。 */
-  warnings?: string[];
-}
-
-/** 本机 Chromium 浏览器 Profile 来源（docs/design/09 M2）。 */
-export interface BrowserLoginSource {
-  /** 稳定 id，如 `chrome:Default`。 */
-  id: string;
-  browserId: string;
-  browserLabel: string;
-  profileDir: string;
-  profileLabel: string;
-  userDataDir: string;
-  cookieDbPath: string;
-  /** 是否为系统 https 默认浏览器。 */
-  isDefaultBrowser: boolean;
-}
-
-export interface BrowserPreviewLoginCookiesRequest {
-  sourceId: string;
-  host: string;
-}
-
-export interface BrowserPreviewLoginCookiesResult {
-  /** 匹配到的 Cookie 名称（不含 value）。 */
-  names: string[];
-  failed: number;
-  warnings: string[];
-}
-
-export interface BrowserApplyLoginCookiesRequest {
-  sourceId: string;
-  host: string;
-}
-
-export interface BrowserApplyLoginCookiesResult {
-  applied: number;
-  names: string[];
-  warnings: string[];
-}
-
-/**
- * 全量导入请求（docs/design/42 §6.6）：把本机 Chrome / Edge 的**完整**登录态搬进面板分区。
- *
- * 与按站点导入（`applyLoginCookies`）的区别：Cookie 不做 host 过滤，域 Cookie 按 `domain`
- * 属性写回（否则 `google.com` 的域 Cookie 不会发给 `accounts.google.com`）。
- */
-export interface BrowserImportLoginDataRequest {
-  sourceId: string;
-  /** 同时导入站点存储（LocalStorage）：源侧要逐个 origin 导航，明显更慢，默认关。 */
-  includeLocalStorage?: boolean;
-  /** 面板当前地址：把当前站点排到 LocalStorage 导入队列最前。 */
-  currentUrl?: string;
-}
-
-/** 全量导入结果（只回传计数与告警，Cookie 值不出主进程）。 */
-export interface BrowserImportLoginDataResult {
-  cookies: number;
-  skippedCookies: number;
-  failedCookies: number;
-  localStorageOrigins: number;
-  localStorageEntries: number;
-  warnings: string[];
 }
 
 /** 关键 computed styles（docs/design/05 §6"样式"行的固定子集）。 */

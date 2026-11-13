@@ -57,8 +57,6 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   defaultProjectDir: null,
   showInTray: false,
   browserEnabled: true,
-  // 导入登录状态须知：同意一次后不再重复展示
-  browserLoginImportConsent: false,
   // 并行 pi 会话上限（多会话架构决策 #7）；超限 start 失败，不自动杀最旧
   maxParallelSessions: 8,
   // 会话预热默认开启（docs/design/44：打开/新建会话即触发，把冷启动移到发送之前）
@@ -159,7 +157,6 @@ export const SETTABLE_KEYS = [
   "defaultProjectDir",
   "showInTray",
   "browserEnabled",
-  "browserLoginImportConsent",
   "maxParallelSessions",
   "sessionPrefetchEnabled",
   "welcomeRecentsEnabled",

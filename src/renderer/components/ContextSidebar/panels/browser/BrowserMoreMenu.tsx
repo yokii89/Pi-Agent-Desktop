@@ -8,7 +8,6 @@ import {
   MagnifyingGlassMinus,
   MagnifyingGlassPlus,
   Monitor,
-  SignIn,
   Toolbox,
 } from "@phosphor-icons/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -19,16 +18,11 @@ import { useT } from "../../../../hooks/useT";
 import { browserService } from "../../../../services/browserService";
 import { useBrowserStore, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from "../../../../stores/browserStore";
 import { GLIDE_MOTION } from "../../../../utils/motionTokens";
-import {
-  handoffOverlaySuppress,
-  prepareOverlayFreeze,
-  releaseOverlayFreeze,
-} from "../../../../utils/overlayFreeze";
+import { prepareOverlayFreeze, releaseOverlayFreeze } from "../../../../utils/overlayFreeze";
 import glideStyles from "../../../ui/GlideList.module.css";
 import { IconButton } from "../../../ui/IconButton";
 import { Segmented } from "../../../ui/Segmented";
 import styles from "./BrowserMoreMenu.module.css";
-import { ImportLoginDialog } from "./ImportLoginDialog";
 
 /** 面板与触发按钮的垂直间隔。 */
 const GAP = 6;
@@ -37,7 +31,6 @@ const VIEWPORT_MARGIN = 8;
 /** 菜单自身的抑制来源。 */
 const SUPPRESS_REASON = "moreMenu";
 /** 导入对话框的抑制来源（与 ImportLoginDialog 保持一致）。 */
-const IMPORT_SUPPRESS_REASON = "loginImport";
 
 /** 视口预设（P1-4）；desktop = 跟随面板宽度。 */
 const VIEWPORT_PRESETS = [
@@ -66,11 +59,8 @@ export function BrowserMoreMenu() {
   const t = useT();
   const store = useBrowserStore();
   const [phase, setPhase] = useState<"closed" | "open" | "closing">("closed");
-  const [importOpen, setImportOpen] = useState(false);
   const openingRef = useRef(false);
   const hadPanelRef = useRef(false);
-  /** 已交接给导入对话框：菜单关闭时只摘 moreMenu，保留冻结帧。 */
-  const handingOffRef = useRef(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const open = phase === "open";
@@ -84,12 +74,6 @@ export function BrowserMoreMenu() {
     }
     if (!hadPanelRef.current) return;
     hadPanelRef.current = false;
-    if (handingOffRef.current) {
-      handingOffRef.current = false;
-      // 仅释放菜单原因；loginImport 仍抑制，冻结帧留给对话框
-      void browserService.setOverlaySuppressed(false, SUPPRESS_REASON);
-      return;
-    }
     void releaseOverlayFreeze(SUPPRESS_REASON, store.setOverlayFreeze);
   }, [phase]);
 
@@ -109,18 +93,14 @@ export function BrowserMoreMenu() {
     })();
   };
 
-  /** `glide: false` 用于交给导入对话框：那里要立刻把冻结帧让给 Modal，不能多演一拍。 */
-  const beginClose = useCallback(
-    (glide = true): void => {
-      if (phase === "closed") return;
-      if (!glide || phase === "closing") {
-        setPhase("closed");
-        return;
-      }
-      setPhase("closing");
-    },
-    [phase],
-  );
+  const beginClose = useCallback((): void => {
+    if (phase === "closed") return;
+    if (phase === "closing") {
+      setPhase("closed");
+      return;
+    }
+    setPhase("closing");
+  }, [phase]);
 
   useEffect(() => {
     if (!open) return;
@@ -163,19 +143,9 @@ export function BrowserMoreMenu() {
             closing={phase === "closing"}
             onClosedNow={() => setPhase("closed")}
             onClose={() => beginClose()}
-            onImportLogin={() => {
-              // 先把抑制权交给对话框，再关菜单：避免视图短暂恢复盖住 Modal
-              handingOffRef.current = true;
-              void (async () => {
-                await handoffOverlaySuppress(IMPORT_SUPPRESS_REASON, SUPPRESS_REASON);
-                setImportOpen(true);
-                beginClose(false);
-              })();
-            }}
           />,
           document.body,
         )}
-      <ImportLoginDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </>
   );
 }
@@ -187,7 +157,6 @@ function MoreMenuPanel({
   closing,
   onClosedNow,
   onClose,
-  onImportLogin,
 }: {
   panelRef: React.RefObject<HTMLDivElement | null>;
   anchor: HTMLElement | null;
@@ -195,7 +164,6 @@ function MoreMenuPanel({
   closing: boolean;
   onClosedNow: () => void;
   onClose: () => void;
-  onImportLogin: () => void;
 }) {
   const t = useT();
   const overlay = useGlideOverlay(panelRef);
@@ -249,13 +217,13 @@ function MoreMenuPanel({
       role="menu"
       aria-label={t("browser.more")}
     >
-      <MenuBody onClose={onClose} onImportLogin={onImportLogin} />
+      <MenuBody onClose={onClose} />
     </div>
   );
 }
 
-/** 菜单内容：强制刷新 / DevTools / 登录态导入 / 缩放 / 视口 / 清理。 */
-function MenuBody({ onClose, onImportLogin }: { onClose: () => void; onImportLogin: () => void }) {
+/** 菜单内容：强制刷新 / DevTools / 缩放 / 视口 / 清理。 */
+function MenuBody({ onClose }: { onClose: () => void }) {
   const t = useT();
   const store = useBrowserStore();
   const zoomPercent = Math.round(store.zoomFactor * 100);
@@ -283,7 +251,6 @@ function MenuBody({ onClose, onImportLogin }: { onClose: () => void; onImportLog
       void store.openDevTools();
       onClose();
     },
-    onImportLogin,
     () => {
       void store.clearCookies();
       onClose();
@@ -329,22 +296,6 @@ function MenuBody({ onClose, onImportLogin }: { onClose: () => void; onImportLog
           <Toolbox size={16} weight="regular" />
         </span>
         <span>DevTools</span>
-      </button>
-
-      <button
-        type="button"
-        role="menuitem"
-        className={styles.action}
-        data-glide-index={2}
-        onClick={(event) => {
-          if (pill.consumeClick(event.detail)) return;
-          onImportLogin();
-        }}
-      >
-        <span className={styles.actionIcon}>
-          <SignIn size={16} weight="regular" />
-        </span>
-        <span>{t("browser.loginImport.menuItem")}</span>
       </button>
 
       <div className={styles.zoomRow}>
@@ -421,7 +372,7 @@ function MenuBody({ onClose, onImportLogin }: { onClose: () => void; onImportLog
         type="button"
         role="menuitem"
         className={[styles.action, styles.actionDanger].join(" ")}
-        data-glide-index={3}
+        data-glide-index={2}
         onClick={(event) => {
           if (pill.consumeClick(event.detail)) return;
           void store.clearCookies();
@@ -438,7 +389,7 @@ function MenuBody({ onClose, onImportLogin }: { onClose: () => void; onImportLog
         type="button"
         role="menuitem"
         className={[styles.action, styles.actionDanger].join(" ")}
-        data-glide-index={4}
+        data-glide-index={3}
         onClick={(event) => {
           if (pill.consumeClick(event.detail)) return;
           void store.clearCache();

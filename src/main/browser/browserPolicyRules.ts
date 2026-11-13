@@ -1,6 +1,6 @@
 /**
  * 内嵌浏览器面板「在应用内浏览」策略里的纯逻辑（无 Electron 依赖，便于单测；
- * 同 `loginImportParse` 的拆分方式）。策略本体见 `browserPolicy.ts`，动机见 docs/design/42。
+ * 策略本体见 `browserPolicy.ts`，动机见 docs/design/42。
  *
  * 历史提醒：这里曾有过「UA 归一 + 伪造 UA-CH」的一组函数（docs/design/42 §3 L5 / §6.3），
  * 2026-10-08 实测证明**它们才是 Google 登录被拦的原因**（请求头自称 Google Chrome、而

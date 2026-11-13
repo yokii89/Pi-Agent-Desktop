@@ -195,7 +195,6 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         break;
       case "showInTray":
       case "browserEnabled":
-      case "browserLoginImportConsent":
       case "sessionPrefetchEnabled":
       case "welcomeRecentsEnabled":
         if (typeof value === "boolean") clean[key] = value;

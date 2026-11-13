@@ -13,12 +13,8 @@ files:
   - build/icon.ico
   - build/icon.png
   # 打包进 asar 的 node_modules 仅限主进程运行时依赖（package.json "dependencies"，当前仅
-  # electron-updater / node-pty / sql.js 及其传递依赖）；渲染层依赖已被 vite 打进 dist，
+  # electron-updater / node-pty 及其传递依赖）；渲染层依赖已被 vite 打进 dist，
   # 一律放 devDependencies，electron-builder 默认不打包它们。
-  # sql.js 全量 22MB，运行时只经 locateFile/require.resolve 加载两个文件，其余全部剔除。
-  - "!**/node_modules/sql.js/dist/**"
-  - "node_modules/sql.js/dist/sql-wasm.js"
-  - "node_modules/sql.js/dist/sql-wasm.wasm"
   # node-pty 剔除调试符号、非目标平台 prebuilds（只发 win32-x64）与运行时死重：
   # build/Release、deps/、third_party/ 是 node-gyp 构建产物与 winpty/conpty 源码镜像——
   # packaged 环境的 .node 一定来自 prebuilds/（loadNativeModule 依次尝试 build/Release →

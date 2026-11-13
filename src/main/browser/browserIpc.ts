@@ -1,21 +1,12 @@
 import { ipcMain } from "electron";
 import type {
-  BrowserApplyLoginCookiesRequest,
-  BrowserApplyLoginCookiesResult,
-  BrowserApplyPastedCookiesRequest,
-  BrowserApplyPastedCookiesResult,
   BrowserBoundsRequest,
   BrowserCloseInstanceRequest,
-  BrowserImportLoginDataRequest,
-  BrowserImportLoginDataResult,
   BrowserInstanceInfo,
-  BrowserLoginSource,
   BrowserNavigateRequest,
   BrowserOpenLocalFileRequest,
   BrowserOverlaySuppressedRequest,
   BrowserPickModeRequest,
-  BrowserPreviewLoginCookiesRequest,
-  BrowserPreviewLoginCookiesResult,
   BrowserSaveScreenshotRequest,
   BrowserSetActiveInstanceRequest,
   BrowserViewportRequest,
@@ -28,7 +19,6 @@ import type {
 } from "../../shared/ipc";
 import { BROWSER_IPC } from "../../shared/ipc";
 import { envelope, envelopeAsync } from "../ipc/envelope";
-import { importBrowserLoginData } from "./browserDataImport";
 import {
   backBrowser,
   captureBrowserOverlayFreeze,
@@ -63,12 +53,6 @@ import {
   stylePatchClear,
   stylePatchExport,
 } from "./browserView";
-import {
-  applyBrowserLoginCookies,
-  applyPastedLoginCookies,
-  listBrowserLoginSources,
-  previewBrowserLoginCookies,
-} from "./loginImport";
 
 /** 注册浏览器面板 IPC（docs/design/05 §7.2）。 */
 export function registerBrowserIpc(): void {
@@ -260,47 +244,6 @@ export function registerBrowserIpc(): void {
         await clearBrowserCookies();
         return null;
       }),
-  );
-
-  ipcMain.handle(
-    BROWSER_IPC.applyPastedCookies,
-    (
-      _event,
-      req: BrowserApplyPastedCookiesRequest,
-    ): Promise<IpcResult<BrowserApplyPastedCookiesResult>> =>
-      envelopeAsync(() => applyPastedLoginCookies(req ?? { host: "", raw: "" })),
-  );
-
-  ipcMain.handle(
-    BROWSER_IPC.listLoginSources,
-    (): Promise<IpcResult<BrowserLoginSource[]>> => envelopeAsync(() => listBrowserLoginSources()),
-  );
-
-  ipcMain.handle(
-    BROWSER_IPC.previewLoginCookies,
-    (
-      _event,
-      req: BrowserPreviewLoginCookiesRequest,
-    ): Promise<IpcResult<BrowserPreviewLoginCookiesResult>> =>
-      envelopeAsync(() => previewBrowserLoginCookies(req ?? { sourceId: "", host: "" })),
-  );
-
-  ipcMain.handle(
-    BROWSER_IPC.applyLoginCookies,
-    (
-      _event,
-      req: BrowserApplyLoginCookiesRequest,
-    ): Promise<IpcResult<BrowserApplyLoginCookiesResult>> =>
-      envelopeAsync(() => applyBrowserLoginCookies(req ?? { sourceId: "", host: "" })),
-  );
-
-  ipcMain.handle(
-    BROWSER_IPC.importLoginData,
-    (
-      _event,
-      req: BrowserImportLoginDataRequest,
-    ): Promise<IpcResult<BrowserImportLoginDataResult>> =>
-      envelopeAsync(() => importBrowserLoginData(req ?? { sourceId: "" })),
   );
 
   ipcMain.handle(

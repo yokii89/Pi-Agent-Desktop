@@ -64,7 +64,7 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 任何新增依赖（运行时或开发时）必须先在此处登记用途，再安装。
 
 **依赖分类契约（安装包体积基线，2026-11-08 瘦身确立）**：`dependencies` 只放**主进程运行时需要
-node_modules 解析**的包（当前仅 `electron-updater` / `node-pty` / `sql.js`——主进程走 tsc 编译不打包）；
+node_modules 解析**的包（当前仅 `electron-updater` / `node-pty`——主进程走 tsc 编译不打包）；
 渲染层依赖（react、gsap、mermaid、shiki、@phosphor-icons/react、@lobehub/icons、@xterm/* 等）一律
 `devDependencies`——它们已被 vite 打进 `dist/`，electron-builder 只打包 `dependencies`，放错分类
 会把整包源码塞进 asar（曾致安装包虚胖 ~70MB）。新增主进程外部依赖 → 进 `dependencies` 并补登记；
@@ -80,7 +80,6 @@ node_modules 解析**的包（当前仅 `electron-updater` / `node-pty` / `sql.j
 - `remark-breaks`（devDep，渲染层构建期打包）：会话正文与思考流的软换行渲染为 `<br>`（模型输出的单换行是段内换行语义）；仅 `MarkdownDoc` 的 `breaks` surface 使用，文件面板预览与 ExtensionView 不开。
 - `gsap`（devDep，渲染层构建期打包）：左侧边栏的展开/折叠、悬浮揭示等交互动效；**必须动态 `import()` 使用**（见下文"动效规范"），不得静态引入。
 - `@electron/rebuild`（dev）：`node-pty` 原生模块针对 Electron ABI 的重编译（`pnpm run rebuild:native`）。
-- `sql.js`（runtime，主进程运行时依赖）：主进程用 WASM SQLite 读取本机 Chromium Cookie 库副本（浏览器登录态导入）；不引入 native SQLite。electron-builder 只保留 `dist/sql-wasm.js` + `dist/sql-wasm.wasm`（见 electron-builder.yml files 规则）。
 - `shiki`（devDep，渲染层构建期打包）：右侧「文件」面板只读预览的代码语法高亮（TextMate 文法 + 双主题 CSS 变量）；经 `shiki/core` 细粒度动态加载，禁止整包 `import "shiki"` 静态引入。
 - `pdfjs-dist`（devDep，渲染层构建期打包）：右侧「文件」面板的 PDF 按页只读预览；PDF.js 与 worker 均通过动态 import / Vite 资源 URL 按需加载，不作为主进程运行时依赖。
 - `@vitest/coverage-v8`（dev）：`packages/view-sdk` 的行/分支覆盖率口径（`pnpm test:sdk:coverage`）。版本必须与 `vitest` 主版本配对；**仅 SDK 测试用**，不扩展到主进程 / 渲染层（后者仍按本文件"测试"条款只跑断言）。`NODE_V8_COVERAGE` 对 vitest worker 无效，不要再试。
