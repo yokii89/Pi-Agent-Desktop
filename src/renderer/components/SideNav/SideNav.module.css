@@ -351,7 +351,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-bottom: var(--spacing-xs);
+  /* 分区留白放进测量盒，避免补间落定时再补上 margin / 外层 padding。 */
+  padding-bottom: calc(var(--spacing-xs) * 2);
 }
 
 .itemText {
@@ -794,10 +795,12 @@
   overflow: hidden;
   margin: 0;
   padding-left: calc(var(--spacing-md) + 4px);
+  padding-bottom: var(--spacing-xs);
 }
 
 /* 折叠容器（分区列表 / 项目子列表）：外层承载高度补间，内层列表负责测量内容高度。
-   内容间距一律用 padding / gap（margin 不计入 scrollHeight，会造成折叠后残留空隙）。
+   留白由内层列表承担，完整计入 useCollapseAnimation 测量的 offsetHeight；
+   外层必须没有 padding，否则高度归零后仍占空间、摘掉内联 height 时又跳一截。
    layout / paint containment 把内部列表的布局与绘制隔离：高度补间逐帧只改外层盒，
    浏览器不必把内部子树重新纳入外侧的失效范围（菜单 / 悬浮卡均 portal 到 body，不受裁剪影响）。 */
 .collapseRoot {
@@ -805,9 +808,14 @@
   flex-direction: column;
   gap: 2px;
   margin: 0;
-  padding: 0 0 var(--spacing-xs);
+  padding: 0;
   overflow: hidden;
   contain: layout paint;
+}
+
+.collapseRoot > ul {
+  /* 内层只负责测量与裁剪：被压缩会让每帧重排列表，也会污染半途反向的目标高度。 */
+  flex-shrink: 0;
 }
 
 /* 树状引导线：一条 1px 竖线，末条收尾为指向条目的分支钩 */

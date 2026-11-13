@@ -1,4 +1,5 @@
 import { type RefObject, useLayoutEffect, useRef, useState } from "react";
+import { prefersReducedMotion } from "../utils/animation";
 import { type GlideCancel, glide, mix } from "../utils/glideMotion";
 import { NAV_MOTION } from "../utils/motionTokens";
 
@@ -100,6 +101,12 @@ export function useCollapseAnimation<
       setRendered(expanded);
       if (!expanded) onCollapsed.current?.();
     };
+
+    // 不启动两段同步落定的补间：高度的收尾清理后，透明度补间会重新写回内联终态。
+    if (prefersReducedMotion()) {
+      settle();
+      return;
+    }
 
     // 实际渲染高度（受 max-height 约束）；scrollHeight 会拿到溢出内容的完整高度
     const contentHeight = inner.offsetHeight;
