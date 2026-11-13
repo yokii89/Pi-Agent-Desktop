@@ -1,3 +1,4 @@
+import { execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
@@ -193,6 +194,108 @@ export async function openDirectory(target: string): Promise<void> {
   }
   const failure = await shell.openPath(target);
   if (failure) throw new Error(failure);
+}
+
+/** VS Code 常见安装位置（PiDesk 仅发布 Windows；「环境变量名/相对路径」两段式）。 */
+const VS_CODE_EXE_CANDIDATES = [
+  "LOCALAPPDATA/Programs/Microsoft VS Code/Code.exe",
+  "ProgramFiles/Microsoft VS Code/Code.exe",
+  "ProgramFiles(x86)/Microsoft VS Code/Code.exe",
+] as const;
+
+/** 依序探测已知安装位置；都不存在返回 null，交给 PATH 兜底。 */
+function findVsCodeExe(): string | null {
+  for (const candidate of VS_CODE_EXE_CANDIDATES) {
+    const sep = candidate.indexOf("/");
+    const base = process.env[candidate.slice(0, sep)];
+    if (!base) continue;
+    const exe = path.join(base, candidate.slice(sep + 1));
+    if (fs.existsSync(exe)) return exe;
+  }
+  return null;
+}
+
+/** 分离启动一个进程：借 spawn 事件确认真的起来了（PATH 里找不到等失败转成可读拒绝）。 */
+function spawnDetached(
+  command: string,
+  args: string[],
+  options?: { verbatimArgs?: boolean },
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+      windowsVerbatimArguments: options?.verbatimArgs === true,
+    });
+    child.once("error", reject);
+    child.once("spawn", () => resolve());
+    child.unref();
+  });
+}
+
+/**
+ * `where code` 找 PATH 里的 code shim；只认 cmd 能执行的形态（.cmd/.exe/.bat）——
+ * `where` 也会列出无扩展名的 bash shim（VS Code bin 目录两者并存），喂给 cmd 会失败。
+ * 找不到（非零退出 / 只有 bash shim）返回 null。
+ */
+function findCodeOnPath(): Promise<string | null> {
+  return new Promise((resolve) => {
+    execFile("where", ["code"], { windowsHide: true }, (err, stdout) => {
+      if (err) {
+        resolve(null);
+        return;
+      }
+      const shims = stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => /\.(cmd|exe|bat)$/i.test(line));
+      resolve(shims[0] ?? null);
+    });
+  });
+}
+
+/**
+ * 用 VS Code 打开目录（顶栏工作区按钮）。探测顺序：已知安装位置的 Code.exe →
+ * PATH 里的 code shim（`where code`）→ shim 上级的真实 Code.exe → cmd 兜底执行 shim。
+ * 都不可用或启动失败时给出可读错误——VS Code 的「添加到 PATH」是安装器可选项，
+ * 静默失败会表现成"点了没反应"。
+ */
+export async function openInVsCode(target: string): Promise<void> {
+  try {
+    fs.statSync(target);
+  } catch {
+    throw new Error("路径不存在或已被移动");
+  }
+  const notFound = () => new Error("未检测到 VS Code，请确认已安装并在安装时勾选了「添加到 PATH」");
+
+  const exe = findVsCodeExe();
+  const launchDirect = exe ? (): Promise<void> => spawnDetached(exe, [target]) : null;
+
+  const shim = launchDirect ? null : await findCodeOnPath();
+  // shim 约定在 <安装根>/bin/code.cmd，真实主体是上级目录的 Code.exe：
+  // 直接 spawn 免受 cmd 引号规则影响（路径含空格时 shell:true 会截断命令）
+  const shimRootExe = shim?.toLowerCase().endsWith(".cmd")
+    ? path.join(path.dirname(path.dirname(shim)), "Code.exe")
+    : null;
+  const launchViaShim =
+    shim && shimRootExe && fs.existsSync(shimRootExe)
+      ? (): Promise<void> => spawnDetached(shimRootExe, [target])
+      : shim
+        ? (): Promise<void> =>
+            // 兜底：cmd /s /c 执行 shim（整段自带外层引号，verbatim 原样传给 cmd）
+            spawnDetached("cmd.exe", ["/d", "/s", "/c", `""${shim}" "${target}""`], {
+              verbatimArgs: true,
+            })
+        : null;
+
+  const launch = launchDirect ?? launchViaShim;
+  if (!launch) throw notFound();
+  try {
+    await launch();
+  } catch {
+    throw notFound();
+  }
 }
 
 // ---------------------------------------------------------------------------

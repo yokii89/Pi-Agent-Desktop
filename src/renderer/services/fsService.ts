@@ -41,6 +41,12 @@ export const fsService = {
     if (!api) return;
     await unwrap(api.fs.openPath(dir));
   },
+  /** 用 VS Code 打开目录；失败（未安装 / 目录不存在）向调用方抛出可展示的错误。 */
+  async openInVsCode(dir: string): Promise<void> {
+    const api = pideskApi();
+    if (!api) return;
+    await unwrap(api.fs.openInVsCode(dir));
+  },
   /** 把 data URL 图片存到系统「下载」目录；失败（数据不可用 / 同名过多）抛出可展示错误。 */
   async saveImageToDownloads(dataUrl: string, name?: string): Promise<FsSaveImageResult> {
     const api = pideskApi();

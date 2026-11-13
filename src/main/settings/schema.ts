@@ -46,6 +46,8 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   locale: "system",
   navCollapsed: false,
   navWidth: NAV_WIDTH_DEFAULT,
+  // 会话顶栏工作区按钮的默认打开方式（设备本地偏好，不进设置同步白名单）
+  workdirOpenTarget: "explorer",
   pinnedSessions: [],
   globalPinnedSessions: [],
   archivedSessions: {},
@@ -147,6 +149,7 @@ export const SETTABLE_KEYS = [
   "locale",
   "navCollapsed",
   "navWidth",
+  "workdirOpenTarget",
   "pinnedSessions",
   "globalPinnedSessions",
   "archivedSessions",

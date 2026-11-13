@@ -116,6 +116,12 @@ export type TerminalShellKind = "powershell" | "cmd" | "gitbash";
  */
 export type TerminalTabCompletion = "cycle" | "list";
 
+/**
+ * 会话顶栏工作区按钮的默认打开方式：explorer = Windows 资源管理器；
+ * vscode = 用 VS Code 打开目录（顶栏分裂按钮的勾选项，选过一次即记住）。
+ */
+export type WorkdirOpenTarget = "explorer" | "vscode";
+
 /** 浏览器面板最近访问的一条 URL（docs/design/05 P0-5）。 */
 export interface BrowserRecentUrl {
   url: string;
@@ -157,6 +163,11 @@ export interface PideskSettings {
    * 属于用户偏好（与主题、折叠态同层），进设置同步白名单。
    */
   navWidth: number;
+  /**
+   * 会话顶栏工作区按钮的默认打开方式（explorer / vscode）。
+   * 设备本地偏好：VS Code 是否安装随机器而异，不进设置同步白名单。
+   */
+  workdirOpenTarget: WorkdirOpenTarget;
   /** 「在工作区内置顶」的会话（JSONL 绝对路径，数组顺序即置顶顺序）；条目固定在其所属列表最前。 */
   pinnedSessions: string[];
   /**
@@ -1699,6 +1710,8 @@ export const FS_IPC = {
   pickFile: "pidesk:fs:pickFile",
   /** 用系统默认应用打开路径（目录/文件均可；会话 FileLink 与侧栏共用）。 */
   openPath: "pidesk:fs:openPath",
+  /** 用 VS Code 打开目录（顶栏工作区按钮）；未安装时返回可读错误。 */
+  openInVsCode: "pidesk:fs:openInVsCode",
   /** 把 data URL 图片落盘到系统「下载」目录（lightbox 右键「保存图片」）。 */
   saveImageToDownloads: "pidesk:fs:saveImageToDownloads",
   /** 订阅目录变动：开始监听某个已展开目录（主进程引用计数）。 */

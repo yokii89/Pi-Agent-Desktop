@@ -902,6 +902,27 @@ export const sessionMessages = defineMessages({
     "zh-CN": "打开文件夹",
     "en-US": "Open folder",
   },
+  // 会话 header 工作区按钮：左段执行默认打开，右段菜单选打开方式（勾选记住默认）
+  "session.workspace.openWorkdir": {
+    "zh-CN": "打开工作目录",
+    "en-US": "Open working directory",
+  },
+  "session.workspace.openWith": {
+    "zh-CN": "选择打开方式",
+    "en-US": "Choose how to open",
+  },
+  "session.workspace.openInExplorer": {
+    "zh-CN": "资源管理器",
+    "en-US": "File Explorer",
+  },
+  "session.workspace.openInVsCode": {
+    "zh-CN": "VS Code",
+    "en-US": "VS Code",
+  },
+  "session.workspace.openFailed": {
+    "zh-CN": "打开失败",
+    "en-US": "Failed to open",
+  },
   "session.workspace.remote": {
     "zh-CN": "远程连接",
     "en-US": "Remote connection",

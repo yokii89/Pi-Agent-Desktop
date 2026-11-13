@@ -1,0 +1,71 @@
+/**
+ * 会话 header 工作区分裂按钮：观感与同排的 GitBranchChip「meta」胶囊同构
+ * （--color-bg-hover 底、pill 圆角、11px muted 字号）。整块 no-drag——
+ * titlebar 的 drag 矩形由 SessionHeader .bar 承担，这里必须显式让出。
+ */
+.chip {
+  display: inline-flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  max-width: 160px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-hover);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  -webkit-app-region: no-drag;
+}
+
+.main,
+.chevron {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.main {
+  gap: 5px;
+  min-width: 0;
+  padding-left: 8px;
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+}
+
+.chevron {
+  padding: 2px 5px;
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+}
+
+.main:hover,
+.main:focus-visible,
+.chevron:hover,
+.chevronOpen {
+  background: var(--color-bg-active);
+}
+
+.main:focus-visible,
+.chevron:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.chipLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.divider {
+  flex-shrink: 0;
+  width: 1px;
+  margin: 3px 1px;
+  background: var(--color-border);
+}
+
+.brandIcon {
+  display: block;
+}

@@ -189,6 +189,10 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
           clean.navWidth = clampNavWidth(value);
         }
         break;
+      case "workdirOpenTarget":
+        // 白名单外的值整项丢弃，不把脏目标写进设置
+        if (value === "explorer" || value === "vscode") clean.workdirOpenTarget = value;
+        break;
       case "showInTray":
       case "browserEnabled":
       case "browserLoginImportConsent":

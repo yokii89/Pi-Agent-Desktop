@@ -13,6 +13,7 @@ import { envelope, envelopeAsync } from "../ipc/envelope";
 import {
   listDirectory,
   openDirectory,
+  openInVsCode,
   pickFile,
   readFile,
   saveImageToDownloads,
@@ -49,6 +50,15 @@ export function registerFsIpc(): void {
     (_event, req: { dir: string }): Promise<IpcResult<null>> =>
       envelopeAsync(async () => {
         await openDirectory(req.dir);
+        return null;
+      }),
+  );
+
+  ipcMain.handle(
+    FS_IPC.openInVsCode,
+    (_event, req: { dir: string }): Promise<IpcResult<null>> =>
+      envelopeAsync(async () => {
+        await openInVsCode(req.dir);
         return null;
       }),
   );

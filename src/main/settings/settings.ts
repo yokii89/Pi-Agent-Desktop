@@ -132,6 +132,8 @@ export function getSettings(): PideskSettings {
     notification: normalizeNotificationSettings(loaded.notification),
     // 手改设置文件时把侧栏宽度夹回合法区间（它同时是持久化值与设置同步项）
     navWidth: clampNavWidth(loaded.navWidth),
+    // 手改设置文件时把未知打开目标回退默认，避免渲染层拿着脏值渲染菜单勾选
+    workdirOpenTarget: loaded.workdirOpenTarget === "vscode" ? "vscode" : "explorer",
     // 手改设置文件时把字号夹回合法范围，非法值回退默认
     sessionStreamFontPx: clampSessionStreamFontPx(loaded.sessionStreamFontPx),
     fontUiPreset: normalizeFontUiPreset(loaded.fontUiPreset),
@@ -174,6 +176,7 @@ export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   next.wallpaperPath = normalizeWallpaperPath(next.wallpaperPath);
   next.wallpaperDim = clampWallpaperDim(next.wallpaperDim);
   next.navWidth = clampNavWidth(next.navWidth);
+  next.workdirOpenTarget = next.workdirOpenTarget === "vscode" ? "vscode" : "explorer";
   next.uiZoom = normalizeUiZoom(next.uiZoom);
   next.shortcuts = sanitizeShortcutsRecord(next.shortcuts);
   next.sessionOrder = sanitizeSessionOrder(next.sessionOrder) ?? DEFAULT_SETTINGS.sessionOrder;

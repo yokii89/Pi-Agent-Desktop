@@ -1,7 +1,7 @@
 /**
  * 顶栏中间槽会话身份条：适配 40px titlebar。
  * Electron 算法：drag 标出可拖矩形并忽略指针事件；no-drag 从该矩形挖洞以恢复交互。
- * 因此条底/空白保持 drag，标题按钮、只读工作目录胶囊（保留 title 悬浮路径）、
+ * 因此条底/空白保持 drag，标题按钮、工作区分裂按钮（WorkdirChip，悬浮看完整路径）、
  * Git 分支、更多菜单一律 no-drag。由 TitleBarCenter 的 glass 底承载观感。
  */
 .bar {
@@ -72,28 +72,6 @@
 
 .titleEdit:focus {
   border-color: var(--color-accent);
-}
-
-/* 只读工作目录锚点：no-drag 才能保留 title 悬浮完整路径（产品约束：悬浮看路径） */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-  max-width: 120px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-hover);
-  color: var(--color-text-muted);
-  font-size: 11px;
-  line-height: 1.4;
-  -webkit-app-region: no-drag;
-}
-
-.chipLabel {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .right {

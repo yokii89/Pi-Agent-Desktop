@@ -1,11 +1,4 @@
-import {
-  DotsThree,
-  Folder,
-  FolderOpen,
-  PlusCircle,
-  PushPin,
-  PushPinSlash,
-} from "@phosphor-icons/react";
+import { DotsThree, FolderOpen, PlusCircle, PushPin, PushPinSlash } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { useT } from "../../hooks/useT";
 import { windowService } from "../../services/windowService";
@@ -16,11 +9,7 @@ import { archiveItem, deleteItem, openFolderItem, renameItem } from "../SideNav/
 import { Menu } from "../ui/Menu";
 import { GitBranchChip } from "./GitBranchChip";
 import styles from "./SessionHeader.module.css";
-
-function basename(dir: string): string {
-  const parts = dir.split(/[\\/]/).filter(Boolean);
-  return parts.at(-1) ?? dir;
-}
+import { WorkdirChip } from "./WorkdirChip";
 
 /** 拖拽区上的双击最大化：仅非交互表面（条底/空白），按钮与输入框仍走自身点击。 */
 function isTitlebarSurface(target: EventTarget): boolean {
@@ -33,7 +22,8 @@ function isTitlebarSurface(target: EventTarget): boolean {
  * 无工作目录时只展示标题；标题可双击（或经更多菜单）重命名。
  *
  * 产品约束：会话进行中不提供「切换工作区」——pi 进程已绑定 cwd，中途换目录会与
- * 实际执行上下文脱节；工作区芯片仅作只读锚点（悬浮看完整路径）。
+ * 实际执行上下文脱节；工作区按钮（WorkdirChip）只负责打开当前目录，
+ * 不承担切换语义（悬浮看完整路径）。
  */
 export function SessionHeader() {
   const t = useT();
@@ -111,12 +101,7 @@ export function SessionHeader() {
           </button>
         )}
 
-        {sessionWorkingDir && (
-          <span className={styles.chip} title={sessionWorkingDir}>
-            <Folder size={13} weight="regular" />
-            <span className={styles.chipLabel}>{basename(sessionWorkingDir)}</span>
-          </span>
-        )}
+        {sessionWorkingDir && <WorkdirChip dir={sessionWorkingDir} />}
 
         {sessionWorkingDir && (
           <GitBranchChip cwd={sessionWorkingDir} direction="bottom" variant="meta" />
