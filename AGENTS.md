@@ -86,6 +86,7 @@ node_modules 解析**的包（当前仅 `electron-updater` / `node-pty` / `sql.j
 - `@vitest/coverage-v8`（dev）：`packages/view-sdk` 的行/分支覆盖率口径（`pnpm test:sdk:coverage`）。版本必须与 `vitest` 主版本配对；**仅 SDK 测试用**，不扩展到主进程 / 渲染层（后者仍按本文件"测试"条款只跑断言）。`NODE_V8_COVERAGE` 对 vitest worker 无效，不要再试。
 - `electron-updater`（runtime，主进程运行时依赖）：设置 →「应用更新」的检查/下载/安装。GitHub Releases + NSIS `latest.yml`/blockmap（差分更新：本地缓存有旧安装包时自动差分下载）；发布流程见 `scripts/release.mjs` 与 `.github/workflows/release.yml`。
 - `mermaid`（devDep，渲染层构建期打包）：会话区 / 文件面板 / ExtensionView 的 ` ```mermaid ` 围栏出图。**只能经 `src/renderer/utils/mermaidLoader.ts` 动态 `import()`**（同 GSAP 条款）——它自带 60+ 个按图表类型切分的惰性 chunk（含 elk 布局引擎），静态引入会把它们全部塞进主 bundle。**不写 `manualChunks` 规则**：mermaid 内部已是动态 import，强行归组反而废掉惰性分块。CSP 无需放宽（`securityLevel: "strict"` 下生产策略实测可跑）。
+- `json5`（devDep，渲染层构建期打包）：文件面板预览中对单行 `.json` / `.jsonc` / `.json5` 内容进行容错解析与缩进格式化；解析失败或内容截断时保留原文。
 
 多模态图片附件**零新依赖**：解码/缩放用浏览器 `createImageBitmap` + `canvas`，不引入 sharp / jimp 等图像库。
 

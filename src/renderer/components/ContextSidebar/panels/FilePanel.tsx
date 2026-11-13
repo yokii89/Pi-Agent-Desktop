@@ -29,6 +29,7 @@ import {
   resolveForPreview,
   resolvePath,
 } from "../../../utils/fileOpen";
+import { formatJsonPreview } from "../../../utils/jsonPreview";
 import {
   canGoBack,
   canGoForward,
@@ -497,7 +498,7 @@ function FilePreviewBody({
       )}
       <CodeHighlight
         key={`${preview.path}:${preview.focusLine ?? 0}`}
-        code={result.content}
+        code={formatJsonPreview(preview.path, result.content, result.truncated)}
         filePath={preview.path}
         className={panelStyles.previewContent}
         focusLine={preview.focusLine}

@@ -3,6 +3,7 @@ import {
   HTML_EXTS,
   IMAGE_EXTS,
   isHtmlPath,
+  isJsonPath,
   isMarkdownPath,
   isNotebookPath,
   isPdfPath,
@@ -58,5 +59,12 @@ describe("specialized file paths", () => {
     expect(isNotebookPath("analysis.IPYNB")).toBe(true);
     expect(isPdfPath("docs/report.PDF")).toBe(true);
     expect(isTabularPath("data.json")).toBe(false);
+  });
+
+  it("recognizes JSON-family files without treating JSONL as JSON", () => {
+    expect(isJsonPath("package.json")).toBe(true);
+    expect(isJsonPath("settings.JSONC")).toBe(true);
+    expect(isJsonPath("config.json5")).toBe(true);
+    expect(isJsonPath("events.jsonl")).toBe(false);
   });
 });

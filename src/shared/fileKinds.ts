@@ -47,6 +47,9 @@ export const TABULAR_EXTS = ["csv", "tsv"] as const;
 /** Jupyter Notebook JSON 按单元格与输出预览。 */
 export const NOTEBOOK_EXTS = ["ipynb"] as const;
 
+/** JSON-family files rendered through the code preview. */
+export const JSON_EXTS = ["json", "jsonc", "json5"] as const;
+
 /** PDF 使用 PDF.js 在侧栏按页渲染。 */
 export const PDF_EXTS = ["pdf"] as const;
 
@@ -74,6 +77,10 @@ export function isTabularPath(path: string): boolean {
 
 export function isNotebookPath(path: string): boolean {
   return (NOTEBOOK_EXTS as readonly string[]).includes(extOf(path));
+}
+
+export function isJsonPath(path: string): boolean {
+  return (JSON_EXTS as readonly string[]).includes(extOf(path));
 }
 
 export function isPdfPath(path: string): boolean {

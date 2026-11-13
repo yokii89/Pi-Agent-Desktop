@@ -50,6 +50,7 @@
     "electron": "41.0.3",
     "electron-builder": "^26.0.12",
     "gsap": "^3.15.0",
+    "json5": "^2.2.3",
     "mermaid": "12.2.0",
     "pdfjs-dist": "^6.5.438",
     "react": "^19.0.0",
