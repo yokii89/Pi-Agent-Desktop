@@ -13,14 +13,14 @@
   align-items: center;
   gap: var(--spacing-sm);
   width: 100%;
-  min-height: 30px;
   /* 左内边距必须是 0：活动组头与文档流正文、工具行同一左缘起笔 */
-  padding: 4px 8px 4px 0;
+  padding: 0 var(--spacing-sm) 0 0;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--tool-row-ink);
   font-size: var(--session-stream-font-md);
+  line-height: 1.7;
   text-align: left;
   cursor: pointer;
   transition: color 120ms cubic-bezier(0.22, 1, 0.36, 1);

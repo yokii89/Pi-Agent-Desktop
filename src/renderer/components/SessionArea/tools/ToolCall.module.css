@@ -24,12 +24,12 @@
   align-items: center;
   gap: var(--spacing-sm);
   width: 100%;
-  min-height: 30px;
   /* 左内边距必须是 0：工具行图标要和文档流正文同一左缘起笔（8px 内缩会让整行
      比 Markdown 段落偏右一截，截图里肉眼可见地没对齐）。右侧内边距留给 caret 呼吸。 */
-  padding: 4px 8px 4px 0;
+  padding: 0 var(--spacing-sm) 0 0;
   border-radius: 6px;
   font-size: var(--session-stream-font-md);
+  line-height: 1.7;
   text-align: left;
   background: transparent;
   border: 0;

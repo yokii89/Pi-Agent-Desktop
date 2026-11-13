@@ -10,14 +10,14 @@
   align-items: center;
   gap: var(--spacing-sm);
   width: 100%;
-  min-height: 28px;
   /* 同工具行：左侧不内缩，折叠头与文档流正文齐左 */
-  padding: 2px 6px 2px 0;
+  padding: 0 6px 0 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-muted);
   font-size: var(--session-stream-font-sm);
+  line-height: 1.7;
   text-align: left;
   cursor: pointer;
   transition: color 120ms cubic-bezier(0.22, 1, 0.36, 1);
