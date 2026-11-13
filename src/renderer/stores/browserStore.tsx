@@ -508,10 +508,6 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
 
   const closePage = useCallback(
     async (id: string): Promise<void> => {
-      if (state.pages.length <= 1) {
-        showToast(t("browser.toast.keepOne"));
-        return;
-      }
       const closedIndex = state.pages.findIndex((page) => page.id === id);
       const remaining = state.pages.filter((page) => page.id !== id);
       // 与主进程 closeBrowserInstance 同构：优先原位置后的下一个，否则前一个

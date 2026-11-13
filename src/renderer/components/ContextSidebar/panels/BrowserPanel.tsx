@@ -206,20 +206,18 @@ export function BrowserPanel() {
                 <PageTabFavicon key={page.favicon ?? ""} src={page.favicon} />
                 <span className={styles.pageTabLabel}>{pageLabel(page, t)}</span>
               </button>
-              {store.pages.length > 1 && (
-                <button
-                  type="button"
-                  className={styles.pageTabClose}
-                  title={t("browser.page.close")}
-                  aria-label={t("browser.page.close")}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void store.closePage(page.id);
-                  }}
-                >
-                  <X size={12} weight="regular" />
-                </button>
-              )}
+              <button
+                type="button"
+                className={styles.pageTabClose}
+                title={t("browser.page.close")}
+                aria-label={t("browser.page.close")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void store.closePage(page.id);
+                }}
+              >
+                <X size={12} weight="regular" />
+              </button>
             </div>
           );
         })}
