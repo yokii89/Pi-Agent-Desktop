@@ -37,6 +37,7 @@ import {
   pushPreviewHistory,
   stepPreviewHistory,
 } from "../../../utils/previewHistory";
+import { WorkdirChip } from "../../SessionArea/WorkdirChip";
 import { CodeHighlight, countCodeLines } from "../../ui/CodeHighlight";
 import { IconButton } from "../../ui/IconButton";
 import styles from "../ContextSidebar.module.css";
@@ -338,17 +339,20 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           </IconButton>
         </div>
       ) : (
-        <div className={panelStyles.searchRow}>
-          <MagnifyingGlass size={16} weight="regular" className={panelStyles.searchIcon} />
-          <input
-            ref={searchRef}
-            className={panelStyles.searchInput}
-            placeholder={t("panels.files.quickOpenPlaceholder")}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={onSearchKeyDown}
-            disabled={!rootDir}
-          />
+        <div className={panelStyles.searchToolbar}>
+          <div className={panelStyles.searchRow}>
+            <MagnifyingGlass size={16} weight="regular" className={panelStyles.searchIcon} />
+            <input
+              ref={searchRef}
+              className={panelStyles.searchInput}
+              placeholder={t("panels.files.quickOpenPlaceholder")}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={onSearchKeyDown}
+              disabled={!rootDir}
+            />
+          </div>
+          {rootDir && <WorkdirChip dir={rootDir} />}
         </div>
       )}
       <div className={styles.panelBody}>
@@ -390,14 +394,17 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           ) : (
             <p className={panelStyles.noMatch}>{t("panels.files.noMatch")}</p>
           )
-        ) : (
-          <FileTree
-            rootDir={rootDir ?? ""}
-            selectedPath={selectedPath}
-            onSelectFile={(path) => openPreview(path)}
-            active={active}
-            revealRequest={fileRevealRequest}
-          />
+        ) : null}
+        {rootDir && (
+          <div hidden={activePreview !== null || previewLoading || activeMatches !== null}>
+            <FileTree
+              rootDir={rootDir}
+              selectedPath={selectedPath}
+              onSelectFile={(path) => openPreview(path)}
+              active={active && activePreview === null && !previewLoading && activeMatches === null}
+              revealRequest={fileRevealRequest}
+            />
+          </div>
         )}
       </div>
     </>
