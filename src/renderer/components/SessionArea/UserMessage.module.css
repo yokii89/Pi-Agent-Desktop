@@ -18,8 +18,8 @@
   color: var(--color-accent-bubble-text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  /* 比会话流 md 小一档：气泡与输入栏同步收紧（16→14） */
-  font-size: var(--session-stream-font-sm);
+  /* 用户消息正文与会话流基准字号一致，随设置中的「对话流字号」缩放。 */
+  font-size: var(--session-stream-font-md);
   line-height: 1.6;
   position: relative;
   display: flex;

@@ -351,6 +351,19 @@ export const sessionMessages = defineMessages({
     "zh-CN": "和它打个招呼",
     "en-US": "Say hello to your companion",
   },
+  "session.input.buddy.greetWithStatus": {
+    "zh-CN": "{status}，点击和它打个招呼",
+    "en-US": "{status}. Click to say hello",
+  },
+  "session.input.buddy.status.running": { "zh-CN": "正在思考", "en-US": "Thinking" },
+  "session.input.buddy.status.switching": {
+    "zh-CN": "正在切换会话",
+    "en-US": "Switching sessions",
+  },
+  "session.input.buddy.status.alert": { "zh-CN": "需要你留意", "en-US": "Needs your attention" },
+  "session.input.buddy.status.success": { "zh-CN": "本轮已完成", "en-US": "Turn completed" },
+  "session.input.buddy.status.error": { "zh-CN": "本轮遇到问题", "en-US": "Turn failed" },
+  "session.input.buddy.status.interrupted": { "zh-CN": "本轮已中断", "en-US": "Turn interrupted" },
   "session.input.maxImages": {
     "zh-CN": "最多附 {count} 张图片",
     "en-US": "Attach at most {count} images",

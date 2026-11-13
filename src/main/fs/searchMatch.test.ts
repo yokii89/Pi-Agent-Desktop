@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSubsequence, matchesFileQuery } from "./searchMatch";
+import { isSubsequence, matchesFileQuery, rankFileSearchHits, scoreFileQuery } from "./searchMatch";
 
 describe("isSubsequence", () => {
   it("按序命中", () => {
@@ -38,6 +38,20 @@ describe("matchesFileQuery", () => {
 
   it("大小写不敏感", () => {
     expect(matchesFileQuery("FileTree.tsx", "src/FileTree.tsx", "ft")).toBe(true);
+  });
+
+  it("文件名强匹配优先于跨目录路径的弱子序列命中", () => {
+    const weakPathHit = {
+      displayPath: "src/renderer/components/ContextSidebar/panels/browser/styleEdit",
+      kind: "dir" as const,
+    };
+    const welcome = { displayPath: "assets/images/welcome.png", kind: "file" as const };
+
+    expect(matchesFileQuery("styleEdit", weakPathHit.displayPath, "wel")).toBe(true);
+    expect(scoreFileQuery("welcome.png", welcome.displayPath, "wel")).toBeGreaterThan(
+      scoreFileQuery("styleEdit", weakPathHit.displayPath, "wel") ?? 0,
+    );
+    expect(rankFileSearchHits([weakPathHit, welcome], "wel")[0]).toEqual(welcome);
   });
 
   it("空查询 = 浏览模式恒命中", () => {

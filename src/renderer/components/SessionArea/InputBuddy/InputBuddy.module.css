@@ -20,6 +20,51 @@
   user-select: none;
 }
 
+.buddy::after {
+  content: "";
+  position: absolute;
+  inset-block-start: var(--spacing-xs);
+  inset-inline-end: 0;
+  z-index: 1;
+  width: 9px;
+  aspect-ratio: 1;
+  border: 2px solid var(--color-bg-surface-solid);
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  box-shadow: 0 0 0 2px var(--color-bg-surface);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.buddy[data-status]::after {
+  visibility: visible;
+}
+
+.buddy[data-status="running"]::after {
+  background: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
+}
+
+.buddy[data-status="alert"]::after {
+  background: var(--color-warning);
+  box-shadow: 0 0 0 2px var(--color-warning-soft);
+}
+
+.buddy[data-status="success"]::after {
+  background: var(--color-success);
+  box-shadow: 0 0 0 2px var(--color-success-soft);
+}
+
+.buddy[data-status="error"]::after {
+  background: var(--color-danger);
+  box-shadow: 0 0 0 2px var(--color-danger-soft);
+}
+
+.buddy[data-status="interrupted"]::after {
+  background: var(--color-warning);
+  box-shadow: 0 0 0 2px var(--color-warning-soft);
+}
+
 /* 键盘聚焦时才画焦点环：鼠标按下已被 onMouseDown 拦掉，不会抢输入框焦点 */
 .buddy:focus-visible {
   outline: 2px solid var(--color-accent);
@@ -2400,6 +2445,20 @@
   50% {
     transform: rotate(-9deg);
   }
+}
+
+/* 运行态与警觉态统一使用语义色，避免随角色配色变化而失去状态含义。 */
+.art[data-pose="thinking"] [data-part="thinking"] {
+  stroke: var(--color-accent);
+}
+
+.art[data-pose="alert"] [data-part="shock"],
+.art[data-pose="alert"] [data-part="sweat"] {
+  stroke: var(--color-warning);
+}
+
+.capy[data-pose="alert"] [data-part="sweat"] path {
+  fill: var(--color-warning);
 }
 
 /* 纯装饰的呼吸 / 摆动不参与减弱动效偏好：直接落成静止姿态。

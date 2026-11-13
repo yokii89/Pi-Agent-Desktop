@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PiAgentEvent, SessionId, SessionPushMessage } from "../../../../shared/ipc";
 import { sessionService } from "../../../services/sessionService";
 import { createSessionRunSignalTracker } from "../../../utils/sessionRunSignals";
-import type { BuddyPose } from "./buddyPose";
+import type { BuddyPose, BuddyStatus } from "./buddyPose";
 
 /** 情绪停留时长：够看清表情，又不至于盖住下一个状态。 */
 const MOOD_MS = {
@@ -14,6 +14,7 @@ const MOOD_MS = {
 
 export interface BuddyMood {
   pose: BuddyPose;
+  status: Extract<BuddyStatus, "success" | "error" | "interrupted"> | null;
 }
 
 const isUserPrompt = (event: PiAgentEvent): boolean =>
@@ -35,8 +36,8 @@ export function useBuddyMood(sessionId: SessionId | null): BuddyMood | null {
   activeId.current = sessionId;
 
   useEffect(() => {
-    const show = (pose: BuddyPose, ms: number): void => {
-      setMood({ pose, sessionId: activeId.current });
+    const show = (pose: BuddyPose, ms: number, status: BuddyMood["status"] = null): void => {
+      setMood({ pose, status, sessionId: activeId.current });
       if (timer.current !== null) window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => {
         timer.current = null;
@@ -50,15 +51,15 @@ export function useBuddyMood(sessionId: SessionId | null): BuddyMood | null {
         case "started":
           return;
         case "completed":
-          show("celebration", MOOD_MS.celebration);
+          show("celebration", MOOD_MS.celebration, "success");
           return;
         case "failed":
         case "crashed":
-          show("dizzy", MOOD_MS.dizzy);
+          show("dizzy", MOOD_MS.dizzy, "error");
           return;
         case "interrupted":
         case "truncated":
-          show("sad", MOOD_MS.sad);
+          show("sad", MOOD_MS.sad, "interrupted");
           return;
       }
     });

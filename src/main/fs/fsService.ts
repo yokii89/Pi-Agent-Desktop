@@ -13,7 +13,7 @@ import type {
   FsSearchHit,
 } from "../../shared/ipc";
 import { parseImageDataUrl, pickAvailablePath, toSaveFileName } from "./saveImageName";
-import { matchesFileQuery } from "./searchMatch";
+import { matchesFileQuery, rankFileSearchHits } from "./searchMatch";
 
 /** 单目录列出上限（docs/design/03 §5：超出折叠为"展开更多"）。 */
 const MAX_LIST_ENTRIES = 500;
@@ -115,8 +115,8 @@ export function readFile(file: string): FsReadResult {
 /**
  * 递归模糊搜索文件与文件夹（大小写不敏感）。
  * - 关键词为空：返回根下浅层目录 + 若干文件（@ 浏览默认列表）。
- * - 有关键词：子序列模糊匹配（matchesFileQuery，记不全名也能搜到）；
- *   渲染层只对召回结果排序，不再二次过滤。
+ * - 有关键词：子序列模糊匹配，文件名相关度优先于路径命中；
+ *   命中集合排序后取前 50 条。
  * 异步 readdir，避免大仓库快速打开时阻塞主进程。
  */
 export async function searchFiles(rootDir: string, query: string): Promise<FsSearchHit[]> {
@@ -134,7 +134,7 @@ export async function searchFiles(rootDir: string, query: string): Promise<FsSea
 
   const walk = async (dir: string, depth: number): Promise<void> => {
     if (
-      hits.length >= MAX_SEARCH_HITS ||
+      (keyword.length === 0 && hits.length >= MAX_SEARCH_HITS) ||
       visited >= MAX_SEARCH_VISITS ||
       depth > MAX_SEARCH_DEPTH
     ) {
@@ -151,7 +151,12 @@ export async function searchFiles(rootDir: string, query: string): Promise<FsSea
 
     for (const dirent of dirents) {
       visited += 1;
-      if (visited >= MAX_SEARCH_VISITS || hits.length >= MAX_SEARCH_HITS) return;
+      if (
+        visited >= MAX_SEARCH_VISITS ||
+        (keyword.length === 0 && hits.length >= MAX_SEARCH_HITS)
+      ) {
+        return;
+      }
       const full = path.join(dir, dirent.name);
       const rel = path.relative(rootDir, full).split(path.sep).join("/");
 
@@ -174,11 +179,7 @@ export async function searchFiles(rootDir: string, query: string): Promise<FsSea
   };
 
   await walk(rootDir, 0);
-  hits.sort((a, b) => {
-    if (a.kind !== b.kind) return a.kind === "dir" ? -1 : 1;
-    return a.displayPath.localeCompare(b.displayPath);
-  });
-  return hits.slice(0, MAX_SEARCH_HITS);
+  return rankFileSearchHits(hits, keyword).slice(0, MAX_SEARCH_HITS);
 }
 
 /** 系统文件选择器（单选文件），取消时返回 null。 */

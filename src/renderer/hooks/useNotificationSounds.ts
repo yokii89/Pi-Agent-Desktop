@@ -7,7 +7,7 @@ import { sessionService } from "../services/sessionService";
 import { settingsService } from "../services/settingsService";
 import { useSessionMeta } from "../stores/sessionStore";
 import { createSessionSoundTriggers } from "../utils/sessionSoundTriggers";
-import { sessionTitle } from "../utils/sessionTitle";
+import { toastSessionTitle } from "../utils/toastTitle";
 
 function play(
   scenario: NotificationScenarioId,
@@ -33,8 +33,14 @@ function bindSessionTriggers(): () => void {
  * 在 SessionProvider 内使用（依赖 useSessionMeta.activeSessionId 等）。
  */
 export function useNotificationSounds(): void {
-  const { activeSessionId, allSessions, getSessionFileById, openSessionFile, firstUserText } =
-    useSessionMeta();
+  const {
+    activeSessionId,
+    allSessions,
+    getSessionFileById,
+    openSessionFile,
+    firstUserText,
+    readLastUserText,
+  } = useSessionMeta();
 
   const metaRef = useRef({
     activeSessionId,
@@ -42,6 +48,7 @@ export function useNotificationSounds(): void {
     getSessionFileById,
     openSessionFile,
     firstUserText,
+    readLastUserText,
   });
   metaRef.current = {
     activeSessionId,
@@ -49,6 +56,7 @@ export function useNotificationSounds(): void {
     getSessionFileById,
     openSessionFile,
     firstUserText,
+    readLastUserText,
   };
 
   useEffect(() => {
@@ -67,13 +75,17 @@ export function useNotificationSounds(): void {
         getSessionFileById: byId,
         activeSessionId: activeId,
         firstUserText: activeFirstUser,
+        readLastUserText: readLastUser,
       } = metaRef.current;
       const file = (sessionId ? byId(sessionId) : null) ?? undefined;
       const summary = file ? sessions.find((s) => s.file === file) : undefined;
-      // 历史列表尚未刷到该文件时，active 桶的首条用户消息可作标题兜底
-      const activeFallback =
-        sessionId && sessionId === activeId ? activeFirstUser?.trim() || undefined : undefined;
-      const name = summary ? sessionTitle(summary, activeFallback ?? "") : activeFallback;
+      // 后台会话 / 冷桶尚无条目的极端情况下，active 桶的首条消息可当兜底
+      const activeFirst = sessionId && sessionId === activeId ? activeFirstUser : undefined;
+      const name = toastSessionTitle({
+        lastUserText: readLastUser(sessionId ?? null),
+        sessionName: summary?.sessionName,
+        firstUserMessage: summary?.firstUserMessage ?? activeFirst,
+      });
       return { sessionTitle: name, sessionFile: file };
     });
     return () => notificationService.setToastSessionResolver(null);

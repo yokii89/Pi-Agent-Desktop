@@ -8,7 +8,7 @@ import { BuddyDog } from "./BuddyDog";
 import { BuddyParrot } from "./BuddyParrot";
 import { BuddyPea } from "./BuddyPea";
 import { BuddySteve } from "./BuddySteve";
-import type { BuddyPose } from "./buddyPose";
+import type { BuddyPose, BuddyStatus } from "./buddyPose";
 import styles from "./InputBuddy.module.css";
 import { useBuddyMood } from "./useBuddyMood";
 
@@ -60,7 +60,19 @@ export function InputBuddy({ kind, running, switching, alert, sessionId, ref }: 
   const [lonely, setLonely] = useState(false);
   const mood = useBuddyMood(sessionId);
 
-  useImperativeHandle(ref, () => ({ nudge: (pose) => setPoke(pose) }), []);
+  useImperativeHandle(
+    ref,
+    () => ({
+      nudge: (pose) => {
+        if (!alert) setPoke(pose);
+      },
+    }),
+    [alert],
+  );
+
+  useEffect(() => {
+    if (alert) setPoke(null);
+  }, [alert]);
 
   // 点击 / 误触抽到的姿态到点自动收回；每次触发换新值，effect 重跑即重置计时
   useEffect(() => {
@@ -104,10 +116,19 @@ export function InputBuddy({ kind, running, switching, alert, sessionId, ref }: 
           : lonely
             ? "sad"
             : "idle";
-  const pose = poke ?? basePose;
+  const pose = alert ? "alert" : (poke ?? basePose);
+  const status: BuddyStatus | null = alert
+    ? "alert"
+    : (mood?.status ?? (switching ? "switching" : running ? "running" : null));
+  const label = status
+    ? t("session.input.buddy.greetWithStatus", {
+        status: t(`session.input.buddy.status.${status}`),
+      })
+    : t("session.input.buddy.greet");
 
   /** 随机抽一个与当前不同的姿态，避免点下去看不出变化。 */
   const pokeBuddy = (): void => {
+    if (alert) return;
     const pool = POKE_POSES.filter((candidate) => candidate !== pose);
     const next = pool[Math.floor(Math.random() * pool.length)] ?? "happy";
     setPoke(next);
@@ -117,8 +138,9 @@ export function InputBuddy({ kind, running, switching, alert, sessionId, ref }: 
     <button
       type="button"
       className={styles.buddy}
-      title={t("session.input.buddy.greet")}
-      aria-label={t("session.input.buddy.greet")}
+      data-status={status ?? undefined}
+      title={label}
+      aria-label={label}
       // 按下不把焦点从输入框抢走：点完还能接着打字
       onMouseDown={(event) => event.preventDefault()}
       onClick={pokeBuddy}

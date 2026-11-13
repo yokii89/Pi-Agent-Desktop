@@ -135,6 +135,11 @@ interface SessionMetaValue {
   sessionWorkingDir: string | null;
   /** 当前会话首条非空用户消息（标题回退用）。 */
   firstUserText: string | null;
+  /**
+   * 读取任意会话桶里最新一条非空用户消息（压成单行）；桶不存在或无用户消息时返回 null。
+   * 走 ref 直读，订阅者（toast 标题解析）不会因流式 delta 每帧重算。
+   */
+  readLastUserText: (sessionId: SessionId | null) => string | null;
   /** 若 pi RPC 未启动则启动（不改 phase）；用于模型等 RPC 预热。 */
   ensureSession: (reason?: SessionStartReason) => Promise<SessionId | null>;
   /**
@@ -289,6 +294,16 @@ function sessionIdFromPendingFile(file: string): SessionId | null {
 
 function firstUserTextOf(entries: SessionEntry[]): string | null {
   for (const entry of entries) {
+    if (entry.kind === "user" && entry.text.trim()) {
+      return entry.text.replace(/\s+/g, " ").trim();
+    }
+  }
+  return null;
+}
+
+function lastUserTextOf(entries: SessionEntry[]): string | null {
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const entry = entries[i];
     if (entry.kind === "user" && entry.text.trim()) {
       return entry.text.replace(/\s+/g, " ").trim();
     }
@@ -1852,6 +1867,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return null;
   }, [entries]);
 
+  /** 任意会话桶的最新用户消息：toast 可能来自后台会话，不能只读 active。 */
+  const readLastUserText = useCallback((sessionId: SessionId | null): string | null => {
+    if (!sessionId) return null;
+    const bucket = bucketsStateRef.current.buckets.get(sessionId);
+    return bucket ? lastUserTextOf(bucket.entries) : null;
+  }, []);
+
   const lastUserPayload = useMemo(() => {
     for (let i = entries.length - 1; i >= 0; i -= 1) {
       const entry = entries[i];
@@ -2144,6 +2166,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       piReady,
       sessionWorkingDir,
       firstUserText,
+      readLastUserText,
       ensureSession,
       getSlashCommands,
       newSession,
@@ -2199,6 +2222,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       piReady,
       sessionWorkingDir,
       firstUserText,
+      readLastUserText,
       ensureSession,
       getSlashCommands,
       newSession,

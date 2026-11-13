@@ -15,3 +15,5 @@ export type BuddyPose =
   | "sad"
   | "celebration"
   | "dizzy";
+
+export type BuddyStatus = "running" | "switching" | "alert" | "success" | "error" | "interrupted";
