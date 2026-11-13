@@ -8,7 +8,12 @@ import {
   MagnifyingGlass,
 } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isHtmlPath, isMarkdownPath } from "../../../../shared/fileKinds";
+import {
+  isHtmlPath,
+  isMarkdownPath,
+  isNotebookPath,
+  isTabularPath,
+} from "../../../../shared/fileKinds";
 import type { TranslateFn } from "../../../../shared/i18n";
 import type { FsReadResult, FsSearchHit } from "../../../../shared/ipc";
 import { useT } from "../../../hooks/useT";
@@ -35,9 +40,12 @@ import {
 import { CodeHighlight, countCodeLines } from "../../ui/CodeHighlight";
 import { IconButton } from "../../ui/IconButton";
 import styles from "../ContextSidebar.module.css";
+import { DelimitedPreview } from "./DelimitedPreview";
 import panelStyles from "./FilePanel.module.css";
 import { FileTree } from "./FileTree";
 import { MarkdownPreview, type MarkdownViewMode } from "./MarkdownPreview";
+import { NotebookPreview } from "./NotebookPreview";
+import { PdfPreview } from "./PdfPreview";
 
 interface PreviewState {
   /** 所属项目根目录：项目切换后旧预览/搜索结果直接失效，避免误展示。 */
@@ -429,6 +437,10 @@ function FilePreviewBody({
     );
   }
 
+  if (result.kind === "pdf") {
+    return <PdfPreview result={result} />;
+  }
+
   if (result.kind === "binary") {
     return (
       <div className={panelStyles.binaryWrap}>
@@ -455,6 +467,20 @@ function FilePreviewBody({
         focusLine={preview.focusLine}
       />
     );
+  }
+
+  if (isTabularPath(preview.path)) {
+    return (
+      <DelimitedPreview
+        path={preview.path}
+        content={result.content}
+        sourceTruncated={result.truncated}
+      />
+    );
+  }
+
+  if (isNotebookPath(preview.path)) {
+    return <NotebookPreview path={preview.path} content={result.content} />;
   }
 
   return (

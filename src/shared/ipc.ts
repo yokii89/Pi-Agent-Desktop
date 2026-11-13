@@ -1682,6 +1682,13 @@ export interface FsReadImageResult {
   byteLength: number;
 }
 
+/** PDF 页面数据，供渲染层 PDF.js 只读绘制。 */
+export interface FsReadPdfResult {
+  kind: "pdf";
+  data: Uint8Array;
+  byteLength: number;
+}
+
 /** 二进制/不可预览：仅元信息，渲染层给占位与「系统打开」。 */
 export interface FsReadBinaryResult {
   kind: "binary";
@@ -1689,7 +1696,11 @@ export interface FsReadBinaryResult {
   mime?: string;
 }
 
-export type FsReadResult = FsReadTextResult | FsReadImageResult | FsReadBinaryResult;
+export type FsReadResult =
+  | FsReadTextResult
+  | FsReadImageResult
+  | FsReadPdfResult
+  | FsReadBinaryResult;
 
 /** 搜索结果：绝对路径 + 相对根目录的显示路径（/ 分隔）。 */
 export interface FsSearchHit {

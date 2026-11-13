@@ -82,6 +82,7 @@ node_modules 解析**的包（当前仅 `electron-updater` / `node-pty` / `sql.j
 - `@electron/rebuild`（dev）：`node-pty` 原生模块针对 Electron ABI 的重编译（`pnpm run rebuild:native`）。
 - `sql.js`（runtime，主进程运行时依赖）：主进程用 WASM SQLite 读取本机 Chromium Cookie 库副本（浏览器登录态导入）；不引入 native SQLite。electron-builder 只保留 `dist/sql-wasm.js` + `dist/sql-wasm.wasm`（见 electron-builder.yml files 规则）。
 - `shiki`（devDep，渲染层构建期打包）：右侧「文件」面板只读预览的代码语法高亮（TextMate 文法 + 双主题 CSS 变量）；经 `shiki/core` 细粒度动态加载，禁止整包 `import "shiki"` 静态引入。
+- `pdfjs-dist`（devDep，渲染层构建期打包）：右侧「文件」面板的 PDF 按页只读预览；PDF.js 与 worker 均通过动态 import / Vite 资源 URL 按需加载，不作为主进程运行时依赖。
 - `@vitest/coverage-v8`（dev）：`packages/view-sdk` 的行/分支覆盖率口径（`pnpm test:sdk:coverage`）。版本必须与 `vitest` 主版本配对；**仅 SDK 测试用**，不扩展到主进程 / 渲染层（后者仍按本文件"测试"条款只跑断言）。`NODE_V8_COVERAGE` 对 vitest worker 无效，不要再试。
 - `electron-updater`（runtime，主进程运行时依赖）：设置 →「应用更新」的检查/下载/安装。GitHub Releases + NSIS `latest.yml`/blockmap（差分更新：本地缓存有旧安装包时自动差分下载）；发布流程见 `scripts/release.mjs` 与 `.github/workflows/release.yml`。
 - `mermaid`（devDep，渲染层构建期打包）：会话区 / 文件面板 / ExtensionView 的 ` ```mermaid ` 围栏出图。**只能经 `src/renderer/utils/mermaidLoader.ts` 动态 `import()`**（同 GSAP 条款）——它自带 60+ 个按图表类型切分的惰性 chunk（含 elk 布局引擎），静态引入会把它们全部塞进主 bundle。**不写 `manualChunks` 规则**：mermaid 内部已是动态 import，强行归组反而废掉惰性分块。CSP 无需放宽（`securityLevel: "strict"` 下生产策略实测可跑）。

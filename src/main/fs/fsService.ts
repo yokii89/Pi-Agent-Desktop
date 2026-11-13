@@ -3,7 +3,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { app, dialog, shell } from "electron";
-import { IMAGE_EXTS, IMAGE_MIME, type ImageExt } from "../../shared/fileKinds";
+import { IMAGE_EXTS, IMAGE_MIME, PDF_EXTS } from "../../shared/fileKinds";
 import type {
   FsEntry,
   FsListResult,
@@ -21,6 +21,8 @@ const MAX_LIST_ENTRIES = 500;
 const MAX_READ_BYTES = 1024 * 1024;
 /** 图片预览上限（base64 会再涨约 1/3，IPC 仍可接受）。 */
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+/** PDF 经 IPC 传递的上限，避免超大文档造成主/渲染进程内存峰值。 */
+const MAX_PDF_BYTES = 40 * 1024 * 1024;
 /** 搜索匹配条数上限。 */
 const MAX_SEARCH_HITS = 50;
 /** 搜索遍历的目录项总量上限（防 node_modules 之外的异常大目录拖垮主进程）。 */
@@ -63,8 +65,19 @@ export function readFile(file: string): FsReadResult {
     throw new Error("不是常规文件");
   }
   const ext = path.extname(file).slice(1).toLowerCase();
+  if ((PDF_EXTS as readonly string[]).includes(ext)) {
+    if (stat.size > MAX_PDF_BYTES) {
+      throw new Error("PDF 文件过大，无法在侧栏预览（上限 40MB）");
+    }
+    return {
+      kind: "pdf",
+      data: new Uint8Array(fs.readFileSync(file)),
+      byteLength: stat.size,
+    };
+  }
+
   const imageMime = (IMAGE_EXTS as readonly string[]).includes(ext)
-    ? IMAGE_MIME[ext as ImageExt]
+    ? IMAGE_MIME[ext as (typeof IMAGE_EXTS)[number]]
     : undefined;
 
   if (imageMime) {

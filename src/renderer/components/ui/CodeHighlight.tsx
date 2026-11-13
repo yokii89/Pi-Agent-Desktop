@@ -60,6 +60,16 @@ const EXT_TO_LANG: Record<string, string> = {
   sql: "sql",
   graphql: "graphql",
   gql: "graphql",
+  csv: "csv",
+  docker: "dockerfile",
+  dockerfile: "dockerfile",
+  env: "dotenv",
+  log: "log",
+  properties: "properties",
+  make: "makefile",
+  mk: "makefile",
+  cmake: "cmake",
+  nginx: "nginx",
   diff: "diff",
   patch: "diff",
 };
@@ -99,11 +109,24 @@ const LANG_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
   markdown: () => import("shiki/langs/markdown.mjs"),
   sql: () => import("shiki/langs/sql.mjs"),
   graphql: () => import("shiki/langs/graphql.mjs"),
+  csv: () => import("shiki/langs/csv.mjs"),
+  dockerfile: () => import("shiki/langs/dockerfile.mjs"),
+  dotenv: () => import("shiki/langs/dotenv.mjs"),
+  log: () => import("shiki/langs/log.mjs"),
+  properties: () => import("shiki/langs/properties.mjs"),
+  makefile: () => import("shiki/langs/makefile.mjs"),
+  cmake: () => import("shiki/langs/cmake.mjs"),
+  nginx: () => import("shiki/langs/nginx.mjs"),
   diff: () => import("shiki/langs/diff.mjs"),
 };
 
 function langFromPath(filePath: string): string {
   const name = filePath.split(/[/\\]/).at(-1) ?? filePath;
+  const lowerName = name.toLowerCase();
+  if (lowerName === "dockerfile" || lowerName.startsWith("dockerfile.")) return "dockerfile";
+  if (lowerName === "makefile" || lowerName === "gnumakefile") return "makefile";
+  if (lowerName === "cmakelists.txt") return "cmake";
+  if (lowerName === ".env" || lowerName.startsWith(".env.")) return "dotenv";
   // 双后缀（.d.ts）优先整段匹配，否则取最后一段
   if (/\.d\.ts$/i.test(name)) return "typescript";
   const ext = name.includes(".") ? (name.split(".").at(-1) ?? "").toLowerCase() : "";

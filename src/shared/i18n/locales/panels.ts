@@ -63,6 +63,32 @@ export const panelMessages = defineMessages({
     "zh-CN": "文件过大，已截断预览",
     "en-US": "File is large; preview truncated",
   },
+  "panels.files.csvRows": { "zh-CN": "{count} 行", "en-US": "{count} rows" },
+  "panels.files.csvEmpty": {
+    "zh-CN": "没有可显示的表格数据",
+    "en-US": "No tabular data to display",
+  },
+  "panels.files.notebook": {
+    "zh-CN": "Notebook · {count} 个单元格",
+    "en-US": "Notebook · {count} cells",
+  },
+  "panels.files.notebookInvalid": {
+    "zh-CN": "Notebook 内容无法解析，显示原始 JSON",
+    "en-US": "Notebook could not be parsed; showing raw JSON",
+  },
+  "panels.files.notebookCode": { "zh-CN": "代码", "en-US": "Code" },
+  "panels.files.notebookMarkdown": { "zh-CN": "Markdown", "en-US": "Markdown" },
+  "panels.files.notebookOutput": { "zh-CN": "输出", "en-US": "Output" },
+  "panels.files.pdfPage": { "zh-CN": "第 {page} / {total} 页", "en-US": "Page {page} of {total}" },
+  "panels.files.pdfLoadFailed": {
+    "zh-CN": "PDF 无法读取或文件已损坏",
+    "en-US": "PDF could not be loaded or is damaged",
+  },
+  "panels.files.pdfPassword": {
+    "zh-CN": "此 PDF 受密码保护，暂不支持预览",
+    "en-US": "Password-protected PDFs are not supported",
+  },
+  "panels.files.pdfPageFailed": { "zh-CN": "页面渲染失败", "en-US": "Page rendering failed" },
   "panels.files.openInBrowser": {
     "zh-CN": "在侧栏浏览器中打开",
     "en-US": "Open in sidebar browser",

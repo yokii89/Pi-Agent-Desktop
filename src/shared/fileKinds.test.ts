@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { HTML_EXTS, IMAGE_EXTS, isHtmlPath, isMarkdownPath, MARKDOWN_EXTS } from "./fileKinds";
+import {
+  HTML_EXTS,
+  IMAGE_EXTS,
+  isHtmlPath,
+  isMarkdownPath,
+  isNotebookPath,
+  isPdfPath,
+  isTabularPath,
+  MARKDOWN_EXTS,
+} from "./fileKinds";
 
 describe("isMarkdownPath", () => {
   it("识别 md / markdown（大小写不敏感、多段后缀取最后一段）", () => {
@@ -39,5 +48,15 @@ describe("isHtmlPath", () => {
     expect(isHtmlPath("style.css")).toBe(false);
     expect(isHtmlPath("html")).toBe(false);
     expect(isHtmlPath("")).toBe(false);
+  });
+});
+
+describe("specialized file paths", () => {
+  it("recognizes tabular, notebook and PDF files case-insensitively", () => {
+    expect(isTabularPath("data.CSV")).toBe(true);
+    expect(isTabularPath("data.tsv")).toBe(true);
+    expect(isNotebookPath("analysis.IPYNB")).toBe(true);
+    expect(isPdfPath("docs/report.PDF")).toBe(true);
+    expect(isTabularPath("data.json")).toBe(false);
   });
 });

@@ -41,6 +41,15 @@ export const MARKDOWN_EXTS = ["md", "markdown"] as const;
 /** 可交由侧栏浏览器渲染的网页扩展名（file:// 专用通道，docs/文件面板文件渲染方案.md）。 */
 export const HTML_EXTS = ["html", "htm"] as const;
 
+/** 表格文件按分隔符预览，不当作普通源码块。 */
+export const TABULAR_EXTS = ["csv", "tsv"] as const;
+
+/** Jupyter Notebook JSON 按单元格与输出预览。 */
+export const NOTEBOOK_EXTS = ["ipynb"] as const;
+
+/** PDF 使用 PDF.js 在侧栏按页渲染。 */
+export const PDF_EXTS = ["pdf"] as const;
+
 /** 取路径最后一段扩展名（小写；无扩展名 / 点文件返回空串）。 */
 function extOf(path: string): string {
   const name = path.split(/[/\\]/).at(-1) ?? path;
@@ -57,4 +66,16 @@ export function isMarkdownPath(path: string): boolean {
 /** 是否网页文件（文件面板「在侧栏浏览器中打开」的分流依据）。 */
 export function isHtmlPath(path: string): boolean {
   return (HTML_EXTS as readonly string[]).includes(extOf(path));
+}
+
+export function isTabularPath(path: string): boolean {
+  return (TABULAR_EXTS as readonly string[]).includes(extOf(path));
+}
+
+export function isNotebookPath(path: string): boolean {
+  return (NOTEBOOK_EXTS as readonly string[]).includes(extOf(path));
+}
+
+export function isPdfPath(path: string): boolean {
+  return (PDF_EXTS as readonly string[]).includes(extOf(path));
 }
