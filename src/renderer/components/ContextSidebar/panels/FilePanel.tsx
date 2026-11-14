@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowSquareOut,
+  Copy,
   Eye,
   EyeSlash,
   Globe,
@@ -16,18 +17,24 @@ import {
 } from "../../../../shared/fileKinds";
 import type { TranslateFn } from "../../../../shared/i18n";
 import type { FsReadResult, FsSearchHit } from "../../../../shared/ipc";
+import { usePreviewFind } from "../../../hooks/usePreviewFind";
 import { useT } from "../../../hooks/useT";
 import { fsService } from "../../../services/fsService";
 import { useBrowserStore } from "../../../stores/browserStore";
+import { useComposerStore } from "../../../stores/composerStore";
+import { useExtensionViewStore } from "../../../stores/extensionViewStore";
 import { useProjectStore } from "../../../stores/projectStore";
 import { useSessionMeta } from "../../../stores/sessionStore";
 import { useUiStore } from "../../../stores/uiStore";
+import { copyTextToClipboard } from "../../../utils/clipboard";
 import {
   normalizePathKey,
   parseLineCol,
   pathBasename,
+  relativeToPath,
   resolveForPreview,
   resolvePath,
+  toNativePath,
 } from "../../../utils/fileOpen";
 import { formatJsonPreview } from "../../../utils/jsonPreview";
 import {
@@ -38,9 +45,12 @@ import {
   pushPreviewHistory,
   stepPreviewHistory,
 } from "../../../utils/previewHistory";
+import { SelectionToolbar } from "../../SessionArea/SelectionToolbar";
 import { WorkdirChip } from "../../SessionArea/WorkdirChip";
 import { CodeHighlight, countCodeLines } from "../../ui/CodeHighlight";
+import { ContextMenu } from "../../ui/ContextMenu";
 import { IconButton } from "../../ui/IconButton";
+import type { MenuItem } from "../../ui/Menu";
 import styles from "../ContextSidebar.module.css";
 import { DelimitedPreview } from "./DelimitedPreview";
 import panelStyles from "./FilePanel.module.css";
@@ -48,6 +58,7 @@ import { FileTree } from "./FileTree";
 import { MarkdownPreview, type MarkdownViewMode } from "./MarkdownPreview";
 import { NotebookPreview } from "./NotebookPreview";
 import { PdfPreview } from "./PdfPreview";
+import { PreviewFindBar } from "./PreviewFindBar";
 
 interface PreviewState {
   /** 所属项目根目录：项目切换后旧预览/搜索结果直接失效，避免误展示。 */
@@ -87,7 +98,9 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     useUiStore();
   const browserStore = useBrowserStore();
   const { currentProject } = useProjectStore();
-  const { sessionWorkingDir } = useSessionMeta();
+  const { sessionWorkingDir, activeSessionId, switchingTo } = useSessionMeta();
+  const { quoteComposer } = useComposerStore();
+  const { hasBlockingViewFor } = useExtensionViewStore();
   const rootDir = currentProject?.dir ?? null;
 
   const [query, setQuery] = useState("");
@@ -102,10 +115,37 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   const [history, setHistory] = useState<PreviewHistory>(emptyPreviewHistory);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchSeqRef = useRef(0);
+  /** 预览内容落在 panelBody 里：划选工具条容器、全选与右键菜单都按它取范围。 */
+  const panelBodyRef = useRef<HTMLDivElement>(null);
+  /** 预览区右键菜单（光标坐标 + 右键时已有的选区文本）。 */
+  const [previewMenu, setPreviewMenu] = useState<{
+    x: number;
+    y: number;
+    selected: string;
+  } | null>(null);
   /** 预览读取序号：丢弃过期读取结果（快速连开文件 / 历史导航连点）。 */
   const previewSeqRef = useRef(0);
   /** 预览/打开请求的 root 标记：无项目时用 ""，切项目后旧预览失效。 */
   const rootKey = rootDir ?? "";
+  /** 内容身份：换文件 / md 预览与源码切换时查找条自行收起并重算。 */
+  const findContentKey =
+    preview && preview.root === rootKey ? `${preview.path}:${mdViewMode}` : null;
+  const find = usePreviewFind(panelBodyRef, findContentKey);
+
+  // Ctrl+F 在预览内容里查找（渲染层没有浏览器级查找条，不抢就没人接这个键）
+  const openFind = find.openFind;
+  const hasActivePreview = preview !== null && preview.root === rootKey;
+  useEffect(() => {
+    if (!active || !hasActivePreview) return;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (!event.ctrlKey || event.altKey || event.metaKey) return;
+      if (event.key.toLowerCase() !== "f") return;
+      event.preventDefault();
+      openFind();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [active, hasActivePreview, openFind]);
 
   // Ctrl+P 打开/重复触发时聚焦搜索框（fileSearchTick 每次触发都递增）
   useEffect(() => {
@@ -281,6 +321,104 @@ export function FilePanel({ active = true }: { active?: boolean }) {
 
   const activePreview = preview && preview.root === rootKey ? preview : null;
   const activeMatches = matches && matches.root === (rootDir ?? "") ? matches.hits : null;
+  /** 可复制的全文：仅文本类预览有（图片/PDF/二进制不提供「复制全文」）。 */
+  const previewText = activePreview?.result.kind === "text" ? activePreview.result.content : null;
+
+  // 划选工具条的引用落点在输入栏：与会话区同一套置灰口径（切换中 / 阻断浮层 / 无会话）
+  const hasBlockingView = hasBlockingViewFor(activeSessionId);
+  const quoteDisabled = switchingTo !== null || hasBlockingView || activeSessionId === null;
+  const quoteDisabledHint =
+    switchingTo !== null
+      ? t("session.restoringShort")
+      : hasBlockingView
+        ? t("session.blockedByOverlay")
+        : activeSessionId === null
+          ? t("panels.files.quoteNoSession")
+          : "";
+
+  /** 写剪贴板 + 双向反馈（与会话区同一范式）。 */
+  const copyToClipboard = useCallback(
+    (text: string): void => {
+      void copyTextToClipboard(text).then((ok) =>
+        showToast(ok ? t("toast.copied") : t("toast.copyFailed")),
+      );
+    },
+    [showToast, t],
+  );
+
+  /** 「全选预览内容」：直接对滚动容器建选区，不依赖用户光标位置。 */
+  const selectAllPreview = useCallback((): void => {
+    const body = panelBodyRef.current;
+    const selection = window.getSelection();
+    if (!body || !selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(body);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, []);
+
+  /**
+   * 预览区右键：先抑掉 Chromium 默认菜单，再开自绘菜单（与会话区 docs/design/12 同口径）。
+   * 没有预览时（文件树 / 搜索结果）只抑制，不给菜单——那些位置由各自的行菜单负责。
+   */
+  const openPreviewMenu = (event: React.MouseEvent<HTMLDivElement>): void => {
+    event.preventDefault();
+    if (!activePreview) return;
+    const selection = window.getSelection();
+    const body = panelBodyRef.current;
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    const insideSelection =
+      body !== null &&
+      selection !== null &&
+      range !== null &&
+      !selection.isCollapsed &&
+      body.contains(range.commonAncestorContainer);
+    setPreviewMenu({
+      x: event.clientX,
+      y: event.clientY,
+      selected: insideSelection ? selection.toString() : "",
+    });
+  };
+
+  const previewMenuItems: MenuItem[] = previewMenu
+    ? [
+        {
+          key: "selection",
+          label: t("panels.files.copySelection"),
+          disabled: previewMenu.selected.trim().length === 0,
+          onSelect: () => copyToClipboard(previewMenu.selected),
+        },
+        { key: "selectAll", label: t("panels.files.selectAll"), onSelect: selectAllPreview },
+        ...(activePreview
+          ? [
+              {
+                key: "copyPath",
+                label: t("panels.files.copyPath"),
+                dividerBefore: true,
+                onSelect: () => copyToClipboard(toNativePath(activePreview.path)),
+              },
+              {
+                key: "openSystem",
+                label: t("panels.files.openInSystem"),
+                onSelect: () => openInSystem(activePreview.path),
+              },
+            ]
+          : []),
+      ]
+    : [];
+
+  /**
+   * 引用到输入栏：引用块首行标出来源文件，后面跟选中文本。
+   * 不标行号 —— 划选是字符偏移，换算回行号要重新数行，得不偿失；文件路径已足够定位。
+   */
+  const quoteFromPreview = useCallback(
+    (text: string): void => {
+      if (!activePreview) return;
+      const source = toNativePath(relativeToPath(rootDir ?? "", activePreview.path));
+      quoteComposer(`${source}\n${text}`);
+    },
+    [activePreview, quoteComposer, rootDir],
+  );
 
   return (
     <>
@@ -332,6 +470,14 @@ export function FilePanel({ active = true }: { active?: boolean }) {
               <Globe size={16} weight="regular" />
             </IconButton>
           )}
+          {previewText !== null && (
+            <IconButton
+              title={t("panels.files.copyContent")}
+              onClick={() => copyToClipboard(previewText)}
+            >
+              <Copy size={16} weight="regular" />
+            </IconButton>
+          )}
           <IconButton
             title={t("panels.files.openInSystem")}
             onClick={() => openInSystem(activePreview.path)}
@@ -356,7 +502,18 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           {rootDir && <WorkdirChip dir={rootDir} />}
         </div>
       )}
-      <div className={styles.panelBody}>
+      {activePreview && find.open && (
+        <PreviewFindBar
+          query={find.query}
+          count={find.count}
+          current={find.current}
+          onQuery={find.setQuery}
+          onStep={find.step}
+          onClose={find.close}
+        />
+      )}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: 预览是只读阅读面，右键只用来开复制菜单/抑制浏览器默认菜单，不伪装成交互 role */}
+      <div className={styles.panelBody} ref={panelBodyRef} onContextMenu={openPreviewMenu}>
         {!rootDir && !activePreview ? (
           <p className={panelStyles.noMatch}>{t("panels.files.selectProject")}</p>
         ) : activePreview ? (
@@ -408,6 +565,21 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           </div>
         )}
       </div>
+      {previewMenu && (
+        <ContextMenu
+          position={{ x: previewMenu.x, y: previewMenu.y }}
+          items={previewMenuItems}
+          onClose={() => setPreviewMenu(null)}
+        />
+      )}
+      {/* 常驻挂载：自身按 selectionchange 命令式显隐，划选预览正文才出现（docs/design/81） */}
+      <SelectionToolbar
+        containerRef={panelBodyRef}
+        quoteDisabled={quoteDisabled}
+        quoteDisabledHint={quoteDisabledHint}
+        onCopy={copyToClipboard}
+        onQuote={quoteFromPreview}
+      />
     </>
   );
 }

@@ -85,7 +85,7 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
           ))}
         </div>
       ) : null}
-      <div ref={bodyRef} className={styles.panelBody} data-panel-scroll="">
+      <div ref={bodyRef} className={styles.panelBody} data-panel-scroll="" data-selectable-text="">
         <ViewNodeRenderer node={entry.root} bridge={bridge} />
       </div>
       {entry.actions.length > 0 ? (

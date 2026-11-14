@@ -38,7 +38,7 @@
 
 /* 文档流列：与悬浮输入栏同宽同中轴（共用 --session-input-column，横向内边距在
    外层 .scroll 上对称留出）；底部留白避开悬浮输入框。
-   body 默认 user-select:none，这里对对话内容放开鼠标选取复制。 */
+   正文可选中由 `data-selectable-text`（global.css）统一放开，见 SessionView.tsx。 */
 .inner {
   max-width: min(100%, var(--session-input-column));
   width: 100%;
@@ -49,7 +49,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-  user-select: text;
 }
 
 /* 消息操作条悬浮区（docs/design/13 P1-6）：操作条 height:0 常驻在内容下缘，

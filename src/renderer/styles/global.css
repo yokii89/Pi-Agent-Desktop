@@ -43,6 +43,15 @@ textarea {
   color: inherit;
 }
 
+/*
+ * 只读正文的统一开关：全应用默认 user-select:none（拖动窗口 / 双击拖拽时不会误选界面文字），
+ * 「用户要读、要抄」的正文区（会话流、文件预览、diff、进程详情）挂这个属性即放开鼠标选取，
+ * 不必每个面板各自在 CSS 里再写一遍。装饰性内容（行号槽、徽章、按钮 chrome）仍在各自样式里写 none。
+ */
+[data-selectable-text] {
+  user-select: text;
+}
+
 button {
   font-family: inherit;
   font-size: inherit;

@@ -98,6 +98,35 @@ export const panelMessages = defineMessages({
     "zh-CN": "复制相对路径",
     "en-US": "Copy relative path",
   },
+  "panels.files.copyPageText": {
+    "zh-CN": "复制本页文本",
+    "en-US": "Copy page text",
+  },
+  "panels.files.findPlaceholder": {
+    "zh-CN": "在文件中查找（Enter 下一个）",
+    "en-US": "Find in file (Enter for next)",
+  },
+  "panels.files.findNoMatch": { "zh-CN": "无匹配", "en-US": "No matches" },
+  "panels.files.findPrev": { "zh-CN": "上一个匹配", "en-US": "Previous match" },
+  "panels.files.findNext": { "zh-CN": "下一个匹配", "en-US": "Next match" },
+  "panels.files.copyContent": { "zh-CN": "复制全文", "en-US": "Copy all text" },
+  "panels.files.copySelection": {
+    "zh-CN": "复制选中内容",
+    "en-US": "Copy selection",
+  },
+  "panels.files.selectAll": { "zh-CN": "全选预览内容", "en-US": "Select all preview text" },
+  "panels.files.revealInExplorer": {
+    "zh-CN": "在资源管理器中显示",
+    "en-US": "Show in File Explorer",
+  },
+  "panels.files.quoteNoSession": {
+    "zh-CN": "没有进行中的会话，无法添加到输入栏",
+    "en-US": "No active session to add it to",
+  },
+  "panels.files.openFolder": {
+    "zh-CN": "打开此文件夹",
+    "en-US": "Open this folder",
+  },
 
   "panels.terminal.title": { "zh-CN": "终端", "en-US": "Terminal" },
   "panels.terminal.newTab": { "zh-CN": "新建终端", "en-US": "New terminal" },

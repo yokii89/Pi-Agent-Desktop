@@ -1731,6 +1731,8 @@ export const FS_IPC = {
   openPath: "pidesk:fs:openPath",
   /** 用 VS Code 打开目录（顶栏工作区按钮）；未安装时返回可读错误。 */
   openInVsCode: "pidesk:fs:openInVsCode",
+  /** 在系统资源管理器中定位并选中路径（文件树右键动作）。 */
+  reveal: "pidesk:fs:reveal",
   /** 把 data URL 图片落盘到系统「下载」目录（lightbox 右键「保存图片」）。 */
   saveImageToDownloads: "pidesk:fs:saveImageToDownloads",
   /** 订阅目录变动：开始监听某个已展开目录（主进程引用计数）。 */

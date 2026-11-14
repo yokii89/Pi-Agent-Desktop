@@ -291,7 +291,12 @@ export function SessionView() {
       >
         {/* 壁纸模式下会话流色块半透明的作用域锚点：tokens.css 只在这棵子树里重写底色令牌，
             输入栏 / 问题导航栏 / 悬浮弹层按 data-stream-surface 之外保持实底（docs/design/120） */}
-        <div className={styles.inner} data-stream-surface="" ref={contentRef}>
+        <div
+          className={styles.inner}
+          data-stream-surface=""
+          data-selectable-text=""
+          ref={contentRef}
+        >
           {showSkeleton ? (
             <div className={styles.skeleton} aria-hidden>
               <div className={styles.skeletonTitle} />

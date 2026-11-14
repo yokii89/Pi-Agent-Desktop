@@ -3,6 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GitCommit, GitLogResult } from "../../../../shared/ipc";
 import { useT } from "../../../hooks/useT";
 import { gitService } from "../../../services/gitService";
+import { useUiStore } from "../../../stores/uiStore";
+import { copyTextToClipboard } from "../../../utils/clipboard";
+import { ContextMenu } from "../../ui/ContextMenu";
+import type { MenuItem } from "../../ui/Menu";
 import styles from "./GitGraphPanel.module.css";
 import { layoutGitGraph, maxLaneCount } from "./gitGraphLayout";
 
@@ -179,7 +183,38 @@ export function GitGraphPanel({ cwd, refreshSeq = 0 }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedOid, setExpandedOid] = useState<string | null>(null);
+  /** 右键菜单落点与被点的提交（行本身是「展开」按钮，复制不给整行加选区）。 */
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number; commit: GitCommit } | null>(null);
   const seqRef = useRef(0);
+  const { showToast } = useUiStore();
+
+  const copy = (text: string): void => {
+    void copyTextToClipboard(text).then((ok) =>
+      showToast(ok ? t("toast.copied") : t("toast.copyFailed")),
+    );
+  };
+
+  const menuItems: MenuItem[] = menuAt
+    ? [
+        {
+          key: "subject",
+          label: t("context.graph.copySubject"),
+          disabled: menuAt.commit.subject.length === 0,
+          onSelect: () => copy(menuAt.commit.subject),
+        },
+        {
+          key: "hash",
+          label: t("context.graph.copyHash"),
+          onSelect: () => copy(menuAt.commit.oid),
+        },
+        {
+          key: "refs",
+          label: t("context.graph.copyRefs"),
+          disabled: menuAt.commit.refs.length === 0,
+          onSelect: () => copy(menuAt.commit.refs.join(", ")),
+        },
+      ]
+    : [];
 
   const load = useCallback(async () => {
     if (!cwd) {
@@ -247,6 +282,10 @@ export function GitGraphPanel({ cwd, refreshSeq = 0 }: Props) {
                 type="button"
                 className={[styles.row, expanded ? styles.rowExpanded : ""].join(" ")}
                 onClick={() => setExpandedOid(expanded ? null : row.commit.oid)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  setMenuAt({ x: event.clientX, y: event.clientY, commit: row.commit });
+                }}
                 aria-expanded={expanded}
                 title={`${row.commit.subject}\n${row.commit.authorName} · ${formatTime(row.commit.authorTime)}\n${row.commit.oid}`}
               >
@@ -302,6 +341,13 @@ export function GitGraphPanel({ cwd, refreshSeq = 0 }: Props) {
         <p className={styles.truncNote}>
           {t("context.graph.truncated", { count: data.commits.length })}
         </p>
+      )}
+      {menuAt && (
+        <ContextMenu
+          position={{ x: menuAt.x, y: menuAt.y }}
+          items={menuItems}
+          onClose={() => setMenuAt(null)}
+        />
       )}
     </div>
   );

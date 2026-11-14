@@ -78,6 +78,8 @@ export const uiMessages = defineMessages({
     "zh-CN": "该文件在此 diff 层没有内容变化。",
     "en-US": "No content changes for this file in this diff layer.",
   },
+  "ui.review.copySelection": { "zh-CN": "复制选中内容", "en-US": "Copy selection" },
+  "ui.review.copyLine": { "zh-CN": "复制这一行", "en-US": "Copy this line" },
 
   // 撤销本轮文件改动
   "ui.rollback.title": {
@@ -183,4 +185,8 @@ export const uiMessages = defineMessages({
     "en-US":
       "If you edited these files after the turn ended, those edits will be overwritten. Staged (git add) content is not restored — handle the index yourself.",
   },
+  // 划选工具条（会话区与文件面板共用同一组件，故不挂在 session.* 下）
+  "ui.selectBar.aria": { "zh-CN": "选区操作", "en-US": "Selection actions" },
+  "ui.selectBar.copy": { "zh-CN": "复制文本", "en-US": "Copy text" },
+  "ui.selectBar.quote": { "zh-CN": "添加到输入栏", "en-US": "Add to composer" },
 });

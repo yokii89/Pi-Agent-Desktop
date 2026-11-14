@@ -164,7 +164,6 @@
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-all;
-  user-select: text;
 }
 
 /* 命令行全文 + 复制按钮并排：code 吃满余量，按钮不随换行拉伸 */
@@ -286,7 +285,6 @@
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-all;
-  user-select: text;
 }
 
 .note {

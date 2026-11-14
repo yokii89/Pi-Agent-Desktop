@@ -50,7 +50,10 @@
 }
 
 /* 右端：与 ContextSidebar 同列；左边线与侧栏.border-left 连成一条。
-   右侧避让 chrome，避免扩展槽被窗控压住。 */
+   右侧避让 chrome，避免扩展槽被窗控压住。
+   与 .left / .center 同口径：**容器是拖拽区**，交互控件自己 no-drag（HeaderMount 槽位内联
+   `no-drag`、IconButton / WindowControls 各自声明）。这里曾经写成 no-drag，导致侧栏展开时
+   顶栏右段整段拖不动窗口——空白处本该是拖拽区。 */
 .right {
   composes: glass from "../../styles/glass.module.css";
   grid-area: titleR;
@@ -62,7 +65,7 @@
   border-left: 1px solid var(--glass-border);
   border-bottom: 1px solid var(--glass-border);
   overflow: hidden;
-  -webkit-app-region: no-drag;
+  -webkit-app-region: drag;
 }
 
 /* chrome：绝对定位叠在 .app 右上，不进入 grid 轨道 */

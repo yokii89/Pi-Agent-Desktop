@@ -18,7 +18,7 @@ export function NotebookPreview({ path, content }: { path: string; content: stri
     );
   }
   return (
-    <div className={styles.wrap}>
+    <div className={styles.wrap} data-selectable-text="">
       {notebook.truncated && (
         <p className={panelStyles.truncatedNote}>{t("panels.files.truncatedNote")}</p>
       )}

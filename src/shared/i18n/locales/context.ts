@@ -351,6 +351,9 @@ export const contextMessages = defineMessages({
   },
   "context.graph.empty": { "zh-CN": "暂无提交", "en-US": "No commits yet" },
   "context.graph.untitled": { "zh-CN": "(无标题)", "en-US": "(no subject)" },
+  "context.graph.copySubject": { "zh-CN": "复制提交信息", "en-US": "Copy commit message" },
+  "context.graph.copyHash": { "zh-CN": "复制提交哈希", "en-US": "Copy commit hash" },
+  "context.graph.copyRefs": { "zh-CN": "复制分支与标签", "en-US": "Copy branch and tags" },
   "context.graph.rootCommit": { "zh-CN": "根提交", "en-US": "Root commit" },
   "context.graph.parentCommits": {
     "zh-CN": "{count} 个父提交",

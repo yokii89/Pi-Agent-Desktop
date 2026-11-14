@@ -5,8 +5,12 @@ import type { FsEntry, FsListResult } from "../../../../shared/ipc";
 import { FileIcon } from "../../../fileIcons";
 import { useT } from "../../../hooks/useT";
 import { fsService } from "../../../services/fsService";
-import { normalizePathKey } from "../../../utils/fileOpen";
+import { useUiStore } from "../../../stores/uiStore";
+import { copyTextToClipboard } from "../../../utils/clipboard";
+import { normalizePathKey, relativeToPath, toNativePath } from "../../../utils/fileOpen";
 import { revealInNearestScroller } from "../../../utils/revealInScroller";
+import { ContextMenu } from "../../ui/ContextMenu";
+import type { MenuItem } from "../../ui/Menu";
 import styles from "./FileTree.module.css";
 
 /** 「在树中定位」请求（uiStore fileRevealRequest 的载荷）。 */
@@ -180,6 +184,7 @@ export function FileTree({
           key={`${node.kind}:${node.path}`}
           node={node}
           depth={0}
+          rootDir={rootDir}
           selectedPath={selectedPath}
           onSelectFile={onSelectFile}
           active={active}
@@ -195,6 +200,8 @@ export function FileTree({
 interface FileTreeNodeProps {
   node: FileNode;
   depth: number;
+  /** 项目根：仅用于右键菜单里的「相对路径」。 */
+  rootDir: string;
   selectedPath: string | null;
   onSelectFile: (absolutePath: string) => void;
   active: boolean;
@@ -208,6 +215,7 @@ interface FileTreeNodeProps {
 function FileTreeNode({
   node,
   depth,
+  rootDir,
   selectedPath,
   onSelectFile,
   active,
@@ -216,9 +224,12 @@ function FileTreeNode({
   revealKey,
 }: FileTreeNodeProps) {
   const t = useT();
+  const { showToast } = useUiStore();
   const rowRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [children, setChildren] = useState<FileNode[] | null>(null);
+  /** 右键菜单落点（光标坐标）。 */
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
   const isDir = node.kind === "dir";
   const version = versions[normalizePathKey(node.path)] ?? 0;
 
@@ -287,6 +298,64 @@ function FileTreeNode({
     setOpen((prev) => !prev);
   };
 
+  /** 写剪贴板 + 双向反馈（与文件预览同一范式）。 */
+  const copy = (text: string): void => {
+    void copyTextToClipboard(text).then((ok) =>
+      showToast(ok ? t("toast.copied") : t("toast.copyFailed")),
+    );
+  };
+
+  const openMenu = (event: React.MouseEvent): void => {
+    event.preventDefault();
+    // 行菜单优先：不再冒泡给面板层的预览右键
+    event.stopPropagation();
+    setMenuAt({ x: event.clientX, y: event.clientY });
+  };
+
+  /** 「在资源管理器中显示」：失败（路径已被移走）把可读原因交给 toast。 */
+  const reveal = (): void => {
+    fsService.reveal(node.path).catch((err: unknown) => {
+      showToast(err instanceof Error ? err.message : t("panels.files.systemOpenFailed"));
+    });
+  };
+
+  /** 「在系统中打开」：文件用默认程序，目录进资源管理器（与预览头部同一个通道）。 */
+  const openInSystem = (): void => {
+    fsService.openPath(node.path).catch((err: unknown) => {
+      showToast(err instanceof Error ? err.message : t("panels.files.systemOpenFailed"));
+    });
+  };
+
+  const menuItems: MenuItem[] = menuAt
+    ? [
+        {
+          key: "path",
+          label: t("panels.files.copyPath"),
+          onSelect: () => copy(toNativePath(node.path)),
+        },
+        {
+          key: "relative",
+          label: t("panels.files.copyRelative"),
+          onSelect: () => copy(toNativePath(relativeToPath(rootDir, node.path))),
+        },
+        {
+          key: "reveal",
+          label: t("panels.files.revealInExplorer"),
+          dividerBefore: true,
+          onSelect: reveal,
+        },
+        ...(isDir
+          ? [
+              {
+                key: "open",
+                label: t("panels.files.openFolder"),
+                onSelect: openInSystem,
+              },
+            ]
+          : [{ key: "open", label: t("panels.files.openInSystem"), onSelect: openInSystem }]),
+      ]
+    : [];
+
   return (
     <li>
       <button
@@ -295,6 +364,7 @@ function FileTreeNode({
         className={[styles.row, selected ? styles.selected : ""].join(" ")}
         style={depthStyle}
         onClick={toggle}
+        onContextMenu={openMenu}
       >
         {isDir ? (
           <>
@@ -327,6 +397,7 @@ function FileTreeNode({
               key={`${child.kind}:${child.path}`}
               node={child}
               depth={depth + 1}
+              rootDir={rootDir}
               selectedPath={selectedPath}
               onSelectFile={onSelectFile}
               active={active}
@@ -341,6 +412,9 @@ function FileTreeNode({
         <p className={styles.emptyDir} style={depthStyle}>
           {t("panels.files.emptyDir")}
         </p>
+      )}
+      {menuAt && (
+        <ContextMenu position={menuAt} items={menuItems} onClose={() => setMenuAt(null)} />
       )}
     </li>
   );

@@ -29,6 +29,27 @@ export function normalizePathKey(p: string): string {
   return p.replace(/\\/g, "/").toLowerCase();
 }
 
+/**
+ * 内部统一用 `/` 分隔；交给外部（资源管理器地址栏、终端、其他工具）时转回 `\`。
+ * 仅用于「复制路径」这类落到用户手上的输出，内部比较 / 拼接一律不经过它。
+ */
+export function toNativePath(p: string): string {
+  return p.replace(/\//g, "\\");
+}
+
+/**
+ * 绝对路径 → 相对某个根目录的路径（`/` 分隔）；目标不在根下时原样返回。
+ * 文件树右键「复制相对路径」与输入栏引用块的来源标注共用。
+ */
+export function relativeToPath(rootDir: string, target: string): string {
+  const root = rootDir.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  const normalized = target.replace(/\\/g, "/");
+  if (!root) return normalized;
+  return normalized.toLowerCase().startsWith(`${root}/`)
+    ? normalized.slice(root.length + 1)
+    : normalized;
+}
+
 /** 归一为 `/` 分隔；保留盘符与 UNC 前缀。 */
 function toPosix(p: string): string {
   return p.replace(/\\/g, "/");

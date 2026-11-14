@@ -20,7 +20,7 @@ export function DelimitedPreview({
   }
   const columns = Math.max(...table.rows.map((row) => row.length));
   return (
-    <div className={styles.wrap}>
+    <div className={styles.wrap} data-selectable-text="">
       <div className={styles.meta}>{t("panels.files.csvRows", { count: table.rows.length })}</div>
       <div className={styles.scroll}>
         <table className={styles.table}>

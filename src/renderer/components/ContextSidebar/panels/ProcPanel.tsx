@@ -278,7 +278,7 @@ export function ProcPanel() {
         </section>
       ) : null}
 
-      <div className={styles.detail}>
+      <div className={styles.detail} data-selectable-text="">
         {!runtimeAlive ? (
           <p className={styles.exitedBanner}>{t("proc.panel.exitedBanner")}</p>
         ) : null}

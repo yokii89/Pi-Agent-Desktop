@@ -41,9 +41,68 @@
   background: var(--color-bg-surface);
 }
 
-.canvasWrap canvas {
+/* 画布与文本层同尺寸叠放（宽高由 PdfPreview 按 viewport 写内联值） */
+.page {
+  position: relative;
   display: inline-block;
-  max-width: none;
+  vertical-align: top;
   background: white;
   box-shadow: var(--shadow-overlay);
+}
+
+.page canvas {
+  display: block;
+  max-width: none;
+  background: white;
+}
+
+/*
+ * pdfjs TextLayer 配方：从 pdfjs-dist/web/pdf_viewer.css 精简，只留定位与字号换算必需的变量。
+ * 页面上看到的仍是画布像素，这一层全透明，只提供选框 / 无障碍文本 / 复制。
+ * 字号用 `total-scale-factor × min-font-size × font-height` 放大再按 `1/min-font-size` 缩回去，
+ * 是 pdfjs 绕开浏览器最小字号限制的做法，两个变量都不能省。
+ */
+.textLayer {
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  letter-spacing: normal;
+  word-spacing: normal;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 1;
+}
+
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+/* marked-content 分组盒不能占位，否则断层 */
+.textLayer .markedContent {
+  display: contents;
+}
+
+/* 透明文字的选区要看得见（默认高亮在透明文字上几乎不可见） */
+.textLayer ::selection {
+  background: var(--color-accent-soft);
 }

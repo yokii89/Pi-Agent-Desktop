@@ -16,6 +16,7 @@ import {
   openInVsCode,
   pickFile,
   readFile,
+  revealInExplorer,
   saveImageToDownloads,
   searchFiles,
 } from "./fsService";
@@ -59,6 +60,15 @@ export function registerFsIpc(): void {
     (_event, req: { dir: string }): Promise<IpcResult<null>> =>
       envelopeAsync(async () => {
         await openInVsCode(req.dir);
+        return null;
+      }),
+  );
+
+  ipcMain.handle(
+    FS_IPC.reveal,
+    (_event, req: { path: string }): IpcResult<null> =>
+      envelope(() => {
+        revealInExplorer(req.path);
         return null;
       }),
   );

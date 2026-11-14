@@ -282,7 +282,7 @@ export function CodeHighlight({ code, filePath, lang, className, focusLine }: Co
     const lines = code.split("\n");
     if (lines.length > 1 && lines.at(-1) === "") lines.pop();
     return (
-      <pre ref={preRef} className={cls} style={gutterStyle}>
+      <pre ref={preRef} className={cls} style={gutterStyle} data-selectable-text="">
         {lines.map((line, index) => (
           <span
             // biome-ignore lint/suspicious/noArrayIndexKey: 静态只读行，无重排/增删
@@ -303,6 +303,7 @@ export function CodeHighlight({ code, filePath, lang, className, focusLine }: Co
       ref={hostRef}
       className={hostCls}
       style={gutterStyle}
+      data-selectable-text=""
       // biome-ignore lint/security/noDangerouslySetInnerHtml: shiki 对源码做 HTML 转义，输出仅为 span+style token
       dangerouslySetInnerHTML={{ __html: html }}
     />

@@ -126,19 +126,20 @@ export function SelectionToolbar({
   }, [sync]);
 
   useEffect(() => {
-    const container = containerRef.current;
     const onWindowResize = (): void => schedule();
     document.addEventListener("selectionchange", schedule);
-    container?.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", onWindowResize);
+    // 捕获阶段监听 scroll：容器内还挂着二级滚动盒（文件面板的 Markdown 正文、PDF 画布），
+    // 只盯容器自己的 scroll 事件会让工具条停在原地。
+    document.addEventListener("scroll", schedule, { capture: true, passive: true });
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
       frameRef.current = 0;
       document.removeEventListener("selectionchange", schedule);
-      container?.removeEventListener("scroll", schedule);
+      document.removeEventListener("scroll", schedule, { capture: true });
       window.removeEventListener("resize", onWindowResize);
     };
-  }, [containerRef, schedule]);
+  }, [schedule]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -172,7 +173,7 @@ export function SelectionToolbar({
       className={styles.panel}
       data-overlay-panel=""
       role="toolbar"
-      aria-label={t("session.selectBar.aria")}
+      aria-label={t("ui.selectBar.aria")}
       hidden
       onMouseDown={(event) => {
         // 默认行为会先把文档选区收拢掉，按钮拿不到快照之外的实时选区；
@@ -183,7 +184,7 @@ export function SelectionToolbar({
       <div className={styles.actions}>
         <button type="button" className={styles.action} onClick={() => run(onCopy)}>
           <Copy size={16} weight="regular" />
-          <span>{t("session.selectBar.copy")}</span>
+          <span>{t("ui.selectBar.copy")}</span>
         </button>
         <button
           type="button"
@@ -193,7 +194,7 @@ export function SelectionToolbar({
           onClick={() => run(onQuote)}
         >
           <ChatCircleDots size={16} weight="regular" />
-          <span>{t("session.selectBar.quote")}</span>
+          <span>{t("ui.selectBar.quote")}</span>
         </button>
       </div>
     </div>,

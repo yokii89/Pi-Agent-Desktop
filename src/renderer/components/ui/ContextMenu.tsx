@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useGlideOverlay } from "../../hooks/useGlideOverlay";
 import styles from "./ContextMenu.module.css";
 import { type MenuItem, MenuList } from "./Menu";
@@ -16,6 +17,11 @@ interface ContextMenuProps {
  *
  * 收起要先演完动画再通知父级卸载，所以内部记一次 `closing` 防止重复触发；
  * 父级主动卸载（如触发元素消失）则直接消失，没有出场动画——这是本组件的边界。
+ *
+ * **必须 portal 到 body**：外壳是 `position: fixed`，而左右侧栏 / 顶栏都是玻璃面
+ * （`backdrop-filter` 会给 fixed 建包含块，`overflow: hidden` 还会裁掉超出部分）。
+ * 挂在侧栏子树里时坐标会被当成「相对侧栏」、菜单被裁在侧栏内部——终端页签（非玻璃）
+ * 曾是唯一调用方，所以这个缺陷一直没暴露。Popover / Modal 同理都走 portal。
  */
 export function ContextMenu({ position, items, onClose }: ContextMenuProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -66,7 +72,7 @@ export function ContextMenu({ position, items, onClose }: ContextMenuProps) {
     };
   }, [beginClose]);
 
-  return (
+  return createPortal(
     <div
       ref={panelRef}
       className={styles.panel}
@@ -74,6 +80,7 @@ export function ContextMenu({ position, items, onClose }: ContextMenuProps) {
       style={{ left: position.x, top: position.y }}
     >
       <MenuList items={items} afterSelect={beginClose} />
-    </div>
+    </div>,
+    document.body,
   );
 }

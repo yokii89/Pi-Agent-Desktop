@@ -119,7 +119,7 @@ export function FileDiffInline({
     return (
       <div className={styles.wrap}>
         <div className={styles.scroll}>
-          <DiffView hunks={state.diff.hunks} />
+          <DiffView hunks={state.diff.hunks} filePath={change.path} />
         </div>
         {state.diff.truncated && <p className={styles.truncated}>{t("ui.review.truncated")}</p>}
       </div>

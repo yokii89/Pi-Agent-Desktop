@@ -693,13 +693,6 @@ export const sessionMessages = defineMessages({
     "zh-CN": "等待模型响应",
     "en-US": "Awaiting response",
   },
-  "session.selectBar.aria": { "zh-CN": "选区操作", "en-US": "Selection actions" },
-  "session.selectBar.copy": { "zh-CN": "复制文本", "en-US": "Copy text" },
-  "session.selectBar.quote": {
-    "zh-CN": "添加到输入栏",
-    "en-US": "Add to composer",
-  },
-
   "session.a11y.assistantReplying": {
     "zh-CN": "AI 正在回复",
     "en-US": "Assistant is replying",

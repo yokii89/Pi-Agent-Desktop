@@ -30,7 +30,7 @@ export function MarkdownPreview({
   return (
     <div className={styles.wrap}>
       {truncated && <p className={panelStyles.truncatedNote}>{t("panels.files.truncatedNote")}</p>}
-      <div className={styles.body}>
+      <div className={styles.body} data-selectable-text="">
         {mode === "preview" ? (
           <MarkdownDoc text={content} sourcePath={path} codeHighlight mermaid />
         ) : (

@@ -505,6 +505,8 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 用 VS Code 打开目录（顶栏工作区按钮）；未安装时主进程返回可读错误。 */
     openInVsCode: (dir: string): Promise<IpcResult<null>> =>
       ipcRenderer.invoke(FS_IPC.openInVsCode, { dir }),
+    /** 在系统资源管理器中定位并选中路径（文件树右键）。 */
+    reveal: (path: string): Promise<IpcResult<null>> => ipcRenderer.invoke(FS_IPC.reveal, { path }),
     /** 把 data URL 图片存到系统「下载」目录（lightbox 右键「保存图片」）。 */
     saveImageToDownloads: (req: FsSaveImageRequest): Promise<IpcResult<FsSaveImageResult>> =>
       ipcRenderer.invoke(FS_IPC.saveImageToDownloads, req),

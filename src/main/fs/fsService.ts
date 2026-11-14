@@ -210,6 +210,19 @@ export async function openDirectory(target: string): Promise<void> {
   if (failure) throw new Error(failure);
 }
 
+/**
+ * 在资源管理器中定位并选中目标（文件树的右键动作）。
+ * `shell.showItemInFolder` 无返回码，先自查存在性以便给出可读错误。
+ */
+export function revealInExplorer(target: string): void {
+  try {
+    fs.statSync(target);
+  } catch {
+    throw new Error("路径不存在或已被移动");
+  }
+  shell.showItemInFolder(target);
+}
+
 /** VS Code 常见安装位置（PiDesk 仅发布 Windows；「环境变量名/相对路径」两段式）。 */
 const VS_CODE_EXE_CANDIDATES = [
   "LOCALAPPDATA/Programs/Microsoft VS Code/Code.exe",

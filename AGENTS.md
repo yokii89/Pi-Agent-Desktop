@@ -188,6 +188,11 @@ import { Play } from "@phosphor-icons/react";
 - 组件文件用 PascalCase（`SessionView.tsx`），其他模块用 camelCase（`sessionStore.ts`）。
 - 状态管理：优先 React 内置（`useState` / `useReducer` / Context），规模变大再统一引入状态库——引入前先在本文件登记。
 - 注释只写"为什么"，不写"是什么"；公共 API（导出函数、IPC 接口）写 JSDoc。
+- **只读正文必须可鼠标选中复制**：全局 `body { user-select: none }`（拖动窗口 / 双击拖拽时不误选界面文字），
+  因此任何「用户要读、要抄」的正文区（会话流、文件预览、diff、进程详情）必须给容器挂
+  `data-selectable-text`（`global.css` 里一条统一规则），**不要**在组件 CSS 里再各写一遍 `user-select: text`；
+  装饰性内容（行号槽、徽章、按钮 chrome）仍在自身样式里保持 `user-select: none`。
+  新开只读面板时这是硬要求，漏了就等于把内容锁死（2026-11 文件面板预览就是这样漏了很久）。
 - **换行一律 LF**，仓库根两个文件各管一层：`.gitattributes`（`* text=auto eol=lf`）管 **git 入库/检出**归一，
   `.editorconfig`（`end_of_line = lf`）管**编辑器别写出 CRLF**——`biome check` 读的是工作区文件，只有后者拦得住它。
   另注意 `.gitattributes` 在本机是「无差别」的（`core.autocrlf=true` 恰好也归一），它的价值在别的机器 / CI 上。

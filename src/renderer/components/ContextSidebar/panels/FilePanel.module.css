@@ -199,3 +199,16 @@
   background: var(--color-bg-hover);
   border-color: var(--color-border-strong);
 }
+
+/*
+ * Ctrl+F 命中高亮：走 CSS Custom Highlight（登记名见 hooks/usePreviewFind），
+ * 不给 DOM 包 <mark> ——Markdown 预览的节点归 React 所有，改动会被对账抹掉。
+ * 全部命中淡一档，当前命中用划选色标出来。
+ */
+:global(::highlight(pidesk-find)) {
+  background: var(--color-accent-soft);
+}
+
+:global(::highlight(pidesk-find-active)) {
+  background: var(--color-selection);
+}
