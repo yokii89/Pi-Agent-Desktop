@@ -208,6 +208,12 @@ export interface PideskSettings {
    * 仅在 active 会话稳定、有空余额度时预热；显式启动永远优先。
    */
   sessionPrefetchEnabled: boolean;
+  /**
+   * 后台会话进程空闲回收阈值（分钟，0 = 关闭；docs/design/138）。
+   * 口径是「无用户动作」：读历史 / 切回会话 / 作答扩展对话框都算使用。
+   * 只回收非 active、非 busy、无在途事务的后台会话。
+   */
+  sessionIdleReclaimMinutes: number;
   /** 欢迎界面是否在输入栏上方显示最近会话（历史记录）快捷入口；默认关闭。 */
   welcomeRecentsEnabled: boolean;
   /** 系统提示音（docs/design/18）；场景/音色/焦点策略见 shared/notification。 */

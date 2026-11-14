@@ -5,6 +5,11 @@ import {
   type LocalePreference,
   normalizeLocalePreference,
 } from "../../../shared/i18n";
+import {
+  DEFAULT_SESSION_IDLE_RECLAIM_MINUTES,
+  isSessionIdleReclaimOption,
+  SESSION_IDLE_RECLAIM_OPTIONS,
+} from "../../../shared/sessionIdle";
 import { useT } from "../../hooks/useT";
 import { projectService } from "../../services/projectService";
 import { settingsService } from "../../services/settingsService";
@@ -21,6 +26,12 @@ const MAX_PARALLEL_OPTIONS = [1, 2, 4, 6, 8, 12, 16, 24, 32].map((n) => ({
   label: String(n),
 }));
 
+/** 空闲回收档位（分钟，0 = 关闭）；与 shared/sessionIdle 的常量同源。 */
+const idleReclaimOptionKeys = SESSION_IDLE_RECLAIM_OPTIONS.map((minutes) => ({
+  value: String(minutes),
+  minutes,
+}));
+
 /**
  * 常规：应用级通用偏好。
  * 主题/侧边栏归外观；pi 与终端归配置/环境。语言切换写入 settings.locale 并即时生效。
@@ -33,6 +44,9 @@ export function GeneralPanel() {
   const [defaultProjectDir, setDefaultProjectDir] = useState<string | null>(null);
   const [showInTray, setShowInTray] = useState(false);
   const [maxParallelSessions, setMaxParallelSessions] = useState(8);
+  const [sessionIdleReclaimMinutes, setSessionIdleReclaimMinutes] = useState(
+    DEFAULT_SESSION_IDLE_RECLAIM_MINUTES,
+  );
   const [sessionPrefetchEnabled, setSessionPrefetchEnabled] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -43,6 +57,9 @@ export function GeneralPanel() {
       setDefaultProjectDir(settings?.defaultProjectDir ?? null);
       setShowInTray(settings?.showInTray ?? false);
       setMaxParallelSessions(settings?.maxParallelSessions ?? 8);
+      setSessionIdleReclaimMinutes(
+        settings?.sessionIdleReclaimMinutes ?? DEFAULT_SESSION_IDLE_RECLAIM_MINUTES,
+      );
       setSessionPrefetchEnabled(settings?.sessionPrefetchEnabled === true);
       setReady(true);
     });
@@ -88,6 +105,14 @@ export function GeneralPanel() {
     if (!Number.isFinite(n) || n < 1 || n > 32) return;
     setMaxParallelSessions(n);
     await settingsService.set({ maxParallelSessions: n });
+  };
+
+  const changeSessionIdleReclaim = async (raw: string): Promise<void> => {
+    const minutes = Number.parseInt(raw, 10);
+    if (!isSessionIdleReclaimOption(minutes)) return;
+    setSessionIdleReclaimMinutes(minutes);
+    // 生效时机：下一次扫描（最长 60s）即按新阈值判定，不需要重启应用
+    await settingsService.set({ sessionIdleReclaimMinutes: minutes });
   };
 
   const changeSessionPrefetch = async (next: boolean): Promise<void> => {
@@ -175,6 +200,26 @@ export function GeneralPanel() {
               ariaLabel={t("settings.general.maxParallelSessions")}
               options={MAX_PARALLEL_OPTIONS}
               onChange={(next) => void changeMaxParallel(next)}
+            />
+          }
+        />
+        <SettingRow
+          label={t("settings.general.sessionIdleReclaim")}
+          description={t("settings.general.sessionIdleReclaim.description")}
+          control={
+            <Select
+              className={styles.selectLike}
+              value={String(sessionIdleReclaimMinutes)}
+              disabled={!ready}
+              ariaLabel={t("settings.general.sessionIdleReclaim")}
+              options={idleReclaimOptionKeys.map(({ value, minutes }) => ({
+                value,
+                label:
+                  minutes === 0
+                    ? t("settings.general.sessionIdleReclaim.off")
+                    : t("settings.general.sessionIdleReclaim.minutes", { count: minutes }),
+              }))}
+              onChange={(next) => void changeSessionIdleReclaim(next)}
             />
           }
         />

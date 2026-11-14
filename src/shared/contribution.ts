@@ -273,7 +273,20 @@ export const RUNTIME_IPC = {
   snapshot: "pidesk:runtime:snapshot",
   /** 主进程推送：runtime 条目变化。 */
   changed: "pidesk:runtime:changed",
+  /**
+   * 上报「用户当前正在查看的会话」（active 会话 + 页面），docs/design/138。
+   * active 会话永不按空闲回收：用户可能正在读、正在码字。
+   */
+  noteViewing: "pidesk:runtime:noteViewing",
 } as const;
+
+/** active 会话心跳的上报参数。 */
+export interface RuntimeViewingRequest {
+  /** 当前 active 会话；null = 没有（空态 / 非会话页）。 */
+  sessionId?: SessionId | null;
+  /** 是否处于会话页；不在会话页时 active 会话不算「正在看」。 */
+  sessionPage?: boolean;
+}
 
 export const VIEW_ACTIVATE_IPC = {
   /** 原子激活 Contribution：ensure → ready → wait live → action → confirm。 */

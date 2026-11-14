@@ -5,6 +5,7 @@ import type {
   ExtensionWorkerStatus,
   PrefetchMetrics,
   PrefetchNotifyRequest,
+  RuntimeViewingRequest,
   SessionRuntimeSnapshot,
   WorkerAcquireResult,
 } from "../shared/contribution";
@@ -380,6 +381,8 @@ export interface PideskGlobalApi {
   };
   runtime: {
     snapshot(): Promise<IpcResult<SessionRuntimeSnapshot[]>>;
+    /** 上报用户正在查看的会话（docs/design/138）：该会话豁免空闲回收。 */
+    noteViewing(req: RuntimeViewingRequest): Promise<IpcResult<null>>;
     onChanged(callback: (snapshot: SessionRuntimeSnapshot) => void): () => void;
   };
   worker: {

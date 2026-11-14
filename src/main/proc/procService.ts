@@ -7,6 +7,7 @@ import type {
   SessionId,
 } from "../../shared/ipc";
 import { PROC_IPC } from "../../shared/ipc";
+import { setBackgroundJobProbe } from "../session/backgroundJobs";
 import {
   loadProcRegistry,
   type PersistedIgnored,
@@ -69,6 +70,10 @@ class ProcService {
 
   constructor(enumerate: EnumerateProcesses = enumerateProcesses) {
     this.enumerate = enumerate;
+    // 会话空闲回收（docs/design/138 §3.4）：后台还有活着的登记项时，该会话正在等命令回执，
+    // 不属于"无用进程"。注入而不是反向 import session 模块：procService → session 已有依赖，
+    // 反向再 import 会成环（见 backgroundJobs.ts 文件头）
+    setBackgroundJobProbe((sessionId) => this.hasBackgroundWork(sessionId));
     this.watcher = new ProcessWatcher({
       enumerate,
       register: (input) => {
@@ -113,6 +118,29 @@ class ProcService {
 
   countAlive(sessionId: SessionId): number {
     return this.registry.countAlive(sessionId);
+  }
+
+  /** 回收安全检查独立于展示过滤；忽略、尚未认领和未完成探测都不等于进程结束。 */
+  async hasBackgroundWork(sessionId: SessionId): Promise<boolean> {
+    const snapshot = await this.enumerate();
+    if (!snapshot) return true;
+    if (this.watcher.hasPotentialBackgroundWork(sessionId, snapshot)) return true;
+    const sessionFile = this.sessionFiles.get(sessionId);
+    const candidates = [
+      ...this.registry
+        .listBySession(sessionId)
+        .filter((proc) => proc.status === "alive" || proc.status === "ignored"),
+      ...this.pendingAdopt.filter((proc) => proc.sessionFile === sessionFile),
+      ...[...this.ignoredMap.values()].filter((proc) => proc.sessionFile === sessionFile),
+    ];
+    return candidates.some((proc) => {
+      const row = snapshot.get(proc.pid);
+      // 命令行能被进程自己改写；只能凭创建时间证明 PID 已复用，未知时仍保护。
+      return (
+        row !== undefined &&
+        (!proc.startedAt || !row.startedAt || Math.abs(proc.startedAt - row.startedAt) <= 2000)
+      );
+    });
   }
 
   /**

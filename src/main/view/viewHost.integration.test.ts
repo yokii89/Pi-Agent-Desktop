@@ -70,7 +70,13 @@ import {
 } from "../../../packages/view-sdk/src/index";
 import type { ViewNode } from "../../../packages/view-sdk/src/types";
 import { VIEW_LIMITS } from "../../shared/view";
-import { disposeViewHost, ensureViewHost, reportViewLayout, sendViewEvent } from "./viewHost";
+import {
+  disposeViewHost,
+  ensureViewHost,
+  hasSessionModal,
+  reportViewLayout,
+  sendViewEvent,
+} from "./viewHost";
 
 /** docs/design/19 §4.1 的 Telegram 面板骨架：连接卡 + 队列卡（table）。 */
 function panelTree(rowCount: number): ViewNode {
@@ -175,6 +181,24 @@ afterAll(() => {
 });
 
 describe("viewHost ↔ view-sdk over the real transport", () => {
+  it("SDK modal 在关闭前保护所属会话，不影响其它会话", async () => {
+    const modalClient = new DesktopViewClient({
+      ...(await ensureViewHost()),
+      sessionId: "idle-guard",
+    });
+    const session = await modalClient.openLive({
+      placement: "modal",
+      title: "Pending input",
+      root: { type: "text", content: "Please confirm" },
+    });
+    await waitFor(() => hasSessionModal("idle-guard"), "modal registered");
+    expect(hasSessionModal("other-session")).toBe(false);
+    session.close();
+    await session.closed;
+    await waitFor(() => !hasSessionModal("idle-guard"), "modal closed");
+    expect(hasSessionModal("idle-guard")).toBe(false);
+    modalClient.dispose();
+  });
   it("advertises the panel slot and view-table in hello", async () => {
     const hello = await client.ensureConnected();
     expect(hello?.placements).toContain("panel");

@@ -9,6 +9,7 @@ import type { PideskSettings } from "../../shared/ipc";
 import { clampNavWidth } from "../../shared/navWidth";
 import { normalizeNotificationSettings } from "../../shared/notification";
 import { normalizeRailStyle } from "../../shared/railStyles";
+import { normalizeSessionIdleReclaimMinutes } from "../../shared/sessionIdle";
 import { sanitizeShortcutsRecord } from "../../shared/shortcuts";
 import {
   clampSplashLogoSize,
@@ -129,6 +130,8 @@ export function getSettings(): PideskSettings {
       loaded.maxParallelSessions >= 1
         ? Math.floor(loaded.maxParallelSessions)
         : DEFAULT_SETTINGS.maxParallelSessions,
+    // 手改设置文件时把空闲回收阈值夹回合法区间（0 = 关闭，非法回退默认）
+    sessionIdleReclaimMinutes: normalizeSessionIdleReclaimMinutes(loaded.sessionIdleReclaimMinutes),
     notification: normalizeNotificationSettings(loaded.notification),
     // 手改设置文件时把侧栏宽度夹回合法区间（它同时是持久化值与设置同步项）
     navWidth: clampNavWidth(loaded.navWidth),
@@ -180,6 +183,9 @@ export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   next.uiZoom = normalizeUiZoom(next.uiZoom);
   next.shortcuts = sanitizeShortcutsRecord(next.shortcuts);
   next.sessionOrder = sanitizeSessionOrder(next.sessionOrder) ?? DEFAULT_SETTINGS.sessionOrder;
+  next.sessionIdleReclaimMinutes = normalizeSessionIdleReclaimMinutes(
+    next.sessionIdleReclaimMinutes,
+  );
   next.splashEnabled = next.splashEnabled !== false;
   next.splashLogoImage = normalizeSplashLogoImage(next.splashLogoImage);
   next.splashLogoSize = clampSplashLogoSize(next.splashLogoSize);

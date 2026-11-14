@@ -9,6 +9,7 @@ import { registerWatcherLifecycle } from "./fs/watcher";
 import { registerIpc } from "./ipc";
 import { procService } from "./proc/procService";
 import { disposeTaskScheduler, initTaskScheduler } from "./scheduler/taskScheduler";
+import { disposeIdleReclaim, initIdleReclaim } from "./session/idleReclaim";
 import { detectPiExecutablePath } from "./session/piLauncher";
 import { disposeAllSessions } from "./session/piSession";
 import { warmPiShellCache } from "./session/piShell";
@@ -99,6 +100,8 @@ app.whenReady().then(async () => {
   initTrayFromSettings();
   // 定时任务：IPC 已注册、窗口已建后启动；错过补扫需要 powerMonitor（ready 之后才可用）
   initTaskScheduler();
+  // 后台会话空闲回收（docs/design/138）：依赖 powerMonitor 与上面的占用注入，启动越晚越安全
+  initIdleReclaim();
   // 应用更新静默检查：窗口已建后延迟触发，失败不打扰（docs/design/35）
   scheduleStartupCheck();
 
@@ -149,6 +152,7 @@ app.on("before-quit", (event) => {
 app.on("will-quit", () => {
   disposeTray();
   disposeTaskScheduler();
+  disposeIdleReclaim();
   disposeUpdater();
   // 检查器浮窗：退出前强制销毁，避免残留独立窗
   disposeInspectorWindow();

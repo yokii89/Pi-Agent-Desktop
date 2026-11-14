@@ -23,6 +23,7 @@ import { useContextSidebarCollapse } from "./hooks/useContextSidebarCollapse";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import { useNotificationSounds } from "./hooks/useNotificationSounds";
 import { useSessionMonitorDock } from "./hooks/useSessionMonitorDock";
+import { useSessionUsageHeartbeat } from "./hooks/useSessionUsageHeartbeat";
 import { procService } from "./services/procService";
 import { BrowserProvider } from "./stores/browserStore";
 import { ComposerProvider } from "./stores/composerStore";
@@ -175,6 +176,8 @@ function AppLayout() {
   const monitorAnimated = page === "session" && phase !== "empty";
   const monitorMounted = useSessionMonitorDock(sidebar.ref, monitorVisible, monitorAnimated);
   useGlobalShortcuts();
+  // 会话使用心跳（docs/design/138）：后台会话空闲回收靠它知道「用户还在看这个会话」
+  useSessionUsageHeartbeat();
 
   return (
     <div

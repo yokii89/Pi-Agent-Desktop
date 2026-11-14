@@ -2,6 +2,7 @@ import type {
   ActivateContributionRequest,
   ActivateContributionResult,
   ContributionCatalogSnapshot,
+  RuntimeViewingRequest,
   SessionRuntimeSnapshot,
 } from "../../shared/contribution";
 import { CATALOG_IPC, RUNTIME_IPC, VIEW_ACTIVATE_IPC } from "../../shared/contribution";
@@ -37,6 +38,13 @@ export const catalogService = {
 export const runtimeService = {
   async snapshot(): Promise<SessionRuntimeSnapshot[]> {
     return unwrap(runtimeApi().snapshot());
+  },
+  /** 上报用户正在查看的会话（docs/design/138）：该会话豁免空闲回收。 */
+  async noteViewing(req: RuntimeViewingRequest): Promise<void> {
+    const api = pideskApi()?.runtime ?? window.pidesk?.runtime;
+    // 旧预加载缺少心跳通道时，主进程因无法确认查看状态而暂停自动回收。
+    if (!api?.noteViewing) return;
+    await unwrap(api.noteViewing(req));
   },
   onChanged(callback: (snapshot: SessionRuntimeSnapshot) => void): () => void {
     return runtimeApi().onChanged(callback);

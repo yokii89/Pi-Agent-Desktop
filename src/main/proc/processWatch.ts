@@ -298,6 +298,9 @@ interface PendingBoundary {
 export class ProcessWatcher {
   private readonly deps: ProcessWatcherDeps;
   private readonly pending = new Map<SessionId, PendingBoundary>();
+  // 展示启发式会丢掉 shell、短命或枚举失败的条目；自动回收必须另保留完整边界证据。
+  private readonly reclaimBoundaries = new Map<SessionId, Set<BashBoundaryState>>();
+  private readonly reclaimRows = new Map<BashBoundaryState, ProcessSnapshotRow[]>();
   private readonly recheckTimers = new Set<ReturnType<typeof setTimeout>>();
   private disposed = false;
 
@@ -316,10 +319,19 @@ export class ProcessWatcher {
       endedAt: null,
     };
     this.pending.set(sessionId, entry);
-    const baseline = (await this.deps.enumerate()) ?? new Map();
+    let boundaries = this.reclaimBoundaries.get(sessionId);
+    if (!boundaries) {
+      boundaries = new Set();
+      this.reclaimBoundaries.set(sessionId, boundaries);
+    }
+    boundaries.add(entry.state);
+    const observed = await this.deps.enumerate();
+    // 缺失基线意味着无法证明没有遗漏后台进程，保守保留此边界直到会话显式结束。
+    const baseline = observed ?? new Map();
     // 期间被新的 bash 取代 / 会话取消 / 应用退出：旧边界不复活
     if (this.disposed || this.pending.get(sessionId) !== entry) return;
     entry.state.baseline = baseline;
+    if (!observed) this.reclaimRows.set(entry.state, []);
     if (entry.endedAt !== null) {
       this.armBoundary(entry, WATCH_TIMING.settleMs - (Date.now() - entry.endedAt));
     }
@@ -349,6 +361,33 @@ export class ProcessWatcher {
     const entry = this.pending.get(sessionId);
     if (entry?.timer) clearTimeout(entry.timer);
     this.pending.delete(sessionId);
+    for (const state of this.reclaimBoundaries.get(sessionId) ?? []) this.reclaimRows.delete(state);
+    this.reclaimBoundaries.delete(sessionId);
+  }
+
+  /** 回收前用完整进程快照验证后台工作，包含 UI 不展示的 shell 与尚未登记的作业。 */
+  hasPotentialBackgroundWork(sessionId: SessionId, snapshot: ProcessSnapshot): boolean {
+    if (this.pending.has(sessionId)) return true;
+    const boundaries = this.reclaimBoundaries.get(sessionId);
+    if (!boundaries) return false;
+    for (const state of boundaries) {
+      const known = this.reclaimRows.get(state);
+      // 空数组是枚举失败哨兵；未收口的异步边界也不能据此判空闲。
+      if (!state.baseline || !known || known.length === 0) return true;
+      const current = diffNewInSubtree(state.baseline, snapshot, state.rootPid, state.startedAt);
+      const surviving = known.filter((row) => {
+        const alive = snapshot.get(row.pid);
+        return (
+          alive &&
+          (!row.startedAt || !alive.startedAt || Math.abs(row.startedAt - alive.startedAt) <= 2000)
+        );
+      });
+      if (current.length > 0 || surviving.length > 0) return true;
+      boundaries.delete(state);
+      this.reclaimRows.delete(state);
+    }
+    if (boundaries.size === 0) this.reclaimBoundaries.delete(sessionId);
+    return false;
   }
 
   dispose(): void {
@@ -357,6 +396,8 @@ export class ProcessWatcher {
       if (entry.timer) clearTimeout(entry.timer);
     }
     this.pending.clear();
+    this.reclaimBoundaries.clear();
+    this.reclaimRows.clear();
     for (const timer of this.recheckTimers) clearTimeout(timer);
     this.recheckTimers.clear();
   }
@@ -380,6 +421,11 @@ export class ProcessWatcher {
     const current = await this.deps.enumerate();
     if (!current || this.disposed) return;
     const rows = diffNewInSubtree(baseline, current, entry.state.rootPid, entry.state.startedAt);
+    const boundaries = this.reclaimBoundaries.get(sessionId);
+    if (boundaries?.has(entry.state) && !this.reclaimRows.has(entry.state)) {
+      if (rows.length > 0) this.reclaimRows.set(entry.state, rows);
+      else boundaries.delete(entry.state);
+    }
     const candidates = pickServiceCandidates(rows);
     for (const row of candidates) {
       // 先活过 1s 复核再登记（设计 §3.1）：短命 helper 直接丢

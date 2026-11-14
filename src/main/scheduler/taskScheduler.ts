@@ -28,6 +28,7 @@ import {
   type SchedulerSnapshot,
   sanitizeSchedulerTaskInput,
 } from "../../shared/scheduler";
+import { setScheduledOccupancy } from "../session/idleReclaim";
 import {
   applyDefaultModelToSession,
   disposeSession,
@@ -66,6 +67,8 @@ let initialized = false;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let snapshot: SchedulerSnapshot = { tasks: [], runs: [] };
 let offActivity: (() => void) | null = null;
+/** 空闲回收的「定时任务占用」注入（docs/design/138）。 */
+let offScheduledOccupancy: (() => void) | null = null;
 /** task.id → 最近一次派发（冲突判定、上一轮进程回收、完成时刻回填）。 */
 const inFlight = new Map<string, InFlightEntry>();
 /** 同任务派发互斥：spawn 期间的异步空窗内，手动与定时触发不得双双通过冲突检查。 */
@@ -98,6 +101,14 @@ function isSessionBusy(sessionId: string): boolean {
   if (hasModeTransition(sessionId)) return true;
   const state = getRuntimeState(sessionId);
   return state === "busy" || state === "starting";
+}
+
+/** 该会话是否被定时任务占用（正在执行或上一轮进程仍保留）；空闲回收豁免。 */
+function isSessionInFlight(sessionId: string): boolean {
+  for (const entry of inFlight.values()) {
+    if (entry.sessionId === sessionId) return true;
+  }
+  return false;
 }
 
 function appendRun(run: ScheduledRunRecord): void {
@@ -436,6 +447,10 @@ export function initTaskScheduler(): void {
   inFlight.clear();
   misfireScan(Date.now());
   offActivity = onRuntimeActivity(handleRuntimeActivity);
+  // 空闲回收（docs/design/138）：定时任务正在使用的会话不按空闲回收，
+  // 否则下一轮触发还要重付一次 ~5.5s 冷启动（docs/design/44）。
+  // 派发进行中（尚未入 inFlight）的会话必然是 starting/busy，回收策略层已排除。
+  offScheduledOccupancy = setScheduledOccupancy(isSessionInFlight);
   powerMonitor.on("resume", handleResume);
   armTimer();
 }
@@ -449,5 +464,7 @@ export function disposeTaskScheduler(): void {
   }
   offActivity?.();
   offActivity = null;
+  offScheduledOccupancy?.();
+  offScheduledOccupancy = null;
   powerMonitor.off("resume", handleResume);
 }

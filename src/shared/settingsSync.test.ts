@@ -35,6 +35,7 @@ function fakeSettings(): PideskSettings {
     browserEnabled: true,
     maxParallelSessions: 4,
     sessionPrefetchEnabled: false,
+    sessionIdleReclaimMinutes: 60,
     welcomeRecentsEnabled: true,
     notification: {
       enabled: true,

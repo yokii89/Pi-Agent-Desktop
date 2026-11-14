@@ -241,6 +241,32 @@ export function getRuntimeSessionFile(sessionId: SessionId): string | null {
   return records.get(sessionId)?.sessionFile ?? null;
 }
 
+/**
+ * 空闲回收候选快照（docs/design/138）：只给判定需要的字段，外加是否用于定时任务。
+ * 不返回 SessionRuntimeSnapshot 全集，避免把 user-owned 细节泄给回收路径。
+ */
+export interface IdleReclaimCandidate {
+  sessionId: SessionId;
+  /** `lastActivityAt ?? startedAt`。 */
+  lastActivityAt: number | null;
+  state: SessionRuntimeState;
+  hasActivationTxn: boolean;
+}
+
+/** 收集全部存活实例作为空闲回收候选（含预定型/用户态，由策略层过滤）。 */
+export function listIdleReclaimCandidates(): IdleReclaimCandidate[] {
+  const out: IdleReclaimCandidate[] = [];
+  for (const rec of records.values()) {
+    out.push({
+      sessionId: rec.sessionId,
+      lastActivityAt: rec.lastActivityAt ?? rec.startedAt,
+      state: rec.state,
+      hasActivationTxn: hasActivationTxnFor(rec.sessionId),
+    });
+  }
+  return out;
+}
+
 /** pi 返回的实际 JSONL 路径用于 reload 后绑定原运行时。 */
 export function noteRuntimeSessionFile(sessionId: SessionId, sessionFile: string): void {
   patchRecord(sessionId, { sessionFile });
@@ -267,6 +293,45 @@ export function markRuntimeUsedByUser(sessionId: SessionId): void {
   }
   rec.lastActivityAt = Date.now();
   pushRuntimeChanged(rec);
+}
+
+/**
+ * 用户仍在看着该会话（心跳，docs/design/138）：只刷新使用时刻，**不**推渲染层。
+ * 与 `markRuntimeUsedByUser` 的区别只是一个每分钟都跑的静默版本：
+ * 心跳不需要让渲染层重绘，只有首次晋升（speculative → 用户态）才需要广播。
+ */
+export function noteRuntimeTouched(sessionId: SessionId): void {
+  const rec = records.get(sessionId);
+  if (!rec) return;
+  // 已结束记录等运行时对账，不能因迟到的心跳晋升成用户态。
+  if (!hasSession(sessionId)) return;
+  if (rec.state === "cold" || rec.state === "stopping" || rec.state === "failed") return;
+  const promoted = !rec.usedByUser || isSpeculativeCreatedBy(rec.createdBy);
+  rec.usedByUser = true;
+  if (isSpeculativeCreatedBy(rec.createdBy)) rec.createdBy = "send";
+  rec.lastActivityAt = Date.now();
+  if (promoted) pushRuntimeChanged(rec);
+}
+
+/** 安全检查仍发现工作时延后空闲起点，不把后台活动晋升成用户操作。 */
+export function deferRuntimeIdleReclaim(sessionId: SessionId): void {
+  const rec = records.get(sessionId);
+  if (rec && hasSession(sessionId)) rec.lastActivityAt = Date.now();
+}
+
+/**
+ * 当前用户正在查看的会话（docs/design/138）：渲染层上报的 active 会话，
+ * 该会话永不按空闲回收。心跳缺失或过期时由 idleReclaim 暂停自动回收。
+ */
+let watchedSessionId: SessionId | null = null;
+
+export function noteWatchedSession(sessionId: SessionId | null): void {
+  watchedSessionId = sessionId;
+}
+
+/** 读取当前登记的 active 会话，回收前必须重读而非复用扫描快照。 */
+export function getWatchedSession(): SessionId | null {
+  return watchedSessionId;
 }
 
 /**
@@ -490,6 +555,7 @@ export async function ensureSessionReady(
   const requested = req.sessionId ? records.get(req.sessionId) : undefined;
   if (requested && hasSession(requested.sessionId)) {
     const hit = isReadyState(requested.state);
+    requested.lastActivityAt = Date.now();
     promote(requested);
     pushRuntimeChanged(requested);
     await waitRuntimeReady(requested.sessionId);
@@ -732,6 +798,7 @@ export function __resetRuntimeCoordinatorForTests(): void {
   records.clear();
   activationLocks.clear();
   activityListeners.clear();
+  watchedSessionId = null;
   prefetchStats.attempts = 0;
   prefetchStats.skippedLimit = 0;
   prefetchStats.reclaimed = 0;

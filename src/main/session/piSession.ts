@@ -33,6 +33,7 @@ import {
 import { resolvePiCommand } from "./piLauncher";
 import { readDefaultModel } from "./piSettings";
 import {
+  deferRuntimeIdleReclaim,
   getRuntimeState,
   markRuntimeActivity,
   markRuntimeExit,
@@ -537,6 +538,8 @@ function handleProtocolLine(inst: SessionInstance, line: string): void {
 
   if (typeof record.type === "string" && FORWARD_EVENT_TYPES.has(record.type)) {
     const agentEvent = parsed as PiAgentEvent;
+    // 工具/队列/压缩等扩展活动也算工作，不能仅依赖 agent_start 的到达顺序。
+    deferRuntimeIdleReclaim(inst.id);
     if (agentEvent.type === "agent_start") {
       markRuntimeActivity(inst.id, "busy");
     } else if (agentEvent.type === "agent_settled") {
@@ -569,6 +572,9 @@ function request(
   if (!inst?.child) {
     return Promise.reject(new Error("pi 会话未启动"));
   }
+  // 读状态的后台轮询不续命；用户操作在写出前和应答后都记账，覆盖长耗时扩展命令。
+  const userAction = !command.startsWith("get_") || command === "get_messages";
+  if (userAction) markRuntimeUsedByUser(sessionId);
   const id = ++inst.nextRequestId;
   return new Promise<unknown>((resolve, reject) => {
     const timer =
@@ -581,10 +587,14 @@ function request(
     inst.pendingRequests.set(id, {
       resolve: (value) => {
         clearTimeout(timer);
+        if (userAction && instances.get(sessionId) === inst && inst.childAlive)
+          markRuntimeUsedByUser(sessionId);
         resolve(value);
       },
       reject: (error) => {
         clearTimeout(timer);
+        if (userAction && instances.get(sessionId) === inst && inst.childAlive)
+          markRuntimeUsedByUser(sessionId);
         reject(error);
       },
     });
@@ -669,7 +679,19 @@ export function respondSessionUi(
   id: string,
   answer: SessionUiAnswer,
 ): boolean {
-  return sessionUi().respond(sessionId, id, answer);
+  const accepted = sessionUi().respond(sessionId, id, answer);
+  if (accepted) markRuntimeUsedByUser(sessionId);
+  return accepted;
+}
+
+/** 自动回收只比较进程对象身份，避免异步探测结束后误关同 id 的新进程。 */
+export function getSessionProcessToken(sessionId: SessionId): object | null {
+  return getLiveInstance(sessionId)?.child ?? null;
+}
+
+/** 在途 RPC（包括非 agent 命令）必须得到应答，自动回收不得将其打断。 */
+export function hasPendingSessionRequests(sessionId: SessionId): boolean {
+  return (getLiveInstance(sessionId)?.pendingRequests.size ?? 0) > 0;
 }
 
 /**

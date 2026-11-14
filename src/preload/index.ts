@@ -6,6 +6,7 @@ import type {
   ExtensionWorkerStatus,
   PrefetchMetrics,
   PrefetchNotifyRequest,
+  RuntimeViewingRequest,
   SessionRuntimeSnapshot,
   WorkerAcquireResult,
 } from "../shared/contribution";
@@ -684,6 +685,9 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 读取主进程权威 runtime 快照（Renderer reload 对账）。 */
     snapshot: (): Promise<IpcResult<SessionRuntimeSnapshot[]>> =>
       ipcRenderer.invoke(RUNTIME_IPC.snapshot),
+    /** 上报用户正在查看的会话（docs/design/138）：该会话豁免空闲回收。 */
+    noteViewing: (req: RuntimeViewingRequest): Promise<IpcResult<null>> =>
+      ipcRenderer.invoke(RUNTIME_IPC.noteViewing, req),
     /** 订阅 runtime 变化推送。 */
     onChanged: (callback: (snapshot: SessionRuntimeSnapshot) => void): (() => void) =>
       subscribe<SessionRuntimeSnapshot>(RUNTIME_IPC.changed, callback),

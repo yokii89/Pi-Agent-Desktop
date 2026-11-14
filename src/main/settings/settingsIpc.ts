@@ -23,6 +23,7 @@ import {
   normalizeNotificationSettings,
 } from "../../shared/notification";
 import { isRailStyle } from "../../shared/railStyles";
+import { SESSION_IDLE_RECLAIM_OPTIONS } from "../../shared/sessionIdle";
 import { sanitizeShortcutsRecord } from "../../shared/shortcuts";
 import {
   clampSplashLogoSize,
@@ -44,6 +45,11 @@ import { getSettings, updateSettings } from "./settings";
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+/** 值是否命中登记的档位表（如空闲回收阈值 0/15/30/60/120）；命中时返回收窄后的类型。 */
+function asOption<T extends number>(options: readonly T[], value: unknown): T | null {
+  return options.includes(value as T) ? (value as T) : null;
 }
 
 function sanitizeProjects(value: unknown): PideskProject[] | undefined {
@@ -207,6 +213,13 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         if (typeof value === "number" && Number.isFinite(value) && value >= 1 && value <= 32) {
           clean.maxParallelSessions = Math.floor(value);
         }
+        break;
+      }
+      case "sessionIdleReclaimMinutes": {
+        // 只接受登记的档位（含 0 = 关闭），其余值整项丢弃；实际生效的阈值由
+        // idleReclaim 每次扫描时读设置，改设置无需重启应用
+        const minutes = asOption(SESSION_IDLE_RECLAIM_OPTIONS, value);
+        if (minutes !== null) clean.sessionIdleReclaimMinutes = minutes;
         break;
       }
       case "sessionStreamFontPx": {

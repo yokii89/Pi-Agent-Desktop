@@ -379,6 +379,24 @@ export const settingsMessages = defineMessages({
     "en-US":
       "How many pi session processes may stay alive (default 8). Starting over the limit fails; free slots via End process in the sidebar. Applies to sessions started after the change",
   },
+  "settings.general.sessionIdleReclaim": {
+    "zh-CN": "后台会话空闲回收",
+    "en-US": "Reclaim idle background sessions",
+  },
+  "settings.general.sessionIdleReclaim.description": {
+    "zh-CN":
+      "后台会话在该时长内没有使用就自动结束进程，释放内存与并行名额；正在查看的会话、正在跑的会话、定时任务占用的会话不会被回收。历史记录完整保留，下次打开会重新启动（首次发送需等冷启动）",
+    "en-US":
+      "End a background session process after this long without use, freeing memory and a parallel slot. The session you are viewing, sessions that are running, and sessions held by scheduled tasks are never reclaimed. History is kept; reopening restarts the process (the first send waits for a cold start)",
+  },
+  "settings.general.sessionIdleReclaim.off": {
+    "zh-CN": "关闭（不回收）",
+    "en-US": "Off (never reclaim)",
+  },
+  "settings.general.sessionIdleReclaim.minutes": {
+    "zh-CN": "{count} 分钟",
+    "en-US": "{count} min",
+  },
   "settings.general.sessionPrefetch": {
     "zh-CN": "会话预热",
     "en-US": "Session prefetch",

@@ -11,6 +11,7 @@ import {
   normalizeNotificationSettings,
 } from "../../shared/notification";
 import { DEFAULT_RAIL_STYLE } from "../../shared/railStyles";
+import { DEFAULT_SESSION_IDLE_RECLAIM_MINUTES } from "../../shared/sessionIdle";
 import type { ShortcutsMap } from "../../shared/shortcuts";
 import {
   DEFAULT_SPLASH_FONT_PRESET,
@@ -61,6 +62,8 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   maxParallelSessions: 8,
   // 会话预热默认开启（docs/design/44：打开/新建会话即触发，把冷启动移到发送之前）
   sessionPrefetchEnabled: true,
+  // 后台会话空闲回收（docs/design/138）：30 分钟无用户动作即释放进程，0 = 关闭
+  sessionIdleReclaimMinutes: DEFAULT_SESSION_IDLE_RECLAIM_MINUTES,
   // 欢迎页最近会话入口默认关闭：新会话界面保持干净，回访入口由侧栏承担
   welcomeRecentsEnabled: false,
   // 系统提示音（docs/design/18）；深拷贝，避免与 DEFAULT_NOTIFICATION_SETTINGS 共享嵌套对象
@@ -159,6 +162,7 @@ export const SETTABLE_KEYS = [
   "browserEnabled",
   "maxParallelSessions",
   "sessionPrefetchEnabled",
+  "sessionIdleReclaimMinutes",
   "welcomeRecentsEnabled",
   "notification",
   "sessionStreamFontPx",

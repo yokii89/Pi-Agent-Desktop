@@ -1116,6 +1116,14 @@ export function closeSessionViews(
   }
 }
 
+/** SDK 弹窗与 RPC extension_ui_request 分属两个通道，自动回收必须同时保护。 */
+export function hasSessionModal(sessionId: string): boolean {
+  for (const view of views.values()) {
+    if (view.sessionId === sessionId && view.placement === "modal") return true;
+  }
+  return false;
+}
+
 /**
  * 仅保留 liveIds 中的会话视图（settings / 无 sessionId 的全局视图不动）。
  * 用于清理「主进程已不认识、但 Host 上仍挂着」的孤儿扩展视图，
