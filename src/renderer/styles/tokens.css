@@ -9,6 +9,12 @@
    用户启用本地背景壁纸时切成透明，让壁纸层透出来（docs/design/111）。
    弹出层、输入框仍用 --color-bg，不跟着透明。 */
 :root {
+  /* 文件预览与就地编辑器共用的代码表面规格。 */
+  --code-font-family: var(--font-family-mono);
+  --code-font-size: var(--font-size-sm);
+  --code-line-height: 1.5;
+  --code-padding: var(--spacing-sm);
+
   --color-canvas: var(--color-bg);
 }
 
@@ -92,6 +98,19 @@
      深底上"浮起一档"，对齐 ZCode 代码卡对比度（docs/design/33） */
   --color-code-bg-solid: #202024;
   --color-code-bg: var(--color-code-bg-solid);
+
+  /* 语法着色（侧栏就地编辑器的 CodeMirror 用，docs/design/141）：
+     取 shiki github-dark 的同一套 tone，预览态与编辑态切来切去不跳色。 */
+  --syn-keyword: #ff7b72;
+  --syn-string: #a5d6ff;
+  --syn-number: #79c0ff;
+  --syn-comment: #8b949e;
+  --syn-function: #d2a8ff;
+  --syn-type: #ffa657;
+  --syn-property: #79c0ff;
+  --syn-operator: #ff7b72;
+  --syn-punctuation: #c9d1d9;
+  --syn-variable: #e6edf3;
 
   /* 运行态文字扫光（docs/design/26）：strong/soft 同族，
      soft 取 22% 与 PiStateMark .ghost 的 opacity 同值 */
@@ -400,6 +419,18 @@
   --color-spark: color-mix(in oklab, var(--color-accent) 72%, black);
   --color-code-bg-solid: #e2e2e6;
   --color-code-bg: var(--color-code-bg-solid);
+
+  /* 语法着色（亮色档，与暗色同名变量一一对应） */
+  --syn-keyword: #cf222e;
+  --syn-string: #0a3069;
+  --syn-number: #0550ae;
+  --syn-comment: #6e7781;
+  --syn-function: #8250df;
+  --syn-type: #953800;
+  --syn-property: #0550ae;
+  --syn-operator: #cf222e;
+  --syn-punctuation: #57606a;
+  --syn-variable: #24292f;
 
   /* 状态色 */
   --color-success: #0f7b6c;

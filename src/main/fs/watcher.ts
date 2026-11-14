@@ -19,6 +19,8 @@ const WATCH_BATCH_MS = 150;
 const WATCH_IGNORE = new Set(["node_modules", ".git", "dist", "build", ".next", "out"]);
 /** 单次合批允许携带的最大目录数（防御异常刷屏把 IPC 撑爆）。 */
 const MAX_BATCH_DIRS = 200;
+/** 文件名完整时附带的路径上限；超限后退回目录级失效。 */
+const MAX_BATCH_PATHS = 500;
 
 interface WatchEntry {
   watcher: fs.FSWatcher;
@@ -30,13 +32,18 @@ interface WatchEntry {
 const watchers = new Map<string, WatchEntry>();
 /** 合批缓冲：受影响目录的绝对路径集合。 */
 let pending = new Set<string>();
+let pendingPaths = new Set<string>();
+let pendingPathUnknown = false;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 function push(): void {
   if (pending.size === 0) return;
   const dirs = [...pending];
+  const paths = pendingPathUnknown ? undefined : [...pendingPaths];
   pending = new Set();
-  const message: FsWatchPushMessage = { dirs };
+  pendingPaths = new Set();
+  pendingPathUnknown = false;
+  const message: FsWatchPushMessage = paths ? { dirs, paths } : { dirs };
   getMainWindow()?.webContents.send(FS_IPC.changed, message);
 }
 
@@ -90,6 +97,15 @@ export function watchDirectory(dir: string): void {
       if (isIgnored(typeof filename === "string" ? filename : null)) return;
       if (pending.size >= MAX_BATCH_DIRS && !pending.has(key)) return;
       pending.add(key);
+      if (typeof filename !== "string") {
+        pendingPathUnknown = true;
+      } else if (!pendingPathUnknown) {
+        pendingPaths.add(path.resolve(key, filename));
+        if (pendingPaths.size > MAX_BATCH_PATHS) {
+          pendingPaths = new Set();
+          pendingPathUnknown = true;
+        }
+      }
       scheduleFlush();
     });
   } catch {
@@ -119,6 +135,8 @@ export function disposeAllWatchers(): void {
     flushTimer = null;
   }
   pending = new Set();
+  pendingPaths = new Set();
+  pendingPathUnknown = false;
   for (const key of [...watchers.keys()]) closeWatcher(key);
 }
 

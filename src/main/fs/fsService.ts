@@ -10,9 +10,12 @@ import type {
   FsReadResult,
   FsSaveImageRequest,
   FsSaveImageResult,
+  FsSaveTextRequest,
+  FsSaveTextResult,
   FsSearchHit,
 } from "../../shared/ipc";
 import { parseImageDataUrl, pickAvailablePath, toSaveFileName } from "./saveImageName";
+import { planTextSave } from "./saveText";
 import { matchesFileQuery, rankFileSearchHits } from "./searchMatch";
 
 /** 单目录列出上限（docs/design/03 §5：超出折叠为"展开更多"）。 */
@@ -106,6 +109,7 @@ export function readFile(file: string): FsReadResult {
       content: buffer.toString("utf8"),
       truncated: stat.size > MAX_READ_BYTES,
       byteLength: stat.size,
+      mtimeMs: stat.mtimeMs,
     };
   } finally {
     fs.closeSync(fd);
@@ -180,6 +184,39 @@ export async function searchFiles(rootDir: string, query: string): Promise<FsSea
 
   await walk(rootDir, 0);
   return rankFileSearchHits(hits, keyword).slice(0, MAX_SEARCH_HITS);
+}
+
+/**
+ * 覆盖写入文本文件（侧栏就地编辑，docs/design/141）。
+ *
+ * 冲突判定按 mtime：磁盘现状与渲染层基线不同就**不写**，回 `conflict` 让用户选
+ * 「覆盖 / 重新加载」——pi 子进程与别的编辑器同时在改这些文件，静默覆盖就是丢改动。
+ * 写失败（无权限、文件被占用）直接抛出，由统一信封转成可读错误。
+ */
+export async function saveTextFile(req: FsSaveTextRequest): Promise<FsSaveTextResult> {
+  if (typeof req.path !== "string" || req.path.length === 0) throw new Error("路径无效");
+  if (typeof req.content !== "string") throw new Error("内容无效");
+
+  let stat: fs.Stats;
+  try {
+    stat = await fsp.stat(req.path);
+  } catch {
+    throw new Error("文件不存在或已被移动");
+  }
+  if (!stat.isFile()) throw new Error("目标不是常规文件");
+
+  const byteLength = Buffer.byteLength(req.content, "utf8");
+  const plan = planTextSave({
+    diskMtimeMs: stat.mtimeMs,
+    expectedMtimeMs: req.expectedMtimeMs,
+    force: req.force === true,
+    byteLength,
+  });
+  if (plan.status === "conflict") return { status: "conflict", mtimeMs: plan.mtimeMs };
+
+  await fsp.writeFile(req.path, req.content, "utf8");
+  const after = await fsp.stat(req.path);
+  return { status: "saved", mtimeMs: after.mtimeMs, byteLength };
 }
 
 /** 系统文件选择器（单选文件），取消时返回 null。 */

@@ -24,6 +24,19 @@ export function pathBasename(p: string): string {
 }
 
 /**
+ * 取所在目录（保持原分隔符与大小写）；已是根 / 无目录部分时返回空串。
+ * 用于「监听文件所在目录」这类需要把父目录交给主进程的场景。
+ */
+export function parentDirPath(p: string): string {
+  const trimmed = p.replace(/[\\/]+$/, "");
+  const idx = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  if (idx <= 0) return "";
+  const parent = trimmed.slice(0, idx);
+  // "C:" 这类盘符根保留分隔符，否则主进程会把 "C:" 归一成非法路径
+  return /^[a-zA-Z]:$/.test(parent) ? `${parent}/` : parent;
+}
+
+/**
  * 判断 target 是否等于或位于 parentDir 内部（目录前缀匹配）。
  * 归一化后按 "parent/" 前缀比较，避免 "D:/a/bc" 误匹配 "D:/a/b"。
  */

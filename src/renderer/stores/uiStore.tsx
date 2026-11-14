@@ -8,6 +8,7 @@ import {
   useLayoutEffect,
   useMemo,
   useReducer,
+  useRef,
 } from "react";
 import { normalizeAccentColor } from "../../shared/accentColor";
 import {
@@ -598,7 +599,16 @@ interface UiStoreValue extends UiState {
   navigate: (page: PageId) => void;
   /** 展开右侧上下文侧栏并切换到指定 Tab（已展开时仅切 Tab）。 */
   openSidebarTab: (tab: RightSidebarTab) => void;
+  /** 收起 / 展开右侧上下文侧栏；收起时会先过一道离开守卫。 */
   toggleRightSidebar: () => void;
+  /** 关闭右侧栏某个页签（同样经离开守卫：关闭文件页签会卸载面板）。 */
+  closeSidebarTab: (tab: RightSidebarTab) => void;
+  /**
+   * 登记「离开前守卫」（当前仅文件面板的就地编辑用，docs/design/141）。
+   * 契约：守卫**自己负责在放行时执行 action**；返回 false 表示已拦截，动作由它延后重放。
+   * 传 null 注销。
+   */
+  registerLeaveGuard: (guard: ((action: () => void) => boolean) | null) => void;
   openSettings: () => void;
   closeSettings: () => void;
   showToast: (message: string, action?: ToastAction) => void;
@@ -621,6 +631,8 @@ const UiStoreContext = createContext<UiStoreValue | null>(null);
 /** 全局 UI 状态：布局折叠、右侧上下文侧栏、路由历史、主题、Toast。 */
 export function UiProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(uiReducer, initialState);
+  /** 面板登记的离开守卫（见 registerLeaveGuard）：只给命题式回调读，不进 React 状态。 */
+  const leaveGuardRef = useRef<((action: () => void) => boolean) | null>(null);
 
   // 启动时从 PiDesk 设置恢复主题与侧边栏折叠态（docs/design/03 §1）
   useEffect(() => {
@@ -735,7 +747,30 @@ export function UiProvider({ children }: { children: ReactNode }) {
     (tab: RightSidebarTab) => dispatch({ type: "setRightSidebar", open: true, tab }),
     [],
   );
-  const toggleRightSidebar = useCallback(() => dispatch({ type: "toggleRightSidebar" }), []);
+  const toggleRightSidebar = useCallback(() => {
+    const toggle = () => dispatch({ type: "toggleRightSidebar" });
+    // 收起侧栏会卸载面板（含未保存的文件草稿）：先过一道离开守卫
+    if (!state.rightSidebarOpen) {
+      toggle();
+      return;
+    }
+    const guard = leaveGuardRef.current;
+    if (guard) guard(toggle);
+    else toggle();
+  }, [state.rightSidebarOpen]);
+  const closeSidebarTab = useCallback((tab: RightSidebarTab) => {
+    const close = () => dispatch({ type: "closeSidebarTab", tab });
+    // 关掉文件页签同样会卸载面板：与收起侧栏走同一个守卫
+    const guard = leaveGuardRef.current;
+    if (guard) guard(close);
+    else close();
+  }, []);
+  const registerLeaveGuard = useCallback(
+    (guard: ((action: () => void) => boolean) | null) => {
+      leaveGuardRef.current = guard;
+    },
+    [],
+  );
   // WebContentsView 盖在渲染层上方：必须在弹设置之前先藏视图，否则 Modal 会被盖住数秒
   // （等到 SettingsDialog 的 effect 再 IPC 已经晚了一帧以上）。
   const openSettings = useCallback(() => {
@@ -775,6 +810,8 @@ export function UiProvider({ children }: { children: ReactNode }) {
       navigate,
       openSidebarTab,
       toggleRightSidebar,
+      closeSidebarTab,
+      registerLeaveGuard,
       openSettings,
       closeSettings,
       showToast,
@@ -790,6 +827,8 @@ export function UiProvider({ children }: { children: ReactNode }) {
       navigate,
       openSidebarTab,
       toggleRightSidebar,
+      closeSidebarTab,
+      registerLeaveGuard,
       openSettings,
       closeSettings,
       showToast,

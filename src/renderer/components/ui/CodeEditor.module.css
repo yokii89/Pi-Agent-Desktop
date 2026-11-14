@@ -1,0 +1,42 @@
+/* 侧栏就地编辑器外壳（docs/design/141）。
+   编辑器本体由 CodeMirror 的 EditorView.theme 着色（值同样取自 tokens 变量），
+   这里只管「撑满父容器」与懒加载占位——面板体是 flex 列里的滚动盒，
+   .cm-editor 必须拿到确切高度，否则 CodeMirror 只量到内容高度。 */
+
+.host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.mount {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.mount > :global(.cm-editor) {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.mount > :global(.cm-editor .cm-scroller) {
+  /* 滚动交给 CodeMirror 自己的 scroller，外层 panelBody 不再滚一层 */
+  max-height: 100%;
+}
+
+.placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: var(--spacing-md);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  pointer-events: none;
+}

@@ -2,13 +2,15 @@ import type {
   FsListResult,
   FsReadResult,
   FsSaveImageResult,
+  FsSaveTextRequest,
+  FsSaveTextResult,
   FsSearchHit,
   FsWatchPushMessage,
 } from "../../shared/ipc";
 import { unwrap } from "./ipc";
 import { pideskApi } from "./pideskApi";
 
-/** 文件树 / 只读预览 / 文件名搜索（主进程 fs 模块）。 */
+/** 文件树 / 只读预览 / 就地编辑写盘 / 文件名搜索（主进程 fs 模块）。 */
 export const fsService = {
   list(dir: string): Promise<FsListResult> {
     const api = pideskApi();
@@ -23,8 +25,18 @@ export const fsService = {
         content: "",
         truncated: false,
         byteLength: 0,
+        mtimeMs: 0,
       });
     return unwrap(api.fs.read(path));
+  },
+  /**
+   * 覆盖写入文本文件：主进程按 mtime 判定冲突，冲突时回 `status: "conflict"`（不抛错）。
+   * 真正失败（无权限 / 文件被移除）仍抛可展示的错误。
+   */
+  saveText(req: FsSaveTextRequest): Promise<FsSaveTextResult> {
+    const api = pideskApi();
+    if (!api) throw new Error("预加载 API 不可用");
+    return unwrap(api.fs.save(req));
   },
   search(dir: string, query: string): Promise<FsSearchHit[]> {
     const api = pideskApi();

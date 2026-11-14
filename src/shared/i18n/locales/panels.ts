@@ -128,6 +128,61 @@ export const panelMessages = defineMessages({
     "en-US": "Open this folder",
   },
 
+  /* 就地编辑（docs/design/141） */
+  "panels.files.edit": { "zh-CN": "编辑文件", "en-US": "Edit file" },
+  "panels.files.save": { "zh-CN": "保存", "en-US": "Save" },
+  "panels.files.saveHint": { "zh-CN": "保存（Ctrl+S）", "en-US": "Save (Ctrl+S)" },
+  "panels.files.exitEdit": { "zh-CN": "退出编辑", "en-US": "Exit editing" },
+  "panels.files.unsaved": { "zh-CN": "未保存", "en-US": "Unsaved" },
+  "panels.files.savedToast": { "zh-CN": "已保存", "en-US": "Saved" },
+  "panels.files.saveFailed": { "zh-CN": "保存失败：{message}", "en-US": "Save failed: {message}" },
+  "panels.files.editorLoading": {
+    "zh-CN": "正在加载编辑器…",
+    "en-US": "Loading editor…",
+  },
+  "panels.files.editorFailed": {
+    "zh-CN": "编辑器加载失败，请重新打开预览",
+    "en-US": "Editor failed to load; reopen the preview",
+  },
+  "panels.files.editorAria": {
+    "zh-CN": "文件内容编辑器：{path}",
+    "en-US": "File content editor: {path}",
+  },
+  "panels.files.externalChanged": {
+    "zh-CN": "磁盘已更新",
+    "en-US": "Changed on disk",
+  },
+  "panels.files.fileGone": {
+    "zh-CN": "文件已被删除或在编辑期间被替换",
+    "en-US": "The file was deleted or replaced while you were editing",
+  },
+  "panels.files.discardTitle": {
+    "zh-CN": "放弃未保存的改动？",
+    "en-US": "Discard unsaved changes?",
+  },
+  "panels.files.discardMessage": {
+    "zh-CN": "{path} 还有未保存的改动，继续操作会丢掉它们。",
+    "en-US": "{path} has unsaved changes; continuing will discard them.",
+  },
+  "panels.files.discardConfirm": { "zh-CN": "放弃改动", "en-US": "Discard" },
+  "panels.files.saveAndContinue": { "zh-CN": "保存并继续", "en-US": "Save and continue" },
+  "panels.files.keepEditing": { "zh-CN": "继续编辑", "en-US": "Keep editing" },
+  "panels.files.conflictTitle": {
+    "zh-CN": "文件已在磁盘上被修改",
+    "en-US": "The file changed on disk",
+  },
+  "panels.files.conflictMessage": {
+    "zh-CN":
+      "{path} 在你编辑期间被其他程序（例如 pi 会话）改过。覆盖会丢掉对方的改动，重新加载会丢掉你的改动。",
+    "en-US":
+      "{path} was changed by another program (a pi session, for example) while you were editing. Overwriting loses their changes; reloading loses yours.",
+  },
+  "panels.files.conflictOverwrite": { "zh-CN": "覆盖磁盘", "en-US": "Overwrite" },
+  "panels.files.conflictReload": {
+    "zh-CN": "重新加载（丢弃我的改动）",
+    "en-US": "Reload (discard mine)",
+  },
+
   "panels.terminal.title": { "zh-CN": "终端", "en-US": "Terminal" },
   "panels.terminal.newTab": { "zh-CN": "新建终端", "en-US": "New terminal" },
   "panels.terminal.closeTab": { "zh-CN": "关闭终端", "en-US": "Close terminal" },

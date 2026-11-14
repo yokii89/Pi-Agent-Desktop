@@ -4,6 +4,8 @@ import type {
   FsReadResult,
   FsSaveImageRequest,
   FsSaveImageResult,
+  FsSaveTextRequest,
+  FsSaveTextResult,
   FsSearchHit,
   FsWatchRequest,
   IpcResult,
@@ -18,6 +20,7 @@ import {
   readFile,
   revealInExplorer,
   saveImageToDownloads,
+  saveTextFile,
   searchFiles,
 } from "./fsService";
 import { unwatchDirectory, watchDirectory } from "./watcher";
@@ -33,6 +36,12 @@ export function registerFsIpc(): void {
   ipcMain.handle(
     FS_IPC.read,
     (_event, req: { path: string }): IpcResult<FsReadResult> => envelope(() => readFile(req.path)),
+  );
+
+  ipcMain.handle(
+    FS_IPC.save,
+    (_event, req: FsSaveTextRequest): Promise<IpcResult<FsSaveTextResult>> =>
+      envelopeAsync(() => saveTextFile(req)),
   );
 
   ipcMain.handle(

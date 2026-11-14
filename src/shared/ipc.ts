@@ -1680,6 +1680,11 @@ export interface FsReadTextResult {
   truncated: boolean;
   /** 原始文件字节数（用于标题栏展示）。 */
   byteLength: number;
+  /**
+   * 读取瞬间的文件 mtime（ms）。侧栏就地编辑把它当冲突检测基线：
+   * 保存时磁盘 mtime 与之不同 = 文件已被外部（pi 子进程 / 另一个编辑器）改过。
+   */
+  mtimeMs: number;
 }
 
 /** 图片预览（data URL，CSP img-src 已放行 data:）。 */
@@ -1710,6 +1715,28 @@ export type FsReadResult =
   | FsReadPdfResult
   | FsReadBinaryResult;
 
+/** 文本文件写盘请求（右侧文件面板就地编辑，docs/design/141）。 */
+export interface FsSaveTextRequest {
+  path: string;
+  content: string;
+  /** 打开 / 上次保存时读到的 mtime；与磁盘不一致即冲突。 */
+  expectedMtimeMs: number;
+  /** 用户在冲突提示里选择「覆盖磁盘」时置 true（唯一绕过 mtime 校验的方式）。 */
+  force?: boolean;
+}
+
+/**
+ * 写盘结果。冲突不是错误（不 throw），由渲染层决定覆盖还是重新加载：
+ * 主进程是唯一权威判定方，渲染层不得自己 stat 后再放行。
+ */
+export type FsSaveTextResult =
+  | {
+      status: "saved" /** 写入后的 mtime，作为下次保存的新基线。 */;
+      mtimeMs: number;
+      byteLength: number;
+    }
+  | { status: "conflict" /** 磁盘现状 mtime。 */; mtimeMs: number };
+
 /** 搜索结果：绝对路径 + 相对根目录的显示路径（/ 分隔）。 */
 export interface FsSearchHit {
   path: string;
@@ -1723,6 +1750,8 @@ export const FS_IPC = {
   list: "pidesk:fs:list",
   /** 只读读取文本文件（有大小上限）。 */
   read: "pidesk:fs:read",
+  /** 覆盖写入文本文件（就地编辑保存；带 mtime 冲突判定）。 */
+  save: "pidesk:fs:save",
   /** 递归按文件名模糊搜索（跳过 node_modules/.git 等）。 */
   search: "pidesk:fs:search",
   /** 打开系统文件选择器（pi 可执行路径等场景）。 */
@@ -1749,9 +1778,11 @@ export interface FsWatchRequest {
   dir: string;
 }
 
-/** 目录变动推送：受影响目录的绝对路径集合（渲染层据此局部失效文件树缓存）。 */
+/** 目录变动推送：目录集合供文件树失效；路径完整时附带变更项供单文件订阅者过滤。 */
 export interface FsWatchPushMessage {
   dirs: string[];
+  /** 所有 watcher 事件均带文件名且未超出上限时提供；缺省表示需按目录级保守处理。 */
+  paths?: string[];
 }
 
 /** 保存图片请求：`dataUrl` 必须是 `data:image/...;base64,`；`name` 为用户可见文件名，属不可信输入，由主进程净化。 */

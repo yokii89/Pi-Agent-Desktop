@@ -39,6 +39,8 @@ import type {
   FsReadResult,
   FsSaveImageRequest,
   FsSaveImageResult,
+  FsSaveTextRequest,
+  FsSaveTextResult,
   FsSearchHit,
   FsWatchPushMessage,
   GitBranchesResult,
@@ -510,6 +512,9 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 把 data URL 图片存到系统「下载」目录（lightbox 右键「保存图片」）。 */
     saveImageToDownloads: (req: FsSaveImageRequest): Promise<IpcResult<FsSaveImageResult>> =>
       ipcRenderer.invoke(FS_IPC.saveImageToDownloads, req),
+    /** 覆盖写入文本文件（侧栏就地编辑）；冲突不报错，回 `status: "conflict"`。 */
+    save: (req: FsSaveTextRequest): Promise<IpcResult<FsSaveTextResult>> =>
+      ipcRenderer.invoke(FS_IPC.save, req),
     /** 订阅目录变动（引用计数 +1）；仅监听文件树中已展开的目录。 */
     watch: (dir: string): Promise<IpcResult<null>> => ipcRenderer.invoke(FS_IPC.watch, { dir }),
     /** 退订目录变动（引用计数 -1）。 */

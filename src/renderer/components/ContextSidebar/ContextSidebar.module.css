@@ -37,8 +37,10 @@
   top: 0;
   bottom: 0;
   left: 0;
+  z-index: 2;
   width: var(--context-sidebar-resize-gutter);
   cursor: col-resize;
+  touch-action: none;
   background: transparent;
 }
 

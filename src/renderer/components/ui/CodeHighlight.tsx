@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { HighlighterCore } from "shiki/core";
 import { normalizeFenceLang } from "../../utils/markdownRefs";
 import styles from "./CodeHighlight.module.css";
@@ -136,16 +136,67 @@ function langFromPath(filePath: string): string {
 let highlighterPromise: Promise<HighlighterCore> | null = null;
 const pendingLangs = new Set<string>();
 
+const codeThemeSettings = [
+  { settings: { foreground: "var(--color-text)" } },
+  {
+    scope: ["comment", "punctuation.definition.comment"],
+    settings: { foreground: "var(--syn-comment)" },
+  },
+  {
+    scope: ["keyword", "storage", "keyword.control"],
+    settings: { foreground: "var(--syn-keyword)" },
+  },
+  { scope: ["string"], settings: { foreground: "var(--syn-string)" } },
+  {
+    scope: ["constant.language", "constant.numeric", "constant.character"],
+    settings: { foreground: "var(--syn-number)" },
+  },
+  {
+    scope: ["entity.name.function", "support.function"],
+    settings: { foreground: "var(--syn-function)" },
+  },
+  {
+    scope: ["entity.name.type", "entity.name.class", "storage.type"],
+    settings: { foreground: "var(--syn-type)" },
+  },
+  {
+    scope: ["variable.parameter", "variable.other.property", "entity.name.property"],
+    settings: { foreground: "var(--syn-property)" },
+  },
+  {
+    scope: ["keyword.operator", "punctuation"],
+    settings: { foreground: "var(--syn-punctuation)" },
+  },
+  { scope: ["variable", "entity.name.variable"], settings: { foreground: "var(--syn-variable)" } },
+];
+
+const codeThemes = [
+  {
+    name: "pidesk-dark",
+    type: "dark" as const,
+    fg: "var(--color-text)",
+    bg: "transparent",
+    colors: { "editor.foreground": "var(--color-text)", "editor.background": "transparent" },
+    settings: codeThemeSettings,
+  },
+  {
+    name: "pidesk-light",
+    type: "light" as const,
+    fg: "var(--color-text)",
+    bg: "transparent",
+    colors: { "editor.foreground": "var(--color-text)", "editor.background": "transparent" },
+    settings: codeThemeSettings,
+  },
+];
+
 function loadHighlighter(): Promise<HighlighterCore> {
   if (!highlighterPromise) {
     highlighterPromise = Promise.all([
       import("shiki/core"),
       import("shiki/engine/javascript"),
-      import("shiki/themes/github-dark.mjs"),
-      import("shiki/themes/github-light.mjs"),
-    ]).then(async ([core, engine, dark, light]) => {
+    ]).then(async ([core, engine]) => {
       const highlighter = await core.createHighlighterCore({
-        themes: [dark.default, light.default],
+        themes: [...codeThemes],
         langs: [],
         engine: engine.createJavaScriptRegexEngine(),
       });
@@ -188,6 +239,8 @@ interface CodeHighlightProps {
   className?: string;
   /** 1-based 目标行：渲染后滚到该行并高亮（会话区 `path:line` 打开）。 */
   focusLine?: number | null;
+  /** 只读 DOM 完成布局时触发，参数表示后续不会再异步替换代码 DOM。 */
+  onLayout?: (stable: boolean) => void;
 }
 
 /** 与编辑器一致的行数：末尾换行不额外计空行。 */
@@ -199,12 +252,19 @@ export function countCodeLines(code: string): number {
 }
 
 /**
- * 只读代码高亮块：shiki 双主题（github-dark / github-light）经 CSS 变量随
- * data-theme 切换；语言按 `lang`（围栏 info string 归一）或文件扩展名推断并
+ * 只读代码高亮块：Shiki 使用与编辑器相同的项目语法令牌，经 CSS 变量随主题切换；
+ * 语言按 `lang`（围栏 info string 归一）或文件扩展名推断并
  * 按需动态加载。加载中/未知语言/过大文件回退纯文本。
  * 两种路径都带左侧行号槽（CSS counter，宽度随行数位数变化）。
  */
-export function CodeHighlight({ code, filePath, lang, className, focusLine }: CodeHighlightProps) {
+export function CodeHighlight({
+  code,
+  filePath,
+  lang,
+  className,
+  focusLine,
+  onLayout,
+}: CodeHighlightProps) {
   const [html, setHtml] = useState<string | null>(null);
   const preRef = useRef<HTMLPreElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -235,8 +295,8 @@ export function CodeHighlight({ code, filePath, lang, className, focusLine }: Co
         const next = highlighter.codeToHtml(code, {
           lang: resolvedLang,
           themes: {
-            light: "github-light",
-            dark: "github-dark",
+            light: "pidesk-light",
+            dark: "pidesk-dark",
           },
           defaultColor: false,
         });
@@ -277,12 +337,22 @@ export function CodeHighlight({ code, filePath, lang, className, focusLine }: Co
     return () => cancelAnimationFrame(raf);
   }, [focusLine, html]);
 
+  useLayoutEffect(() => {
+    onLayout?.(code.length > MAX_HIGHLIGHT_BYTES || html !== null);
+  }, [code.length, html, onLayout]);
+
   if (html === null) {
     const cls = [styles.block, className ?? ""].join(" ").trim();
     const lines = code.split("\n");
     if (lines.length > 1 && lines.at(-1) === "") lines.pop();
     return (
-      <pre ref={preRef} className={cls} style={gutterStyle} data-selectable-text="">
+      <pre
+        ref={preRef}
+        className={cls}
+        style={gutterStyle}
+        data-selectable-text=""
+        data-code-preview-scroll=""
+      >
         {lines.map((line, index) => (
           <span
             // biome-ignore lint/suspicious/noArrayIndexKey: 静态只读行，无重排/增删
@@ -290,6 +360,7 @@ export function CodeHighlight({ code, filePath, lang, className, focusLine }: Co
             className={[styles.line, focusLine === index + 1 ? styles.lineFocus : ""]
               .filter(Boolean)
               .join(" ")}
+            data-code-line=""
           >
             {line}
           </span>
@@ -304,6 +375,7 @@ export function CodeHighlight({ code, filePath, lang, className, focusLine }: Co
       className={hostCls}
       style={gutterStyle}
       data-selectable-text=""
+      data-code-preview-scroll=""
       // biome-ignore lint/security/noDangerouslySetInnerHtml: shiki 对源码做 HTML 转义，输出仅为 span+style token
       dangerouslySetInnerHTML={{ __html: html }}
     />

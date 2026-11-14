@@ -1,18 +1,19 @@
 .block {
   margin: 0;
-  padding: var(--spacing-sm);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
+  padding: var(--code-padding);
+  font-family: var(--code-font-family);
+  font-size: var(--code-font-size);
+  line-height: var(--code-line-height);
   color: var(--color-text);
   white-space: pre;
   overflow: auto;
   counter-reset: line;
 }
 
-.block:focus-visible {
-  outline: 1px solid var(--color-border-strong);
-  outline-offset: -1px;
+/* 编辑器与只读预览使用同一选区色。 */
+.block ::selection,
+.host :global(.shiki) ::selection {
+  background: var(--color-selection);
 }
 
 .block .line {
@@ -41,22 +42,22 @@
 }
 
 .host {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
+  font-family: var(--code-font-family);
+  font-size: var(--code-font-size);
+  line-height: var(--code-line-height);
   overflow: auto;
 }
 
 /* shiki 输出的 pre 默认带主题背景；侧栏要透明以贴合玻璃面板 */
 .host :global(.shiki) {
   margin: 0;
-  padding: var(--spacing-sm);
+  padding: var(--code-padding);
   white-space: pre;
   overflow: visible;
   background-color: transparent;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
+  font-family: var(--code-font-family);
+  font-size: var(--code-font-size);
+  line-height: var(--code-line-height);
   counter-reset: line;
 }
 
@@ -99,11 +100,7 @@
   background: var(--code-gutter-bg, var(--color-bg-elevated));
 }
 
-/*
- * 双主题：shiki 以 defaultColor:false 同时吐出 --shiki-light / --shiki-dark，
- * 此处按 data-theme 选用对应变量（与 tokens.css 主题切换机制一致）。
- * 行号 ::before 不在此列，保持 --color-text-muted。
- */
+/* Shiki tokens and CodeMirror share the same theme variables. */
 .host :global(.shiki),
 .host :global(.shiki span) {
   color: var(--shiki-light);
@@ -112,11 +109,6 @@
 :global([data-theme="dark"]) .host :global(.shiki),
 :global([data-theme="dark"]) .host :global(.shiki span) {
   color: var(--shiki-dark);
-}
-
-/* 优先级高于上面的 .shiki span，行号不跟随主题 token 色 */
-.host :global(.shiki .line::before) {
-  color: var(--color-text-muted);
 }
 
 /* path:line 打开时的目标行：整行底色提示，行号槽同步 */

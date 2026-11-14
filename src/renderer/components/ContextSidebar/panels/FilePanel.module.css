@@ -113,12 +113,30 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 编辑态元信息：未保存 / 磁盘已更新两种状态各一档颜色（文字已表明含义，颜色只是加强） */
+.dirtyMeta {
+  color: var(--color-accent);
+}
+
+.warnMeta {
+  color: var(--color-warning);
+}
+
+/* 编辑态面板体：滚动交给 CodeMirror 自己的 scroller，阅读态的内边距也让出来
+   （双类名提权：站点模块的打包顺序排在 ContextSidebar.module.css 之后） */
+.panelBodyEditing.panelBodyEditing {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .previewContent {
   margin: 0;
   min-height: 0;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
+  font-family: var(--code-font-family);
+  font-size: var(--code-font-size);
+  line-height: var(--code-line-height);
   color: var(--color-text);
   white-space: pre;
   overflow: auto;

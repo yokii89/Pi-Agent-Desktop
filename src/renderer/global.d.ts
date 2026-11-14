@@ -35,6 +35,8 @@ import type {
   FsReadResult,
   FsSaveImageRequest,
   FsSaveImageResult,
+  FsSaveTextRequest,
+  FsSaveTextResult,
   FsSearchHit,
   FsWatchPushMessage,
   GitBranchesResult,
@@ -313,6 +315,8 @@ export interface PideskGlobalApi {
     /** 在系统资源管理器中定位并选中路径。 */
     reveal(path: string): Promise<IpcResult<null>>;
     saveImageToDownloads(req: FsSaveImageRequest): Promise<IpcResult<FsSaveImageResult>>;
+    /** 覆盖写入文本文件（侧栏就地编辑）；冲突不报错，回 `status: "conflict"`。 */
+    save(req: FsSaveTextRequest): Promise<IpcResult<FsSaveTextResult>>;
     /** 订阅目录变动（引用计数 +1）；仅监听已展开目录。 */
     watch(dir: string): Promise<IpcResult<null>>;
     /** 退订目录变动（引用计数 -1）。 */

@@ -86,6 +86,7 @@ node_modules 解析**的包（当前仅 `electron-updater` / `node-pty`——主
 - `electron-updater`（runtime，主进程运行时依赖）：设置 →「应用更新」的检查/下载/安装。GitHub Releases + NSIS `latest.yml`/blockmap（差分更新：本地缓存有旧安装包时自动差分下载）；发布流程见 `scripts/release.mjs` 与 `.github/workflows/release.yml`。
 - `mermaid`（devDep，渲染层构建期打包）：会话区 / 文件面板 / ExtensionView 的 ` ```mermaid ` 围栏出图。**只能经 `src/renderer/utils/mermaidLoader.ts` 动态 `import()`**（同 GSAP 条款）——它自带 60+ 个按图表类型切分的惰性 chunk（含 elk 布局引擎），静态引入会把它们全部塞进主 bundle。**不写 `manualChunks` 规则**：mermaid 内部已是动态 import，强行归组反而废掉惰性分块。CSP 无需放宽（`securityLevel: "strict"` 下生产策略实测可跑）。
 - `json5`（devDep，渲染层构建期打包）：文件面板预览中对单行 `.json` / `.jsonc` / `.json5` 内容进行容错解析与缩进格式化；解析失败或内容截断时保留原文。
+- `@codemirror/*` + `@lezer/highlight` + `@codemirror/lang-*`（devDep，渲染层构建期打包）：右侧「文件」面板的就地编辑器内核与 13 个按后缀懒加载的语法包（docs/design/141）。**只能经 `src/renderer/editor/codeEditor.ts` 动态 `import()`**（同 GSAP / mermaid 条款）——它把 CodeMirror 切成 `codeEditor` 独立 chunk，语言包各自一个 chunk，静态引入会把这 ~350KB 塞回主 bundle。高亮配色只允许 `tokens.css` 的 `--syn-*`，主题差异不改代码。
 
 多模态图片附件**零新依赖**：解码/缩放用浏览器 `createImageBitmap` + `canvas`，不引入 sharp / jimp 等图像库。
 
@@ -161,6 +162,26 @@ import { Play } from "@phosphor-icons/react";
     只按 `type === "message"` 读盘会让通知在重开会话后消失（docs/design/129 §8.4）。
 - **流式渲染数据源**：`message_update`（text/thinking/toolcall delta，按 `contentIndex` 组装）做增量显示；`message_end` 与 `get_messages` 为权威数据，用于对账与会话恢复。用户消息由渲染层发送时乐观插入，忽略 pi 回显的用户角色消息事件，避免重复。
 - 会话历史仍以 pi 原生 JSONL 为准（`~/.pi/agent/sessions/`），恢复会话用 `--session <file>` 启动参数；PiDesk 不自建会话存储。
+
+## 文件面板就地编辑（docs/design/141）
+
+右侧「文件」面板的编辑态是**轻量就地编辑**，不是 IDE：单文件、手动保存、与预览互斥渲染。
+
+- **写盘只有一个入口**：`FS_IPC.save`（`main/fs/fsService.saveTextFile`）。**冲突判定必须在主进程**（stat 真实
+  mtime 对比渲染层基线），冲突走 `{ status: "conflict" }` 返回值而**不是** throw——它是正常分支，用户要在
+  「覆盖磁盘 / 重新加载」之间选。渲染层不得自己 stat 后放行。
+- **可编辑范围**：仅 `kind === "text"` 且未截断的文件；Markdown 只在「源码」态可编辑，表格 / Notebook 的预览态、
+  图片 / PDF / 二进制 / 超 1MB 截断文件一律不出现编辑入口。
+- **离开漏斗**：任何会让当前预览失效的入口（换文件、前进/后退、回文件树、树定位、FileLink 打开、退出编辑）
+  一律走 `FilePanel` 的 `guardLeave()`——脏内容必须得到「放弃 / 保存并继续 / 继续编辑」三选一，
+  新增入口漏接就是一条静默丢改动的路。
+- **脏状态以编辑器为准**：`dirty` state 只是头部显示的影子，判定统一调 `CodeEditorHandle.isDirty()`。
+- **换行不得被归一**：编辑器文档与基线取 LF 形态，写盘时经 `shared/lineEndings` 还原原文件的 CRLF 与末尾换行；
+  少了这一步，改一行就会在 git 里显示成「整个文件都改了」。
+- **外部改动靠目录 watch**（复用 `fsService.watch` 引用计数）：无脏内容静默换版本，有脏内容只标「磁盘已更新」不打断输入；
+  自家保存的目录回推用 `SELF_WRITE_GRACE_MS` 跳过，否则每次保存都自弹冲突。
+- **编辑态不使用预览态的那套交互**：右键回 Chromium 原生菜单（剪切/粘贴刚需）、Ctrl+F 交给 CodeMirror 查找面板、
+  划选工具条与自绘右键菜单都不挂。
 
 ## 数据持久化
 
