@@ -1,9 +1,13 @@
 .run {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-bottom: 4px;
+  gap: var(--spacing-sm);
+  padding-bottom: var(--spacing-xs);
   position: relative;
+}
+
+.active {
+  min-height: var(--spacing-xl);
 }
 
 .usage {
@@ -15,11 +19,12 @@
   cursor: default;
 }
 
-/* 时间/用时/操作贴在 π 状态点右侧，不推到行末 */
+/* 用时与重试信息紧随状态，停止操作统一留在输入栏。 */
 .right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
   min-width: 0;
 }
 
@@ -28,6 +33,7 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .retry {

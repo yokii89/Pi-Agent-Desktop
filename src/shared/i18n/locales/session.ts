@@ -690,8 +690,8 @@ export const sessionMessages = defineMessages({
     "en-US": "Starting pi process…",
   },
   "session.firstToken": {
-    "zh-CN": "等待模型响应…",
-    "en-US": "Waiting for the model…",
+    "zh-CN": "等待模型响应",
+    "en-US": "Awaiting response",
   },
   "session.selectBar.aria": { "zh-CN": "选区操作", "en-US": "Selection actions" },
   "session.selectBar.copy": { "zh-CN": "复制文本", "en-US": "Copy text" },

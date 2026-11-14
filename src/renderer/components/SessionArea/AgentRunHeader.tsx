@@ -1,4 +1,4 @@
-import { ArrowClockwise, StopCircle } from "@phosphor-icons/react";
+import { ArrowClockwise } from "@phosphor-icons/react";
 import { useNowTick } from "../../hooks/useNowTick";
 import { useT } from "../../hooks/useT";
 import { useSessionMeta } from "../../stores/sessionStore";
@@ -7,6 +7,7 @@ import { formatTokens } from "../../utils/formatTokens";
 import { formatElapsed } from "../../utils/time";
 import styles from "./AgentRunHeader.module.css";
 import { PiStateMark } from "./PiStateMark";
+import { RunActivityLabel } from "./RunActivityLabel";
 
 function formatCost(total: number): string {
   if (total <= 0) return "";
@@ -15,20 +16,23 @@ function formatCost(total: number): string {
 }
 
 /**
- * 一次 agent run 的边界头：π 状态 + 本轮用时计时 + 停止/重试。
+ * 一次 agent run 的边界头：文字微光运行态 / π 终态 + 本轮用时 + 失败重试。
  * 工作目录由 SessionHeader 统一展示，这里不再重复。
  * 「重试」只挂在 findRetrySurfaceId 选出的终态落点上（中间 attempt 不带按钮）。
  */
 export function AgentRunHeader({
   entry,
   showRetry = false,
+  waitingForFirstToken = false,
 }: {
   entry: RunEntry;
   /** 是否为当前轮唯一重试落点（由 SessionView 按 findRetrySurfaceId 注入）。 */
   showRetry?: boolean;
+  /** 本 run 尚无可见的模型活动（空助手消息仍算等待）。 */
+  waitingForFirstToken?: boolean;
 }) {
   const t = useT();
-  const { stop, retryLastUserMessage, canRetryLastUser } = useSessionMeta();
+  const { retryLastUserMessage, canRetryLastUser } = useSessionMeta();
   const running = entry.status === "running";
   const now = useNowTick(running);
   // 终态必须用 endedAt；缺失时退回 startedAt（显示 0s），绝不能拿挂载时刻当终点，
@@ -60,8 +64,12 @@ export function AgentRunHeader({
       : null;
 
   return (
-    <div className={styles.run}>
-      <PiStateMark status={entry.status} size={16} showLabel={entry.status !== "completed"} />
+    <div className={`${styles.run} ${running ? styles.active : ""}`}>
+      {running ? (
+        <RunActivityLabel waitingForFirstToken={waitingForFirstToken} />
+      ) : (
+        <PiStateMark status={entry.status} size={16} showLabel={entry.status !== "completed"} />
+      )}
       <span className={styles.right}>
         {entry.retry && (
           <span className={styles.retry} title={entry.retry.errorMessage ?? undefined}>
@@ -83,12 +91,6 @@ export function AgentRunHeader({
           <span className={styles.usage} title={usageTitle}>
             {usageText}
           </span>
-        )}
-        {running && !entry.synthetic && (
-          <button type="button" className={styles.ghost} onClick={stop}>
-            <StopCircle size={14} weight="regular" />
-            {t("session.input.stop")}
-          </button>
         )}
         {retryVisible && (
           <button

@@ -1,0 +1,28 @@
+.label {
+  display: inline-block;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: var(--session-stream-font-sm);
+  white-space: nowrap;
+}
+
+/* 只有动画已就绪才裁剪文字；未加载、加载失败和减少动效都使用静态字色。 */
+.shimmer {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-text-muted) 28%,
+    var(--color-text-strong) 43%,
+    var(--color-text-muted) 58%
+  );
+  background-size: 260% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    background: none;
+    color: var(--color-text-muted);
+  }
+}

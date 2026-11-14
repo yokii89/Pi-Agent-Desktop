@@ -108,6 +108,15 @@ export const QUEUE_TRAY_MOTION = {
   easeIn: [0.4, 0, 1, 1],
 } as const;
 
+/** 会话 run 头的文字微光（session-start-variants 方案 C）：等待与运行共用同一段扫光。 */
+export const RUN_ACTIVITY_MOTION = {
+  /** 首字等待文案的出现延迟，快速响应不闪占位。 */
+  waitDelay: 0.4,
+  /** 低对比扫光周期。 */
+  sweep: 2.4,
+  ease: "none",
+} as const;
+
 /**
  * 冷启动进度条（PiColdStartBar，docs/会话进程懒加载方案 §4.2）：
  * 分段轨道爬行到 90% 封顶，进程就绪后补到 100% 再淡出卸载。

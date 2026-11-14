@@ -24,7 +24,7 @@ import { AssistantMessage } from "./AssistantMessage";
 import { hasAssistantReplyText } from "./assistantReplyText";
 import { CustomNotice } from "./CustomNotice";
 import { FileEditsSummary } from "./FileEditsSummary";
-import { FirstTokenWaiter } from "./FirstTokenWaiter";
+import { findFirstTokenWaitingRunId } from "./firstTokenWaiting";
 import { QuestionRail } from "./QuestionRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { SelectionToolbar } from "./SelectionToolbar";
@@ -261,14 +261,8 @@ export function SessionView() {
   // 终态失败只保留一个「重试」落点：中间 attempt 的 run 头不再各带按钮
   const retrySurfaceId = findRetrySurfaceId(entries);
 
-  // 首字等待占位（docs/design/13 P1-3）：run 已开始且其后还没有任何条目时出现
-  const lastEntry = entries.at(-1);
-  const showWaiter =
-    !showSkeleton &&
-    lastEntry !== undefined &&
-    lastEntry.kind === "run" &&
-    lastEntry.status === "running" &&
-    lastEntry.synthetic !== true;
+  // 等待提示收进 run 头；空助手消息仍保留等待，实际活动出现才原位切换。
+  const waitingRunId = showSkeleton ? null : findFirstTokenWaitingRunId(entries);
 
   const unreadLabel =
     unreadEntries > 0
@@ -351,6 +345,7 @@ export function SessionView() {
                       isLastUser={entryIsLastUser}
                       coldStart={startPending && entryIsLastUser}
                       showRetry={entry.id === retrySurfaceId}
+                      waitingForFirstToken={entry.id === waitingRunId}
                       assistantSettled={false}
                       assistantFooterDeferred={false}
                       afterStreams={streamsAfter.get(entry.id) ?? EMPTY_STREAMS}
@@ -366,7 +361,6 @@ export function SessionView() {
               {trailingStreams.map((stream) => (
                 <StreamMount key={stream.id} entry={stream} />
               ))}
-              {showWaiter && <FirstTokenWaiter />}
             </>
           )}
         </div>
@@ -394,7 +388,7 @@ export function SessionView() {
 
 /**
  * 条目行：历史稳定条目在 entries 数组整体替换时凭引用相等跳过重渲染。
- * 运行中的 run 头仍会因自身 useSessionMeta 订阅而更新（usage/停止按钮）。
+ * run 头的重试能力仍由自身 useSessionMeta 订阅更新。
  */
 const EntryRow = memo(function EntryRow({
   entry,
@@ -402,6 +396,7 @@ const EntryRow = memo(function EntryRow({
   isLastUser,
   coldStart,
   showRetry,
+  waitingForFirstToken = false,
   assistantSettled,
   assistantFooterDeferred,
   afterStreams,
@@ -413,6 +408,8 @@ const EntryRow = memo(function EntryRow({
   coldStart: boolean;
   /** 当前轮唯一「重试」落点（findRetrySurfaceId）；中间失败 attempt 为 false。 */
   showRetry: boolean;
+  /** 首字等待只传给当前真实 run，空助手条目不会提前撤掉提示。 */
+  waitingForFirstToken?: boolean;
   /** 合并后的助手单元所属 run 已收口：输出结束才显示回复页脚。 */
   assistantSettled: boolean;
   /** 页脚顺延到本轮编辑汇总卡下方（由 SessionView 单独渲染）。 */
@@ -430,7 +427,11 @@ const EntryRow = memo(function EntryRow({
           coldStart={coldStart}
         />
       ) : entry.kind === "run" ? (
-        <AgentRunHeader entry={entry} showRetry={showRetry} />
+        <AgentRunHeader
+          entry={entry}
+          showRetry={showRetry}
+          waitingForFirstToken={waitingForFirstToken}
+        />
       ) : entry.kind === "custom" ? (
         <CustomNotice entry={entry} />
       ) : entry.kind === "notice" ? (
