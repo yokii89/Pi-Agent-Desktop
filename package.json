@@ -1,7 +1,7 @@
 {
   "name": "pidesk",
   "productName": "PiDesk",
-  "version": "0.5.10",
+  "version": "0.5.11",
   "description": "Windows desktop client for pi",
   "author": "yecen",
   "main": "dist/main/index.js",
