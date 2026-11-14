@@ -142,6 +142,11 @@ export function disposeTerminal(id: string): void {
   }
 }
 
+/** 关闭询问使用的存活终端数，不包含已退出的页签。 */
+export function liveTerminalCount(): number {
+  return terminals.size;
+}
+
 /** 应用退出时回收所有 pty（index.ts will-quit 调用）。 */
 export function disposeAllTerminals(): void {
   for (const id of [...terminals.keys()]) {

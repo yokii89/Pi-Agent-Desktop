@@ -1,4 +1,12 @@
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { useGlideOverlay } from "../../hooks/useGlideOverlay";
 import { type GlideCancel, glide } from "../../utils/glideMotion";
@@ -19,6 +27,10 @@ interface ModalProps {
    * 下层不抢焦点由开合栈（只有栈顶处理键盘）负责。默认 false，其余调用方表现不变。
    */
   nested?: boolean;
+  /** 应用级决策置于其他浮层上方，沿用浮层进出场动画。 */
+  priority?: boolean;
+  /** 打开时优先聚焦的控件，默认聚焦面板。 */
+  initialFocusRef?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }
 
@@ -32,7 +44,7 @@ const FOCUSABLE_SELECTOR =
  * 拦不住同一节点上的另一个监听器，一次 Esc 会连关两层（docs/design/128）。
  */
 let modalSeq = 0;
-const openStack: number[] = [];
+const openStack: Array<{ id: number; priority: boolean }> = [];
 
 /**
  * 通用浮窗：遮罩 + 居中面板，portal 到 body。
@@ -46,6 +58,8 @@ export function Modal({
   panelClassName,
   ariaLabel,
   nested = false,
+  priority = false,
+  initialFocusRef,
   children,
 }: ModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -53,36 +67,38 @@ export function Modal({
   const stackId = useRef<number | null>(null);
   const backdropTween = useRef<GlideCancel>(() => {});
   const overlay = useGlideOverlay(panelRef);
+  const animated = nested || priority;
 
   // 声明在键盘监听之前：键盘处理读的就是这条 effect 写入的栈位
   useEffect(() => {
     if (!open) return;
     const id = ++modalSeq;
     stackId.current = id;
-    openStack.push(id);
+    openStack.push({ id, priority });
     return () => {
-      const index = openStack.indexOf(id);
+      const index = openStack.findIndex((entry) => entry.id === id);
       if (index >= 0) openStack.splice(index, 1);
       if (stackId.current === id) stackId.current = null;
     };
-  }, [open]);
+  }, [open, priority]);
 
-  const isTopmost = useCallback(
-    (): boolean => stackId.current !== null && openStack[openStack.length - 1] === stackId.current,
-    [],
-  );
+  const isTopmost = useCallback((): boolean => {
+    const priorities = openStack.filter((entry) => entry.priority);
+    const stack = priorities.length > 0 ? priorities : openStack;
+    return stackId.current !== null && stack[stack.length - 1]?.id === stackId.current;
+  }, []);
 
   /**
-   * 挂载态与 open 分开：二级浮窗要演完退场才卸载节点。
+   * 挂载态与 open 分开：二级与应用级决策浮窗要演完退场才卸载节点。
    * 打开走渲染期置位（放进 useEffect 会晚一帧才出现，点击像卡了一下）；
-   * 非 nested 的调用方维持原样：即时卸载、不播进出场。
+   * 其他调用方维持原样：即时卸载、不播进出场。
    */
   const [mounted, setMounted] = useState(open);
   if (open && !mounted) setMounted(true);
 
   useEffect(() => {
     if (open || !mounted) return;
-    if (!nested) {
+    if (!animated) {
       setMounted(false);
       return;
     }
@@ -100,10 +116,10 @@ export function Modal({
       });
     }
     overlay.exit(() => setMounted(false));
-  }, [open, mounted, nested, overlay]);
+  }, [open, mounted, animated, overlay]);
 
   useLayoutEffect(() => {
-    if (!open || !nested) return;
+    if (!open || !animated) return;
     const backdrop = backdropRef.current;
     backdropTween.current();
     if (backdrop) {
@@ -121,7 +137,7 @@ export function Modal({
     // 对话框没有锚点，缩放原点留在面板中心
     overlay.prime();
     overlay.enter();
-  }, [open, nested, overlay]);
+  }, [open, animated, overlay]);
 
   useEffect(() => {
     if (!open) return;
@@ -149,7 +165,7 @@ export function Modal({
       const active = document.activeElement;
       // 浮层（下拉/菜单）portal 在 body 上、不在本面板子树里；焦点落在其中是合法状态，
       // 抢回来会让方向键与擦选在对话框内无法使用（docs/design/51）
-      if (active instanceof Element && active.closest("[data-overlay-panel]")) return;
+      if (!priority && active instanceof Element && active.closest("[data-overlay-panel]")) return;
       if (!panel.contains(active)) {
         event.preventDefault();
         first.focus();
@@ -165,7 +181,20 @@ export function Modal({
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose, isTopmost]);
+  }, [open, onClose, isTopmost, priority]);
+
+  // 关窗决策期间，后台会话新弹出的对话框也不能把键盘焦点抢走。
+  useEffect(() => {
+    if (!open || !priority) return;
+    const retainFocus = (event: FocusEvent): void => {
+      const panel = panelRef.current;
+      if (!isTopmost() || !panel || (event.target instanceof Node && panel.contains(event.target)))
+        return;
+      (initialFocusRef?.current ?? panel).focus();
+    };
+    document.addEventListener("focusin", retainFocus);
+    return () => document.removeEventListener("focusin", retainFocus);
+  }, [open, priority, initialFocusRef, isTopmost]);
 
   // 遮罩点击关闭：用 ref 绑定，避免把交互挂在静态 div 的 JSX 上
   useEffect(() => {
@@ -186,12 +215,12 @@ export function Modal({
     if (!open) return;
     restoreRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    panelRef.current?.focus();
+    (initialFocusRef?.current ?? panelRef.current)?.focus();
     return () => {
       const restore = restoreRef.current;
       if (restore?.isConnected) restore.focus();
     };
-  }, [open]);
+  }, [open, initialFocusRef]);
 
   useEffect(
     () => () => {
@@ -205,7 +234,13 @@ export function Modal({
   return createPortal(
     <div
       ref={backdropRef}
-      className={[styles.backdrop, nested ? styles.backdropNested : ""].join(" ").trim()}
+      className={[
+        styles.backdrop,
+        nested ? styles.backdropNested : "",
+        priority ? styles.backdropPriority : "",
+      ]
+        .join(" ")
+        .trim()}
     >
       <div
         ref={panelRef}

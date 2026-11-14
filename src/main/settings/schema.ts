@@ -57,6 +57,7 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   browserViewportWidth: null,
   defaultProjectDir: null,
   showInTray: false,
+  closeAction: "ask",
   browserEnabled: true,
   // 并行 pi 会话上限（多会话架构决策 #7）；超限 start 失败，不自动杀最旧
   maxParallelSessions: 8,
@@ -159,6 +160,7 @@ export const SETTABLE_KEYS = [
   "browserViewportWidth",
   "defaultProjectDir",
   "showInTray",
+  "closeAction",
   "browserEnabled",
   "maxParallelSessions",
   "sessionPrefetchEnabled",

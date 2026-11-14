@@ -4,7 +4,7 @@ import { getSettings } from "../settings/settings";
 
 /**
  * 系统托盘（设置「在系统托盘显示」）。
- * 开启后关闭主窗口改为隐藏到托盘；托盘菜单提供「显示主窗口 / 退出」。
+ * 常驻图标与关窗行为分别设置；托盘菜单提供「显示主窗口 / 退出」。
  *
  * 不 import createMainWindow：避免与 close-to-tray 形成模块环。
  * 单窗口应用，显示时直接取当前 BrowserWindow 即可。
@@ -23,9 +23,14 @@ export function markQuitting(): void {
   quitting = true;
 }
 
-function showMainWindow(): void {
-  const win = BrowserWindow.getAllWindows()[0];
-  if (!win) return;
+/** 原生退出确认取消后恢复正常关窗询问。 */
+export function cancelQuitting(): void {
+  quitting = false;
+}
+
+function showMainWindow(onlyIfHidden = false): void {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.getTitle() === "PiDesk");
+  if (!win || (onlyIfHidden && win.isVisible())) return;
   if (win.isMinimized()) win.restore();
   win.show();
   win.focus();
@@ -62,10 +67,25 @@ function destroyTray(): void {
 /** 按设置同步托盘显隐；重复调用幂等。 */
 export function applyTrayEnabled(enabled: boolean): void {
   if (enabled) {
-    if (!tray) createTray();
+    if (!tray || tray.isDestroyed()) {
+      try {
+        createTray();
+      } catch (error) {
+        destroyTray();
+        console.warn("[tray] 创建托盘失败", error);
+      }
+    }
   } else {
+    // 移除唯一可恢复入口之前先把主窗口带回来。
+    if (tray) showMainWindow(true);
     destroyTray();
   }
+}
+
+/** 确保隐藏窗口之后仍有恢复入口；失败时调用方必须保持窗口可见。 */
+export function ensureTrayForHide(): boolean {
+  applyTrayEnabled(true);
+  return tray !== null && !tray.isDestroyed();
 }
 
 /** 启动时按已持久化设置拉起/关闭托盘（createMainWindow 之后调用）。 */

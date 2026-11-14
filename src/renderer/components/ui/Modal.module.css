@@ -20,6 +20,10 @@
   backdrop-filter: none;
 }
 
+.backdropPriority {
+  z-index: var(--z-modal-priority);
+}
+
 .panel {
   display: flex;
   flex-direction: column;

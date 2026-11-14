@@ -10,9 +10,11 @@ import {
   isSessionIdleReclaimOption,
   SESSION_IDLE_RECLAIM_OPTIONS,
 } from "../../../shared/sessionIdle";
+import { type CloseAction, isCloseAction } from "../../../shared/windowClose";
 import { useT } from "../../hooks/useT";
 import { projectService } from "../../services/projectService";
 import { settingsService } from "../../services/settingsService";
+import { windowService } from "../../services/windowService";
 import { useUiStore } from "../../stores/uiStore";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
@@ -43,6 +45,7 @@ export function GeneralPanel() {
     useUiStore();
   const [defaultProjectDir, setDefaultProjectDir] = useState<string | null>(null);
   const [showInTray, setShowInTray] = useState(false);
+  const [closeAction, setCloseAction] = useState<CloseAction>("ask");
   const [maxParallelSessions, setMaxParallelSessions] = useState(8);
   const [sessionIdleReclaimMinutes, setSessionIdleReclaimMinutes] = useState(
     DEFAULT_SESSION_IDLE_RECLAIM_MINUTES,
@@ -56,6 +59,7 @@ export function GeneralPanel() {
       if (cancelled) return;
       setDefaultProjectDir(settings?.defaultProjectDir ?? null);
       setShowInTray(settings?.showInTray ?? false);
+      setCloseAction(settings?.closeAction ?? "ask");
       setMaxParallelSessions(settings?.maxParallelSessions ?? 8);
       setSessionIdleReclaimMinutes(
         settings?.sessionIdleReclaimMinutes ?? DEFAULT_SESSION_IDLE_RECLAIM_MINUTES,
@@ -63,8 +67,17 @@ export function GeneralPanel() {
       setSessionPrefetchEnabled(settings?.sessionPrefetchEnabled === true);
       setReady(true);
     });
+    // 从设置浮窗关窗后，隐藏动作可能同时启用托盘或记住偏好。
+    const offCloseSettled = windowService.onCloseSettled(() => {
+      void settingsService.get().then((settings) => {
+        if (cancelled || !settings) return;
+        setShowInTray(settings.showInTray);
+        setCloseAction(settings.closeAction);
+      });
+    });
     return () => {
       cancelled = true;
+      offCloseSettled();
     };
   }, []);
 
@@ -90,6 +103,14 @@ export function GeneralPanel() {
   const changeShowInTray = async (next: boolean): Promise<void> => {
     setShowInTray(next);
     await settingsService.set({ showInTray: next });
+  };
+
+  const changeCloseAction = async (raw: string): Promise<void> => {
+    if (!isCloseAction(raw)) return;
+    const settings = await settingsService.set({ closeAction: raw });
+    if (!settings) return;
+    setCloseAction(settings.closeAction);
+    setShowInTray(settings.showInTray);
   };
 
   const changeBrowserEnabled = (next: boolean): void => {
@@ -172,6 +193,23 @@ export function GeneralPanel() {
               disabled={!ready}
               onChange={changeShowInTray}
               aria-label={t("settings.general.showInTray")}
+            />
+          }
+        />
+        <SettingRow
+          label={t("settings.general.closeAction")}
+          description={t("settings.general.closeAction.description")}
+          control={
+            <Select
+              className={styles.selectLike}
+              value={closeAction}
+              disabled={!ready}
+              ariaLabel={t("settings.general.closeAction")}
+              options={["ask", "tray", "quit"].map((value) => ({
+                value,
+                label: t(`settings.general.closeAction.${value}`),
+              }))}
+              onChange={(value) => void changeCloseAction(value)}
             />
           }
         />

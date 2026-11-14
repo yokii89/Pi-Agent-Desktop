@@ -170,6 +170,7 @@ import type { UsageQuery, UsageReport } from "../shared/usage";
 import { USAGE_IPC } from "../shared/usage";
 import type { ExtensionViewPush, ViewEvent } from "../shared/view";
 import { VIEW_IPC } from "../shared/view";
+import type { WindowCloseDecision, WindowCloseRequest } from "../shared/windowClose";
 
 /**
  * 预加载白名单 API，命名空间 window.pidesk。
@@ -193,6 +194,15 @@ contextBridge.exposeInMainWorld("pidesk", {
       ipcRenderer.invoke(WINDOW_IPC.toggleMaximize),
     /** 关闭窗口。 */
     close: (): Promise<IpcResult<null>> => ipcRenderer.invoke(WINDOW_IPC.close),
+    /** 订阅关窗询问与撤销；挂载弹窗后回 ready，用户作答没有超时。 */
+    onCloseRequest: (callback: (request: WindowCloseRequest) => void): (() => void) =>
+      subscribe<WindowCloseRequest>(WINDOW_IPC.closeRequest, callback),
+    onCloseSettled: (callback: (id: number) => void): (() => void) =>
+      subscribe<number>(WINDOW_IPC.closeSettled, callback),
+    closeReady: (id: number): Promise<IpcResult<null>> =>
+      ipcRenderer.invoke(WINDOW_IPC.closeReady, id),
+    closeDecision: (decision: WindowCloseDecision): Promise<IpcResult<null>> =>
+      ipcRenderer.invoke(WINDOW_IPC.closeDecision, decision),
     /** 查询当前是否最大化。 */
     isMaximized: (): Promise<IpcResult<boolean>> => ipcRenderer.invoke(WINDOW_IPC.getState),
     /** 订阅最大化状态变化（含双击拖拽区等系统触发的场景）。 */

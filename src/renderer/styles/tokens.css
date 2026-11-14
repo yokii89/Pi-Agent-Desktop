@@ -269,6 +269,12 @@
      若仍低于 modal 遮罩会被完全盖住（表现为按钮点了没反应）。 */
   --z-menu: 160;
   --z-toast: 200;
+  /** 应用关窗决策高于菜单与设置浮窗。 */
+  --z-modal-priority: 180;
+  --close-dialog-width: 480px;
+  --close-dialog-mark-size: 22px;
+  --close-dialog-indicator-width: 3px;
+  --close-dialog-color-duration: 140ms;
 
   /* 遮罩：一层浮窗用 --z-modal 档（重遮罩 + 模糊），二级浮窗只补一层淡遮罩。
      模糊留给最外层：同屏叠两次 backdrop-filter 会把下层浮窗糊成一团，还多付一次全屏合成。 */

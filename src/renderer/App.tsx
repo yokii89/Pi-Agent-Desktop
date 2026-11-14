@@ -19,6 +19,7 @@ import { TerminalPanel } from "./components/TerminalPanel/TerminalPanel";
 import { TitleBar } from "./components/TitleBar/TitleBar";
 import { Toast } from "./components/ui/Toast";
 import { WallpaperBackground } from "./components/Wallpaper/WallpaperBackground";
+import { CloseRequestDialogHost } from "./components/Window/CloseRequestDialog";
 import { useContextSidebarCollapse } from "./hooks/useContextSidebarCollapse";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import { useNotificationSounds } from "./hooks/useNotificationSounds";
@@ -224,6 +225,7 @@ function AppLayout() {
       </AppErrorBoundary>
       <CommandPalette />
       {reviewWindowOpen && <ReviewWindow />}
+      <CloseRequestDialogHost />
       <Toast />
     </div>
   );

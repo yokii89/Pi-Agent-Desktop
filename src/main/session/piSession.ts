@@ -874,13 +874,16 @@ export function disposeSession(sessionId: SessionId): void {
   } catch {
     // 进程已退出时忽略
   }
+  // pi 收到 stdin EOF 后会先跑完收尾（MCP token 刷新落盘、扩展 dispose）再退，
+  // 且关停一旦开始不再被 EOF / 单次信号打断（pi 1.5.1，#11599）。窗口给到 5s，
+  // 否则强杀会把已换出的 refresh token 丢掉，下次启动就是 invalid_grant（#11692）。
   const killTimer = setTimeout(() => {
     try {
       child.kill();
     } catch {
       // 已退出时忽略
     }
-  }, 3000);
+  }, 5000);
   child.once("exit", () => {
     clearTimeout(killTimer);
     if (instances.get(sessionId)?.child === null) {
@@ -890,7 +893,7 @@ export function disposeSession(sessionId: SessionId): void {
   });
 }
 
-/** 应用退出：遍历全部实例 dispose，各 3s kill 兜底（will-quit）。 */
+/** 应用退出：遍历全部实例 dispose，各 5s kill 兜底（will-quit）。 */
 export function disposeAllSessions(): void {
   for (const id of [...instances.keys()]) {
     disposeSession(id);

@@ -364,11 +364,18 @@ export const settingsMessages = defineMessages({
     "en-US": "Show in system tray",
   },
   "settings.general.showInTray.description": {
-    "zh-CN":
-      "在 Windows 系统托盘显示 PiDesk 图标；开启后关闭窗口会最小化到托盘、应用继续在后台运行",
-    "en-US":
-      "Show PiDesk in the Windows tray. Closing the window then minimizes to tray and keeps the app running",
+    "zh-CN": "在 Windows 系统托盘常驻 PiDesk 图标；关闭窗口时的动作由下方设置决定",
+    "en-US": "Keep a PiDesk icon in the Windows tray. Set what closing the window does below",
   },
+  "settings.general.closeAction": { "zh-CN": "关闭窗口时", "en-US": "When closing the window" },
+  "settings.general.closeAction.description": {
+    "zh-CN": "关闭窗口时询问、隐藏到托盘，还是直接退出；选「隐藏到托盘」会同时在托盘常驻图标",
+    "en-US":
+      "Ask, hide to tray, or quit when closing the window. Hiding to tray also enables the tray icon",
+  },
+  "settings.general.closeAction.ask": { "zh-CN": "每次询问", "en-US": "Ask every time" },
+  "settings.general.closeAction.tray": { "zh-CN": "隐藏到托盘", "en-US": "Hide to tray" },
+  "settings.general.closeAction.quit": { "zh-CN": "退出 PiDesk", "en-US": "Quit PiDesk" },
   "settings.general.maxParallelSessions": {
     "zh-CN": "并行会话上限",
     "en-US": "Max parallel sessions",

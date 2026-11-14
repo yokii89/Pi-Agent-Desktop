@@ -23,6 +23,7 @@ import {
 } from "../../shared/splash";
 import { normalizeUiZoom } from "../../shared/uiZoom";
 import { clampWallpaperDim, normalizeWallpaperPath } from "../../shared/wallpaper";
+import { isCloseAction } from "../../shared/windowClose";
 import {
   clampSessionStreamFontPx,
   DEFAULT_SETTINGS,
@@ -111,6 +112,11 @@ export function getSettings(): PideskSettings {
     ...DEFAULT_SETTINGS,
     ...settings,
     locale: normalizeLocalePreference(loaded.locale),
+    closeAction: isCloseAction(loaded.closeAction) ? loaded.closeAction : "ask",
+    // 不把 closeAction==="tray" 当成 showInTray 的依据：托盘图标只在「隐藏那一刻」按需创建
+    // （closePrompt 的 ensureTrayForHide 会建并置位）。读侧强制会把用户在设置里关掉的图标
+    // 在下一次读取 / 任意设置写入时悄悄恢复，与写回结果自相矛盾（docs/design/139）。
+    showInTray: loaded.showInTray === true,
     projects: Array.isArray(loaded.projects) ? loaded.projects : DEFAULT_SETTINGS.projects,
     // 手改过设置文件时也要保证是字符串数组，避免渲染层拿到非数组后崩溃
     pinnedSessions: Array.isArray(settings.pinnedSessions)
@@ -171,6 +177,9 @@ export function getSettings(): PideskSettings {
 export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   const next: PideskSettings = { ...getSettings(), ...patch };
   next.locale = normalizeLocalePreference(next.locale);
+  next.closeAction = isCloseAction(next.closeAction) ? next.closeAction : "ask";
+  // 选择隐藏偏好时一并启用托盘；之后仍可单独关闭常驻图标。
+  if (patch.closeAction === "tray") next.showInTray = true;
   next.fontUiPreset = normalizeFontUiPreset(next.fontUiPreset);
   next.fontMonoPreset = normalizeFontMonoPreset(next.fontMonoPreset);
   next.questionRailStyle = normalizeRailStyle(next.questionRailStyle);

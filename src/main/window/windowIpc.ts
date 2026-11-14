@@ -1,6 +1,7 @@
 import { ipcMain, shell } from "electron";
 import { WINDOW_IPC } from "../../shared/ipc";
 import { envelope, envelopeAsync } from "../ipc/envelope";
+import { acknowledgeClosePrompt, decideClosePrompt } from "./closePrompt";
 import { getMainWindow } from "./createMainWindow";
 
 /** 注册窗口控制 IPC（自绘标题栏三键 + 最大化状态查询 + 外链）。 */
@@ -29,6 +30,22 @@ export function registerWindowIpc(): void {
   ipcMain.handle(WINDOW_IPC.close, () =>
     envelope(() => {
       getMainWindow()?.close();
+      return null;
+    }),
+  );
+
+  ipcMain.handle(WINDOW_IPC.closeReady, (event, id: unknown) =>
+    envelope(() => {
+      const win = getMainWindow();
+      if (win && event.sender === win.webContents) acknowledgeClosePrompt(win, id);
+      return null;
+    }),
+  );
+
+  ipcMain.handle(WINDOW_IPC.closeDecision, (event, decision: unknown) =>
+    envelope(() => {
+      const win = getMainWindow();
+      if (win && event.sender === win.webContents) decideClosePrompt(win, decision);
       return null;
     }),
   );

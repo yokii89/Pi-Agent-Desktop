@@ -11,6 +11,7 @@ export default defineConfig({
   test: {
     include: [
       "view/**/*.test.ts",
+      "window/**/*.test.ts",
       "browser/**/*.test.ts",
       "session/**/*.test.ts",
       "proc/**/*.test.ts",

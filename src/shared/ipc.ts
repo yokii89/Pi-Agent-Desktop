@@ -11,6 +11,7 @@ import type { NotificationSettings } from "./notification";
 import type { RailStyle } from "./railStyles";
 import type { ShortcutsMap } from "./shortcuts";
 import type { SplashFontPreset } from "./splash";
+import type { CloseAction } from "./windowClose";
 
 /** 请求-响应类 IPC 的统一返回信封。 */
 export interface IpcResult<T> {
@@ -27,6 +28,10 @@ export const WINDOW_IPC = {
   minimize: "pidesk:window:minimize",
   toggleMaximize: "pidesk:window:maximize",
   close: "pidesk:window:close",
+  closeRequest: "pidesk:window:closeRequest",
+  closeReady: "pidesk:window:closeReady",
+  closeDecision: "pidesk:window:closeDecision",
+  closeSettled: "pidesk:window:closeSettled",
   getState: "pidesk:window:getState",
   /** 主进程推送：窗口最大化状态变化，payload 为 boolean。 */
   stateChanged: "pidesk:window:stateChanged",
@@ -194,8 +199,10 @@ export interface PideskSettings {
   browserViewportWidth: number | null;
   /** 添加/新建项目时文件夹选择器的默认起始目录；null 时落到用户目录下 PiDeskProjects。 */
   defaultProjectDir: string | null;
-  /** 是否在系统托盘显示；开启后关闭窗口最小化到托盘，应用继续后台运行。 */
+  /** 是否常驻系统托盘图标；关窗行为由 closeAction 决定。 */
   showInTray: boolean;
+  /** 关窗时询问、隐藏到托盘或退出。 */
+  closeAction: CloseAction;
   /** 是否启用内置浏览器面板；关闭后右栏不再显示 Browser Tab。 */
   browserEnabled: boolean;
   /**

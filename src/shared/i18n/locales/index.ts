@@ -16,6 +16,7 @@ import { sessionMessages } from "./session";
 import { settingsMessages } from "./settings";
 import { sidenavMessages } from "./sidenav";
 import { uiMessages } from "./ui";
+import { windowMessages } from "./window";
 
 const ALL_DEFS: MessageDefs = {
   ...commonMessages,
@@ -35,6 +36,7 @@ const ALL_DEFS: MessageDefs = {
   ...uiMessages,
   ...commandPaletteMessages,
   ...scheduledMessages,
+  ...windowMessages,
 };
 
 function catalogFor(locale: LocaleId): Record<string, string> {

@@ -1,8 +1,7 @@
 import path from "node:path";
 import { app, BrowserWindow } from "electron";
 import { resolveAppIconPath } from "../appIcon";
-import { getSettings } from "../settings/settings";
-import { isQuittingApp } from "./tray";
+import { attachClosePrompt } from "./closePrompt";
 import { attachWindowZoom } from "./windowZoom";
 
 // dist 产物根目录（package.json main 位于 dist/main/index.js），
@@ -67,13 +66,7 @@ export function createMainWindow(): BrowserWindow {
   attachWindowZoom(win);
   win.on("maximize", () => notifyWindowState(win));
   win.on("unmaximize", () => notifyWindowState(win));
-  // 托盘开启时关闭 = 隐藏到托盘；托盘菜单「退出」或未开托盘时才真正销毁
-  win.on("close", (event) => {
-    if (!isQuittingApp() && getSettings().showInTray) {
-      event.preventDefault();
-      win.hide();
-    }
-  });
+  attachClosePrompt(win);
 
   if (devServerUrl) {
     // 开发态：加载 dev server，渲染层享受原生 HMR（改组件/样式不重启窗口）

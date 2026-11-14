@@ -199,6 +199,9 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         // 白名单外的值整项丢弃，不把脏目标写进设置
         if (value === "explorer" || value === "vscode") clean.workdirOpenTarget = value;
         break;
+      case "closeAction":
+        if (value === "ask" || value === "tray" || value === "quit") clean.closeAction = value;
+        break;
       case "showInTray":
       case "browserEnabled":
       case "sessionPrefetchEnabled":

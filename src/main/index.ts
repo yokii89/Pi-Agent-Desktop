@@ -21,7 +21,8 @@ import { disposeViewHost, ensureViewHost } from "./view/viewHost";
 import { registerWallpaperProtocol, registerWallpaperScheme } from "./wallpaper/wallpaperProtocol";
 import { createMainWindow, getMainWindow } from "./window/createMainWindow";
 import { disposeInspectorWindow } from "./window/inspectorWindow";
-import { disposeTray, initTrayFromSettings } from "./window/tray";
+import { getQuitProcPolicy, setQuitProcPolicy } from "./window/quitPolicy";
+import { cancelQuitting, disposeTray, initTrayFromSettings, markQuitting } from "./window/tray";
 
 registerTerminalLifecycle();
 registerBrowserLifecycle();
@@ -114,17 +115,20 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-/** 退出前后台进程处置：null=尚未确认（无存活项时直接放行）。 */
-let quitProcPolicy: "kill" | "keep" | null = null;
-
 /**
  * 应用退出前若有存活后台进程则统一确认（docs/design/37 §6）。
  * 默认「一并结束」；「保留」只放弃登记不 kill。
  */
 app.on("before-quit", (event) => {
-  if (quitProcPolicy !== null) return;
+  if (getQuitProcPolicy() !== null) {
+    markQuitting();
+    return;
+  }
   const alive = procService.listAllAlive();
-  if (alive.length === 0) return;
+  if (alive.length === 0) {
+    markQuitting();
+    return;
+  }
   event.preventDefault();
   const names = alive
     .slice(0, 5)
@@ -144,8 +148,11 @@ app.on("before-quit", (event) => {
   const result = parent
     ? dialog.showMessageBoxSync(parent, options)
     : dialog.showMessageBoxSync(options);
-  if (result === 2) return;
-  quitProcPolicy = result === 0 ? "kill" : "keep";
+  if (result === 2) {
+    cancelQuitting();
+    return;
+  }
+  setQuitProcPolicy(result === 0 ? "kill" : "keep");
   app.quit();
 });
 
@@ -159,7 +166,7 @@ app.on("will-quit", () => {
   // 多实例并行：遍历全部 pi 会话进程 dispose（各实例 3s kill 兜底）
   disposeAllSessions();
   // 后台进程：按用户选择一并结束或保留（保留只放弃登记）
-  if (quitProcPolicy === "kill" || quitProcPolicy === null) {
+  if (getQuitProcPolicy() !== "keep") {
     procService.prepareQuit("kill");
   } else {
     procService.prepareQuit("keep");

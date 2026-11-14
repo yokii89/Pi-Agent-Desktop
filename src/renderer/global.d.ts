@@ -140,6 +140,7 @@ import type {
 import type { UpdateStatus } from "../shared/update";
 import type { UsageQuery, UsageReport } from "../shared/usage";
 import type { ExtensionViewPush, ViewEvent } from "../shared/view";
+import type { WindowCloseDecision, WindowCloseRequest } from "../shared/windowClose";
 
 /** 渲染层可用的预加载白名单 API（与 src/preload/index.ts 保持同步）。 */
 export interface PideskGlobalApi {
@@ -147,6 +148,10 @@ export interface PideskGlobalApi {
     minimize(): Promise<IpcResult<null>>;
     toggleMaximize(): Promise<IpcResult<boolean>>;
     close(): Promise<IpcResult<null>>;
+    onCloseRequest(callback: (request: WindowCloseRequest) => void): () => void;
+    onCloseSettled(callback: (id: number) => void): () => void;
+    closeReady(id: number): Promise<IpcResult<null>>;
+    closeDecision(decision: WindowCloseDecision): Promise<IpcResult<null>>;
     isMaximized(): Promise<IpcResult<boolean>>;
     onWindowStateChange(callback: (isMaximized: boolean) => void): () => void;
     openExternal(url: string): Promise<IpcResult<null>>;

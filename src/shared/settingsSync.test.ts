@@ -32,6 +32,7 @@ function fakeSettings(): PideskSettings {
     browserViewportWidth: null,
     defaultProjectDir: "C:/projects",
     showInTray: true,
+    closeAction: "ask",
     browserEnabled: true,
     maxParallelSessions: 4,
     sessionPrefetchEnabled: false,
