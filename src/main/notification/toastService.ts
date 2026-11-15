@@ -1,22 +1,46 @@
-import { type BrowserWindow, Notification } from "electron";
+import { randomUUID } from "node:crypto";
+import { pathToFileURL } from "node:url";
+import { app, type BrowserWindow, Notification } from "electron";
 import { NOTIFICATION_IPC, type SystemToastRequest } from "../../shared/notification";
 import { resolveNotificationIconPath } from "../appIcon";
 import { getSettings } from "../settings/settings";
 import { getMainWindow } from "../window/createMainWindow";
+import { buildToastXml, parseToastToken, ToastTargets } from "./toastProtocol";
 
 /** 与 Windows toast 可读性相关的硬截断（协议层也截，这里兜底 IPC 直调）。 */
 const TITLE_MAX = 200;
 const BODY_MAX = 500;
 
 /**
- * 已展示、尚未结算的 toast。
- *
- * 原生通知的生命周期挂在 JS 包装对象上：包装被回收时 Electron 会撤掉原生侧的 tag 登记，
- * 而 Windows 的激活回调是靠 `tag` 反查通知实例的（`windows_toast_activator.cc`
- * HandleToastActivation），查不到就直接丢弃 —— `click` 永远不会发。
- * 因此在 close/click 之前必须自己握住引用（docs/design/24 §9）。
+ * 原生通知的生命周期挂在 JS 包装对象上，close/click 前必须保留引用。
+ * Windows 协议激活的会话目标独立保存在 toastTargets，不随通知横幅消失而删除。
  */
 const liveToasts = new Set<Notification>();
+const toastTargets = new ToastTargets();
+const toastProtocol = app.isPackaged ? "pidesk" : "pidesk-dev";
+let protocolRegistered = false;
+
+/** Register Windows notification activation before ready and route launches to the existing process. */
+export function registerToastActivation(): boolean {
+  if (process.platform !== "win32") return true;
+  if (!app.requestSingleInstanceLock()) return false;
+  app.on("second-instance", (_event, argv) => {
+    const win = bringWindowForward();
+    const token = parseToastToken(argv, toastProtocol);
+    const target = token ? toastTargets.take(token) : undefined;
+    if (win && target) win.webContents.send(NOTIFICATION_IPC.activated, target);
+  });
+  return true;
+}
+
+function ensureToastProtocol(): boolean {
+  if (protocolRegistered) return true;
+  // The app path is essential for electron . / pnpm dev; a bare electron.exe opens its welcome page.
+  protocolRegistered = app.isPackaged
+    ? app.setAsDefaultProtocolClient(toastProtocol)
+    : app.setAsDefaultProtocolClient(toastProtocol, process.execPath, [app.getAppPath()]);
+  return protocolRegistered;
+}
 
 /**
  * 把主窗口拉到用户眼前；窗口不可用时返回 null。
@@ -79,13 +103,27 @@ export function showSystemToast(req: SystemToastRequest): boolean {
   if (debounceMs > 0 && last !== undefined && now - last < debounceMs) return false;
 
   try {
+    const token = randomUUID();
+    const icon = resolveNotificationIconPath();
+    const useProtocol = process.platform === "win32";
+    if (useProtocol && !ensureToastProtocol()) return false;
     const toast = new Notification({
       title,
       body: body ?? "",
-      // Windows toast 靠 icon 写入 appLogoOverride；缺图标时头部只显示 AUMID
-      icon: resolveNotificationIconPath(),
+      icon,
       silent: true, // 声音由 renderer 提示音链路负责，避免双响
+      ...(useProtocol
+        ? {
+            toastXml: buildToastXml(
+              title,
+              body ?? "",
+              `${toastProtocol}://notification/${token}`,
+              icon ? pathToFileURL(icon).href : undefined,
+            ),
+          }
+        : {}),
     });
+    if (useProtocol) toastTargets.add(token, req);
     toast.once("close", () => liveToasts.delete(toast));
     toast.once("click", () => {
       liveToasts.delete(toast);

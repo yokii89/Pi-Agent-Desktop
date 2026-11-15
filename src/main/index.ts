@@ -7,6 +7,7 @@ import { registerBrowserLifecycle } from "./browser/browserView";
 import { disposeExtensionWorker } from "./extension/extensionWorkerManager";
 import { registerWatcherLifecycle } from "./fs/watcher";
 import { registerIpc } from "./ipc";
+import { registerToastActivation } from "./notification/toastService";
 import { procService } from "./proc/procService";
 import { disposeTaskScheduler, initTaskScheduler } from "./scheduler/taskScheduler";
 import { disposeIdleReclaim, initIdleReclaim } from "./session/idleReclaim";
@@ -23,6 +24,8 @@ import { createMainWindow, getMainWindow } from "./window/createMainWindow";
 import { disposeInspectorWindow } from "./window/inspectorWindow";
 import { getQuitProcPolicy, setQuitProcPolicy } from "./window/quitPolicy";
 import { cancelQuitting, disposeTray, initTrayFromSettings, markQuitting } from "./window/tray";
+
+if (!registerToastActivation()) app.exit(0);
 
 registerTerminalLifecycle();
 registerBrowserLifecycle();
