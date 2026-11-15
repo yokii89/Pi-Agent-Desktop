@@ -93,7 +93,7 @@
 }
 
 .grip:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
 }
 
 /* 不可排序的行也占住手柄位，保证不同行的种类图标同一列 */
@@ -106,7 +106,7 @@
 .kindIcon {
   flex: 0 0 auto;
   display: inline-flex;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .row[data-queue-kind="followUp"] .kindIcon {
@@ -179,7 +179,7 @@
 
 .convertBtn:focus-visible,
 .iconBtn:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
 }
 
 /* 拖动跟手层：fixed 不受托盘 overflow 裁剪；不参与布局，无过渡（跟指针直接走） */

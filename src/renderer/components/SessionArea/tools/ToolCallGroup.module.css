@@ -33,17 +33,17 @@
 }
 
 .header:hover {
-  --tool-row-ink: var(--color-accent);
-  --tool-row-ink-muted: var(--color-accent);
+  --tool-row-ink: var(--color-accent-fg);
+  --tool-row-ink-muted: var(--color-accent-fg);
 }
 
 .header:active {
-  --tool-row-ink: var(--color-accent-hover);
-  --tool-row-ink-muted: var(--color-accent-hover);
+  --tool-row-ink: var(--color-accent-fg-hover);
+  --tool-row-ink-muted: var(--color-accent-fg-hover);
 }
 
 .header:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: 1px;
 }
 

@@ -62,7 +62,7 @@ button {
 }
 
 a {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   text-decoration: none;
 }
 
@@ -165,7 +165,7 @@ a:hover {
   :root .toolFlow {
     animation: none;
     background-image: none;
-    color: var(--color-accent);
+    color: var(--color-accent-fg);
   }
 }
 

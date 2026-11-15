@@ -109,7 +109,7 @@
 
 .card:focus-visible:not([data-active="true"]),
 .cancel:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent-border);
   outline-offset: 2px;
 }
 

@@ -19,7 +19,7 @@
 }
 
 .searchRow:focus-within {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
 }
 
 .searchIcon {
@@ -115,7 +115,7 @@
 
 /* 编辑态元信息：未保存 / 磁盘已更新两种状态各一档颜色（文字已表明含义，颜色只是加强） */
 .dirtyMeta {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .warnMeta {

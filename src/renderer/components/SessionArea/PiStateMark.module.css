@@ -40,7 +40,7 @@
 }
 
 .isRunning {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 .isCompleted {
   color: var(--color-success);
@@ -169,7 +169,7 @@
 }
 
 .isRunning .label {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 .isCompleted .label {
   color: var(--color-success);

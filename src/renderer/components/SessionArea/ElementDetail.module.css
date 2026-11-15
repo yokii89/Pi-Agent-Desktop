@@ -9,7 +9,7 @@
 
 .title {
   margin: 0 0 2px;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-sm);
   font-weight: 600;

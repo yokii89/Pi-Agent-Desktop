@@ -53,7 +53,7 @@
   height: 28px;
   border-radius: var(--radius-md);
   background: var(--color-accent-soft);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .headText {
@@ -164,7 +164,7 @@
 }
 
 .rowAction:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: 1px;
 }
 
@@ -247,7 +247,7 @@
 }
 
 .procOpen:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: 1px;
 }
 

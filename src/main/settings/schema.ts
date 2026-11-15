@@ -37,7 +37,7 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   terminalShell: "powershell",
   terminalTabCompletion: "cycle",
   theme: "dark",
-  // 自定义主题色；null = 跟随主题默认蓝（tokens.css 的 --color-accent）
+  // 主题色偏好；null = 应用默认蓝，system = 跟随系统，hex = 固定颜色
   accentColor: null,
   // 本地背景壁纸（docs/design/111）；null = 主题纯色背景
   wallpaperPath: null,

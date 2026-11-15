@@ -187,12 +187,12 @@
 }
 
 .unitField:focus-within {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   box-shadow: 0 0 0 2px var(--color-accent-soft);
 }
 
 .unitFieldAdjusted {
-  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  border-color: color-mix(in srgb, var(--color-accent-border) 45%, var(--color-border));
 }
 
 .unitFieldDisabled {
@@ -249,7 +249,7 @@
 }
 
 .unitField[data-dragging="1"] .unitInput {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .unitSuffix {
@@ -286,7 +286,7 @@
 }
 
 .textInput:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   box-shadow: 0 0 0 2px var(--color-accent-soft);
 }
 
@@ -313,7 +313,7 @@
 }
 
 .selectShell:focus-within {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   box-shadow: 0 0 0 2px var(--color-accent-soft);
 }
 
@@ -348,7 +348,7 @@
 }
 
 .colorShell:focus-within {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   box-shadow: 0 0 0 2px var(--color-accent-soft);
 }
 
@@ -424,7 +424,6 @@
   --seg-radius: calc(var(--radius-sm) + 1px);
   --seg-track: transparent;
   --seg-border: transparent;
-  --seg-ink-active: var(--color-text);
 }
 
 .segmentSegBordered {

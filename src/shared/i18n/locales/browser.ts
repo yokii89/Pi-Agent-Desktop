@@ -148,6 +148,15 @@ export const browserMessages = defineMessages({
   },
   "browser.styles.adjust": { "zh-CN": "临时调整", "en-US": "Live adjust" },
   "browser.styles.copyCss": { "zh-CN": "复制 CSS", "en-US": "Copy CSS" },
+  "browser.styles.save": { "zh-CN": "保存", "en-US": "Save" },
+  "browser.styles.applyToPreview": { "zh-CN": "应用到预览", "en-US": "Apply to preview" },
+  "browser.styles.copyForAi": { "zh-CN": "复制 CSS 给 AI", "en-US": "Copy CSS for AI" },
+  "browser.styles.discardDrafts": { "zh-CN": "放弃更改", "en-US": "Discard changes" },
+  "browser.styles.cssGroup": { "zh-CN": "CSS", "en-US": "CSS" },
+  "browser.styles.applyFailed": {
+    "zh-CN": "样式应用失败，请重新拾取元素后重试。",
+    "en-US": "Could not apply styles. Pick the element again and retry.",
+  },
   "browser.styles.copyCssLabel": {
     "zh-CN": "临时调整 CSS",
     "en-US": "Live-adjust CSS",
@@ -183,7 +192,7 @@ export const browserMessages = defineMessages({
   },
   "browser.styles.addPlaceholder.name": { "zh-CN": "属性名", "en-US": "Property" },
   "browser.styles.addPlaceholder.value": { "zh-CN": "值", "en-US": "Value" },
-  "browser.styles.addSubmit": { "zh-CN": "添加临时调整", "en-US": "Add live adjust" },
+  "browser.styles.addSubmit": { "zh-CN": "添加属性", "en-US": "Add property" },
   "browser.styles.added": { "zh-CN": "已添加", "en-US": "Added" },
   "browser.styles.addHint.text": {
     "zh-CN": "未在目录中的属性按文本值写入。",
@@ -328,6 +337,14 @@ export const browserMessages = defineMessages({
   },
   "browser.box.noSelection": { "zh-CN": "尚未选中元素。", "en-US": "No element selected." },
   "browser.box.content": { "zh-CN": "内容区", "en-US": "Content" },
+  "browser.box.measurements": {
+    "zh-CN": "盒模型尺寸（像素）",
+    "en-US": "Box measurements (pixels)",
+  },
+  "browser.box.top": { "zh-CN": "上", "en-US": "Top" },
+  "browser.box.right": { "zh-CN": "右", "en-US": "Right" },
+  "browser.box.bottom": { "zh-CN": "下", "en-US": "Bottom" },
+  "browser.box.left": { "zh-CN": "左", "en-US": "Left" },
   "browser.viewport.width": { "zh-CN": "视口宽度", "en-US": "Viewport width" },
   "browser.viewport.presetsLabel": {
     "zh-CN": "视口宽度预设",
@@ -405,6 +422,12 @@ export const browserMessages = defineMessages({
     "en-US": "e.g. http://localhost:5173 — pick an element, press Enter to add to chat",
   },
   "browser.inspector.label": { "zh-CN": "元素检查器", "en-US": "Element inspector" },
+  "browser.inspector.target": { "zh-CN": "当前检查目标", "en-US": "Inspecting" },
+  "browser.inspector.ancestorTarget": { "zh-CN": "祖先节点", "en-US": "Ancestor" },
+  "browser.inspector.elementSize": {
+    "zh-CN": "尺寸 {width} × {height}",
+    "en-US": "Size {width} × {height}",
+  },
   "browser.inspector.resize": {
     "zh-CN": "拖拽调整检查器高度",
     "en-US": "Drag to resize inspector",

@@ -38,7 +38,7 @@
 
 .selection {
   position: absolute;
-  border: 1px solid var(--color-accent);
+  border: 1px solid var(--color-accent-border);
   background: color-mix(in srgb, var(--color-accent) 18%, transparent);
   pointer-events: none;
 }

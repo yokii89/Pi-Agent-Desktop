@@ -26,8 +26,8 @@
 
 .queueSendBtn:hover {
   background: var(--color-bg-active);
-  border-color: var(--color-accent);
-  color: var(--color-accent-hover);
+  border-color: var(--color-accent-border);
+  color: var(--color-accent-fg-hover);
 }
 
 .iconBtn {

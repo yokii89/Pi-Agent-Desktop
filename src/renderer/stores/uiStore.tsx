@@ -10,7 +10,11 @@ import {
   useReducer,
   useRef,
 } from "react";
-import { normalizeAccentColor } from "../../shared/accentColor";
+import {
+  type AccentColorPreference,
+  normalizeAccentColor,
+  resolveAccentColor,
+} from "../../shared/accentColor";
 import {
   type FontMonoPreset,
   type FontUiPreset,
@@ -46,8 +50,10 @@ import {
   DEFAULT_SHORTCUTS,
   SHORTCUT_BINDINGS,
 } from "../actions/actionRegistry";
+import { useSystemAccentColor } from "../hooks/useSystemAccentColor";
 import { browserService } from "../services/browserService";
 import { settingsService } from "../services/settingsService";
+import { applyAccentColor } from "../utils/applyAccentColor";
 import {
   closeSidebarTab as closeTab,
   openSidebarTab as openTab,
@@ -111,36 +117,6 @@ function applyFontFamilies(uiPreset: FontUiPreset, monoPreset: FontMonoPreset): 
   const root = document.documentElement;
   root.style.setProperty("--font-family-ui", resolveFontUiStack(uiPreset));
   root.style.setProperty("--font-family-mono", resolveFontMonoStack(monoPreset));
-}
-
-/** 覆盖的 4 个 accent 令牌：派生色（hover/text/soft）依赖主题配方（与 tokens.css 两套默认值对齐）。 */
-const ACCENT_VAR_NAMES = [
-  "--color-accent",
-  "--color-accent-hover",
-  "--color-accent-text",
-  "--color-accent-soft",
-] as const;
-
-/** 主题色覆盖写根元素 CSS 变量；null 移除覆盖还原 tokens.css 默认。派生色用 color-mix 从主题色推导。 */
-function applyAccentColor(color: string | null, theme: Theme): void {
-  const root = document.documentElement;
-  if (!color) {
-    for (const name of ACCENT_VAR_NAMES) root.style.removeProperty(name);
-    return;
-  }
-  const dark = theme === "dark";
-  root.style.setProperty("--color-accent", color);
-  root.style.setProperty(
-    "--color-accent-hover",
-    dark ? `color-mix(in oklab, ${color} 88%, white)` : `color-mix(in oklab, ${color} 84%, black)`,
-  );
-  root.style.setProperty("--color-accent-text", dark ? "#0b1a2b" : "#ffffff");
-  root.style.setProperty(
-    "--color-accent-soft",
-    dark
-      ? `color-mix(in oklab, ${color} 16%, transparent)`
-      : `color-mix(in oklab, ${color} 12%, transparent)`,
-  );
 }
 
 /** Toast 的可选快捷动作（如「重载会话」）；点击后执行并立即收起提示。 */
@@ -221,8 +197,8 @@ interface UiState {
   fontMonoPreset: FontMonoPreset;
   /** 对话流问题导航分段栏的标记样式（设置 → 个性化）。 */
   questionRailStyle: RailStyle;
-  /** 自定义主题色（设置 → 外观）；null = 跟随主题默认，见 applyAccentColor。 */
-  accentColor: string | null;
+  /** 主题色偏好；实际系统色不存入此字段，见 applyAccentColor。 */
+  accentColor: AccentColorPreference;
   /** 本地背景壁纸绝对路径（设置 → 个性化）；null = 主题纯色背景（docs/design/111）。 */
   wallpaperPath: string | null;
   /** 壁纸遮罩强度（0–100）：越高背景越淡、正文越清晰。 */
@@ -269,7 +245,7 @@ type UiAction =
   | { type: "setFontUiPreset"; preset: FontUiPreset }
   | { type: "setFontMonoPreset"; preset: FontMonoPreset }
   | { type: "setQuestionRailStyle"; style: RailStyle }
-  | { type: "setAccentColor"; color: string | null }
+  | { type: "setAccentColor"; color: AccentColorPreference }
   | { type: "setWallpaperPath"; path: string | null }
   | { type: "setWallpaperDim"; dim: number }
   | { type: "setInputBuddy"; kind: InputBuddyKind }
@@ -294,7 +270,7 @@ type UiAction =
       fontUiPreset: FontUiPreset;
       fontMonoPreset: FontMonoPreset;
       questionRailStyle: RailStyle;
-      accentColor: string | null;
+      accentColor: AccentColorPreference;
       wallpaperPath: string | null;
       wallpaperDim: number;
       inputBuddy: InputBuddyKind;
@@ -631,6 +607,7 @@ const UiStoreContext = createContext<UiStoreValue | null>(null);
 /** 全局 UI 状态：布局折叠、右侧上下文侧栏、路由历史、主题、Toast。 */
 export function UiProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(uiReducer, initialState);
+  const systemAccentColor = useSystemAccentColor();
   /** 面板登记的离开守卫（见 registerLeaveGuard）：只给命题式回调读，不进 React 状态。 */
   const leaveGuardRef = useRef<((action: () => void) => boolean) | null>(null);
 
@@ -732,8 +709,8 @@ export function UiProvider({ children }: { children: ReactNode }) {
 
   // 主题色覆盖同主题一样用 layout effect：子组件在被动 effect 里读 tokens 建配色，父级必须先行
   useLayoutEffect(() => {
-    applyAccentColor(state.accentColor, state.theme);
-  }, [state.accentColor, state.theme]);
+    applyAccentColor(resolveAccentColor(state.accentColor, systemAccentColor), state.theme);
+  }, [state.accentColor, state.theme, systemAccentColor]);
 
   // 壁纸开关落成根元素标记：tokens.css 据此把 --color-canvas 切成透明；
   // layout effect 与主题同路，避免首帧先画一层实底再被壁纸顶掉
@@ -765,12 +742,9 @@ export function UiProvider({ children }: { children: ReactNode }) {
     if (guard) guard(close);
     else close();
   }, []);
-  const registerLeaveGuard = useCallback(
-    (guard: ((action: () => void) => boolean) | null) => {
-      leaveGuardRef.current = guard;
-    },
-    [],
-  );
+  const registerLeaveGuard = useCallback((guard: ((action: () => void) => boolean) | null) => {
+    leaveGuardRef.current = guard;
+  }, []);
   // WebContentsView 盖在渲染层上方：必须在弹设置之前先藏视图，否则 Modal 会被盖住数秒
   // （等到 SettingsDialog 的 effect 再 IPC 已经晚了一帧以上）。
   const openSettings = useCallback(() => {

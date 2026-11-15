@@ -13,6 +13,7 @@ import { ValueControl } from "./ValueControl";
 export interface PropertyRowProps {
   decl: StylePatchDeclaration;
   compact?: boolean;
+  disabled?: boolean;
   onToggleEnabled: (name: string, enabled: boolean) => void;
   onToggleImportant: (name: string, important: boolean) => void;
   onValueChange: (name: string, value: string) => void;
@@ -23,6 +24,7 @@ export interface PropertyRowProps {
 export function PropertyRow({
   decl,
   compact,
+  disabled = false,
   onToggleEnabled,
   onToggleImportant,
   onValueChange,
@@ -31,11 +33,12 @@ export function PropertyRow({
 }: PropertyRowProps) {
   const t = useT();
   return (
-    <div className={[styles.row, decl.enabled ? "" : styles.rowDisabled].join(" ")}>
+    <div className={[styles.row, decl.enabled && !disabled ? "" : styles.rowDisabled].join(" ")}>
       <input
         type="checkbox"
         className={styles.rowToggle}
         checked={decl.enabled}
+        disabled={disabled}
         title={decl.enabled ? t("browser.styles.toggleOff") : t("browser.styles.toggleOn")}
         aria-label={`${decl.enabled ? t("browser.styles.toggleOffLabel") : t("browser.styles.toggleOnLabel")} ${decl.name}`}
         onChange={(event) => onToggleEnabled(decl.name, event.target.checked)}
@@ -56,7 +59,7 @@ export function PropertyRow({
           <ValueControl
             name={decl.name}
             value={decl.value}
-            disabled={!decl.enabled}
+            disabled={disabled || !decl.enabled}
             compact={compact}
             onChange={(value) => onValueChange(decl.name, value)}
             onLive={onValueLive ? (value) => onValueLive(decl.name, value) : undefined}
@@ -71,6 +74,7 @@ export function PropertyRow({
             decl.important ? t("browser.styles.importantOff") : t("browser.styles.importantOn")
           }
           aria-pressed={decl.important}
+          disabled={disabled}
           onClick={() => onToggleImportant(decl.name, !decl.important)}
         >
           !
@@ -79,6 +83,7 @@ export function PropertyRow({
           type="button"
           className={[styles.rowIcon, styles.rowIconDanger].join(" ")}
           title={t("browser.styles.removeDecl")}
+          disabled={disabled}
           onClick={() => onRemove(decl.name)}
         >
           <X size={13} weight="regular" />

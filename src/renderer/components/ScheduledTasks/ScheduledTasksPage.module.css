@@ -141,7 +141,7 @@
 
 .scheduleIcon {
   flex-shrink: 0;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .taskSide {
@@ -275,7 +275,7 @@
 }
 
 .sectionIcon {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   flex-shrink: 0;
 }
 
@@ -313,7 +313,7 @@
 }
 
 .textInput:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   box-shadow: 0 0 0 2px var(--color-accent-soft);
 }
 
@@ -336,7 +336,7 @@
 }
 
 .promptInput:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   box-shadow: 0 0 0 2px var(--color-accent-soft);
 }
 
@@ -410,7 +410,7 @@
 }
 
 .weekdayChipActive {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   background: var(--color-accent-soft);
   color: var(--color-text-strong);
   font-weight: 600;

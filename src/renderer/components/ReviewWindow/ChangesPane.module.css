@@ -96,7 +96,7 @@
   --seg-radius: calc(var(--radius-sm) + 1px);
   --seg-track: transparent;
   --seg-border: transparent;
-  --seg-thumb: var(--color-accent-soft);
+  --seg-thumb: var(--color-accent-subtle);
 
   min-width: 0;
 }
@@ -109,7 +109,7 @@
 
 /* 落点那层的计数换强调色：滑块是副本，选中墨色由 [data-seg-thumb] 这一层带过去 */
 [data-seg-thumb] .filterCount {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 /* —— 详情栏 —— */

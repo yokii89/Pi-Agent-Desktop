@@ -90,7 +90,7 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
     focusPane,
   } = useTerminalStore();
   const { currentProject, ready } = useProjectStore();
-  const { theme, fontMonoPreset, terminalPanelHeight, dispatch, shortcuts } = useUiStore();
+  const { fontMonoPreset, terminalPanelHeight, dispatch, shortcuts } = useUiStore();
   const rootRef = useRef<HTMLElement>(null);
   const resizeRef = useRef<ResizeSession | null>(null);
   // 窗格句柄按窗格位置存：焦点跟随 focusedPane，切换 Tab / 进入分屏后要能动到对应实例
@@ -466,7 +466,6 @@ export function TerminalPanel({ hidden }: TerminalPanelProps) {
                           };
                         }}
                         ariaLabel={t("terminal.instanceAria", { title: tab.title })}
-                        theme={theme}
                         fontFamily={resolveFontMonoStack(fontMonoPreset)}
                         subscribeData={(callback) =>
                           terminalService.subscribeData(tab.id, callback)

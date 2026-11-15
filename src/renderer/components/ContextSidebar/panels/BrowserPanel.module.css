@@ -13,7 +13,7 @@
 }
 
 .panel.picking {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: -1px;
 }
 
@@ -45,8 +45,8 @@
 }
 
 .pageTabActive {
-  background: var(--color-bg-active);
-  color: var(--color-text-strong);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-fg);
 }
 
 .pageTabButton {
@@ -142,7 +142,7 @@
 }
 
 .addressWrap:focus-within {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
 }
 
 .address {
@@ -250,7 +250,7 @@
 }
 
 .recentLocal {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .recentUrl {
@@ -297,7 +297,7 @@
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   font-size: var(--font-size-sm);
   white-space: nowrap;
   cursor: pointer;
@@ -319,7 +319,7 @@
 }
 
 .hostPicking {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent-border);
   outline-offset: -2px;
 }
 

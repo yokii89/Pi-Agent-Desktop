@@ -53,7 +53,7 @@
 }
 
 .actionRun {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 /* 命令品牌徽标（pnpm / git / node…）：动作文案与命令原文之间的执行主体标记 */
@@ -96,7 +96,7 @@
 }
 
 .statRun {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .statErr {
@@ -105,7 +105,7 @@
 
 /* pi-bash-jobs 转后台徽标（docs/design/129 P2）：与运行态同属 accent 族，但无扫光跟随 */
 .statBg {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .statAdd {
@@ -138,17 +138,17 @@
 }
 
 .row:not(.plain):hover {
-  --tool-row-ink: var(--color-accent);
-  --tool-row-ink-muted: var(--color-accent);
+  --tool-row-ink: var(--color-accent-fg);
+  --tool-row-ink-muted: var(--color-accent-fg);
 }
 
 .row:not(.plain):active {
-  --tool-row-ink: var(--color-accent-hover);
-  --tool-row-ink-muted: var(--color-accent-hover);
+  --tool-row-ink: var(--color-accent-fg-hover);
+  --tool-row-ink-muted: var(--color-accent-fg-hover);
 }
 
 .row:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: 1px;
 }
 

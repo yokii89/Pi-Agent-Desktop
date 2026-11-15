@@ -26,6 +26,7 @@ import { registerViewActivateIpc } from "../view/viewActivateIpc";
 import { registerViewIpc } from "../view/viewIpc";
 import { registerWallpaperIpc } from "../wallpaper/wallpaperIpc";
 import { registerInspectorFloatIpc } from "../window/inspectorFloatIpc";
+import { registerSystemAccentColorIpc } from "../window/systemAccentColor";
 import { registerWindowIpc } from "../window/windowIpc";
 
 /** 集中注册所有 IPC handler。各域 handler 就近放在对应功能模块内。 */
@@ -34,6 +35,7 @@ export function registerIpc(): void {
     registerWindowIpc,
     registerClipboardIpc,
     registerSettingsIpc,
+    registerSystemAccentColorIpc,
     registerNotificationIpc,
     registerProjectIpc,
     registerSessionIpc,

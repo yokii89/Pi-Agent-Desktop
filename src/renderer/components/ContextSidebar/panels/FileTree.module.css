@@ -37,7 +37,7 @@
 
 .selected,
 .selected:hover {
-  background: var(--color-bg-active);
+  background: var(--color-accent-subtle);
   color: var(--color-text-strong);
 }
 

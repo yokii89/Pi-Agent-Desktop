@@ -1,93 +1,97 @@
-import { Eraser } from "@phosphor-icons/react";
+import { CaretDown, CaretRight, Code, Eraser, Plus } from "@phosphor-icons/react";
+import { useEffect, useState } from "react";
 import { useT } from "../../../../../hooks/useT";
 import { useInspectorStore } from "../../../../../stores/inspectorStore";
 import { useStyleEditStore } from "../../../../../stores/styleEditStore";
 import { AddPropertyForm } from "./AddPropertyForm";
+import { CssReferencePanel } from "./CssReferencePanel";
 import { PropertyRow } from "./PropertyRow";
 import styles from "./styleEdit.module.css";
-
-/**
- * 「临时调整」属性列表（CSS 模式主编辑面）。
- * 目标栏由 StylesTab 统一挂在模式切换之上；这里只负责声明行 + 添加属性。
- */
 
 export function AdjustPanel({ compact }: { compact: boolean }) {
   const t = useT();
   const edit = useStyleEditStore();
   const inspector = useInspectorStore();
-  const hasCurrent = edit.currentDeclarations.length > 0;
-  const canEdit = inspector.nodeId !== null && !inspector.stale;
+  const [open, setOpen] = useState(false);
+  const currentDeclarations =
+    edit.currentNodeId === inspector.nodeId ? edit.currentDeclarations : [];
+  const hasCurrent = currentDeclarations.length > 0;
+  const canEdit =
+    inspector.nodeId !== null && edit.currentNodeId === inspector.nodeId && !inspector.stale;
+
+  useEffect(() => {
+    if (edit.error) setOpen(true);
+  }, [edit.error]);
 
   return (
-    <div>
-      <section
-        className={[
-          styles.adjustCard,
-          edit.totalEnabled > 0 ? styles.adjustCardLive : "",
-          edit.navCleared ? styles.adjustCardMuted : "",
-        ].join(" ")}
-        aria-label={t("browser.styles.adjust")}
-      >
-        <header className={styles.adjustHead}>
-          <span className={styles.adjustTitle}>{t("browser.styles.adjust")}</span>
-          <span className={styles.adjustMeta}>
-            {hasCurrent
-              ? t("browser.styles.currentCount", { count: edit.currentDeclarations.length })
-              : canEdit
-                ? t("browser.styles.editHere")
-                : t("browser.styles.pickFirst")}
-            {edit.otherNodeCount > 0
-              ? ` · ${t("browser.styles.otherNodes", { count: edit.otherNodeCount })}`
-              : ""}
-          </span>
-          {hasCurrent && (
-            <div className={styles.adjustHeadActions}>
-              <button
-                type="button"
-                className={styles.iconBtn}
-                title={t("browser.styles.clearCurrent")}
-                onClick={edit.clearCurrent}
-              >
-                <Eraser size={13} weight="regular" />
-              </button>
-            </div>
-          )}
-        </header>
-
-        <p className={styles.adjustNote}>{t("browser.styles.adjustNote")}</p>
-
-        {edit.error && <p className={styles.adjustError}>{edit.error}</p>}
-
-        {hasCurrent && (
-          <ul className={styles.adjustList}>
-            {edit.currentDeclarations.map((decl) => (
-              <li key={decl.name}>
-                <PropertyRow
-                  decl={decl}
-                  compact={compact}
-                  onToggleEnabled={edit.toggleEnabled}
-                  onToggleImportant={edit.toggleImportant}
-                  onValueChange={(name, value) => edit.setValue(name, value, true)}
-                  onValueLive={(name, value) => edit.setValue(name, value, true)}
-                  onRemove={edit.removeDeclaration}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-
+    <section className={styles.cssDraft} aria-label={t("browser.styles.cssGroup")}>
+      <header className={styles.cssDraftHeader}>
+        <button
+          type="button"
+          className={styles.cssDraftToggle}
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          {open ? <CaretDown size={14} /> : <CaretRight size={14} />}
+          <Code size={14} weight="regular" />
+          <span>{t("browser.styles.cssGroup")}</span>
+          {hasCurrent && <span className={styles.cssDraftCount}>{currentDeclarations.length}</span>}
+        </button>
         {canEdit && (
-          <AddPropertyForm
-            compact={compact}
-            existingNames={edit.currentDeclarations.map((decl) => decl.name)}
-            onAdd={edit.upsertDeclaration}
-          />
+          <button
+            type="button"
+            className={styles.iconBtn}
+            title={t("browser.styles.add")}
+            aria-label={t("browser.styles.add")}
+            onClick={() => setOpen(true)}
+          >
+            <Plus size={14} weight="regular" />
+          </button>
         )}
-
-        {!canEdit && !hasCurrent && (
-          <p className={styles.emptyNote}>{t("browser.styles.emptyAdjust")}</p>
+        {hasCurrent && (
+          <button
+            type="button"
+            className={styles.iconBtn}
+            title={t("browser.styles.clearCurrent")}
+            aria-label={t("browser.styles.clearCurrent")}
+            disabled={!canEdit}
+            onClick={edit.clearCurrent}
+          >
+            <Eraser size={14} weight="regular" />
+          </button>
         )}
-      </section>
-    </div>
+      </header>
+      {open && (
+        <div className={styles.cssDraftBody}>
+          {edit.error && <p className={styles.adjustError}>{edit.error}</p>}
+          {hasCurrent && (
+            <ul className={styles.adjustList}>
+              {currentDeclarations.map((decl) => (
+                <li key={decl.name}>
+                  <PropertyRow
+                    decl={decl}
+                    compact={compact}
+                    disabled={!canEdit}
+                    onToggleEnabled={edit.toggleEnabled}
+                    onToggleImportant={edit.toggleImportant}
+                    onValueChange={edit.setValue}
+                    onValueLive={edit.setValue}
+                    onRemove={edit.removeDeclaration}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit && (
+            <AddPropertyForm
+              compact={compact}
+              existingNames={currentDeclarations.map((decl) => decl.name)}
+              onAdd={edit.upsertDeclaration}
+            />
+          )}
+          <CssReferencePanel compact={compact} />
+        </div>
+      )}
+    </section>
   );
 }

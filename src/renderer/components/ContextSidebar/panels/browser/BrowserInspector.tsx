@@ -34,6 +34,7 @@ import { StylesTab } from "./StylesTab";
 /** 检查器区高度边界：下限固定像素，上限为面板高度的占比（保证页面区仍可用）。 */
 const MIN_HEIGHT = 120;
 const MAX_HEIGHT_RATIO = 0.6;
+const LIVE_PREVIEW_INTERVAL_MS = 120;
 
 interface ResizeSession {
   startY: number;
@@ -118,6 +119,17 @@ export function BrowserInspector({ floatHost = false }: { floatHost?: boolean })
   // 浮窗打开时主窗整段不渲染：预览页占满侧栏高度（docs/design/38 验收 2）；
   // 停靠 / 关闭只在浮窗标题条操作，不在主窗留占位条。
   const dockedHidden = !floatHost && inspectorFloatOpen;
+
+  const { previewEnabled, hasDrafts, applying, error, applyDrafts, subscribeApplied } = edit;
+  // 只有当前宿主写预览；切换页签或折叠检查器不打断最后一次修改。
+  useEffect(() => {
+    if (dockedHidden || !previewEnabled || !hasDrafts || applying || error) return;
+    const timer = window.setTimeout(() => void applyDrafts(), LIVE_PREVIEW_INTERVAL_MS);
+    return () => window.clearTimeout(timer);
+  }, [dockedHidden, previewEnabled, hasDrafts, applying, error, applyDrafts]);
+
+  const refresh = inspector.refresh;
+  useEffect(() => subscribeApplied(refresh), [subscribeApplied, refresh]);
 
   const buildHandoff = (): InspectorFloatHandoff => ({
     tab: browserPanelTab,

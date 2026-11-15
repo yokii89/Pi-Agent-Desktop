@@ -127,7 +127,7 @@ export function UnitField({
           if (!Number.isFinite(base)) return;
           const stepped = Math.round((base + dx * (event.shiftKey ? 10 : 1)) * 100) / 100;
           setDraft(String(stepped));
-          onLive?.(String(stepped));
+          (onLive ?? onChange)(String(stepped));
         }}
         onPointerUp={(event) => {
           if (!dragRef.current) return;

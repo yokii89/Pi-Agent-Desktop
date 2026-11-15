@@ -8,11 +8,13 @@ import {
   useReducer,
   useRef,
 } from "react";
+import { t } from "../../shared/i18n";
 import type {
   InspectorFloatHandoff,
   InspectorFloatNodePatch,
   StylePatchDeclaration,
 } from "../../shared/ipc";
+import { formatStylePatchCss } from "../../shared/stylePatchCss";
 import { browserService } from "../services/browserService";
 import { useBrowserStore } from "./browserStore";
 
@@ -23,15 +25,11 @@ function normalizeDeclName(name: string): string {
 }
 
 /**
- * 样式热更改意图（docs/design/22 §5.3）。
+ * 样式编辑意图（docs/design/22 §5.3）。
  *
- * 职责边界：只负责「用户的临时调整」——草稿、已应用声明、按节点归拢、失效清空；
- * 页面真相的只读快照仍归 inspectorStore，导航/托盘归 browserStore。
- * 热应用经 browserService.stylePatch 写主进程 PiDesk 调整样式表。
+ * 只读页面快照归 inspectorStore，浏览器上下文归 browserStore；本 store 分开持有待保存草稿
+ * 与已应用声明。默认实时预览；关闭后保留草稿，供手动应用或复制。
  */
-
-/** 连续输入（拖拽/滑条）的合并窗口；提交类操作走 flush 立刻发。 */
-const LIVE_DEBOUNCE_MS = 50;
 
 interface NodePatch {
   selector: string;
@@ -39,9 +37,13 @@ interface NodePatch {
 }
 
 interface StyleEditState {
+  /** Working values, stored only for nodes that differ from the applied map. */
   byNode: Map<number, NodePatch>;
+  /** Rules currently installed in the browser page. */
+  appliedByNode: Map<number, NodePatch>;
   currentNodeId: number | null;
   applying: boolean;
+  previewEnabled: boolean;
   error: string | null;
   /** 导航后提示「临时调整已清除」。 */
   navCleared: boolean;
@@ -50,14 +52,16 @@ interface StyleEditState {
 type StyleEditAction =
   | { type: "focusNode"; nodeId: number | null }
   | {
-      type: "local";
+      type: "draft";
       nodeId: number;
       selector: string;
       declarations: StylePatchDeclaration[];
     }
-  | { type: "applied"; nodeId: number; selector: string; declarations: StylePatchDeclaration[] }
+  | { type: "applied"; nodeId: number; selector: string; patch: NodePatch }
+  | { type: "previewEnabled"; enabled: boolean }
   | { type: "removeNode"; nodeId: number }
   | { type: "clearAll" }
+  | { type: "discardDrafts" }
   | { type: "applying"; applying: boolean }
   | { type: "error"; message: string | null }
   | { type: "navCleared" }
@@ -65,14 +69,18 @@ type StyleEditAction =
   | {
       type: "hydrate";
       patches: InspectorFloatNodePatch[];
+      drafts: InspectorFloatNodePatch[];
       currentNodeId: number | null;
       navCleared: boolean;
+      previewEnabled: boolean;
     };
 
 const initialState: StyleEditState = {
   byNode: new Map(),
+  appliedByNode: new Map(),
   currentNodeId: null,
   applying: false,
+  previewEnabled: true,
   error: null,
   navCleared: false,
 };
@@ -81,13 +89,47 @@ function cloneDecls(decls: StylePatchDeclaration[]): StylePatchDeclaration[] {
   return decls.map((decl) => ({ ...decl }));
 }
 
+function samePatch(
+  patch: NodePatch | undefined,
+  selector: string,
+  declarations: StylePatchDeclaration[],
+): boolean {
+  if (!patch) return declarations.length === 0;
+  if (patch.selector !== selector || patch.declarations.length !== declarations.length)
+    return false;
+  return patch.declarations.every((decl, index) => {
+    const candidate = declarations[index];
+    return (
+      decl.name === candidate?.name &&
+      decl.value === candidate.value &&
+      decl.important === candidate.important &&
+      decl.enabled === candidate.enabled
+    );
+  });
+}
+
+function removedDeclarations(
+  applied: NodePatch | undefined,
+  draft: NodePatch,
+): StylePatchDeclaration[] {
+  return (applied?.declarations ?? [])
+    .filter((previous) => previous.enabled)
+    .filter((previous) => {
+      const current = draft.declarations.find(
+        (declaration) => normalizeDeclName(declaration.name) === normalizeDeclName(previous.name),
+      );
+      return !current?.enabled;
+    });
+}
+
 function reducer(state: StyleEditState, action: StyleEditAction): StyleEditState {
   switch (action.type) {
     case "focusNode":
       return { ...state, currentNodeId: action.nodeId, error: null };
-    case "local": {
+    case "draft": {
       const next = new Map(state.byNode);
-      if (action.declarations.length === 0) {
+      const baseline = state.appliedByNode.get(action.nodeId);
+      if (!state.applying && samePatch(baseline, action.selector, action.declarations)) {
         next.delete(action.nodeId);
       } else {
         next.set(action.nodeId, {
@@ -98,42 +140,67 @@ function reducer(state: StyleEditState, action: StyleEditAction): StyleEditState
       return { ...state, byNode: next, navCleared: false, error: null };
     }
     case "applied": {
-      const next = new Map(state.byNode);
-      if (action.declarations.length === 0) {
-        next.delete(action.nodeId);
+      const applied = new Map(state.appliedByNode);
+      if (action.patch.declarations.length === 0) {
+        applied.delete(action.nodeId);
       } else {
-        next.set(action.nodeId, {
+        applied.set(action.nodeId, {
           selector: action.selector,
-          declarations: cloneDecls(action.declarations),
+          declarations: cloneDecls(action.patch.declarations),
         });
       }
-      return { ...state, byNode: next, applying: false, error: null };
+      const drafts = new Map(state.byNode);
+      const draft = drafts.get(action.nodeId);
+      // 写入期间仍可编辑；只结算已发送的版本，后续输入留给下一次应用。
+      if (draft === action.patch) {
+        drafts.delete(action.nodeId);
+      } else if (draft) {
+        drafts.set(action.nodeId, { ...draft, selector: action.selector });
+      }
+      return { ...state, appliedByNode: applied, byNode: drafts, error: null };
     }
+    case "previewEnabled":
+      return { ...state, previewEnabled: action.enabled, error: null };
     case "removeNode": {
       const next = new Map(state.byNode);
       next.delete(action.nodeId);
       return { ...state, byNode: next };
     }
     case "clearAll":
-      return { ...initialState, currentNodeId: state.currentNodeId };
+      return {
+        ...initialState,
+        currentNodeId: state.currentNodeId,
+        previewEnabled: state.previewEnabled,
+      };
+    case "discardDrafts":
+      return { ...state, byNode: new Map(), error: null };
     case "applying":
       return { ...state, applying: action.applying };
     case "error":
       return { ...state, error: action.message, applying: false };
     case "navCleared":
-      return { ...initialState, navCleared: true };
+      return { ...initialState, navCleared: true, previewEnabled: state.previewEnabled };
     case "hydrate": {
-      const next = new Map<number, NodePatch>();
+      const applied = new Map<number, NodePatch>();
       for (const patch of action.patches) {
-        next.set(patch.nodeId, {
+        applied.set(patch.nodeId, {
+          selector: patch.selector,
+          declarations: cloneDecls(patch.declarations),
+        });
+      }
+      const drafts = new Map<number, NodePatch>();
+      for (const patch of action.drafts) {
+        drafts.set(patch.nodeId, {
           selector: patch.selector,
           declarations: cloneDecls(patch.declarations),
         });
       }
       return {
-        byNode: next,
+        byNode: drafts,
+        appliedByNode: applied,
         currentNodeId: action.currentNodeId,
         applying: false,
+        previewEnabled: action.previewEnabled,
         error: null,
         navCleared: action.navCleared,
       };
@@ -147,10 +214,9 @@ interface StyleEditStoreValue extends StyleEditState {
   /** 当前节点的调整（含未启用）。 */
   currentDeclarations: StylePatchDeclaration[];
   currentSelector: string;
-  /** 全部节点已启用的调整条数（调整条角标）。 */
-  totalEnabled: number;
-  /** 其他节点上仍有调整的数量。 */
-  otherNodeCount: number;
+  hasDrafts: boolean;
+  exportDeclarationCount: number;
+  setPreviewEnabled: (enabled: boolean) => void;
   setFocusNode: (nodeId: number | null) => void;
   upsertDeclaration: (name: string, value: string) => void;
   /** 一次写入多条（盒四边联动 / Flow 同时写 display+flex-direction）。 */
@@ -159,22 +225,27 @@ interface StyleEditStoreValue extends StyleEditState {
   removeDeclarations: (names: string[]) => void;
   toggleEnabled: (name: string, enabled: boolean) => void;
   toggleImportant: (name: string, important: boolean) => void;
-  setValue: (name: string, value: string, live?: boolean) => void;
+  setValue: (name: string, value: string) => void;
   removeDeclaration: (name: string) => void;
   clearCurrent: () => void;
   clearAll: () => void;
-  exportCss: (host: string) => Promise<string>;
+  discardDrafts: () => void;
+  applyDrafts: () => Promise<boolean>;
+  exportCss: (host: string) => string;
   dismissNavCleared: () => void;
   /** 热更成功后通知（StylesTab 用来拉 computed 对账）。 */
   subscribeApplied: (listener: () => void) => () => void;
   /** 导出 UI 草稿（不含 tab；tab 归 uiStore）。 */
   serializeHandoffBody: () => Pick<
     InspectorFloatHandoff,
-    "currentNodeId" | "navCleared" | "patches"
+    "currentNodeId" | "navCleared" | "patches" | "drafts" | "previewEnabled"
   >;
   /** 停靠 ⇄ 浮窗移交：恢复 UI 草稿。 */
   hydrateHandoffBody: (
-    body: Pick<InspectorFloatHandoff, "currentNodeId" | "navCleared" | "patches">,
+    body: Pick<
+      InspectorFloatHandoff,
+      "currentNodeId" | "navCleared" | "patches" | "drafts" | "previewEnabled"
+    >,
   ) => void;
 }
 
@@ -187,8 +258,8 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
   stateRef.current = state;
   const browserRef = useRef(browser);
   browserRef.current = browser;
-  const timerRef = useRef<number | null>(null);
   const seqRef = useRef(0);
+  const applyingRef = useRef(false);
   // 热更成功后由 StylesTab 拉一次 computed 对账（22 R3）
   const appliedListenersRef = useRef(new Set<() => void>());
 
@@ -196,11 +267,8 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
     () =>
       browserService.subscribe((message) => {
         if (message.type === "inspectInvalidated") {
-          if (timerRef.current !== null) {
-            window.clearTimeout(timerRef.current);
-            timerRef.current = null;
-          }
           seqRef.current += 1;
+          applyingRef.current = false;
           dispatch({ type: "navCleared" });
           return;
         }
@@ -212,63 +280,24 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
   );
 
   const currentPatch =
-    state.currentNodeId !== null ? state.byNode.get(state.currentNodeId) : undefined;
+    state.currentNodeId !== null
+      ? (state.byNode.get(state.currentNodeId) ?? state.appliedByNode.get(state.currentNodeId))
+      : undefined;
   const currentDeclarations = currentPatch?.declarations ?? [];
   const currentSelector = currentPatch?.selector ?? "";
 
-  const totalEnabled = useMemo(() => {
+  const exportDeclarationCount = useMemo(() => {
     let count = 0;
-    for (const patch of state.byNode.values()) {
-      count += patch.declarations.filter((decl) => decl.enabled).length;
+    for (const [nodeId, draft] of new Map([...state.appliedByNode, ...state.byNode])) {
+      count += draft.declarations.filter((decl) => decl.enabled).length;
+      count += removedDeclarations(state.appliedByNode.get(nodeId), draft).length;
     }
     return count;
-  }, [state.byNode]);
+  }, [state.appliedByNode, state.byNode]);
 
-  const otherNodeCount = useMemo(() => {
-    let count = 0;
-    for (const [nodeId] of state.byNode) {
-      if (nodeId !== state.currentNodeId) count += 1;
-    }
-    return count;
-  }, [state.byNode, state.currentNodeId]);
-
-  const pushPatch = useCallback(
-    (
-      nodeId: number,
-      selector: string,
-      declarations: StylePatchDeclaration[],
-      live: boolean,
-    ): void => {
-      dispatch({ type: "local", nodeId, selector, declarations });
-      const run = (): void => {
-        timerRef.current = null;
-        seqRef.current += 1;
-        const seq = seqRef.current;
-        dispatch({ type: "applying", applying: true });
-        void browserService.stylePatch(nodeId, selector, declarations).then((result) => {
-          if (seq !== seqRef.current) return;
-          if (!result) {
-            dispatch({ type: "error", message: "热更改未生效，请重新拾取元素" });
-            return;
-          }
-          dispatch({
-            type: "applied",
-            nodeId,
-            selector: result.selector,
-            declarations,
-          });
-          for (const listener of appliedListenersRef.current) listener();
-        });
-      };
-      if (timerRef.current !== null) {
-        window.clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      if (live) {
-        timerRef.current = window.setTimeout(run, LIVE_DEBOUNCE_MS);
-      } else {
-        run();
-      }
+  const stagePatch = useCallback(
+    (nodeId: number, selector: string, declarations: StylePatchDeclaration[]): void => {
+      dispatch({ type: "draft", nodeId, selector, declarations });
     },
     [],
   );
@@ -280,10 +309,10 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
   } | null => {
     const nodeId = stateRef.current.currentNodeId;
     if (nodeId === null) return null;
-    const patch = stateRef.current.byNode.get(nodeId);
+    const patch = stateRef.current.byNode.get(nodeId) ?? stateRef.current.appliedByNode.get(nodeId);
     const picked = browserRef.current.lastPicked;
     const fallbackSelector =
-      picked && picked.kind === "element" && picked.selector ? picked.selector : "";
+      picked && picked.kind === "element" && picked.nodeId === nodeId ? picked.selector : "";
     return {
       nodeId,
       selector: patch?.selector || fallbackSelector,
@@ -303,9 +332,9 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
       const key = normalizeDeclName(name);
       const declarations = ctx.declarations.filter((decl) => normalizeDeclName(decl.name) !== key);
       declarations.push({ name: key, value: value.trim(), important: false, enabled: true });
-      pushPatch(ctx.nodeId, ctx.selector, declarations, false);
+      stagePatch(ctx.nodeId, ctx.selector, declarations);
     },
-    [ensureContext, pushPatch],
+    [ensureContext, stagePatch],
   );
 
   const upsertDeclarations = useCallback(
@@ -326,9 +355,9 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
           enabled: true,
         });
       }
-      pushPatch(ctx.nodeId, ctx.selector, declarations, false);
+      stagePatch(ctx.nodeId, ctx.selector, declarations);
     },
-    [ensureContext, pushPatch],
+    [ensureContext, stagePatch],
   );
 
   const removeDeclarations = useCallback(
@@ -339,44 +368,44 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
       const declarations = ctx.declarations.filter(
         (decl) => !keys.has(normalizeDeclName(decl.name)),
       );
-      pushPatch(ctx.nodeId, ctx.selector, declarations, false);
+      stagePatch(ctx.nodeId, ctx.selector, declarations);
     },
-    [ensureContext, pushPatch],
+    [ensureContext, stagePatch],
   );
 
   const mutateDeclaration = useCallback(
-    (name: string, patch: Partial<StylePatchDeclaration>, live: boolean): void => {
+    (name: string, patch: Partial<StylePatchDeclaration>): void => {
       const ctx = ensureContext();
       if (!ctx) return;
       const key = normalizeDeclName(name);
       const declarations = ctx.declarations.map((decl) =>
         normalizeDeclName(decl.name) === key ? { ...decl, ...patch, name: decl.name } : decl,
       );
-      pushPatch(ctx.nodeId, ctx.selector, declarations, live);
+      stagePatch(ctx.nodeId, ctx.selector, declarations);
     },
-    [ensureContext, pushPatch],
+    [ensureContext, stagePatch],
   );
 
   const toggleEnabled = useCallback(
     (name: string, enabled: boolean): void => {
-      mutateDeclaration(name, { enabled }, false);
+      mutateDeclaration(name, { enabled });
     },
     [mutateDeclaration],
   );
 
   const toggleImportant = useCallback(
     (name: string, important: boolean): void => {
-      mutateDeclaration(name, { important }, false);
+      mutateDeclaration(name, { important });
     },
     [mutateDeclaration],
   );
 
   const setValue = useCallback(
-    (name: string, value: string, live = false): void => {
+    (name: string, value: string): void => {
       const trimmed = value.trim();
       // 空值不写入（清空输入时保留上一生效值，避免规则被掏空）
       if (!trimmed) return;
-      mutateDeclaration(name, { value: trimmed }, live);
+      mutateDeclaration(name, { value: trimmed });
     },
     [mutateDeclaration],
   );
@@ -387,29 +416,95 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
       if (!ctx) return;
       const key = normalizeDeclName(name);
       const declarations = ctx.declarations.filter((decl) => normalizeDeclName(decl.name) !== key);
-      pushPatch(ctx.nodeId, ctx.selector, declarations, false);
+      stagePatch(ctx.nodeId, ctx.selector, declarations);
     },
-    [ensureContext, pushPatch],
+    [ensureContext, stagePatch],
   );
 
   const clearCurrent = useCallback((): void => {
     const ctx = ensureContext();
     if (!ctx) return;
-    pushPatch(ctx.nodeId, ctx.selector, [], false);
-  }, [ensureContext, pushPatch]);
+    stagePatch(ctx.nodeId, ctx.selector, []);
+  }, [ensureContext, stagePatch]);
 
   const clearAll = useCallback((): void => {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
     seqRef.current += 1;
+    applyingRef.current = false;
     dispatch({ type: "clearAll" });
     void browserService.stylePatchClear(null);
   }, []);
 
-  const exportCss = useCallback(async (host: string): Promise<string> => {
-    return browserService.stylePatchExport(host);
+  const discardDrafts = useCallback((): void => {
+    if (stateRef.current.applying || applyingRef.current) return;
+    seqRef.current += 1;
+    dispatch({ type: "discardDrafts" });
+  }, []);
+
+  const setPreviewEnabled = useCallback((enabled: boolean): void => {
+    dispatch({ type: "previewEnabled", enabled });
+  }, []);
+
+  const applyDrafts = useCallback(async (): Promise<boolean> => {
+    const pending = [...stateRef.current.byNode.entries()];
+    if (pending.length === 0 || stateRef.current.applying || applyingRef.current) return false;
+    applyingRef.current = true;
+    seqRef.current += 1;
+    const seq = seqRef.current;
+    dispatch({ type: "applying", applying: true });
+    for (const [nodeId, patch] of pending) {
+      if (seq !== seqRef.current) {
+        return false;
+      }
+      const result = await browserService.stylePatch(nodeId, patch.selector, patch.declarations);
+      if (seq !== seqRef.current) {
+        return false;
+      }
+      if (!result) {
+        applyingRef.current = false;
+        dispatch({ type: "error", message: t("browser.styles.applyFailed") });
+        return false;
+      }
+      dispatch({
+        type: "applied",
+        nodeId,
+        selector: result.selector,
+        patch,
+      });
+    }
+    if (seq !== seqRef.current) {
+      return false;
+    }
+    applyingRef.current = false;
+    dispatch({ type: "applying", applying: false });
+    for (const listener of appliedListenersRef.current) listener();
+    return true;
+  }, []);
+
+  const exportCss = useCallback((host: string): string => {
+    const current = stateRef.current;
+    const removals: string[] = [];
+    for (const [nodeId, draft] of current.byNode) {
+      const removed = removedDeclarations(current.appliedByNode.get(nodeId), draft);
+      if (removed.length > 0) {
+        removals.push(
+          "/* Remove from " +
+            draft.selector +
+            ": " +
+            removed.map((decl) => decl.name).join(", ") +
+            " */",
+        );
+      }
+    }
+    const css = formatStylePatchCss(
+      [...new Map([...current.appliedByNode, ...current.byNode]).values()].map(
+        ({ selector, declarations }) => ({
+          selector,
+          declarations,
+        }),
+      ),
+      host,
+    );
+    return [css, ...removals].filter(Boolean).join("\n\n");
   }, []);
 
   const dismissNavCleared = useCallback((): void => {
@@ -424,29 +519,41 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const serializeHandoffBody = useCallback(() => {
+    // 新宿主接管未完成的草稿，旧宿主不得继续发送后续节点。
+    seqRef.current += 1;
+    applyingRef.current = false;
     const current = stateRef.current;
-    const patches: InspectorFloatNodePatch[] = [];
-    for (const [nodeId, patch] of current.byNode) {
-      patches.push({
+    const serialize = (source: Map<number, NodePatch>): InspectorFloatNodePatch[] =>
+      [...source].map(([nodeId, patch]) => ({
         nodeId,
         selector: patch.selector,
         declarations: cloneDecls(patch.declarations),
-      });
-    }
+      }));
     return {
       currentNodeId: current.currentNodeId,
       navCleared: current.navCleared,
-      patches,
+      previewEnabled: current.previewEnabled,
+      patches: serialize(current.appliedByNode),
+      drafts: serialize(current.byNode),
     };
   }, []);
 
   const hydrateHandoffBody = useCallback(
-    (body: Pick<InspectorFloatHandoff, "currentNodeId" | "navCleared" | "patches">): void => {
+    (
+      body: Pick<
+        InspectorFloatHandoff,
+        "currentNodeId" | "navCleared" | "patches" | "drafts" | "previewEnabled"
+      >,
+    ): void => {
+      seqRef.current += 1;
+      applyingRef.current = false;
       dispatch({
         type: "hydrate",
         patches: body.patches,
+        drafts: body.drafts,
         currentNodeId: body.currentNodeId,
         navCleared: body.navCleared,
+        previewEnabled: body.previewEnabled ?? true,
       });
     },
     [],
@@ -457,8 +564,9 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
       ...state,
       currentDeclarations,
       currentSelector,
-      totalEnabled,
-      otherNodeCount,
+      hasDrafts: state.byNode.size > 0,
+      exportDeclarationCount,
+      setPreviewEnabled,
       setFocusNode,
       upsertDeclaration,
       upsertDeclarations,
@@ -469,6 +577,8 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
       removeDeclaration,
       clearCurrent,
       clearAll,
+      discardDrafts,
+      applyDrafts,
       exportCss,
       dismissNavCleared,
       subscribeApplied,
@@ -479,8 +589,8 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
       state,
       currentDeclarations,
       currentSelector,
-      totalEnabled,
-      otherNodeCount,
+      exportDeclarationCount,
+      setPreviewEnabled,
       setFocusNode,
       upsertDeclaration,
       upsertDeclarations,
@@ -491,6 +601,8 @@ export function StyleEditProvider({ children }: { children: ReactNode }) {
       removeDeclaration,
       clearCurrent,
       clearAll,
+      discardDrafts,
+      applyDrafts,
       exportCss,
       dismissNavCleared,
       subscribeApplied,

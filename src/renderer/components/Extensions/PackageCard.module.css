@@ -31,7 +31,7 @@
 }
 
 .main:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -45,7 +45,7 @@
   justify-content: center;
   border-radius: var(--radius-md);
   background: var(--color-accent-soft);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .text {
@@ -86,7 +86,7 @@
   padding: 1px 6px;
   border-radius: var(--radius-pill);
   background: var(--color-accent-soft);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   font-size: var(--font-size-sm);
   line-height: 1.4;
 }
@@ -194,12 +194,12 @@
 }
 
 .kindTab[aria-selected="true"] {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   background: var(--color-accent-soft);
 }
 
 .kindTab:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: 1px;
 }
 

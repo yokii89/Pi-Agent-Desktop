@@ -36,7 +36,7 @@
 }
 
 .field:focus-visible {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   box-shadow: 0 0 0 2px var(--color-accent-soft);
 }
 
@@ -74,5 +74,5 @@
 .check {
   display: inline-flex;
   flex-shrink: 0;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }

@@ -97,7 +97,7 @@
 }
 
 .undo:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: 1px;
 }
 
@@ -116,7 +116,7 @@
 }
 
 .review:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: 1px;
 }
 
@@ -163,8 +163,8 @@
 }
 
 .filePath:hover {
-  color: var(--color-accent);
-  border-bottom-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  color: var(--color-accent-fg);
+  border-bottom-color: color-mix(in srgb, var(--color-accent-border) 55%, transparent);
   background: transparent;
 }
 
@@ -195,7 +195,7 @@
   border: 0;
   border-top: 1px solid var(--color-border);
   background: transparent;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   font-size: var(--session-stream-font-sm);
   text-align: left;
   cursor: pointer;
@@ -203,10 +203,10 @@
 
 .more:hover {
   background: var(--color-bg-hover);
-  color: var(--color-accent-hover);
+  color: var(--color-accent-fg-hover);
 }
 
 .more:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: -1px;
 }

@@ -3,6 +3,7 @@
  * channel 命名遵循 AGENTS.md：`pidesk:<域>:<动作>`。
  */
 
+import type { AccentColorPreference } from "./accentColor";
 import type { SessionStartReason } from "./contribution";
 import type { FontMonoPreset, FontUiPreset } from "./fontPresets";
 import type { LocalePreference } from "./i18n";
@@ -88,12 +89,17 @@ export interface InspectorFloatNodePatch {
   declarations: StylePatchDeclaration[];
 }
 
-/** 停靠 ⇄ 浮窗移交快照：仅 UI 草稿；已写入 CSSOM 的热更不撤。 */
+/** 停靠 ⇄ 浮窗移交快照：分别携带页面已应用规则与待保存草稿。 */
 export interface InspectorFloatHandoff {
   tab: InspectorFloatTab;
   currentNodeId: number | null;
   navCleared: boolean;
+  /** 默认开启实时预览；旧快照缺省时仍按开启处理。 */
+  previewEnabled?: boolean;
+  /** 当前仍生效在预览页的规则。 */
   patches: InspectorFloatNodePatch[];
+  /** 尚未应用到预览的编辑。 */
+  drafts: InspectorFloatNodePatch[];
 }
 
 export interface InspectorFloatStateMessage {
@@ -145,8 +151,8 @@ export interface PideskSettings {
   /** Tab 补全形态；cycle 逐个替换候选，list 一次列出全部（docs/design/60）。 */
   terminalTabCompletion: TerminalTabCompletion;
   theme: ThemeId;
-  /** 自定义主题色（#RRGGBB），覆盖 tokens.css 的 --color-accent 及其派生令牌；null = 跟随主题默认。 */
-  accentColor: string | null;
+  /** 主题色：null = 应用默认，system = 跟随本机系统强调色，#RRGGBB = 固定颜色。 */
+  accentColor: AccentColorPreference;
   /**
    * 本地背景壁纸的绝对路径；null = 使用主题纯色背景（docs/design/111）。
    * 图片 / 视频由扩展名判定，素材只留在本机、不进设置同步。
@@ -277,6 +283,12 @@ export function clampSessionStreamFontPx(value: unknown): number {
 export const SETTINGS_IPC = {
   get: "pidesk:settings:get",
   set: "pidesk:settings:set",
+} as const;
+
+/** 本机系统强调色只在运行时读取/推送，实际色值不进入用户设置。 */
+export const THEME_IPC = {
+  getSystemAccentColor: "pidesk:theme:getSystemAccentColor",
+  systemAccentColorChanged: "pidesk:theme:systemAccentColorChanged",
 } as const;
 
 export const WALLPAPER_IPC = {
@@ -2190,7 +2202,7 @@ export interface BrowserCloseInstanceRequest {
   id: string;
 }
 
-/** 面板宿主区域相对窗口内容区的 bounds（CSS px == DIP）。 */
+/** 面板宿主区域相对窗口内容区的 CSS px；主进程按主窗口 UI 缩放换算为 DIP。 */
 export interface BrowserBoundsRequest {
   x: number;
   y: number;

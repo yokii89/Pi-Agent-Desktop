@@ -183,6 +183,12 @@ export interface PideskGlobalApi {
     get(): Promise<IpcResult<PideskSettings>>;
     set(patch: Partial<PideskSettings>): Promise<IpcResult<PideskSettings>>;
   };
+  theme: {
+    /** 读取本机强调色；不支持或读取失败时返回 null。 */
+    getSystemAccentColor(): Promise<IpcResult<string | null>>;
+    /** 订阅系统强调色变化，返回取消订阅函数。 */
+    onSystemAccentColorChanged(callback: (color: string | null) => void): () => void;
+  };
   wallpaper: {
     /** 打开系统文件选择器挑选本地壁纸（图片 / 视频）；取消返回 null。 */
     pick(): Promise<IpcResult<string | null>>;

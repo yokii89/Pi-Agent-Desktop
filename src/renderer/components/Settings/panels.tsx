@@ -129,6 +129,13 @@ export function AppearancePanel() {
           control={
             <div className={styles.accentSwatches}>
               <AccentSwatch
+                color="system"
+                label={t("settings.appearance.accent.system")}
+                selected={accentColor === "system"}
+                disabled={!hydrated}
+                onSelect={(next) => dispatch({ type: "setAccentColor", color: next })}
+              />
+              <AccentSwatch
                 color={null}
                 label={t("settings.appearance.accent.default")}
                 selected={accentColor === null}

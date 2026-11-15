@@ -12,7 +12,7 @@
 }
 
 .bar:focus-within {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
 }
 
 .input {

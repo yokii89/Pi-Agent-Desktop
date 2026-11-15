@@ -150,6 +150,7 @@ import {
   SESSION_UI_IPC,
   SETTINGS_IPC,
   TERMINAL_IPC,
+  THEME_IPC,
   WALLPAPER_IPC,
   WINDOW_IPC,
 } from "../shared/ipc";
@@ -264,6 +265,13 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 合并更新设置，返回更新后的完整设置。 */
     set: (patch: Partial<PideskSettings>): Promise<IpcResult<PideskSettings>> =>
       ipcRenderer.invoke(SETTINGS_IPC.set, patch),
+  },
+
+  theme: {
+    getSystemAccentColor: (): Promise<IpcResult<string | null>> =>
+      ipcRenderer.invoke(THEME_IPC.getSystemAccentColor),
+    onSystemAccentColorChanged: (callback: (color: string | null) => void): (() => void) =>
+      subscribe<string | null>(THEME_IPC.systemAccentColorChanged, callback),
   },
 
   wallpaper: {

@@ -28,7 +28,7 @@ button.chip:hover {
 }
 
 button.chip:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent-border);
   outline-offset: 2px;
 }
 

@@ -1,108 +1,117 @@
-import { Check, Copy, Crosshair, Eraser, Sparkle } from "@phosphor-icons/react";
+import {
+  ArrowCounterClockwise,
+  CheckCircle,
+  Copy,
+  Eraser,
+  FloppyDisk,
+} from "@phosphor-icons/react";
 import { useT } from "../../../../../hooks/useT";
+import { GlideChevron } from "../../../../ui/GlideChevron";
+import { Menu, type MenuItem } from "../../../../ui/Menu";
+import { Toggle } from "../../../../ui/Toggle";
 import styles from "./styleEdit.module.css";
 
-/**
- * 样式 tab 目标栏（UI 重设计）：检查目标 + 热更改状态 + 全局动作。
- * 把「在改谁 / 改了多少 / 怎么带走」收进一眼可见的一行。
- */
-
-export interface TargetBarProps {
-  label: string;
-  selector: string;
-  totalEnabled: number;
-  navCleared: boolean;
-  /** 写路径进行中（debounce 合并后的 IPC 窗口）。 */
-  applying?: boolean;
-  onCopyCss: () => void;
+interface TargetBarProps {
+  target: string;
+  targetTitle: string;
+  hasDrafts: boolean;
+  hasApplied: boolean;
+  canCopy: boolean;
+  applying: boolean;
+  previewEnabled: boolean;
+  onPreviewChange: (enabled: boolean) => void;
+  onApply: () => void;
+  onCopyForAi: () => void;
+  onDiscard: () => void;
   onClearAll: () => void;
-  onDismissNav: () => void;
 }
 
 export function TargetBar({
-  label,
-  selector,
-  totalEnabled,
-  navCleared,
+  target,
+  targetTitle,
+  hasDrafts,
+  hasApplied,
+  canCopy,
   applying,
-  onCopyCss,
+  previewEnabled,
+  onPreviewChange,
+  onApply,
+  onCopyForAi,
+  onDiscard,
   onClearAll,
-  onDismissNav,
 }: TargetBarProps) {
   const t = useT();
-  const hasLabel = Boolean(label || selector);
-  const chipText = label || selector || t("browser.styles.targetEmpty");
-  const badgeClass = [
-    styles.liveBadge,
-    navCleared ? styles.liveBadgeWarn : "",
-    !navCleared && totalEnabled === 0 ? styles.liveBadgeIdle : "",
-    applying ? styles.liveBadgeApplying : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const items: MenuItem[] = [
+    {
+      key: "apply",
+      label: t("browser.styles.applyToPreview"),
+      icon: <CheckCircle size={16} weight="regular" />,
+      disabled: !hasDrafts || applying,
+      onSelect: onApply,
+    },
+    {
+      key: "copy-for-ai",
+      label: t("browser.styles.copyForAi"),
+      icon: <Copy size={16} weight="regular" />,
+      disabled: !canCopy || applying,
+      onSelect: onCopyForAi,
+    },
+    {
+      key: "discard",
+      label: t("browser.styles.discardDrafts"),
+      icon: <ArrowCounterClockwise size={16} weight="regular" />,
+      disabled: !hasDrafts || applying,
+      dividerBefore: true,
+      onSelect: onDiscard,
+    },
+    {
+      key: "clear-all",
+      label: t("browser.styles.clearAll"),
+      icon: <Eraser size={16} weight="regular" />,
+      disabled: (!hasApplied && !hasDrafts) || applying,
+      dividerBefore: true,
+      tone: "danger",
+      onSelect: onClearAll,
+    },
+  ];
 
   return (
     <div className={styles.targetBar}>
-      <div
-        className={[styles.targetChip, hasLabel ? "" : styles.targetChipEmpty].join(" ")}
-        title={selector || label}
-      >
-        <Crosshair size={14} weight="regular" />
-        <span className={styles.targetLabel}>{chipText}</span>
-      </div>
-
-      <span className={badgeClass} title={t("browser.styles.liveBadgeTitle")}>
-        {navCleared ? (
-          <>
-            <Sparkle size={11} weight="regular" />
-            {t("browser.styles.cleared")}
-          </>
-        ) : (
-          <>
-            <span className={styles.liveDot} />
-            {totalEnabled > 0
-              ? applying
-                ? t("browser.styles.applying")
-                : t("browser.styles.liveCount", { count: totalEnabled })
-              : applying
-                ? t("browser.styles.applying")
-                : t("browser.styles.noLive")}
-          </>
-        )}
-      </span>
-
+      <code className={styles.targetSelector} title={targetTitle} data-selectable-text>
+        {target || t("browser.styles.targetEmpty")}
+      </code>
       <div className={styles.targetActions}>
-        {navCleared ? (
-          <button
-            type="button"
-            className={styles.iconBtn}
-            title={t("browser.styles.gotIt")}
-            onClick={onDismissNav}
-          >
-            <Check size={14} weight="regular" />
-          </button>
-        ) : (
-          <>
+        <div className={styles.previewToggle}>
+          <Toggle
+            checked={previewEnabled}
+            onChange={onPreviewChange}
+            aria-label={t("browser.styles.applyToPreview")}
+          />
+          <span>{t("browser.styles.applyToPreview")}</span>
+        </div>
+        <Menu
+          align="right"
+          direction="bottom"
+          items={items}
+          trigger={({ open, onClick }) => (
             <button
               type="button"
-              className={styles.iconBtn}
-              title={t("browser.styles.copyAsCss")}
-              disabled={totalEnabled === 0}
-              onClick={onCopyCss}
+              className={[styles.saveButton, hasDrafts ? styles.saveButtonDirty : ""]
+                .filter(Boolean)
+                .join(" ")}
+              title={t("browser.styles.save")}
+              aria-label={t("browser.styles.save")}
+              aria-haspopup="menu"
+              aria-expanded={open}
+              disabled={(!hasDrafts && !hasApplied) || applying}
+              onClick={onClick}
             >
-              <Copy size={14} weight="regular" />
+              <FloppyDisk size={16} weight="regular" />
+              <span>{t("browser.styles.save")}</span>
+              <GlideChevron size={12} />
             </button>
-            <button
-              type="button"
-              className={[styles.iconBtn, styles.iconBtnDanger].join(" ")}
-              title={t("browser.styles.clearAll")}
-              disabled={totalEnabled === 0}
-              onClick={onClearAll}
-            >
-              <Eraser size={14} weight="regular" />
-            </button>
-          </>
-        )}
+          )}
+        />
       </div>
     </div>
   );

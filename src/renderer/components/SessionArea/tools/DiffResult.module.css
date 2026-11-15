@@ -159,6 +159,6 @@
 }
 
 .fold:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: -1px;
 }

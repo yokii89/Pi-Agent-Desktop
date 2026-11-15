@@ -50,5 +50,5 @@
 }
 
 .retry:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
 }

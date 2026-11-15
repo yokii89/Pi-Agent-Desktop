@@ -147,9 +147,9 @@
 
 .beta {
   padding: 0 6px;
-  border: 1px solid var(--color-accent);
+  border: 1px solid var(--color-accent-border);
   border-radius: var(--radius-sm);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   font-size: var(--font-size-sm);
   line-height: 1.5;
 }
@@ -185,7 +185,7 @@
 
 /* 选中底色由选中药丸统一承担（docs/design/54），行上只保留文字强调 */
 .navItemActive {
-  color: var(--color-text-strong);
+  color: var(--color-accent-fg);
 }
 
 /* 选中药丸（docs/design/54）：选项 / 项目 / 历史记录共用的一块高亮底。
@@ -199,7 +199,7 @@
   left: 0;
   z-index: 1;
   border-radius: var(--radius-md);
-  background: var(--color-bg-active);
+  background: var(--color-accent-subtle);
   opacity: 0;
   pointer-events: none;
 }
@@ -458,7 +458,7 @@
   grid-template-columns: repeat(3, 3px);
   grid-auto-rows: 3px;
   gap: 2px;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .runningDot {
@@ -510,7 +510,7 @@
 }
 
 .historyItemActive .historyTitle {
-  color: var(--color-text-strong);
+  color: var(--color-accent-fg);
 }
 
 .historyItem:hover .historyTitle,
@@ -559,7 +559,7 @@
   min-width: 0;
   margin: 3px var(--row-slot) 3px var(--spacing-md);
   padding: 2px var(--spacing-xs);
-  border: 1px solid var(--color-accent);
+  border: 1px solid var(--color-accent-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-surface);
   color: var(--color-text-strong);

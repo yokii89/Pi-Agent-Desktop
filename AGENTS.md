@@ -63,6 +63,8 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 
 任何新增依赖（运行时或开发时）必须先在此处登记用途，再安装。
 
+- @codemirror/legacy-modes（devDep，渲染层构建期打包）：为专用 CodeMirror 语言包未覆盖的文件提供 StreamLanguage 模式；首次打开对应文件的源码视图时按需加载，读写模式共用。
+
 **依赖分类契约（安装包体积基线，2026-11-08 瘦身确立）**：`dependencies` 只放**主进程运行时需要
 node_modules 解析**的包（当前仅 `electron-updater` / `node-pty`——主进程走 tsc 编译不打包）；
 渲染层依赖（react、gsap、mermaid、shiki、@phosphor-icons/react、@lobehub/icons、@xterm/* 等）一律

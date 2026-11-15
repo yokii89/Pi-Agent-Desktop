@@ -53,8 +53,8 @@
   --seg-radius: var(--radius-pill);
   --seg-track: transparent;
   --seg-border: transparent;
-  --seg-thumb: var(--color-accent-soft);
-  --seg-ink-active: var(--color-accent);
+  --seg-thumb: var(--color-accent-subtle);
+  --seg-ink-active: var(--color-accent-fg);
   --seg-gap: 5px;
 }
 
@@ -87,7 +87,7 @@
 /* —— 行内命中高亮 —— */
 .highlightMark {
   background: none;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   font-weight: 600;
 }
 
@@ -168,7 +168,7 @@
 .historyChipPrefix {
   flex-shrink: 0;
   font-family: var(--font-family-mono);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .historyChipText {

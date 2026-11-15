@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react"
 import type { HighlighterCore } from "shiki/core";
 import { countCodeLines } from "../../utils/codeLines";
 import { normalizeFenceLang } from "../../utils/markdownRefs";
+import { sourceLanguageForPath } from "../../utils/sourceLanguages";
 import styles from "./CodeHighlight.module.css";
 
 /**
@@ -9,71 +10,6 @@ import styles from "./CodeHighlight.module.css";
  * 超限时回退纯 <pre>。
  */
 const MAX_HIGHLIGHT_BYTES = 200_000;
-
-const EXT_TO_LANG: Record<string, string> = {
-  ts: "typescript",
-  mts: "typescript",
-  cts: "typescript",
-  tsx: "tsx",
-  js: "javascript",
-  mjs: "javascript",
-  cjs: "javascript",
-  jsx: "jsx",
-  json: "json",
-  jsonc: "jsonc",
-  json5: "json5",
-  yaml: "yaml",
-  yml: "yaml",
-  toml: "toml",
-  ini: "ini",
-  cfg: "ini",
-  conf: "ini",
-  css: "css",
-  scss: "scss",
-  less: "less",
-  html: "html",
-  htm: "html",
-  xml: "xml",
-  svg: "xml",
-  vue: "vue",
-  svelte: "svelte",
-  py: "python",
-  rb: "ruby",
-  php: "php",
-  sh: "bash",
-  bash: "bash",
-  zsh: "bash",
-  ps1: "powershell",
-  rs: "rust",
-  go: "go",
-  c: "c",
-  h: "c",
-  cpp: "cpp",
-  cc: "cpp",
-  cxx: "cpp",
-  hpp: "cpp",
-  cs: "csharp",
-  java: "java",
-  kt: "kotlin",
-  swift: "swift",
-  md: "markdown",
-  markdown: "markdown",
-  sql: "sql",
-  graphql: "graphql",
-  gql: "graphql",
-  csv: "csv",
-  docker: "dockerfile",
-  dockerfile: "dockerfile",
-  env: "dotenv",
-  log: "log",
-  properties: "properties",
-  make: "makefile",
-  mk: "makefile",
-  cmake: "cmake",
-  nginx: "nginx",
-  diff: "diff",
-  patch: "diff",
-};
 
 /** 按需动态加载的文法模块：只拉当前打开文件真正用到的语言。 */
 const LANG_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
@@ -122,16 +58,7 @@ const LANG_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
 };
 
 function langFromPath(filePath: string): string {
-  const name = filePath.split(/[/\\]/).at(-1) ?? filePath;
-  const lowerName = name.toLowerCase();
-  if (lowerName === "dockerfile" || lowerName.startsWith("dockerfile.")) return "dockerfile";
-  if (lowerName === "makefile" || lowerName === "gnumakefile") return "makefile";
-  if (lowerName === "cmakelists.txt") return "cmake";
-  if (lowerName === ".env" || lowerName.startsWith(".env.")) return "dotenv";
-  // 双后缀（.d.ts）优先整段匹配，否则取最后一段
-  if (/\.d\.ts$/i.test(name)) return "typescript";
-  const ext = name.includes(".") ? (name.split(".").at(-1) ?? "").toLowerCase() : "";
-  return EXT_TO_LANG[ext] ?? "plaintext";
+  return sourceLanguageForPath(filePath)?.shikiLanguage ?? "plaintext";
 }
 
 let highlighterPromise: Promise<HighlighterCore> | null = null;
@@ -147,9 +74,13 @@ const codeThemeSettings = [
     scope: ["keyword", "storage", "keyword.control"],
     settings: { foreground: "var(--syn-keyword)" },
   },
-  { scope: ["string"], settings: { foreground: "var(--syn-string)" } },
+  { scope: ["keyword.operator"], settings: { foreground: "var(--syn-operator)" } },
   {
-    scope: ["constant.language", "constant.numeric", "constant.character"],
+    scope: ["string", "constant.character"],
+    settings: { foreground: "var(--syn-string)" },
+  },
+  {
+    scope: ["constant.language", "constant.numeric"],
     settings: { foreground: "var(--syn-number)" },
   },
   {
@@ -157,18 +88,24 @@ const codeThemeSettings = [
     settings: { foreground: "var(--syn-function)" },
   },
   {
-    scope: ["entity.name.type", "entity.name.class", "storage.type"],
+    scope: [
+      "entity.name.type",
+      "entity.name.class",
+      "entity.name.namespace",
+      "storage.type",
+      "support.type",
+    ],
     settings: { foreground: "var(--syn-type)" },
   },
   {
-    scope: ["variable.parameter", "variable.other.property", "entity.name.property"],
+    scope: ["variable.other.property", "entity.name.property", "entity.other.attribute-name"],
     settings: { foreground: "var(--syn-property)" },
   },
+  { scope: ["punctuation"], settings: { foreground: "var(--syn-punctuation)" } },
   {
-    scope: ["keyword.operator", "punctuation"],
-    settings: { foreground: "var(--syn-punctuation)" },
+    scope: ["variable", "variable.parameter", "entity.name.variable"],
+    settings: { foreground: "var(--syn-variable)" },
   },
-  { scope: ["variable", "entity.name.variable"], settings: { foreground: "var(--syn-variable)" } },
 ];
 
 const codeThemes = [
@@ -253,7 +190,10 @@ export function CodeHighlight({ code, filePath, lang, className, focusLine }: Co
   const preRef = useRef<HTMLPreElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
 
-  const gutterWidth = useMemo(() => `${String(countCodeLines(code)).length + 1}ch`, [code]);
+  const gutterWidth = useMemo(
+    () => `${Math.max(2, String(countCodeLines(code)).length)}ch`,
+    [code],
+  );
   const gutterStyle = useMemo(
     () => ({ "--gutter-w": gutterWidth }) as CSSProperties,
     [gutterWidth],

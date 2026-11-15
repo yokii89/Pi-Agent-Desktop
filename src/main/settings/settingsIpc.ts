@@ -168,7 +168,7 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         if (value === "dark" || value === "light") clean.theme = value as ThemeId;
         break;
       case "accentColor":
-        // null（恢复默认）是合法值；非法 hex 归一为 null 而不是丢弃整项，
+        // system（跟随系统）与 null（恢复默认）都是合法值；非法 hex 归一为 null，
         // 否则渲染层回写时永远清不掉旧值
         clean.accentColor = normalizeAccentColor(value);
         break;

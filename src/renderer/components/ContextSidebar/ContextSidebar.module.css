@@ -143,8 +143,8 @@
 
 .tabItemActive,
 .tabItemActive:hover {
-  background: var(--color-bg-active);
-  color: var(--color-text-strong);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-fg);
 }
 
 .tabButton {
@@ -297,7 +297,7 @@
    泛光贴边但不外溢太远：启动页列表左右只有 --spacing-md 的呼吸，光晕再大就会被滚动容器裁掉。 */
 .launcherCard:hover {
   background: var(--color-bg-hover);
-  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent-border) 55%, transparent);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--color-accent) 26%, transparent),
     0 0 12px color-mix(in srgb, var(--color-accent) 20%, transparent);

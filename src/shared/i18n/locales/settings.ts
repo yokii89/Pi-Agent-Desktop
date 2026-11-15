@@ -444,11 +444,15 @@ export const settingsMessages = defineMessages({
   "settings.appearance.group.accent": { "zh-CN": "主题色", "en-US": "Accent color" },
   "settings.appearance.accent": { "zh-CN": "主题色", "en-US": "Accent color" },
   "settings.appearance.accent.description": {
-    "zh-CN": "用于发送按钮、链接、开关等强调元素；选择后立即生效。",
+    "zh-CN": "用于发送按钮、链接、开关等强调元素；可跟随系统强调色自动更新。",
     "en-US":
-      "Used for emphasis elements like the send button, links and toggles. Applies immediately.",
+      "Used for the send button, links and toggles. Follow the system accent color to update automatically.",
   },
   "settings.appearance.accent.default": { "zh-CN": "默认", "en-US": "Default" },
+  "settings.appearance.accent.system": {
+    "zh-CN": "跟随系统强调色",
+    "en-US": "Follow system accent color",
+  },
   "settings.appearance.accent.preset.red": { "zh-CN": "红色", "en-US": "Red" },
   "settings.appearance.accent.preset.orange": { "zh-CN": "橙色", "en-US": "Orange" },
   "settings.appearance.accent.preset.amber": { "zh-CN": "琥珀", "en-US": "Amber" },

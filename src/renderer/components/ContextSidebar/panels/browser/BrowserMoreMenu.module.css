@@ -112,8 +112,8 @@
   --seg-radius: calc(var(--radius-sm) + 1px);
   --seg-track: transparent;
   --seg-border: transparent;
-  --seg-thumb: var(--color-accent-soft);
-  --seg-ink-active: var(--color-accent);
+  --seg-thumb: var(--color-accent-subtle);
+  --seg-ink-active: var(--color-accent-fg);
 }
 
 .viewportInput {

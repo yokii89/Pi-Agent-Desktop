@@ -168,7 +168,7 @@
   border: none;
   background: none;
   padding: 0;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   font-size: var(--font-size-sm);
   cursor: pointer;
 }
@@ -225,7 +225,7 @@
 
 .repoLink {
   font-size: var(--font-size-sm);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   word-break: break-all;
 }
 
@@ -276,7 +276,7 @@
   border: none;
   background: none;
   padding: var(--spacing-xs);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   font-size: var(--font-size-sm);
   cursor: pointer;
 }

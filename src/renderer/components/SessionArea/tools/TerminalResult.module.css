@@ -104,8 +104,8 @@
 /* pi-bash-jobs 转后台（docs/design/129 P2）：与 .err 同配方、accent 取色——
    进程还在跑不是失败，但也不能读成「这条命令已经完了」 */
 .bg {
-  color: var(--color-accent);
-  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+  color: var(--color-accent-fg);
+  border-color: color-mix(in srgb, var(--color-accent-border) 35%, var(--color-border));
   background: var(--color-accent-soft);
 }
 
@@ -134,7 +134,7 @@
 }
 
 .ghost:focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-accent-border);
   outline-offset: 1px;
 }
 
@@ -155,7 +155,7 @@
   color: var(--color-warning);
 }
 :global(.ansiBlue) {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 :global(.ansiMagenta) {
   color: color-mix(in srgb, var(--color-accent) 70%, #d2a8ff);
@@ -180,7 +180,7 @@
   color: var(--color-warning);
 }
 :global(.ansiBrightBlue) {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 :global(.ansiBrightMagenta) {
   color: color-mix(in srgb, var(--color-accent) 70%, #d2a8ff);

@@ -266,6 +266,8 @@ export const browserService = {
 export interface BrowserContextItem {
   id: string;
   kind: "element" | "screenshot";
+  /** CDP nodeId for the picked element; screenshots have no inspect target. */
+  nodeId?: number | null;
   url: string;
   at: number;
   /** screenshot 形态时为 "img"。 */
@@ -288,6 +290,7 @@ export function itemFromPickedElement(element: BrowserPickedElement): BrowserCon
   return {
     id: element.id,
     kind: "element",
+    nodeId: element.nodeId,
     url: element.url,
     at: element.at,
     tag: element.tag,

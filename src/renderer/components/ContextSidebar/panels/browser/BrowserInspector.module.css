@@ -53,8 +53,8 @@
   --seg-radius: calc(var(--radius-sm) + 1px);
   --seg-track: transparent;
   --seg-border: transparent;
-  --seg-thumb: var(--color-accent-soft);
-  --seg-ink-active: var(--color-accent);
+  --seg-thumb: var(--color-accent-subtle);
+  --seg-ink-active: var(--color-accent-fg);
 
   min-width: 0;
 }
@@ -177,7 +177,7 @@
 
 .targetLabel {
   overflow: hidden;
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-sm);
   text-overflow: ellipsis;
@@ -203,8 +203,8 @@
   --seg-pad: var(--spacing-xs);
   --seg-min: 0px;
   --seg-gap: var(--spacing-xs);
-  --seg-thumb: var(--color-accent-soft);
-  --seg-ink-active: var(--color-accent);
+  --seg-thumb: var(--color-accent-subtle);
+  --seg-ink-active: var(--color-accent-fg);
 }
 
 .modeHint {
@@ -241,9 +241,9 @@
 }
 
 .actionPrimary {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   background: var(--color-accent-soft);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .actionPrimary:disabled {
@@ -410,9 +410,9 @@
 }
 
 .boxBorder {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .boxPadding {
@@ -495,7 +495,7 @@
 
 .treeRowCurrent {
   background: var(--color-accent-soft);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .treeIndent {

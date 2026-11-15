@@ -56,11 +56,7 @@ const highlightStyle = HighlightStyle.define([
   },
   { tag: [tags.string, tags.special(tags.string), tags.regexp], color: "var(--syn-string)" },
   { tag: [tags.number, tags.bool, tags.null, tags.atom], color: "var(--syn-number)" },
-  {
-    tag: [tags.comment, tags.lineComment, tags.blockComment],
-    color: "var(--syn-comment)",
-    fontStyle: "italic",
-  },
+  { tag: [tags.comment, tags.lineComment, tags.blockComment], color: "var(--syn-comment)" },
   {
     tag: [tags.function(tags.variableName), tags.function(tags.propertyName)],
     color: "var(--syn-function)",
@@ -76,8 +72,8 @@ const highlightStyle = HighlightStyle.define([
   },
   { tag: [tags.punctuation, tags.bracket, tags.separator], color: "var(--syn-punctuation)" },
   { tag: [tags.variableName, tags.self, tags.labelName], color: "var(--syn-variable)" },
-  { tag: [tags.heading, tags.strong], color: "var(--color-text-strong)", fontWeight: "600" },
-  { tag: [tags.link, tags.url], color: "var(--color-accent-link)", textDecoration: "underline" },
+  { tag: [tags.heading, tags.strong], color: "var(--color-text-strong)" },
+  { tag: [tags.link, tags.url], color: "var(--color-accent-link)" },
   { tag: tags.invalid, color: "var(--color-danger)" },
 ]);
 
@@ -103,10 +99,12 @@ function buildTheme(dark: boolean): ReturnType<typeof EditorView.theme> {
       },
       ".cm-content": {
         padding: "var(--code-padding) 0",
-        caretColor: "var(--color-accent)",
+        fontWeight: "400",
+        fontStyle: "normal",
+        caretColor: "var(--color-accent-border)",
       },
-      ".cm-line": { padding: "0 var(--code-padding)" },
-      ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--color-accent)" },
+      ".cm-line": { padding: "0" },
+      ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--color-accent-border)" },
       ".cm-selectionBackground, .cm-content ::selection": {
         backgroundColor: "var(--color-selection) !important",
       },
@@ -115,11 +113,15 @@ function buildTheme(dark: boolean): ReturnType<typeof EditorView.theme> {
         color: "var(--color-text-muted)",
         border: "none",
         borderRight: "1px solid var(--color-border)",
+        margin: "0 var(--spacing-sm) 0 var(--code-padding)",
+        padding: "var(--code-padding) 0",
         userSelect: "none",
       },
       ".cm-lineNumbers .cm-gutterElement": {
-        padding: "0 var(--spacing-sm) 0 var(--spacing-xs)",
+        boxSizing: "content-box",
+        padding: "0 var(--spacing-sm) 0 0",
         minWidth: "2ch",
+        textAlign: "right",
       },
       ".cm-activeLineGutter": {
         backgroundColor: "transparent",
@@ -156,7 +158,7 @@ function buildTheme(dark: boolean): ReturnType<typeof EditorView.theme> {
         color: "var(--color-text)",
         padding: "2px 6px",
       },
-      ".cm-textfield:focus": { borderColor: "var(--color-accent)", outline: "none" },
+      ".cm-textfield:focus": { borderColor: "var(--color-accent-border)", outline: "none" },
       ".cm-button": {
         backgroundImage: "none",
         backgroundColor: "var(--color-bg-surface)",

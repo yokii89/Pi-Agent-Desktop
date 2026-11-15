@@ -2,7 +2,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { useEffect, useImperativeHandle, useRef } from "react";
-import type { Theme } from "../../stores/uiStore";
+import { readTerminalTheme, subscribeTerminalTheme } from "../../utils/terminalTheme";
 import styles from "./PtyTerminal.module.css";
 
 interface PtyTerminalProps {
@@ -13,8 +13,6 @@ interface PtyTerminalProps {
   onData: (data: string) => void;
   onResize: (cols: number, rows: number) => void;
   ariaLabel: string;
-  /** 主题标识：变化时按当前 tokens 重建 xterm 配色。 */
-  theme: Theme;
   /** 等宽 font-family 栈：变化时热更新 xterm（xterm 不支持 var()，不能直接吃 tokens）。 */
   fontFamily: string;
 }
@@ -34,7 +32,6 @@ export function PtyTerminal({
   onData,
   onResize,
   ariaLabel,
-  theme,
   fontFamily,
   ref,
 }: PtyTerminalProps & { ref?: React.Ref<PtyTerminalHandle> }) {
@@ -55,13 +52,16 @@ export function PtyTerminal({
       fontSize: 13,
       cursorBlink: true,
       scrollback: 5000,
-      theme: readXtermTheme(),
+      theme: readTerminalTheme(),
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(container);
     term.element?.setAttribute("aria-label", ariaLabel);
     termRef.current = term;
+    const unsubscribeTheme = subscribeTerminalTheme((theme) => {
+      term.options.theme = theme;
+    });
 
     // 挂载时回放积压输出，再订阅实时 chunk（同一同步块内完成，无竞态窗口）
     const buffered = backlog();
@@ -112,19 +112,13 @@ export function PtyTerminal({
 
     return () => {
       observer.disconnect();
+      unsubscribeTheme();
       unsubscribe();
       dataDisposable.dispose();
       term.dispose();
       termRef.current = null;
     };
   }, []);
-
-  // 主题切换时跟随 tokens 重建配色（xterm 不支持 var()，只能读计算值）
-  // biome-ignore lint/correctness/useExhaustiveDependencies: theme 仅作为重读 tokens 的信号
-  useEffect(() => {
-    const term = termRef.current;
-    if (term) term.options.theme = readXtermTheme();
-  }, [theme]);
 
   // 等宽字体预设切换时热更新（挂载时已按当时栈初始化）
   useEffect(() => {
@@ -139,27 +133,4 @@ export function PtyTerminal({
 function readToken(name: string, fallback: string): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return value || fallback;
-}
-
-/** 按当前主题读取 xterm 配色。 */
-function readXtermTheme(): {
-  background: string;
-  foreground: string;
-  cursor: string;
-  selectionBackground: string;
-  scrollbarSliderBackground: string;
-  scrollbarSliderHoverBackground: string;
-  scrollbarSliderActiveBackground: string;
-} {
-  return {
-    background: readToken("--terminal-bg", "#0d0d0f"),
-    foreground: readToken("--terminal-fg", "#cccccc"),
-    cursor: readToken("--color-accent", "#4a8cff"),
-    selectionBackground: readToken("--color-bg-active", "rgba(255, 255, 255, 0.1)"),
-    // 滚动条滑条：xterm 默认取「前景色 20%」，在暗色终端上几乎看不出；
-    // 改走 muted / 正文 / 强化三档（与全局细滚动条的悬停配方同源，见 global.css）
-    scrollbarSliderBackground: readToken("--color-text-muted", "#8a8a90"),
-    scrollbarSliderHoverBackground: readToken("--color-text", "#d4d4d4"),
-    scrollbarSliderActiveBackground: readToken("--color-text-strong", "#e6e6e9"),
-  };
 }

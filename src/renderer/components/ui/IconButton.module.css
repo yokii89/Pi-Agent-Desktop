@@ -28,10 +28,10 @@
 }
 
 .active {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .active:hover:not(:disabled) {
-  color: var(--color-accent-hover);
+  color: var(--color-accent-fg-hover);
   background: var(--color-bg-hover);
 }

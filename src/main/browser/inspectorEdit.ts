@@ -4,6 +4,7 @@ import type {
   StylePatchExportResult,
   StylePatchResult,
 } from "../../shared/ipc";
+import { formatStylePatchCss as formatSharedStylePatchCss } from "../../shared/stylePatchCss";
 import { sendCommand } from "./cdp";
 import { ensureDocumentRequested } from "./inspectorCdp";
 
@@ -79,14 +80,7 @@ export function formatStylePatchCss(
   entries: Array<{ selector: string; declarations: StylePatchDeclaration[] }>,
   host: string,
 ): string {
-  const blocks: string[] = [];
-  const site = host.trim() || "本地页面";
-  for (const { selector, declarations } of entries) {
-    const text = buildRuleText(selector, declarations);
-    if (!text) continue;
-    blocks.push(`/* PiDesk 临时调整 · ${site} · ${selector} */\n${text}`);
-  }
-  return blocks.join("\n\n");
+  return formatSharedStylePatchCss(entries, host);
 }
 
 async function ensureOverrideSheet(wc: WebContents): Promise<string> {

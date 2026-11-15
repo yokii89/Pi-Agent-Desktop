@@ -1,10 +1,9 @@
-/* 盒模型（DevTools 示意图观感 × PiDesk tokens）。
-   同心色带：margin 琥珀 / border 蓝 / padding 青绿 / content 中性。 */
-
 .root {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
+  min-width: 0;
 }
 
 .empty {
@@ -14,183 +13,201 @@
   line-height: 1.7;
 }
 
-/* ── 示意图 ───────────────────────────────────────── */
-
 .diagram {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-xs) 0 var(--spacing-sm);
-}
-
-.band {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  border-radius: 3px;
+  width: 100%;
+  max-width: 32rem;
+  margin-inline: auto;
   font-family: var(--font-family-mono);
-  font-size: 10px;
-  line-height: 1;
+  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 
 .margin {
-  background: color-mix(in srgb, var(--color-warning) 14%, var(--color-bg-surface));
-  color: var(--color-warning);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-warning) 35%, transparent);
+  --box-tone: var(--color-warning);
 }
 
 .border {
-  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-bg-surface));
-  color: var(--color-accent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent);
+  --box-tone: var(--color-accent-fg);
 }
 
 .padding {
-  background: color-mix(in srgb, var(--color-success) 16%, var(--color-bg-surface));
-  color: var(--color-success);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-success) 40%, transparent);
+  --box-tone: var(--color-success);
+}
+
+.band {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 2.75em) minmax(0, 1fr) minmax(0, 2.75em);
+  grid-template-rows: var(--spacing-lg) auto var(--spacing-lg);
+  grid-template-areas: ". top ." "left inner right" ". bottom .";
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--box-tone) 28%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--box-tone) 7%, var(--color-bg-surface));
+  color: var(--color-text);
+  line-height: 1.4;
+}
+
+.band.margin {
+  border-style: dashed;
+  border-radius: var(--radius-lg);
+}
+
+.bandLabel {
+  position: absolute;
+  top: var(--spacing-xs);
+  left: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.top,
+.right,
+.bottom,
+.left {
+  min-width: 0;
+  overflow: hidden;
+  padding-inline: calc(var(--spacing-xs) / 2);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top {
+  grid-area: top;
+}
+
+.right {
+  grid-area: right;
+}
+
+.bottom {
+  grid-area: bottom;
+}
+
+.left {
+  grid-area: left;
+}
+
+.inner {
+  grid-area: inner;
+  min-width: 0;
 }
 
 .content {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 56px;
-  min-height: 28px;
-  padding: 6px 10px;
-  border-radius: 4px;
-  background: var(--color-bg-elevated);
-  box-shadow: inset 0 0 0 1px var(--color-border);
-  color: var(--color-text);
-  font-family: var(--font-family-mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.edgeTop,
-.edgeRight,
-.edgeBottom,
-.edgeLeft {
-  position: absolute;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-}
-
-.edgeTop {
-  top: 3px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.edgeBottom {
-  bottom: 3px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.edgeLeft {
-  top: 50%;
-  left: 4px;
-  transform: translateY(-50%);
-}
-
-.edgeRight {
-  top: 50%;
-  right: 4px;
-  transform: translateY(-50%);
-}
-
-/* 宽侧栏不够时的紧凑降级（放在基础规则之后，避免降序特异） */
-.rootCompact .band {
-  padding: 10px;
-}
-
-.rootCompact .diagram {
-  justify-content: flex-start;
-}
-
-/* ── 图例明细 ─────────────────────────────────────── */
-
-.legend {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.legendRow {
-  display: grid;
-  grid-template-columns: 10px 56px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  min-height: 28px;
-  padding: 4px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-bg-surface);
-}
-
-.swatch {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-}
-
-.swatchMargin {
-  background: var(--color-warning);
-}
-
-.swatchBorder {
-  background: var(--color-accent);
-}
-
-.swatchPadding {
-  background: var(--color-success);
-}
-
-.swatchContent {
-  background: var(--color-text-muted);
-}
-
-.legendLabel {
-  color: var(--color-text-muted);
-  font-family: var(--font-family-mono);
-  font-size: 11px;
-}
-
-.legendValue {
+  gap: var(--spacing-xs);
   min-width: 0;
-  color: var(--color-text);
-  font-family: var(--font-family-mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
+  padding: var(--spacing-sm) var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
 }
 
-.sides {
-  display: inline-flex;
+.contentLabel,
+.unit {
+  color: var(--color-text-muted);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+}
+
+.contentSize {
+  display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-}
-
-.sideChip {
-  min-width: 22px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--color-bg-hover);
-  text-align: center;
-}
-
-.contentValue {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  max-width: 100%;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .times {
-  opacity: 0.5;
+  color: var(--color-text-muted);
+}
+
+.details {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.details th,
+.details td {
+  overflow: hidden;
+  padding: var(--spacing-sm) var(--spacing-xs);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details thead th {
+  padding-top: 0;
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.details th:first-child {
+  width: 30%;
+  text-align: left;
+}
+
+.details tbody tr {
+  border-top: 1px solid var(--color-border);
+}
+
+.details tbody th {
+  font-weight: 400;
+}
+
+.details tbody th,
+.details td {
+  font-family: var(--font-family-mono);
+  color: var(--color-text);
+}
+
+.layerName {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.swatch {
+  flex-shrink: 0;
+  width: var(--spacing-sm);
+  height: var(--spacing-sm);
+  border: 1px solid color-mix(in srgb, var(--box-tone) 55%, transparent);
+  border-radius: calc(var(--radius-sm) / 2);
+  background: color-mix(in srgb, var(--box-tone) 20%, var(--color-bg-surface));
+}
+
+.rootCompact .band {
+  grid-template-columns: minmax(0, 2.25em) minmax(0, 1fr) minmax(0, 2.25em);
+}
+
+.rootCompact .bandLabel {
+  display: none;
+}
+
+.rootCompact .layerName {
+  gap: var(--spacing-xs);
+}
+
+@container (max-width: 340px) {
+  .band {
+    grid-template-columns: minmax(0, 2.25em) minmax(0, 1fr) minmax(0, 2.25em);
+  }
+
+  .bandLabel {
+    display: none;
+  }
+
+  .layerName {
+    gap: var(--spacing-xs);
+  }
 }

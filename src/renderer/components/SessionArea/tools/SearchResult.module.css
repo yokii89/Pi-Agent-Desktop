@@ -46,7 +46,7 @@
 .mark {
   color: var(--color-text-strong);
   background: var(--color-accent-soft);
-  border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-accent-border) 45%, transparent);
   border-radius: 2px;
   padding: 0 1px;
 }

@@ -28,7 +28,7 @@
 }
 
 .swatch:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent-border);
   outline-offset: 2px;
 }
 
@@ -39,13 +39,13 @@
 
 /* 选中态：强调描边 + 浅色底 + 右上角勾选角标（与分段栏样式选项同一套表达） */
 .swatchSelected {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   background: var(--color-accent-soft);
   box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 .swatchSelected:hover:not(:disabled) {
-  border-color: var(--color-accent-hover);
+  border-color: var(--color-accent-fg-hover);
 }
 
 /* 预览按设计稿裁切区的比例（290 × 203）撑满按钮内宽，底边即伙伴的立足线 */

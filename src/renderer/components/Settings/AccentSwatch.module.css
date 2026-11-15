@@ -1,7 +1,7 @@
 /**
  * 主题色选择按钮（设置 → 外观）。swatch 只负责外框与选中态；
  * 预览是纯色圆点，颜色来自预设数据（用户选择值），
- * 「默认」档吃 var(--color-accent)，即当前主题默认蓝。
+ * 「默认」档使用独立的默认蓝令牌，不跟随当前选中的强调色。
  */
 
 .swatch {
@@ -25,8 +25,17 @@
   border-color: var(--color-text-muted);
 }
 
+.swatchSystem {
+  width: auto;
+  gap: var(--spacing-xs);
+  padding-inline: var(--spacing-md);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+
 .swatch:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent-border);
   outline-offset: 2px;
 }
 
@@ -37,13 +46,13 @@
 
 /* 选中态：强调描边 + 浅色底 + 右上角勾选角标（与伙伴/样式选择同一套表达） */
 .swatchSelected {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   background: var(--color-accent-soft);
   box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 .swatchSelected:hover:not(:disabled) {
-  border-color: var(--color-accent-hover);
+  border-color: var(--color-accent-fg-hover);
 }
 
 .preview {
@@ -53,9 +62,9 @@
   border-radius: 50%;
 }
 
-/* 默认档：吃当前主题的 --color-accent，覆盖后也即时反映 */
+/* 默认档预览始终表达点击后的颜色。 */
 .previewDefault {
-  background: var(--color-accent);
+  background: var(--color-accent-default);
 }
 
 .check {

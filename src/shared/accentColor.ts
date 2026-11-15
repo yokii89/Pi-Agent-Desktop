@@ -21,15 +21,43 @@ export const ACCENT_PRESETS = [
 
 export type AccentPresetId = (typeof ACCENT_PRESETS)[number]["id"];
 
+/** null 使用应用默认色，system 跟随本机强调色，hex 使用固定颜色。 */
+export type AccentColorPreference = "system" | `#${string}` | null;
+
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/;
 
 /**
- * 归一主题色：合法的小写 #RRGGBB 原样返回；其余值（含 null / 缺省）回退 null，
- * null 表示跟随主题默认蓝（tokens.css 的 --color-accent）。
+ * 归一主题色偏好：保留 system，hex 统一为小写，其余值回退应用默认色。
  * 读盘兜底与 IPC patch 校验共用同一份规则。
  */
-export function normalizeAccentColor(value: unknown): string | null {
+export function normalizeAccentColor(value: unknown): AccentColorPreference {
+  if (value === "system") return value;
   if (typeof value !== "string") return null;
   const hex = value.trim().toLowerCase();
-  return HEX_COLOR_RE.test(hex) ? hex : null;
+  return HEX_COLOR_RE.test(hex) ? (hex as `#${string}`) : null;
+}
+
+/** Electron 返回不带 # 的 RRGGBBAA；应用强调色始终不透明，不能按 Windows 的 ARGB 解读。 */
+export function normalizeSystemAccentColor(value: unknown): `#${string}` | null {
+  if (typeof value !== "string" || !/^[0-9a-f]{8}$/i.test(value)) return null;
+  return `#${value.slice(0, 6).toLowerCase()}`;
+}
+
+/** 系统色无法读取时回退应用默认色，保留 system 偏好供后续变化恢复。 */
+export function resolveAccentColor(
+  preference: AccentColorPreference,
+  systemColor: string | null,
+): `#${string}` | null {
+  const color = normalizeAccentColor(preference === "system" ? systemColor : preference);
+  return color === "system" ? null : color;
+}
+
+/** 任意系统色都可能很亮或很暗；选用对比更高的黑/白前景。 */
+export function accentTextTone(color: string): "dark" | "light" {
+  const channels = [1, 3, 5].map((offset) => {
+    const channel = Number.parseInt(color.slice(offset, offset + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? "dark" : "light";
 }

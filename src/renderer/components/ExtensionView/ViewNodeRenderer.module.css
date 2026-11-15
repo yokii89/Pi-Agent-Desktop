@@ -429,7 +429,7 @@
   --seg-pad: var(--spacing-sm);
   --seg-max: 180px;
   --seg-radius: var(--radius-pill);
-  --seg-thumb: var(--color-accent-soft);
+  --seg-thumb: var(--color-accent-subtle);
 
   /* 贴合内容宽度：轨道随页签增减而变宽，原语的 ResizeObserver 才会重测滑块槽位
      （被父级拉满时宽度不动，新增的页签就没有槽位可裁）。长过容器仍由 max-width 兜住并滚动。 */

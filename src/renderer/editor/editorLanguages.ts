@@ -1,73 +1,7 @@
+import { StreamLanguage } from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
+import { type EditorLanguageId, sourceLanguageForPath } from "../utils/sourceLanguages";
 
-/**
- * 编辑态的语言覆盖（docs/design/141）。
- *
- * 只放**编辑时真正会用到的**语言包：预览态的高亮由 shiki 覆盖 40+ 种文法，那是一次性
- * tokenize；编辑态要给的是"打字时还能认出语法"，语言包逐个动态 import，命中不到就退化成
- * 纯文本编辑（仍然可编辑、可保存），不会因为缺语言而挡住编辑。
- *
- * 新增语言只需在这里加两处：`EditorLanguageId` 一个成员 + `EDITOR_LANGUAGES` 一条装载器，
- * 再在 `EDITOR_EXT_LANGUAGE` 里挂上后缀。
- */
-export type EditorLanguageId =
-  | "javascript"
-  | "typescript"
-  | "javascript-jsx"
-  | "typescript-jsx"
-  | "json"
-  | "css"
-  | "html"
-  | "markdown"
-  | "python"
-  | "yaml"
-  | "xml"
-  | "sql"
-  | "rust"
-  | "java"
-  | "cpp"
-  | "php";
-
-/** 后缀 → 语言 id（双后缀与特殊文件名先单独判定，见 editorLanguageFor）。 */
-const EDITOR_EXT_LANGUAGE: Record<string, EditorLanguageId> = {
-  js: "javascript",
-  mjs: "javascript",
-  cjs: "javascript",
-  jsx: "javascript-jsx",
-  ts: "typescript",
-  mts: "typescript",
-  cts: "typescript",
-  tsx: "typescript-jsx",
-  json: "json",
-  jsonc: "json",
-  json5: "json",
-  css: "css",
-  scss: "css",
-  less: "css",
-  html: "html",
-  htm: "html",
-  vue: "html",
-  svelte: "html",
-  md: "markdown",
-  markdown: "markdown",
-  py: "python",
-  yml: "yaml",
-  yaml: "yaml",
-  xml: "xml",
-  svg: "xml",
-  sql: "sql",
-  rs: "rust",
-  java: "java",
-  c: "cpp",
-  h: "cpp",
-  cpp: "cpp",
-  cc: "cpp",
-  cxx: "cpp",
-  hpp: "cpp",
-  php: "php",
-};
-
-/** 语言 id → 装载器（每包一个惰性 chunk；包内再按语法切分）。 */
 const EDITOR_LANGUAGES: Record<EditorLanguageId, () => Promise<Extension>> = {
   javascript: async () => (await import("@codemirror/lang-javascript")).javascript(),
   typescript: async () =>
@@ -88,19 +22,39 @@ const EDITOR_LANGUAGES: Record<EditorLanguageId, () => Promise<Extension>> = {
   java: async () => (await import("@codemirror/lang-java")).java(),
   cpp: async () => (await import("@codemirror/lang-cpp")).cpp(),
   php: async () => (await import("@codemirror/lang-php")).php(),
+  toml: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/toml")).toml),
+  properties: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/properties")).properties),
+  ruby: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/ruby")).ruby),
+  shell: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/shell")).shell),
+  powershell: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/powershell")).powerShell),
+  go: async () => StreamLanguage.define((await import("@codemirror/legacy-modes/mode/go")).go),
+  dockerfile: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/dockerfile")).dockerFile),
+  csharp: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/clike")).csharp),
+  kotlin: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/clike")).kotlin),
+  swift: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/swift")).swift),
+  nginx: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/nginx")).nginx),
+  cmake: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/cmake")).cmake),
+  diff: async () =>
+    StreamLanguage.define((await import("@codemirror/legacy-modes/mode/diff")).diff),
 };
 
-/** 按路径推断编辑语言；命中不到返回 null（纯文本编辑）。 */
+/** Resolves the editor language for a source file. Unknown text files remain editable as plain text. */
 export function editorLanguageFor(filePath: string): EditorLanguageId | null {
-  const name = filePath.split(/[/\\]/).at(-1) ?? filePath;
-  const lower = name.toLowerCase();
-  if (lower === "dockerfile" || lower.startsWith("dockerfile.")) return null;
-  if (lower === ".env" || lower.startsWith(".env.")) return null;
-  const ext = lower.includes(".") ? (lower.split(".").at(-1) ?? "") : "";
-  return EDITOR_EXT_LANGUAGE[ext] ?? null;
+  return sourceLanguageForPath(filePath)?.editorLanguage ?? null;
 }
 
-/** 装载语言扩展；失败时返回 null（调用方保持纯文本，不打断编辑）。 */
+/** Loads a language extension on demand; failures leave the editor in plain text mode. */
 export async function loadEditorLanguage(id: EditorLanguageId): Promise<Extension | null> {
   try {
     return await EDITOR_LANGUAGES[id]();

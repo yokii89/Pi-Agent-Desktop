@@ -99,7 +99,8 @@ export function DesignPanel({ disabled }: DesignPanelProps) {
   }, [data]);
 
   const decls = edit.currentDeclarations;
-  const canEdit = !disabled && edit.currentNodeId !== null && !stale;
+  const canEdit =
+    !disabled && edit.currentNodeId !== null && edit.currentNodeId === data?.nodeId && !stale;
 
   const val = useCallback(
     (prop: string) => resolveDisplayValue(prop, computedMap, decls),
@@ -195,7 +196,7 @@ export function DesignPanel({ disabled }: DesignPanelProps) {
     setMany(targets.map((name) => ({ name, value: css })));
   };
 
-  if (loading && !data) {
+  if (loading && (!data || data.nodeId !== edit.currentNodeId)) {
     return <p className={styles.empty}>{t("browser.styles.loading")}</p>;
   }
   if (!data) {

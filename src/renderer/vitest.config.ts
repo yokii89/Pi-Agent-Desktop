@@ -9,6 +9,7 @@ export default defineConfig({
   test: {
     include: [
       "stores/**/*.test.ts",
+      "services/**/*.test.ts",
       "utils/**/*.test.ts",
       "components/**/*.test.ts",
       "actions/**/*.test.ts",

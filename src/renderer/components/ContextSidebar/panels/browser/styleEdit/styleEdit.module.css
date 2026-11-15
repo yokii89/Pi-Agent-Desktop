@@ -6,15 +6,13 @@
 
 /* 段高 28px + 上下 2px 内缩 = 与旧 .modeSwitch 同样的 34px 外壳。
    旧选中态那圈 0 1px 2px 的投影画不出来：滑块是一条被 clip-path 裁开的副本，
-   投影会被同一次裁剪切掉，所以维持 --color-bg-active 的底 + 正文墨色表达落点。
-   类名写两遍是为了在与原语 .root/.sm 的 --seg-* 同名声明之争里稳定胜出。 */
+   投影会被同一次裁剪切掉，所以沿用分段原语的浅染色底与选中文字表达落点。 */
 .designSeg {
   --seg-h: 32px;
   --seg-inset: 2px;
   --seg-min: 0px;
   --seg-pad: var(--spacing-sm);
   --seg-font: var(--font-size-sm);
-  --seg-ink-active: var(--color-text);
 
   margin: 0 0 var(--spacing-sm);
 }
@@ -23,91 +21,72 @@
 
 .targetBar {
   display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-height: 34px;
   margin: 0 0 var(--spacing-xs);
-  padding: 4px 0 6px;
+  padding: 0 0 var(--spacing-xs);
   border-bottom: 1px solid var(--color-border);
 }
 
-.targetChip {
-  display: inline-flex;
-  flex: 1;
-  align-items: center;
-  gap: 6px;
+.targetSelector {
   min-width: 0;
-  padding: 4px var(--spacing-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-  color: var(--color-accent);
-  font-family: var(--font-family-mono);
-  font-size: 11px;
-}
-
-.targetChipEmpty {
-  color: var(--color-text-muted);
-}
-
-.targetLabel {
   overflow: hidden;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.liveBadge {
+.targetActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.previewToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.saveButton {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  font-size: 11px;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.liveBadgeIdle {
-  background: var(--color-muted-soft);
+  justify-content: center;
+  gap: var(--spacing-xs);
+  height: 30px;
+  padding: 0 var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
   color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.liveBadgeWarn {
-  background: var(--color-warning-soft);
-  color: var(--color-warning);
+.saveButton:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-hover);
+  color: var(--color-text);
 }
 
-.liveDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 25%, transparent);
+.saveButtonDirty {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-fg);
 }
 
-.liveBadgeApplying {
-  animation: livePulse 0.9s ease-in-out infinite;
-}
-
-@keyframes livePulse {
-  50% {
-    opacity: 0.55;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .liveBadgeApplying {
-    animation: none;
-  }
-}
-
-.targetActions {
-  display: flex;
-  flex-shrink: 0;
-  gap: 2px;
+.saveButton:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .iconBtn {
@@ -138,67 +117,101 @@
   color: var(--color-danger);
 }
 
-/* ── 调整卡片 ─────────────────────────────────────── */
-
-.adjustCard {
-  margin: 0 0 var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-  overflow: visible;
+.cssDraft {
+  margin-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
 }
 
-.adjustCardLive {
-  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
-  box-shadow: inset 2px 0 0 var(--color-accent);
-}
-
-.adjustCardMuted {
-  border-color: var(--color-border);
-  background: var(--color-bg-hover);
-}
-
-.adjustHead {
+.cssDraftHeader {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  padding: 8px 10px 6px;
+  min-height: 34px;
 }
 
-.adjustTitle {
+.cssDraftToggle {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--color-text);
   font-size: var(--font-size-sm);
-  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
 }
 
-.adjustMeta {
-  flex: 1;
+.cssDraftToggle:hover {
+  color: var(--color-accent-fg);
+}
+
+.cssDraftCount {
+  margin-left: auto;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
 }
 
-.adjustHeadActions {
+.cssDraftBody {
+  padding-bottom: var(--spacing-sm);
+}
+
+.cssDraft {
+  margin-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.cssDraftHeader {
   display: flex;
-  flex-shrink: 0;
-  gap: 2px;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-height: 34px;
 }
 
-.adjustNote {
-  margin: 0;
-  padding: 0 10px 8px;
+.cssDraftToggle {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cssDraftToggle:hover {
+  color: var(--color-accent-fg);
+}
+
+.cssDraftCount {
+  margin-left: auto;
   color: var(--color-text-muted);
-  font-size: 10px;
-  line-height: 1.5;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.cssDraftBody {
+  padding-bottom: var(--spacing-sm);
 }
 
 .adjustError {
-  margin: 0 10px 8px;
-  padding: 6px 8px;
+  margin: 0 0 var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-sm);
   background: var(--color-danger-soft);
   color: var(--color-danger);
-  font-size: 11px;
-  line-height: 1.4;
+  font-size: var(--font-size-sm);
 }
 
 .noticeStrip {
@@ -430,7 +443,7 @@
 }
 
 .field:focus-within {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   box-shadow: 0 0 0 2px var(--color-accent-soft);
 }
 
@@ -485,7 +498,7 @@
 }
 
 .lengthDragging .lengthNum {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 /* 单位 chip 是嵌在数值框右端的自绘下拉：分隔线、底色、字号直接挂在 Popover 的 root 上
@@ -595,7 +608,7 @@
 }
 
 .addGhost:focus-within {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
   border-style: solid;
   color: var(--color-text);
 }
@@ -643,7 +656,7 @@
 
 .addSubmit:hover:not(:disabled) {
   background: var(--color-accent-soft);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .addSubmit:disabled {
@@ -748,7 +761,7 @@
 }
 
 .computedFilter:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-border);
 }
 
 .computedFilter::placeholder {
@@ -834,7 +847,7 @@
 
 .readonlyRowAdjusted {
   box-shadow: inset 2px 0 0 var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .readonlyName {
@@ -843,7 +856,7 @@
 }
 
 .readonlyRowAdjusted .readonlyName {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .readonlyValue {
@@ -853,7 +866,7 @@
 }
 
 .readonlyRowAdjusted .readonlyValue {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 .promoteBtn {
@@ -881,7 +894,7 @@
 }
 
 .promoteBtn:hover:not(:disabled) {
-  color: var(--color-accent);
+  color: var(--color-accent-fg);
   background: var(--color-accent-soft);
 }
 

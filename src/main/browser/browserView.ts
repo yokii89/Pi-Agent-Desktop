@@ -23,6 +23,7 @@ import type {
 import { getSettings, updateSettings } from "../settings/settings";
 import { getMainWindow } from "../window/createMainWindow";
 import { broadcastBrowserOutput } from "../window/inspectorWindow";
+import { rendererBoundsToDip } from "./browserBounds";
 import {
   bindDebugger,
   captureViewport,
@@ -523,14 +524,15 @@ function applyBoundsFor(entry: BrowserInstance): void {
     view.setVisible(false);
     return;
   }
+  const dipBounds = rendererBoundsToDip(bounds, win.webContents.getZoomFactor());
   // 响应式视口（P1-4）：按预设宽度收缩视图，余下区域透出面板底色
   const width =
-    viewportWidth !== null ? Math.min(Math.round(viewportWidth), bounds.width) : bounds.width;
+    viewportWidth !== null ? Math.min(Math.round(viewportWidth), dipBounds.width) : dipBounds.width;
   view.setBounds({
-    x: Math.round(bounds.x),
-    y: Math.round(bounds.y),
-    width: Math.max(1, width),
-    height: Math.round(bounds.height),
+    x: dipBounds.x,
+    y: dipBounds.y,
+    width,
+    height: dipBounds.height,
   });
   // 先摆好 bounds 再挂回/显示，避免以错误坐标闪一帧
   if (!entry.addedToWindow) {
