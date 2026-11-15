@@ -74,10 +74,6 @@ export const procMessages = defineMessages({
     "zh-CN": "当前会话没有后台进程",
     "en-US": "No background processes in this session",
   },
-  "proc.panel.emptyHint": {
-    "zh-CN": "agent 用 bash 在后台启动的服务会出现在这里",
-    "en-US": "Services started in the background by agent bash calls appear here",
-  },
   "proc.panel.openLabel": {
     "zh-CN": "查看进程详情：{name}",
     "en-US": "View process details: {name}",
@@ -105,12 +101,16 @@ export const procMessages = defineMessages({
     "en-US": "Source call not found (possibly from an earlier session)",
   },
   "proc.panel.source.empty": {
-    "zh-CN": "这次调用没有捕获到输出",
-    "en-US": "No output was captured for this call",
+    "zh-CN": "暂无输出",
+    "en-US": "No output",
   },
   "proc.panel.source.note": {
     "zh-CN": "这里只是启动阶段捕获的输出；进程后续 stdout 无法读取。",
     "en-US": "Only output captured during startup; later stdout can't be read.",
+  },
+  "proc.panel.source.startupOnly": {
+    "zh-CN": "启动输出",
+    "en-US": "Startup only",
   },
   "proc.panel.source.capped": {
     "zh-CN": "输出过长，仅显示前 {chars} 个字符；完整内容见会话流。",
@@ -152,18 +152,10 @@ export const procMessages = defineMessages({
     "zh-CN": "没有子进程",
     "en-US": "No child processes",
   },
-  "proc.panel.runtime.exited": {
-    "zh-CN": "进程已退出，端口与子进程不再更新",
-    "en-US": "Process exited; ports and children are no longer updated",
-  },
   "proc.panel.status.alive": { "zh-CN": "运行中", "en-US": "Running" },
   "proc.panel.status.exited": { "zh-CN": "已退出", "en-US": "Exited" },
   "proc.panel.status.killed": { "zh-CN": "已停止", "en-US": "Stopped" },
   "proc.panel.status.ignored": { "zh-CN": "已忽略", "en-US": "Ignored" },
-  "proc.panel.exitedBanner": {
-    "zh-CN": "该进程已退出",
-    "en-US": "This process has exited",
-  },
   "proc.panel.endedAt": {
     "zh-CN": "{time} 退出",
     "en-US": "Ended {time}",
@@ -201,20 +193,12 @@ export const procMessages = defineMessages({
     "en-US": "Up {elapsed} · Memory {memory} · CPU {cpu}",
   },
   "proc.panel.liveFollow": {
-    "zh-CN": "实时跟随",
+    "zh-CN": "跟随中",
     "en-US": "Following",
   },
   "proc.panel.followEnded": {
-    "zh-CN": "跟随已结束",
-    "en-US": "Follow ended",
-  },
-  "proc.panel.source.liveNote": {
-    "zh-CN": "作业日志增量跟随（仅保留尾部 64KB，向上滚动暂停跟随）",
-    "en-US": "Tailing the job log (last 64KB kept; scroll up to pause following)",
-  },
-  "proc.panel.source.endedNote": {
-    "zh-CN": "作业已结束，展示日志尾部",
-    "en-US": "Job ended; showing the log tail",
+    "zh-CN": "已结束",
+    "en-US": "Ended",
   },
   "proc.panel.openLog": {
     "zh-CN": "打开日志文件",

@@ -1,4 +1,10 @@
-import { ArrowClockwise, ArrowUpRight, Copy, Terminal } from "@phosphor-icons/react";
+import {
+  ArrowClockwise,
+  ArrowSquareOut,
+  ArrowUpRight,
+  Copy,
+  Terminal,
+} from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ManagedProcess, ProcDetail, SessionId } from "../../../../shared/ipc";
 import { summarizeCommand, useProcActions } from "../../../hooks/useProcActions";
@@ -106,9 +112,8 @@ function useProcDetail(sessionId: SessionId | null, proc: ManagedProcess | null,
 /**
  * 右侧栏「后台进程」页签（docs/design/101）：上方存活列表、下方详情。
  *
- * 详情 = 进程元信息 + 来源 bash 调用（command/timeout/已捕获输出/退出码）+
- * 系统信息（子进程树 / TCP 端点 / 内存）。实时 stdout 读不到（doc 37 §1.3），
- * 来源调用里只展示启动阶段捕获的那段输出。
+ * 详情 = 进程元信息 + 来源 bash 调用 + 系统信息（子进程树 / TCP 端点 / 内存）。
+ * 带 job 日志的进程可实时跟随；其他进程仅显示来源调用捕获的启动阶段输出（doc 37 §1.3）。
  */
 export function ProcPanel() {
   const t = useT();
@@ -230,7 +235,6 @@ export function ProcPanel() {
       <div className={styles.empty}>
         <Terminal size={24} weight="regular" className={styles.emptyIcon} />
         <p className={styles.emptyTitle}>{t("proc.panel.empty")}</p>
-        <p className={styles.muted}>{t("proc.panel.emptyHint")}</p>
       </div>
     );
   }
@@ -279,10 +283,6 @@ export function ProcPanel() {
       ) : null}
 
       <div className={styles.detail} data-selectable-text="">
-        {!runtimeAlive ? (
-          <p className={styles.exitedBanner}>{t("proc.panel.exitedBanner")}</p>
-        ) : null}
-
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>{t("proc.panel.overview")}</h3>
           <div className={styles.commandRow}>
@@ -338,7 +338,14 @@ export function ProcPanel() {
         </section>
 
         <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>{t("proc.panel.source")}</h3>
+          <div className={styles.sectionHead}>
+            <h3 className={styles.sectionTitle}>{t("proc.panel.source")}</h3>
+            {output?.logPath ? (
+              <IconButton title={t("proc.panel.openLog")} onClick={() => openLog(output.logPath)}>
+                <ArrowSquareOut size={16} weight="regular" />
+              </IconButton>
+            ) : null}
+          </div>
           {sourceBlock ? (
             <>
               <div className={styles.commandRow}>
@@ -359,12 +366,17 @@ export function ProcPanel() {
                     {t("proc.panel.timeout", { seconds: timeoutSeconds })}
                   </span>
                 ) : null}
-                {followActive ? (
-                  <span className={styles.liveChip}>{t("proc.panel.liveFollow")}</span>
-                ) : null}
-                {followEnded ? (
-                  <span className={styles.liveChipEnded}>{t("proc.panel.followEnded")}</span>
-                ) : null}
+                {jobLogAvailable ? (
+                  followActive ? (
+                    <span className={styles.liveChip}>{t("proc.panel.liveFollow")}</span>
+                  ) : followEnded ? (
+                    <span className={styles.liveChipEnded}>{t("proc.panel.followEnded")}</span>
+                  ) : null
+                ) : (
+                  <span className={styles.exitChip} title={t("proc.panel.source.note")}>
+                    {t("proc.panel.source.startupOnly")}
+                  </span>
+                )}
               </div>
               {liveText.length > 0 || shownOutput ? (
                 <pre ref={livePreRef} onScroll={handleLiveScroll} className={styles.output}>
@@ -378,49 +390,24 @@ export function ProcPanel() {
                   {t("proc.panel.source.capped", { chars: OUTPUT_DISPLAY_LIMIT })}
                 </p>
               ) : null}
-              {followActive || followEnded ? (
-                <p className={styles.note}>
-                  {followActive
-                    ? t("proc.panel.source.liveNote")
-                    : t("proc.panel.source.endedNote")}
-                  {output?.logPath ? (
-                    <>
-                      {" "}
-                      <button
-                        type="button"
-                        className={styles.logLink}
-                        onClick={() => openLog(output.logPath)}
-                      >
-                        {t("proc.panel.openLog")}
-                      </button>
-                    </>
-                  ) : null}
-                </p>
-              ) : (
-                <p className={styles.note}>{t("proc.panel.source.note")}</p>
-              )}
             </>
           ) : (
             <p className={styles.muted}>{t("proc.panel.source.missing")}</p>
           )}
         </section>
 
-        <section className={styles.section}>
+        <section className={styles.section} hidden={!runtimeAlive}>
           <div className={styles.sectionHead}>
             <h3 className={styles.sectionTitle}>{t("proc.panel.runtime")}</h3>
-            {runtimeAlive ? (
-              <IconButton title={t("proc.panel.refresh")} disabled={loading} onClick={refresh}>
-                <ArrowClockwise
-                  size={16}
-                  weight="regular"
-                  className={loading ? styles.spin : undefined}
-                />
-              </IconButton>
-            ) : null}
+            <IconButton title={t("proc.panel.refresh")} disabled={loading} onClick={refresh}>
+              <ArrowClockwise
+                size={16}
+                weight="regular"
+                className={loading ? styles.spin : undefined}
+              />
+            </IconButton>
           </div>
-          {!runtimeAlive ? (
-            <p className={styles.muted}>{t("proc.panel.runtime.exited")}</p>
-          ) : error ? (
+          {error ? (
             <div className={styles.errorRow}>
               <span>{t("proc.panel.runtime.failed", { message: error })}</span>
               <button type="button" className={styles.retry} onClick={refresh}>
