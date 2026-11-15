@@ -5,6 +5,7 @@ export interface ThinkingMatrixPalette {
   accentForeground: string;
   spark: string;
   strong: string;
+  otherColors: readonly string[];
 }
 
 interface ThinkingMatrixCell {
@@ -15,12 +16,14 @@ interface ThinkingMatrixCell {
   verticalBar: boolean;
 }
 
+type ThinkingMatrixColor = Exclude<keyof ThinkingMatrixPalette, "otherColors">;
+
 interface ThinkingMatrixRay {
   angle: number;
   dots: number;
   speed: number;
   phase: number;
-  color: keyof ThinkingMatrixPalette;
+  color: ThinkingMatrixColor;
 }
 
 /** Canvas renderer lifecycle exposed to the React slider. */
@@ -37,6 +40,7 @@ const COMET_WIDTH = 56;
 const COMET_HEIGHT = 48;
 const COMET_ART_WIDTH = 76;
 const COMET_ART_HEIGHT = 64;
+const PIXEL_FLOW_SPEED = 2.5;
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -58,11 +62,26 @@ function readPalette(element: Element): ThinkingMatrixPalette {
     accentForeground: readToken(element, "--color-accent-fg"),
     spark: readToken(element, "--color-spark"),
     strong: readToken(element, "--color-text-strong"),
+    otherColors: [1, 2, 3, 4, 5].map((lane) => readToken(element, `--graph-lane-${lane}`)),
   };
 }
 
 function colorMix(first: string, second: string, firstWeight: number): string {
   return `color-mix(in oklab, ${first} ${firstWeight}%, ${second})`;
+}
+
+function activeCellColor(cell: ThinkingMatrixCell, palette: ThinkingMatrixPalette): string {
+  if (cell.colorBias < 0.5) return palette.accent;
+  if (cell.colorBias < 0.8) {
+    const otherColorIndex = Math.min(
+      palette.otherColors.length - 1,
+      Math.floor(((cell.colorBias - 0.5) / 0.3) * palette.otherColors.length),
+    );
+    return palette.otherColors[otherColorIndex] ?? palette.accent;
+  }
+
+  const tint = (cell.colorBias - 0.8) / 0.2;
+  return colorMix(palette.accent, palette.spark, Math.round(85 - tint * 65));
 }
 
 function fillRoundedRect(
@@ -110,12 +129,7 @@ function buildCells(width: number, height: number): ThinkingMatrixCell[][] {
 
 function buildRays(): ThinkingMatrixRay[] {
   const rays: ThinkingMatrixRay[] = [];
-  const colors: Array<keyof ThinkingMatrixPalette> = [
-    "accentForeground",
-    "spark",
-    "accent",
-    "strong",
-  ];
+  const colors: Array<ThinkingMatrixColor> = ["accentForeground", "spark", "accent", "strong"];
 
   for (let index = 0; index < RAY_COUNT; index += 1) {
     rays.push({
@@ -176,19 +190,19 @@ function drawTrack(
 
       const relativePosition = value > 0.02 ? clamp(columnNorm / value, 0, 1) : 0;
       const intensity = columnNorm ** 1.35 * 0.65 + relativePosition ** 1.6 * 0.35;
-      const flow = Math.sin(time * cell.frequency - column * 0.38 + cell.phase);
+      const flow = Math.sin(time * cell.frequency * PIXEL_FLOW_SPEED - column * 0.38 + cell.phase);
       const shimmer = (flow + 1) * 0.5;
 
       if (cell.verticalBar && columnNorm < value - 0.05 && row === 1) {
-        context.fillStyle = palette.muted;
+        context.fillStyle = colorMix(palette.accent, palette.spark, 55);
         context.globalAlpha = 0.38 + 0.22 * shimmer;
         fillRoundedRect(context, x, y, cellWidth, cellHeight * 2 + gap, radius * 1.2);
         row += 1;
         continue;
       }
 
-      const activeProbability = 0.1 + 0.88 * intensity ** 1.15;
-      const dynamicThreshold = (cell.threshold + time * 0.08) % 1;
+      const activeProbability = 0.16 + 0.84 * intensity ** 1.1;
+      const dynamicThreshold = (cell.threshold + time * 0.08 * PIXEL_FLOW_SPEED) % 1;
       const isLit =
         cell.threshold < activeProbability || dynamicThreshold < activeProbability * 0.4;
 
@@ -199,38 +213,21 @@ function drawTrack(
         continue;
       }
 
-      let color = palette.muted;
-      let alpha = 0.24 + 0.42 * shimmer * (0.4 + columnNorm);
-      if (columnNorm < 0.32) {
-        color = cell.colorBias < 0.45 ? palette.muted : palette.accentForeground;
-      } else if (columnNorm < 0.68) {
-        color =
-          cell.colorBias < 0.24
-            ? colorMix(palette.accentForeground, palette.accent, 66)
-            : cell.colorBias < 0.66
-              ? colorMix(palette.accent, palette.spark, 58)
-              : palette.spark;
-        alpha = 0.35 + 0.55 * shimmer;
-      } else {
-        color =
-          cell.colorBias < 0.2
-            ? palette.accentForeground
-            : cell.colorBias < 0.52
-              ? palette.spark
-              : cell.colorBias < 0.8
-                ? colorMix(palette.spark, palette.strong, 70)
-                : palette.strong;
-        alpha = 0.55 + 0.45 * shimmer;
-      }
+      const alpha =
+        columnNorm < 0.32
+          ? 0.24 + 0.42 * shimmer * (0.4 + columnNorm)
+          : columnNorm < 0.68
+            ? 0.35 + 0.55 * shimmer
+            : 0.55 + 0.45 * shimmer;
+      let color = activeCellColor(cell, palette);
 
       const proximity = Math.max(0, 1 - Math.abs(columnNorm - value) * 7);
       if (proximity > 0 && value > 0.25) {
         color = colorMix(color, palette.strong, Math.round(proximity * 45 * shimmer));
-        alpha = Math.min(1, alpha + proximity * 0.3);
       }
 
       context.fillStyle = color;
-      context.globalAlpha = alpha;
+      context.globalAlpha = Math.min(1, alpha + proximity * 0.3);
       fillRoundedRect(context, x, y, cellWidth, cellHeight, radius);
     }
   }
