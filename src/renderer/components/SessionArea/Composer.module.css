@@ -6,8 +6,8 @@
   min-height: 72px;
   padding: var(--spacing-sm);
   outline: none;
-  /* 与用户气泡正文同一令牌（14px），避免输入栏/气泡字号不一致 */
-  font-size: var(--session-stream-font-sm);
+  /* 与对话流正文共用字号，随设置中的「对话流字号」同步变化。 */
+  font-size: var(--session-stream-font-md);
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
