@@ -1,6 +1,6 @@
 import path from "node:path";
 import { app, BrowserWindow } from "electron";
-import { resolveAppIconPath } from "../appIcon";
+import { resolveAppIconPath, resolveTaskbarIconPath } from "../appIcon";
 import { attachClosePrompt } from "./closePrompt";
 import { attachWindowZoom } from "./windowZoom";
 
@@ -42,6 +42,7 @@ export function createMainWindow(): BrowserWindow {
     return existing;
   }
 
+  const appIconPath = resolveAppIconPath();
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -51,7 +52,7 @@ export function createMainWindow(): BrowserWindow {
     show: false,
     backgroundColor: "#111113",
     title: "PiDesk",
-    icon: resolveAppIconPath(),
+    icon: appIconPath,
     webPreferences: {
       preload: distPath("preload", "index.js"),
       contextIsolation: true,
@@ -60,6 +61,15 @@ export function createMainWindow(): BrowserWindow {
       sandbox: false,
     },
   });
+
+  if (process.platform === "win32") {
+    const taskbarIconPath = resolveTaskbarIconPath();
+    // BrowserWindow.icon 设置窗口图标；任务栏按钮还需通过 AppUserModel 登记图标。
+    win.setAppDetails({
+      appId: APP_USER_MODEL_ID,
+      ...(taskbarIconPath ? { appIconPath: taskbarIconPath } : {}),
+    });
+  }
 
   win.once("ready-to-show", () => win.show());
   // 界面缩放（Ctrl+= / Ctrl+- / Ctrl+0）自己接管，见 windowZoom

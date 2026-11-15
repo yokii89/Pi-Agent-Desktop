@@ -134,9 +134,9 @@ export const settingsMessages = defineMessages({
   },
   "settings.profile.syncHint": {
     "zh-CN":
-      "只同步界面偏好（主题、语言、字体、通知、快捷键等）。项目路径、pi 路径、会话记录等本机数据不会上传。",
+      "只同步界面偏好（主题、语言、字体、思考动画、通知、快捷键等）。项目路径、pi 路径、会话记录等本机数据不会上传。",
     "en-US":
-      "Only UI preferences (theme, language, fonts, notifications, shortcuts) are synced. Machine-local paths and sessions are never uploaded.",
+      "Only UI preferences (theme, language, fonts, thinking animation, notifications, shortcuts) are synced. Machine-local paths and sessions are never uploaded.",
   },
   "settings.profile.syncPush": {
     "zh-CN": "上传到 GitHub",
@@ -478,9 +478,9 @@ export const settingsMessages = defineMessages({
   },
 
   "settings.personalization.hint": {
-    "zh-CN": "调整界面字体、背景壁纸与会话区阅读密度；改动立即生效并写入本机设置。",
+    "zh-CN": "调整界面字体、思考动画、背景壁纸与会话区阅读密度；改动立即生效并写入本机设置。",
     "en-US":
-      "Tune UI fonts, the background wallpaper, and reading density in the session stream. Changes apply immediately and are saved.",
+      "Tune UI fonts, the thinking animation, background wallpaper, and reading density in the session stream. Changes apply immediately and are saved.",
   },
   "settings.personalization.group.wallpaper": {
     "zh-CN": "壁纸",
@@ -648,6 +648,40 @@ export const settingsMessages = defineMessages({
   "settings.personalization.monoPreview.sample": {
     "zh-CN": "function explore() { return infinite(); }",
     "en-US": "function explore() { return infinite(); }",
+  },
+
+  "settings.personalization.group.thinkingAnimation": {
+    "zh-CN": "思考动画",
+    "en-US": "Thinking animation",
+  },
+  "settings.personalization.thinkingAnimation": {
+    "zh-CN": "运行中标记",
+    "en-US": "Running marker",
+  },
+  "settings.personalization.thinkingAnimation.description": {
+    "zh-CN": "选择 agent 思考或等待首字时显示的状态动画；改动立即生效并写入本机设置。",
+    "en-US":
+      "Choose the marker shown while the agent is thinking or waiting for its first token. Changes apply immediately and are saved.",
+  },
+  "settings.personalization.thinkingAnimation.option.pi": {
+    "zh-CN": "π 标记",
+    "en-US": "Pi mark",
+  },
+  "settings.personalization.thinkingAnimation.option.reasoning": {
+    "zh-CN": "推理轨迹",
+    "en-US": "Reasoning",
+  },
+  "settings.personalization.thinkingAnimation.option.twins": {
+    "zh-CN": "双轨推理",
+    "en-US": "Twin paths",
+  },
+  "settings.personalization.thinkingAnimation.option.gyro": {
+    "zh-CN": "陀螺点阵",
+    "en-US": "Gyro",
+  },
+  "settings.personalization.thinkingAnimation.option.lighthouse": {
+    "zh-CN": "灯塔扫描",
+    "en-US": "Lighthouse",
   },
 
   "settings.personalization.group.rail": {

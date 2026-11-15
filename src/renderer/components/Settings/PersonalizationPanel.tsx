@@ -2,6 +2,7 @@ import type { FontMonoPreset, FontUiPreset } from "../../../shared/fontPresets";
 import { FONT_MONO_PRESETS, FONT_UI_PRESETS } from "../../../shared/fontPresets";
 import { INPUT_BUDDY_KINDS } from "../../../shared/inputBuddy";
 import { RAIL_STYLES } from "../../../shared/railStyles";
+import { THINKING_ANIMATIONS } from "../../../shared/thinkingAnimation";
 import { wallpaperFileName, wallpaperKindFromPath } from "../../../shared/wallpaper";
 import { useT } from "../../hooks/useT";
 import { wallpaperService } from "../../services/wallpaperService";
@@ -13,6 +14,7 @@ import { BuddySwatch } from "./BuddySwatch";
 import { RailStyleSwatch } from "./RailStyleSwatch";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import styles from "./Settings.module.css";
+import { ThinkingAnimationSwatch } from "./ThinkingAnimationSwatch";
 
 /** 可选对话流字号档（px）；默认 16 对齐 tokens 的 --session-stream-font-md。 */
 const FONT_SIZE_OPTIONS = [
@@ -35,6 +37,7 @@ export function PersonalizationPanel() {
     fontMonoPreset,
     questionRailStyle,
     inputBuddy,
+    thinkingAnimation,
     wallpaperPath,
     wallpaperDim,
     hydrated,
@@ -184,6 +187,28 @@ export function PersonalizationPanel() {
             <span className={styles.monoFontPreview}>
               {t("settings.personalization.monoPreview.sample")}
             </span>
+          }
+        />
+      </SettingsSection>
+
+      <SettingsSection title={t("settings.personalization.group.thinkingAnimation")}>
+        <SettingRow
+          stack
+          label={t("settings.personalization.thinkingAnimation")}
+          description={t("settings.personalization.thinkingAnimation.description")}
+          control={
+            <div className={styles.thinkingAnimationGrid}>
+              {THINKING_ANIMATIONS.map((animation) => (
+                <ThinkingAnimationSwatch
+                  key={animation}
+                  animation={animation}
+                  label={t(`settings.personalization.thinkingAnimation.option.${animation}`)}
+                  selected={thinkingAnimation === animation}
+                  disabled={!hydrated}
+                  onSelect={(next) => dispatch({ type: "setThinkingAnimation", animation: next })}
+                />
+              ))}
+            </div>
           }
         />
       </SettingsSection>

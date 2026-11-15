@@ -548,11 +548,16 @@
   padding-bottom: var(--spacing-md);
 }
 
-/* 输入栏伙伴选择：一排预览并排，形名不进可见文案（见 BuddySwatch） */
-.buddySwatches {
+/* 个性化：输入栏伙伴与思考动画预览色板均允许换行。 */
+.buddySwatches,
+.thinkingAnimationGrid {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-sm);
+}
+
+.thinkingAnimationGrid {
+  padding-bottom: var(--spacing-md);
 }
 
 /* 主题色选择：一排色点并排（见 AccentSwatch） */

@@ -21,6 +21,7 @@ import {
   DEFAULT_SPLASH_TEXT_SUB,
   DEFAULT_SPLASH_TEXT_ZH,
 } from "../../shared/splash";
+import { DEFAULT_THINKING_ANIMATION } from "../../shared/thinkingAnimation";
 import { UI_ZOOM_DEFAULT } from "../../shared/uiZoom";
 import { DEFAULT_WALLPAPER_DIM } from "../../shared/wallpaper";
 
@@ -78,6 +79,8 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   questionRailStyle: DEFAULT_RAIL_STYLE,
   // 输入栏右上角的伙伴形象（设置 → 个性化）；默认小狗，向后兼容
   inputBuddy: DEFAULT_INPUT_BUDDY,
+  // 会话运行中的动画（设置 → 个性化）；默认保留原有 π 标记
+  thinkingAnimation: DEFAULT_THINKING_ANIMATION,
   // 渲染层全局快捷键（设置 → 键盘快捷键）；默认映射由渲染层动作注册表提供，
   // 主进程只持有结构校验后的透传值（hydrate 时归一）
   shortcuts: {} as ShortcutsMap,
@@ -172,6 +175,7 @@ export const SETTABLE_KEYS = [
   "fontMonoPreset",
   "questionRailStyle",
   "inputBuddy",
+  "thinkingAnimation",
   "shortcuts",
   "splashEnabled",
   "splashLogoImage",

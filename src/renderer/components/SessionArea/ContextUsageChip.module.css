@@ -1,4 +1,4 @@
-/* 上下文用量：模型名左侧的纯圆环，明细靠 CSS tooltip + Popover（docs/design/28） */
+/* 上下文用量：模型名左侧的纯圆环，彩色弧线表示剩余量，底轨表示已用量。明细靠 CSS tooltip + Popover（docs/design/28） */
 .chip {
   position: relative;
   display: inline-flex;
@@ -20,14 +20,15 @@
   outline-offset: 1px;
 }
 
-/* 16px 进度环：conic-gradient 自绘，数据可视化而非 UI 图标 */
+/* 16px 进度环：conic-gradient 自绘，数据可视化而非 UI 图标。
+   彩色弧线是剩余量，未着色部分是已用量；底轨使用较亮的边框令牌，避免暗色主题融进背景。 */
 .ring {
   width: 16px;
   height: 16px;
   border-radius: 50%;
   background: conic-gradient(
-    var(--ring-color, var(--color-accent)) var(--ring-pct, 0%),
-    var(--color-border) 0
+    var(--ring-color, var(--color-success)) var(--remaining-pct, 0%),
+    var(--color-border-strong) 0
   );
   -webkit-mask: radial-gradient(
     farthest-side,

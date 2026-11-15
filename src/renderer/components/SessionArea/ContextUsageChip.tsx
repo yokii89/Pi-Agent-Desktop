@@ -64,6 +64,7 @@ export function ContextUsageChip() {
   const percent = contextUsage?.percent ?? null;
   const usedTokens = contextUsage?.tokens ?? null;
   const remaining = percent != null ? 100 - percent : null;
+  const remainingPercent = remaining != null ? Math.min(100, Math.max(0, remaining)) : 0;
 
   const title = autoCompactionEnabled
     ? `${t("session.context.tooltip")} ${t("session.context.auto")}`
@@ -103,7 +104,7 @@ export function ContextUsageChip() {
             className={styles.ring}
             style={
               {
-                "--ring-pct": `${Math.min(100, Math.max(0, percent ?? 0))}%`,
+                "--remaining-pct": `${remainingPercent}%`,
               } as CSSProperties
             }
           />

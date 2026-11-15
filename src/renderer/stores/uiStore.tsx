@@ -40,6 +40,11 @@ import { clampNavWidth, NAV_WIDTH_DEFAULT } from "../../shared/navWidth";
 import { DEFAULT_RAIL_STYLE, normalizeRailStyle, type RailStyle } from "../../shared/railStyles";
 import { normalizeShortcutsMap, type ShortcutsMap } from "../../shared/shortcuts";
 import {
+  DEFAULT_THINKING_ANIMATION,
+  normalizeThinkingAnimation,
+  type ThinkingAnimation,
+} from "../../shared/thinkingAnimation";
+import {
   clampWallpaperDim,
   DEFAULT_WALLPAPER_DIM,
   normalizeWallpaperPath,
@@ -197,6 +202,8 @@ interface UiState {
   fontMonoPreset: FontMonoPreset;
   /** 对话流问题导航分段栏的标记样式（设置 → 个性化）。 */
   questionRailStyle: RailStyle;
+  /** 会话 run 进行中的状态动画（设置 → 个性化）。 */
+  thinkingAnimation: ThinkingAnimation;
   /** 主题色偏好；实际系统色不存入此字段，见 applyAccentColor。 */
   accentColor: AccentColorPreference;
   /** 本地背景壁纸绝对路径（设置 → 个性化）；null = 主题纯色背景（docs/design/111）。 */
@@ -245,6 +252,7 @@ type UiAction =
   | { type: "setFontUiPreset"; preset: FontUiPreset }
   | { type: "setFontMonoPreset"; preset: FontMonoPreset }
   | { type: "setQuestionRailStyle"; style: RailStyle }
+  | { type: "setThinkingAnimation"; animation: ThinkingAnimation }
   | { type: "setAccentColor"; color: AccentColorPreference }
   | { type: "setWallpaperPath"; path: string | null }
   | { type: "setWallpaperDim"; dim: number }
@@ -270,6 +278,7 @@ type UiAction =
       fontUiPreset: FontUiPreset;
       fontMonoPreset: FontMonoPreset;
       questionRailStyle: RailStyle;
+      thinkingAnimation: ThinkingAnimation;
       accentColor: AccentColorPreference;
       wallpaperPath: string | null;
       wallpaperDim: number;
@@ -313,6 +322,7 @@ const initialState: UiState = {
   fontUiPreset: "default",
   fontMonoPreset: "default",
   questionRailStyle: DEFAULT_RAIL_STYLE,
+  thinkingAnimation: DEFAULT_THINKING_ANIMATION,
   accentColor: null,
   wallpaperPath: null,
   wallpaperDim: DEFAULT_WALLPAPER_DIM,
@@ -464,6 +474,11 @@ function uiReducer(state: UiState, action: UiAction): UiState {
       if (state.questionRailStyle === style) return state;
       return { ...state, questionRailStyle: style };
     }
+    case "setThinkingAnimation": {
+      const animation = normalizeThinkingAnimation(action.animation);
+      if (state.thinkingAnimation === animation) return state;
+      return { ...state, thinkingAnimation: animation };
+    }
     case "setAccentColor": {
       const color = normalizeAccentColor(action.color);
       if (state.accentColor === color) return state;
@@ -553,6 +568,7 @@ function uiReducer(state: UiState, action: UiAction): UiState {
         fontUiPreset: normalizeFontUiPreset(action.fontUiPreset),
         fontMonoPreset: normalizeFontMonoPreset(action.fontMonoPreset),
         questionRailStyle: normalizeRailStyle(action.questionRailStyle),
+        thinkingAnimation: normalizeThinkingAnimation(action.thinkingAnimation),
         accentColor: normalizeAccentColor(action.accentColor),
         wallpaperPath: normalizeWallpaperPath(action.wallpaperPath),
         wallpaperDim: clampWallpaperDim(action.wallpaperDim),
@@ -627,6 +643,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
         fontUiPreset: settings.fontUiPreset ?? "default",
         fontMonoPreset: settings.fontMonoPreset ?? "default",
         questionRailStyle: settings.questionRailStyle ?? DEFAULT_RAIL_STYLE,
+        thinkingAnimation: settings.thinkingAnimation ?? DEFAULT_THINKING_ANIMATION,
         accentColor: settings.accentColor ?? null,
         wallpaperPath: settings.wallpaperPath ?? null,
         wallpaperDim: settings.wallpaperDim ?? DEFAULT_WALLPAPER_DIM,
@@ -653,6 +670,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
       fontUiPreset: state.fontUiPreset,
       fontMonoPreset: state.fontMonoPreset,
       questionRailStyle: state.questionRailStyle,
+      thinkingAnimation: state.thinkingAnimation,
       accentColor: state.accentColor,
       wallpaperPath: state.wallpaperPath,
       inputBuddy: state.inputBuddy,
@@ -670,6 +688,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     state.fontUiPreset,
     state.fontMonoPreset,
     state.questionRailStyle,
+    state.thinkingAnimation,
     state.accentColor,
     state.wallpaperPath,
     state.inputBuddy,

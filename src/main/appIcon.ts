@@ -28,6 +28,17 @@ export function resolveAppIconPath(): string | undefined {
 }
 
 /**
+ * Windows 任务栏使用的原生图标路径。
+ *
+ * 打包后的 icon.ico 位于 app.asar，窗口能通过 Electron 读取，但 Windows 原生
+ * AppUserModel 接口需要真实文件路径；最终 EXE 已由 electron-builder 嵌入同一图标。
+ */
+export function resolveTaskbarIconPath(): string | undefined {
+  if (process.platform === "win32" && app.isPackaged) return process.execPath;
+  return resolveAppIconPath();
+}
+
+/**
  * 系统 toast 图标路径：优先 PNG。
  * Electron 会把它写成 toast 的 `appLogoOverride`，不传则 Windows 只回 AUMID、无应用图。
  */

@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../../hooks/useT";
+import { useUiStore } from "../../stores/uiStore";
 import { type Gsap, loadGsap, prefersReducedMotion } from "../../utils/animation";
 import { RUN_ACTIVITY_MOTION } from "../../utils/motionTokens";
 import styles from "./RunActivityLabel.module.css";
+import { ThinkingAnimationMark } from "./ThinkingAnimationMark";
 
 /** 运行态的文字微光：首字等待与后续活动共用一个落点，计时不参与读屏播报。 */
 export function RunActivityLabel({ waitingForFirstToken }: { waitingForFirstToken: boolean }) {
   const t = useT();
+  const { thinkingAnimation } = useUiStore();
   const labelRef = useRef<HTMLSpanElement>(null);
   const [waitVisible, setWaitVisible] = useState(false);
 
@@ -77,8 +80,11 @@ export function RunActivityLabel({ waitingForFirstToken }: { waitingForFirstToke
   }, []);
 
   return (
-    <span ref={labelRef} className={styles.label} role="status">
-      {t(waitingForFirstToken && waitVisible ? "session.firstToken" : "session.piState.running")}
+    <span className={styles.activity} role="status">
+      <ThinkingAnimationMark animation={thinkingAnimation} size={16} />
+      <span ref={labelRef} className={styles.label}>
+        {t(waitingForFirstToken && waitVisible ? "session.firstToken" : "session.piState.running")}
+      </span>
     </span>
   );
 }

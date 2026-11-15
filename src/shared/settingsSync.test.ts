@@ -50,6 +50,7 @@ function fakeSettings(): PideskSettings {
     fontMonoPreset: "cascadia",
     questionRailStyle: "line",
     inputBuddy: "dog",
+    thinkingAnimation: "pi",
     shortcuts: {},
     splashEnabled: true,
     splashLogoImage: "data:image/png;base64,AAAA",
@@ -78,6 +79,7 @@ describe("settingsSync whitelist", () => {
     // 侧栏宽度是用户偏好（docs/design/137）：跨端同步，不是本机机器状态
     expect(picked.navWidth).toBe(248);
     expect(picked.welcomeRecentsEnabled).toBe(true);
+    expect(picked.thinkingAnimation).toBe("pi");
   });
 
   it("解析合法信封", () => {
@@ -106,12 +108,14 @@ describe("settingsSync whitelist", () => {
       ...local,
       theme: "light" as const,
       welcomeRecentsEnabled: false,
+      thinkingAnimation: "twins" as const,
       navWidth: 320,
     };
     const changes = diffSyncableSettings(local, remote);
     expect(changes.map((c) => c.key).sort()).toEqual([
       "navWidth",
       "theme",
+      "thinkingAnimation",
       "welcomeRecentsEnabled",
     ]);
     expect(changes.find((c) => c.key === "navWidth")).toMatchObject({

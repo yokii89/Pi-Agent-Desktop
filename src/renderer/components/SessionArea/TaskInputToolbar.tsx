@@ -9,7 +9,6 @@ import {
   Shield,
   ShieldCheck,
   Sparkle,
-  Spinner,
 } from "@phosphor-icons/react";
 import { memo, useCallback, useMemo, useRef, useState } from "react";
 import type { AccessModeIconName } from "../../../shared/contribution";
@@ -31,6 +30,7 @@ import { ThinkingLevelSlider } from "../ui/ThinkingLevelSlider";
 import { ContextUsageChip } from "./ContextUsageChip";
 import { SendButton } from "./SendButton";
 import styles from "./TaskInputToolbar.module.css";
+import { ThinkingAnimationMark } from "./ThinkingAnimationMark";
 
 interface ToolbarProps {
   running: boolean;
@@ -55,6 +55,7 @@ export function TaskInputToolbar({
   onStop,
 }: ToolbarProps) {
   const t = useT();
+  const { thinkingAnimation } = useUiStore();
   const { thinkingLevel, thinkingLevels, setThinkingLevel } = useComposerStore();
   const { modelLabel, modelProvider, modelId, processAlive, refreshModelState } = useSessionMeta();
   const attachInputRef = useRef<HTMLInputElement | null>(null);
@@ -122,7 +123,7 @@ export function TaskInputToolbar({
 
       {running && (
         <span className={styles.runningMark} title={t("session.input.running")}>
-          <Spinner size={16} weight="regular" className={styles.spin} />
+          <ThinkingAnimationMark animation={thinkingAnimation} size={16} />
         </span>
       )}
 
@@ -386,6 +387,7 @@ function ThinkingChip({
         onChange={apply}
         title={t("session.input.thinkingLevel")}
         valueLabel={t(THINKING_LABEL_KEY[level])}
+        variant="input"
       />
     </Popover>
   );

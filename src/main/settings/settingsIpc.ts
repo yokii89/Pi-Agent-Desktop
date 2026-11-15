@@ -31,6 +31,7 @@ import {
   isSplashFontPreset,
   isSplashLogoDataUrl,
 } from "../../shared/splash";
+import { isThinkingAnimation } from "../../shared/thinkingAnimation";
 import { clampWallpaperDim, normalizeWallpaperPath } from "../../shared/wallpaper";
 import { envelope } from "../ipc/envelope";
 import { onPrefetchSettingChanged } from "../session/speculativePrefetch";
@@ -250,6 +251,9 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
       case "inputBuddy":
         // 白名单外的值整项丢弃，不把脏 id 写进设置
         if (isInputBuddyKind(value)) clean.inputBuddy = value;
+        break;
+      case "thinkingAnimation":
+        if (isThinkingAnimation(value)) clean.thinkingAnimation = value;
         break;
       case "notification": {
         const notification = sanitizeNotification(value);

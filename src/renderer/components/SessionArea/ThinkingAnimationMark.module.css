@@ -1,0 +1,8 @@
+.orb {
+  display: block;
+  flex: 0 0 auto;
+  width: var(--thinking-animation-size, 16px);
+  height: var(--thinking-animation-size, 16px);
+  overflow: visible;
+  color: var(--color-accent-fg);
+}

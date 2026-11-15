@@ -114,16 +114,6 @@
   margin-right: 2px;
 }
 
-.spin {
-  animation: spin 0.9s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* 外壳与内边距来自 ui/overlayShell，高亮来自 ui/GlideList 的药丸，
    这里只留这个面板自己的宽度与行排版（--row-* 见 GlideList.module.css）。 */
 .modePanel {

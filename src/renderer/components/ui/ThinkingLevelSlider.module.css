@@ -1,11 +1,11 @@
-/**
- * 思考等级滑轨浮层（复刻 docs/ui-design/prompt-bar-micro-interactions.html 的强度滑轨）。
- * 开合动效归 Popover 的定帧时间轴；thumb / 进度条的位移由 ThinkingLevelSlider
- * 逐帧写 `--effort-x` / `--effort-fill`（docs/design/51），这里只描述静息几何与颜色。
- * 14/28/4/-3 等 是滑轨部件的几何常量（thumb、档位点的物理尺寸），不是主题间距。
- */
+/* 思考等级滑轨（输入栏彗星矩阵 / 设置页紧凑档位）。输入栏画布只读主题令牌，
+   彗星位置与档位补间由 ThinkingLevelSlider 驱动；这里只描述静息几何与布局。 */
 .panel {
   width: 248px;
+}
+
+.inputPanel {
+  width: min(352px, calc(100vw - 40px));
 }
 
 .head {
@@ -55,6 +55,87 @@
 
 .track:focus-visible {
   box-shadow: 0 0 0 1px var(--color-border-strong);
+}
+
+.inputTrack {
+  height: 48px;
+  margin: 0 var(--spacing-sm);
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.inputTrack:focus-visible {
+  box-shadow: none;
+}
+
+.matrixViewport {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 28px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-overlay-item);
+  background: var(--color-bg);
+  box-shadow: inset 0 2px 6px color-mix(in srgb, var(--color-bg) 78%, transparent);
+  transform: translateY(-50%);
+}
+
+.inputTrack:focus-visible .matrixViewport {
+  outline: 1px solid var(--color-border-strong);
+  outline-offset: 3px;
+}
+
+.matrixCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.raysCanvas {
+  position: absolute;
+  left: var(--effort-pct, 4%);
+  top: 50%;
+  width: 120px;
+  height: 120px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.raysArtwork {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cometHandle {
+  position: absolute;
+  left: var(--effort-pct, 4%);
+  top: 50%;
+  z-index: 1;
+  display: block;
+  width: 56px;
+  height: 48px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.cometCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dragging .cometHandle {
+  filter: drop-shadow(0 0 8px var(--color-spark));
+}
+
+.inputPanel[data-single] .raysCanvas,
+.inputPanel[data-single] .cometHandle {
+  display: none;
 }
 
 .fill {
