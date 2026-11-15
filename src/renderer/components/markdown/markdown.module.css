@@ -325,23 +325,6 @@
   flex: 0 0 auto;
 }
 
-/* Markdown 里解析成功的本地图片 */
-.mdImg {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin: 0 0 var(--spacing-sm);
-  border-radius: var(--radius-sm);
-}
-
-/* 远程图（生产 CSP 不放行）/ 读取失败 / 非图片：占位提示 */
-.mdImgBroken {
-  display: block;
-  margin: 0 0 var(--spacing-sm);
-  color: var(--color-warning);
-  font-size: 0.875em;
-}
-
 /* 锚点、mailto 等本预览无法处理的引用降级为普通文字 */
 .mdLinkDead {
   color: var(--color-text-muted);

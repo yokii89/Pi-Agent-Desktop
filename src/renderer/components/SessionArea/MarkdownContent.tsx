@@ -19,6 +19,8 @@ interface MarkdownContentProps {
   caret?: boolean;
   /** 软换行渲染为 <br>（docs/design/29 缺陷 E）。会话正文与思考流开，ExtensionView 保持 false。 */
   breaks?: boolean;
+  imageBaseDir?: string | null;
+  imagePreview?: boolean;
 }
 
 /**
@@ -33,12 +35,31 @@ export const MarkdownContent = memo(function MarkdownContent({
   streaming = false,
   caret = streaming,
   breaks = false,
+  imageBaseDir,
+  imagePreview,
 }: MarkdownContentProps) {
   // streaming 常为 false（历史块），早退避免 split 开销
   if (!streaming || !STREAM_SPLIT_ENABLED) {
-    return <StaticMarkdown text={text} className={className} breaks={breaks} />;
+    return (
+      <StaticMarkdown
+        text={text}
+        className={className}
+        breaks={breaks}
+        imageBaseDir={imageBaseDir}
+        imagePreview={imagePreview}
+      />
+    );
   }
-  return <StreamingMarkdown text={text} className={className} caret={caret} breaks={breaks} />;
+  return (
+    <StreamingMarkdown
+      text={text}
+      className={className}
+      caret={caret}
+      breaks={breaks}
+      imageBaseDir={imageBaseDir}
+      imagePreview={imagePreview}
+    />
+  );
 });
 
 /**
@@ -50,15 +71,21 @@ const StaticMarkdown = memo(function StaticMarkdown({
   className,
   breaks,
   streaming = false,
+  imageBaseDir,
+  imagePreview,
 }: {
   text: string;
   className?: string;
   breaks: boolean;
   streaming?: boolean;
+  imageBaseDir?: string | null;
+  imagePreview?: boolean;
 }) {
   return (
     <MarkdownDoc
       text={text}
+      imageBaseDir={imageBaseDir}
+      imagePreview={imagePreview}
       codeCopy
       codeHighlight
       mermaid
@@ -79,11 +106,15 @@ function StreamingMarkdown({
   className,
   caret,
   breaks,
+  imageBaseDir,
+  imagePreview,
 }: {
   text: string;
   className?: string;
   caret: boolean;
   breaks: boolean;
+  imageBaseDir?: string | null;
+  imagePreview?: boolean;
 }) {
   // 切分是廉价字符串扫描（相对 markdown parse 可忽略），每次 delta 都重切也安全；
   // 前缀块靠 StaticMarkdown 的 prop 相等跳过重渲染。
@@ -92,11 +123,20 @@ function StreamingMarkdown({
   return (
     <div className={styles.streamFlow}>
       {blocks.map((block, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: 前缀只追加不重排，索引键保证 memo 命中
-        <StaticMarkdown key={index} text={block} className={className} breaks={breaks} />
+        <StaticMarkdown
+          // biome-ignore lint/suspicious/noArrayIndexKey: 前缀只追加不重排，索引键保证 memo 命中
+          key={index}
+          text={block}
+          className={className}
+          breaks={breaks}
+          imageBaseDir={imageBaseDir}
+          imagePreview={imagePreview}
+        />
       ))}
       <StaticMarkdown
         text={visibleTail}
+        imageBaseDir={imageBaseDir}
+        imagePreview={imagePreview}
         className={caret ? [className, styles.caretHost].filter(Boolean).join(" ") : className}
         breaks={breaks}
         streaming

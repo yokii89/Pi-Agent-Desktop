@@ -9,26 +9,33 @@ const PROTOCOL_RE = /^[a-z][a-z0-9+.-]*:/i;
  * Markdown 中的本地引用（图片 src / 链接 href）解析为本地绝对路径。
  * - `http(s):` / `data:` / `mailto:` / 纯锚点 `#` 等非本地引用返回 null。
  * - `file://` 剥协议取 pathname（Windows 盘符会多出前导 `/`，一并去掉）。
- * - 相对路径基于 md 文件所在目录拼接并归一化 `./` `../`；越出根时截断在根。
+ * - 相对路径优先基于 md 文件目录，否则基于显式 baseDir；无目录时返回 null。
+ * - 归一化 `./` `../` 时保留盘符、POSIX 根与 UNC 共享目录。
  */
-export function resolveMarkdownRef(src: string, mdPath: string): string | null {
+export function resolveMarkdownRef(
+  src: string,
+  mdPath?: string | null,
+  baseDir?: string | null,
+): string | null {
   const raw = src.trim();
   if (!raw || raw.startsWith("#")) return null;
 
   let value = raw;
   // Windows 盘符绝对路径（D:/ 或 D:\）必须先于协议判断：`D:` 会被协议正则误判为 scheme
-  const isDrivePath = /^[a-zA-Z]:[\\/]/.test(value);
+  const isDrivePath = /^[a-zA-Z]:(?:[\\/]|%5c|%2f)/i.test(value);
   if (/^file:\/\//i.test(value)) {
     try {
-      value = decodeURIComponent(new URL(value).pathname);
+      const url = new URL(value);
+      value = decodeURIComponent(url.pathname);
+      if (url.hostname) value = `//${url.hostname}${value}`;
     } catch {
       return null;
     }
-    // file:///D:/x/y.png → /D:/x/y.png → D:/x/y.png
-    if (/^\/[a-zA-Z]:/.test(value)) value = value.slice(1);
   } else if (!isDrivePath && PROTOCOL_RE.test(value)) {
     return null;
   } else {
+    // URL 片段不属于文件名；文件名里的 # / ? 应由 Markdown URL 编码保留。
+    value = value.split(/[?#]/, 1)[0];
     try {
       value = decodeURIComponent(value);
     } catch {
@@ -36,11 +43,16 @@ export function resolveMarkdownRef(src: string, mdPath: string): string | null {
     }
   }
 
+  // file URL 或 Markdown 生成的 /D:/x/y.png 均指向 Windows 盘符路径。
+  if (/^\/[a-zA-Z]:[\\/]/.test(value)) value = value.slice(1);
+
   // 盘符开头（D:/ 或 D:\）或根开头（/ 或 \）按绝对路径归一化
   if (/^[a-zA-Z]:[\\/]/.test(value) || /^[/\\]/.test(value)) {
     return normalizeAbsolute(value);
   }
-  return normalizeRelative(dirnameOf(mdPath), value);
+  const directory = mdPath ? dirnameOf(mdPath) : baseDir;
+  if (!directory || !/^(?:[a-zA-Z]:[\\/]|[/\\])/.test(directory)) return null;
+  return normalizeAbsolute(`${directory.replace(/[/\\]+$/, "")}/${value}`);
 }
 
 const FENCE_LANG_ALIAS: Record<string, string> = {
@@ -74,15 +86,17 @@ export function normalizeFenceLang(info: string): string {
 /** md 文件所在目录（兼容 / 与 \）。 */
 function dirnameOf(p: string): string {
   const idx = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  if (idx === 0 || (idx === 2 && /^[a-zA-Z]:/.test(p))) return p.slice(0, idx + 1);
   return idx > 0 ? p.slice(0, idx) : p;
 }
 
 /** 绝对路径归一化：保留盘符 / POSIX 根，`..` 越出根时截断在根。 */
 function normalizeAbsolute(value: string): string {
   const winDrive = /^[a-zA-Z]:/.test(value);
-  const posixRoot = !winDrive && /^[/\\]/.test(value);
+  const unc = /^[/\\]{2}/.test(value);
+  const posixRoot = !winDrive && !unc && /^[/\\]/.test(value);
   const sep = value.includes("\\") ? "\\" : "/";
-  const floor = winDrive || posixRoot ? 1 : 0;
+  const floor = unc ? 2 : winDrive ? 1 : 0;
   const out: string[] = [];
   for (const seg of value.split(/[/\\]+/)) {
     if (!seg || seg === ".") continue;
@@ -92,23 +106,6 @@ function normalizeAbsolute(value: string): string {
     }
     out.push(seg);
   }
-  return (posixRoot ? "/" : "") + out.join(sep);
-}
-
-/** 相对路径拼接归一化：基于 md 所在目录，`..` 不越过根（盘符 / POSIX 根）。 */
-function normalizeRelative(baseDir: string, rel: string): string {
-  const sep = baseDir.includes("\\") ? "\\" : "/";
-  const baseSegs = baseDir.split(/[/\\]+/).filter(Boolean);
-  const posixRoot = /^[/\\]/.test(baseDir);
-  const floor = /^[a-zA-Z]:$/.test(baseSegs[0] ?? "") || posixRoot ? 1 : 0;
-  const out = baseSegs;
-  for (const seg of rel.split(/[/\\]+/)) {
-    if (!seg || seg === ".") continue;
-    if (seg === "..") {
-      if (out.length > floor) out.pop();
-      continue;
-    }
-    out.push(seg);
-  }
-  return (posixRoot ? "/" : "") + out.join(sep);
+  const prefix = unc ? sep + sep : posixRoot ? "/" : "";
+  return prefix + out.join(sep) + (winDrive && out.length === 1 ? sep : "");
 }

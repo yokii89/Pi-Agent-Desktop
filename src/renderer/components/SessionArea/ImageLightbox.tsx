@@ -1,4 +1,4 @@
-import { DownloadSimple } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, DownloadSimple, X } from "@phosphor-icons/react";
 import { type MouseEvent, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "../../hooks/useT";
@@ -68,23 +68,29 @@ export function ImageLightbox({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      if (!ready || menuPos || event.defaultPrevented || event.isComposing) return;
       if (event.key === "ArrowLeft") {
+        event.preventDefault();
         event.stopPropagation();
         showDelta(-1);
       } else if (event.key === "ArrowRight") {
+        event.preventDefault();
         event.stopPropagation();
         showDelta(1);
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [showDelta]);
+  }, [showDelta, ready, menuPos]);
 
   const image = images[Math.min(Math.max(current, 0), images.length - 1)];
   if (!image || !ready) return null;
   const label = image.name ?? t("session.image.attachment");
+  // 现有保存 API 接受 base64 图片；远程预览不能把 URL 当作图片数据写入。
+  const canSave = /^data:image\/[a-z0-9.+-]+;base64,/i.test(image.src);
 
   const openMenuAtCursor = (event: MouseEvent<HTMLDivElement>): void => {
+    if (!canSave) return;
     event.preventDefault();
     setMenuPos({ x: event.clientX, y: event.clientY });
   };
@@ -120,15 +126,59 @@ export function ImageLightbox({
       <Modal open onClose={onClose} ariaLabel={label} panelClassName={styles.panel}>
         {/* biome-ignore lint/a11y/noStaticElementInteractions: 图片是只读展示面，右键只是保存入口，不伪装成交互 role */}
         <div className={styles.stage} onContextMenu={openMenuAtCursor}>
-          <img className={styles.img} src={image.src} alt={label} />
+          <PreviewImage key={image.src} src={image.src} label={label} />
         </div>
         <div className={styles.bar}>
-          <span className={styles.title}>{label}</span>
-          {images.length > 1 ? (
-            <span className={styles.counter}>
-              {current + 1} / {images.length}
-            </span>
-          ) : null}
+          <span className={styles.title} data-selectable-text="">
+            {label}
+          </span>
+          <div className={styles.actions}>
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  className={styles.action}
+                  aria-label={t("session.image.previous")}
+                  title={t("session.image.previous")}
+                  onClick={() => showDelta(-1)}
+                >
+                  <CaretLeft size={20} weight="regular" />
+                </button>
+                <span className={styles.counter}>
+                  {current + 1} / {images.length}
+                </span>
+                <button
+                  type="button"
+                  className={styles.action}
+                  aria-label={t("session.image.next")}
+                  title={t("session.image.next")}
+                  onClick={() => showDelta(1)}
+                >
+                  <CaretRight size={20} weight="regular" />
+                </button>
+              </>
+            )}
+            {canSave && (
+              <button
+                type="button"
+                className={styles.action}
+                aria-label={t("session.image.save")}
+                title={t("session.image.save")}
+                onClick={() => void saveCurrent()}
+              >
+                <DownloadSimple size={20} weight="regular" />
+              </button>
+            )}
+            <button
+              type="button"
+              className={styles.action}
+              aria-label={t("common.close")}
+              title={t("common.close")}
+              onClick={onClose}
+            >
+              <X size={20} weight="regular" />
+            </button>
+          </div>
         </div>
       </Modal>
       {/* 菜单 portal 到 body：Modal 遮罩的 backdrop-filter 会把 fixed 的包含块从视口改写成遮罩 */}
@@ -138,6 +188,30 @@ export function ImageLightbox({
             document.body,
           )
         : null}
+    </>
+  );
+}
+
+function PreviewImage({ src, label }: { src: string; label: string }) {
+  const t = useT();
+  const [status, setStatus] = useState<"loading" | "loaded" | "failed">("loading");
+  return (
+    <>
+      {status !== "failed" && (
+        <img
+          className={styles.img}
+          src={src}
+          alt={label}
+          referrerPolicy="no-referrer"
+          onLoad={() => setStatus("loaded")}
+          onError={() => setStatus("failed")}
+        />
+      )}
+      {status !== "loaded" && (
+        <span className={styles.status} role="status">
+          {status === "failed" ? t("common.imageLoadFailed", { src: label }) : t("common.loading")}
+        </span>
+      )}
     </>
   );
 }

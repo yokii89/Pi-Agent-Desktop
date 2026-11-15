@@ -112,13 +112,14 @@ export interface ToolImage {
   alt: string;
 }
 
-export type ToolResultPayload =
+export type ToolResultPayload = (
   | TerminalPayload
   | FileReadPayload
   | FileChangePayload
   | SearchPayload
   | DiffPayload
-  | GenericPayload;
+  | GenericPayload
+) & { images?: ToolImage[] };
 
 // 后两个是 pi-bash-jobs 的作业工具（docs/design/129 §8.2）：读作业输出、停作业进程，
 // 本质都是对命令行的操作，落 generic 会丢「已运行 N 条命令」的摘要口径。
@@ -619,12 +620,24 @@ export function buildToolResult(
   result: unknown,
   isError: boolean,
 ): ToolResultPayload {
+  const images = extractImages(result);
+  const payload = buildToolTextResult(kind, args, result, isError, images);
+  // 图片独立于工具种类：read 的说明文字、终端或搜索结果都可能同时携带图片。
+  return images.length > 0 ? { ...payload, images } : payload;
+}
+
+function buildToolTextResult(
+  kind: ToolKind,
+  args: unknown,
+  result: unknown,
+  isError: boolean,
+  images: ToolImage[],
+): ToolResultPayload {
   const parsedArgs = parseToolArgs(kind, args);
   const rawText = extractResultText(result) ?? "";
   const capped = capResultText(rawText);
   const text = capped.text;
   const details = extractResultDetails(result);
-  const images = extractImages(result);
 
   if (kind === "terminal") {
     return {

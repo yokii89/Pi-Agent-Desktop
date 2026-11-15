@@ -12,6 +12,16 @@ import { TerminalResult } from "./TerminalResult";
  * 未知工具一律落到 GenericToolResult，UI 不按文本猜类型。
  */
 export function ToolResultRouter({ block }: { block: ToolAssistantBlock }) {
+  const images = block.result?.images;
+  return (
+    <>
+      {images && images.length > 0 && <ImageResult images={images} />}
+      <ToolTextResult block={block} />
+    </>
+  );
+}
+
+function ToolTextResult({ block }: { block: ToolAssistantBlock }) {
   const result = block.result;
 
   if (result?.kind === "terminal") {
@@ -69,19 +79,6 @@ export function ToolResultRouter({ block }: { block: ToolAssistantBlock }) {
         additions={result.additions}
         deletions={result.deletions}
       />
-    );
-  }
-
-  if (result?.kind === "generic") {
-    return (
-      <>
-        {result.images.length > 0 && <ImageResult images={result.images} />}
-        <GenericToolResult
-          argsText={block.argsText}
-          resultText={block.resultText}
-          status={block.status}
-        />
-      </>
     );
   }
 

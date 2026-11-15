@@ -753,6 +753,9 @@ export const sessionMessages = defineMessages({
     "en-US": "Preview {name}",
   },
   "session.image.save": { "zh-CN": "保存图片", "en-US": "Save image" },
+  "session.image.previous": { "zh-CN": "上一张图片", "en-US": "Previous image" },
+  "session.image.next": { "zh-CN": "下一张图片", "en-US": "Next image" },
+  "session.image.inline": { "zh-CN": "正文图片", "en-US": "Inline image" },
   "session.image.saved": {
     "zh-CN": "已保存到「下载」：{name}",
     "en-US": "Saved to Downloads: {name}",

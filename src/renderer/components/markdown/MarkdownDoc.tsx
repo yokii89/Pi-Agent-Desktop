@@ -1,6 +1,6 @@
 import { Copy, ImageSquare } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { isValidElement, memo, useEffect, useRef, useState } from "react";
+import { isValidElement, memo, useMemo, useRef, useState } from "react";
 import type { Components } from "react-markdown";
 import Markdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
@@ -8,16 +8,17 @@ import remarkGfm from "remark-gfm";
 import { isHtmlPath } from "../../../shared/fileKinds";
 import { useT } from "../../hooks/useT";
 import { clipboardService } from "../../services/clipboardService";
-import { fsService } from "../../services/fsService";
 import { useBrowserStore } from "../../stores/browserStore";
 import { useUiStore } from "../../stores/uiStore";
 import { countCodeLines } from "../../utils/codeLines";
 import { elementToPng } from "../../utils/elementToPng";
 import { isExternalHttpUrl } from "../../utils/linkify";
+import { markdownUrlTransform } from "../../utils/markdownImageSource";
 import { normalizeFenceLang, resolveMarkdownRef } from "../../utils/markdownRefs";
 import { FileLink, looksLikeFilePath } from "../SessionArea/FileLink";
 import { CodeHighlight } from "../ui/CodeHighlight";
 import { UrlLink } from "../ui/UrlLink";
+import { MarkdownImage, MarkdownImageLinkContext } from "./MarkdownImage";
 import { MarkdownTable } from "./MarkdownTable";
 import { MermaidBlock } from "./MermaidBlock";
 import styles from "./markdown.module.css";
@@ -38,38 +39,19 @@ const MAX_HIGHLIGHT_LINES = 200;
 const MAX_MERMAID_CHARS = 8_000;
 const MAX_MERMAID_LINES = 200;
 
-/** 本地图片 dataUrl 缓存：同一文件多次引用 / 重渲染只读一次盘。 */
-const imageDataUrlCache = new Map<string, Promise<string | null>>();
-const IMAGE_CACHE_LIMIT = 24;
-/** 单图缓存上限：大图不驻留内存（预览多个含大图文档时 dataUrl 很占）。 */
-const IMAGE_CACHE_MAX_ENTRY_BYTES = 2 * 1024 * 1024;
-
-function loadImageDataUrl(path: string): Promise<string | null> {
-  const hit = imageDataUrlCache.get(path);
-  if (hit) return hit;
-  const promise = fsService
-    .read(path)
-    .then((result) => {
-      if (result.kind !== "image") return null;
-      // 超上限的大图只返回不入缓存，用完即回收
-      if (result.dataUrl.length > IMAGE_CACHE_MAX_ENTRY_BYTES) return result.dataUrl;
-      if (imageDataUrlCache.size >= IMAGE_CACHE_LIMIT) imageDataUrlCache.clear();
-      imageDataUrlCache.set(path, promise);
-      return result.dataUrl;
-    })
-    .catch(() => null);
-  return promise;
-}
-
 interface MarkdownDocProps {
   text: string;
   /** 覆盖根节点类名（muted 思考流 / 附加包装样式）。 */
   className?: string;
   /**
    * 源文件路径：提供后按 Markdown 处理本地引用——相对图片解析为 dataUrl、
-   * 相对链接在文件面板内跳转。会话区（无文件语境）不传，维持原渲染。
+   * 相对链接在文件面板内跳转。会话区用 imageBaseDir 提供图片目录。
    */
   sourcePath?: string | null;
+  /** 会话工作目录，仅用于图片相对路径；sourcePath 提供时优先按源文档定位。 */
+  imageBaseDir?: string | null;
+  /** 普通插图点击进入图片查看器；图片链接仍执行链接动作。 */
+  imagePreview?: boolean;
   /** 块级围栏代码用 shiki 高亮（文件面板预览开，会话区维持现状关）。 */
   codeHighlight?: boolean;
   /** 块级代码块外壳右上角加「复制为图片 / 复制为文本」（会话区开，docs/design/136）。 */
@@ -214,54 +196,6 @@ function FenceShell({
   );
 }
 
-/** Markdown 内本地图片：相对路径解析 → fs 读取 → dataUrl（缓存）；失败显示占位。 */
-function MarkdownImg({ sourcePath, src, alt }: { sourcePath: string; src?: string; alt?: string }) {
-  const t = useT();
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    // 先清旧态：元素被 React 复用（换文件同位置）时不能残留上一张图
-    setDataUrl(null);
-    if (typeof src !== "string" || src.trim() === "") {
-      setFailed(true);
-      return;
-    }
-    // data: 引用 CSP 已放行，直通
-    if (/^data:/i.test(src)) {
-      setDataUrl(src);
-      setFailed(false);
-      return;
-    }
-    const resolved = resolveMarkdownRef(src, sourcePath);
-    if (!resolved) {
-      // http(s) 远程图生产 CSP 不放行（img-src 'self' data:），按失败占位
-      setFailed(true);
-      return;
-    }
-    let cancelled = false;
-    setFailed(false);
-    loadImageDataUrl(resolved).then((url) => {
-      if (cancelled) return;
-      if (url) setDataUrl(url);
-      else setFailed(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [src, sourcePath]);
-
-  if (dataUrl) {
-    return <img className={styles.mdImg} src={dataUrl} alt={alt ?? ""} draggable={false} />;
-  }
-  if (failed) {
-    return (
-      <span className={styles.mdImgBroken}>{t("common.imageLoadFailed", { src: src ?? "" })}</span>
-    );
-  }
-  return null;
-}
-
 /** Markdown 内链接：有源文件语境时本地路径在面板内跳转；http(s) 一律交系统浏览器；
  * 其余协议降级死链。会话区（无 sourcePath）同样必须接管——默认 <a> 会把整个应用导航走
  * （docs/design/13 P0-1）。外链形态与输入栏、用户气泡同源（docs/design/131）。 */
@@ -341,6 +275,8 @@ function hastHasImage(node: unknown): boolean {
 
 function buildComponents(opts: {
   sourcePath?: string | null;
+  imageBaseDir?: string | null;
+  imagePreview?: boolean;
   codeHighlight?: boolean;
   codeCopy?: boolean;
   mermaid?: boolean;
@@ -363,13 +299,31 @@ function buildComponents(opts: {
     // a 无条件接管（docs/design/13 P0-1）：有源文件语境解析本地路径，
     // 会话区至少拦下 http(s) 外链，其余协议降级死链，禁止应用内导航
     a: (props) => (
-      <MarkdownLink
-        sourcePath={opts.sourcePath ?? null}
-        href={props.href}
-        imageContent={hastHasImage(props.node)}
+      <MarkdownImageLinkContext
+        value={
+          isExternalHttpUrl(props.href) ||
+          (opts.sourcePath != null &&
+            resolveMarkdownRef(props.href ?? "", opts.sourcePath) !== null)
+        }
       >
-        {props.children}
-      </MarkdownLink>
+        <MarkdownLink
+          sourcePath={opts.sourcePath ?? null}
+          href={props.href}
+          imageContent={hastHasImage(props.node)}
+        >
+          {props.children}
+        </MarkdownLink>
+      </MarkdownImageLinkContext>
+    ),
+    img: (props) => (
+      <MarkdownImage
+        sourcePath={opts.sourcePath}
+        baseDir={opts.imageBaseDir}
+        preview={opts.imagePreview}
+        src={props.src}
+        alt={props.alt}
+        title={props.title}
+      />
     ),
     // 表格一律套外壳：圆角卡片 + 横向滚动容器（docs/design/135）。
     // 工具条只在会话区开，组件始终复用同一条渲染路径。
@@ -391,12 +345,6 @@ function buildComponents(opts: {
       </FenceShell>
     );
   }
-  const sourcePath = opts.sourcePath;
-  if (sourcePath != null) {
-    components.img = (props) => (
-      <MarkdownImg sourcePath={sourcePath} src={props.src} alt={props.alt} />
-    );
-  }
   return components;
 }
 
@@ -408,6 +356,8 @@ export const MarkdownDoc = memo(function MarkdownDoc({
   text,
   className,
   sourcePath,
+  imageBaseDir,
+  imagePreview,
   codeHighlight,
   codeCopy,
   breaks = false,
@@ -415,18 +365,36 @@ export const MarkdownDoc = memo(function MarkdownDoc({
   tableTools = false,
   streaming = false,
 }: MarkdownDocProps) {
+  // 稳定组件身份：正文增量不应重新挂载已加载的图片或重启文件读取。
+  const components = useMemo(
+    () =>
+      buildComponents({
+        sourcePath,
+        imageBaseDir,
+        imagePreview,
+        codeHighlight,
+        codeCopy,
+        mermaid,
+        tableTools,
+        streaming,
+      }),
+    [
+      sourcePath,
+      imageBaseDir,
+      imagePreview,
+      codeHighlight,
+      codeCopy,
+      mermaid,
+      tableTools,
+      streaming,
+    ],
+  );
   return (
     <div className={[styles.md, className].filter(Boolean).join(" ")}>
       <Markdown
         remarkPlugins={breaks ? remarkPluginsWithBreaks : remarkPlugins}
-        components={buildComponents({
-          sourcePath,
-          codeHighlight,
-          codeCopy,
-          mermaid,
-          tableTools,
-          streaming,
-        })}
+        components={components}
+        urlTransform={markdownUrlTransform}
       >
         {text}
       </Markdown>

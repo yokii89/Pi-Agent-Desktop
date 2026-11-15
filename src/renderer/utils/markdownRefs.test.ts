@@ -4,6 +4,21 @@ import { normalizeFenceLang, resolveMarkdownRef } from "./markdownRefs";
 describe("resolveMarkdownRef", () => {
   const md = "D:\\docs\\project\\README.md";
 
+  it("根目录与 UNC 路径不丢根、不越过共享目录", () => {
+    expect(resolveMarkdownRef("a.png", "/README.md")).toBe("/a.png");
+    expect(resolveMarkdownRef("../../a.png", "/home/README.md")).toBe("/a.png");
+    expect(resolveMarkdownRef("../a.png", "C:/README.md")).toBe("C:/a.png");
+    expect(resolveMarkdownRef("file://server/share/a%20b.png")).toBe("//server/share/a b.png");
+    expect(resolveMarkdownRef("../../../a.png", null, "\\\\server\\share\\docs")).toBe(
+      "\\\\server\\share\\a.png",
+    );
+  });
+
+  it("URL 查询和片段不污染文件名，编码后的特殊字符仍保留", () => {
+    expect(resolveMarkdownRef("a.png?v=2#preview", md)).toBe("D:\\docs\\project\\a.png");
+    expect(resolveMarkdownRef("a%23b.png", md)).toBe("D:\\docs\\project\\a#b.png");
+  });
+
   it("相对路径基于 md 所在目录拼接并归一化 ./ ../", () => {
     expect(resolveMarkdownRef("./img/a.png", md)).toBe("D:\\docs\\project\\img\\a.png");
     expect(resolveMarkdownRef("img/a.png", md)).toBe("D:\\docs\\project\\img\\a.png");

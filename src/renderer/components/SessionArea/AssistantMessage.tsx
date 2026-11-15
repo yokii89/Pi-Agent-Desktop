@@ -1,4 +1,5 @@
 import { memo, useMemo } from "react";
+import { useSessionMeta } from "../../stores/sessionStore";
 import type { AssistantBlock, ToolAssistantBlock } from "../../stores/sessionTranscript";
 import { ActivityGroup } from "./ActivityGroup";
 import { AssistantFooter } from "./AssistantFooter";
@@ -32,6 +33,7 @@ export function AssistantMessage({
   /** 页脚由外层挂到编辑汇总卡下方（本组件不再渲染，避免出现两次）。 */
   footerDeferred?: boolean;
 }) {
+  const { sessionWorkingDir } = useSessionMeta();
   const units = useMemo(() => groupFlow(blocks), [blocks]);
   const hasStreaming = blocks.some((block) => block.kind !== "tool" && block.streaming === true);
   const showFooter = settled && !footerDeferred && hasAssistantReplyText(blocks);
@@ -46,14 +48,14 @@ export function AssistantMessage({
         const inner = unit.blocks;
         if (inner.length === 1) {
           // biome-ignore lint/suspicious/noArrayIndexKey: 同上
-          return <BlockView key={`g-${index}`} block={inner[0]} />;
+          return <BlockView key={`g-${index}`} block={inner[0]} imageBaseDir={sessionWorkingDir} />;
         }
         if (isToolOnlyGroup(inner)) {
           // biome-ignore lint/suspicious/noArrayIndexKey: 同上
           return <ToolCallGroup key={`g-${index}`} blocks={inner as ToolAssistantBlock[]} />;
         }
         // biome-ignore lint/suspicious/noArrayIndexKey: 同上
-        return <MixedFallback key={`g-${index}`} group={inner} />;
+        return <MixedFallback key={`g-${index}`} group={inner} imageBaseDir={sessionWorkingDir} />;
       })}
       {showFooter && <AssistantFooter blocks={blocks} at={at} />}
     </article>
@@ -61,10 +63,24 @@ export function AssistantMessage({
 }
 
 /** 块级 memo：引用未变的历史块在流式 delta 时跳过重渲染。 */
-const BlockView = memo(function BlockView({ block }: { block: AssistantBlock }) {
+const BlockView = memo(function BlockView({
+  block,
+  imageBaseDir,
+}: {
+  block: AssistantBlock;
+  imageBaseDir: string | null;
+}) {
   if (block.kind === "text") {
     // 单一组件 + streaming prop：流式收尾时原地 reconcile，不切换组件类型（docs/design/13 P1-4）
-    return <MarkdownContent text={block.text} streaming={block.streaming === true} breaks />;
+    return (
+      <MarkdownContent
+        text={block.text}
+        streaming={block.streaming === true}
+        breaks
+        imageBaseDir={imageBaseDir}
+        imagePreview
+      />
+    );
   }
   if (block.kind === "thinking") {
     return <ReasoningBlock text={block.text} streaming={block.streaming} />;
@@ -72,12 +88,18 @@ const BlockView = memo(function BlockView({ block }: { block: AssistantBlock }) 
   return <ToolCall block={block} />;
 });
 
-function MixedFallback({ group }: { group: AssistantBlock[] }) {
+function MixedFallback({
+  group,
+  imageBaseDir,
+}: {
+  group: AssistantBlock[];
+  imageBaseDir: string | null;
+}) {
   return (
     <>
       {group.map((block, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: 同上
-        <BlockView key={`m-${index}`} block={block} />
+        <BlockView key={`m-${index}`} block={block} imageBaseDir={imageBaseDir} />
       ))}
     </>
   );

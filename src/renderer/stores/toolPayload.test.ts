@@ -6,7 +6,37 @@ import {
   parseBackgroundJob,
   parseToolArgs,
   parseUnifiedDiff,
+  type ToolKind,
 } from "./toolPayload";
+
+describe("混合图文工具结果", () => {
+  it.each<ToolKind>(["read", "terminal", "write", "edit", "search", "diff", "generic"])(
+    "%s 保留同一结果中的图片及原有展示类型",
+    (kind) => {
+      const result = buildToolResult(
+        kind,
+        { path: "a.png" },
+        {
+          content: [
+            { type: "text", text: "Screenshot captured with annotations" },
+            { type: "image", data: "AAAA", mimeType: "image/png" },
+            { type: "image", data: "BBBB", mimeType: "image/jpeg" },
+          ],
+        },
+        false,
+      );
+      expect(result.kind).toBe(kind === "write" || kind === "edit" ? "change" : kind);
+      expect(result.images?.map((image) => image.src)).toEqual([
+        "data:image/png;base64,AAAA",
+        "data:image/jpeg;base64,BBBB",
+      ]);
+      if (result.kind === "read")
+        expect(result.content).toBe("Screenshot captured with annotations");
+      if (result.kind === "terminal")
+        expect(result.output).toBe("Screenshot captured with annotations");
+    },
+  );
+});
 
 /**
  * 变更行统计（汇总卡与工具行共用）：pi 的 edit 结果只有「Successfully replaced N block(s)」文案、

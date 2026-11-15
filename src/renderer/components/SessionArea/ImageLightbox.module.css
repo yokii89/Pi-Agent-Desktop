@@ -1,11 +1,12 @@
 .panel {
   width: min(920px, 100%);
   height: min(80vh, 720px);
-  background: color-mix(in srgb, var(--color-bg) 88%, black);
+  background: var(--color-bg);
   border-color: var(--color-border-strong);
 }
 
 .stage {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -33,6 +34,7 @@
 }
 
 .title {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -42,4 +44,43 @@
 .counter {
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xs);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: var(--spacing-xs);
+}
+
+.status {
+  position: absolute;
+  inset: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
