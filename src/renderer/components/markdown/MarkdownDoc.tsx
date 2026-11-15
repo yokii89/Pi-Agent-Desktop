@@ -5,6 +5,7 @@ import type { Components } from "react-markdown";
 import Markdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import { isHtmlPath } from "../../../shared/fileKinds";
 import { useT } from "../../hooks/useT";
 import { clipboardService } from "../../services/clipboardService";
@@ -14,19 +15,21 @@ import { countCodeLines } from "../../utils/codeLines";
 import { elementToPng } from "../../utils/elementToPng";
 import { isExternalHttpUrl } from "../../utils/linkify";
 import { markdownUrlTransform } from "../../utils/markdownImageSource";
+import { normalizeMathDelimiters } from "../../utils/markdownMath";
 import { normalizeFenceLang, resolveMarkdownRef } from "../../utils/markdownRefs";
 import { FileLink, looksLikeFilePath } from "../SessionArea/FileLink";
 import { CodeHighlight } from "../ui/CodeHighlight";
 import { UrlLink } from "../ui/UrlLink";
 import { MarkdownImage, MarkdownImageLinkContext } from "./MarkdownImage";
 import { MarkdownTable } from "./MarkdownTable";
+import { MathFormula } from "./MathFormula";
 import { MermaidBlock } from "./MermaidBlock";
 import styles from "./markdown.module.css";
 
 /** 模块级常量：避免每次 render 新建插件数组导致 memo 失效。 */
-const remarkPlugins = [remarkGfm];
+const remarkPlugins = [remarkGfm, remarkMath];
 /** 会话流（breaks 开）：软换行渲染为 <br>，与不含 breaks 的数组分开持有，防 memo 失效。 */
-const remarkPluginsWithBreaks = [remarkGfm, remarkBreaks];
+const remarkPluginsWithBreaks = [remarkGfm, remarkMath, remarkBreaks];
 
 /** 流式代码块高亮护栏（docs/design/10 §3.9）：超过即退回纯 <pre>，避免长代码拖慢流式。 */
 const MAX_HIGHLIGHT_CHARS = 20_000;
@@ -284,8 +287,31 @@ function buildComponents(opts: {
   streaming?: boolean;
 }): Components {
   const components: Components = {
+    pre({ children }) {
+      const child = isValidElement(children)
+        ? (children.props as { className?: string; children?: ReactNode })
+        : null;
+      if (child?.className?.split(" ").includes("math-display")) {
+        return <MathFormula source={flattenText(child.children).replace(/\n$/, "")} display />;
+      }
+      return opts.codeHighlight || opts.codeCopy || opts.mermaid ? (
+        <FenceShell
+          codeHighlight={opts.codeHighlight ?? false}
+          codeCopy={opts.codeCopy ?? false}
+          mermaid={opts.mermaid ?? false}
+          streaming={opts.streaming ?? false}
+        >
+          {children}
+        </FenceShell>
+      ) : (
+        <pre>{children}</pre>
+      );
+    },
     // 行内 / 无语言 code：像文件路径时升级 FileLink（会话区原样保留）
     code({ className, children, ...props }) {
+      if (className?.split(" ").includes("math-inline")) {
+        return <MathFormula source={flattenText(children)} />;
+      }
       if (!className) {
         const text = String(children ?? "").trim();
         if (looksLikeFilePath(text)) return <FileLink path={text} />;
@@ -333,18 +359,6 @@ function buildComponents(opts: {
       </MarkdownTable>
     ),
   };
-  if (opts.codeHighlight || opts.codeCopy || opts.mermaid) {
-    components.pre = (props) => (
-      <FenceShell
-        codeHighlight={opts.codeHighlight ?? false}
-        codeCopy={opts.codeCopy ?? false}
-        mermaid={opts.mermaid ?? false}
-        streaming={opts.streaming ?? false}
-      >
-        {props.children}
-      </FenceShell>
-    );
-  }
   return components;
 }
 
@@ -396,7 +410,7 @@ export const MarkdownDoc = memo(function MarkdownDoc({
         components={components}
         urlTransform={markdownUrlTransform}
       >
-        {text}
+        {normalizeMathDelimiters(text)}
       </Markdown>
     </div>
   );

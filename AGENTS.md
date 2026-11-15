@@ -79,6 +79,7 @@ node_modules 解析**的包（当前仅 `electron-updater` / `node-pty`——主
 - `@lobehub/icons`（devDep，渲染层构建期打包）：AI / 模型厂商品牌 logo（设置 →「模型」的 provider 图标），见「第三方 AI 品牌 logo」一节；**只允许深引单图标组件**（`@lobehub/icons/es/<Icon>/components/Mono` / `Color`），禁止整包 `import … from "@lobehub/icons"`——主入口会把 @lobehub/ui、lucide-react 等 peer 一并拉进依赖图。
 - `@xterm/addon-fit`（devDep，渲染层构建期打包）：xterm 终端的容器尺寸自适应插件，与 `@xterm/xterm` 配套使用（仅中央工作区底部的终端面板）。
 - `react-markdown` + `remark-gfm`（devDep，渲染层构建期打包）：会话区 AI 回复的 Markdown 文档流渲染（GFM 表格/任务列表/删除线）。
+- `remark-math` + `katex` + `@types/katex`（devDep，渲染层构建期打包）：共享 Markdown 内核解析数学公式；KaTeX 引擎、样式与本地字体按需加载，禁用可信 HTML / 外部资源命令，公式不经过代码高亮或文件路径识别。
 - `remark-breaks`（devDep，渲染层构建期打包）：会话正文与思考流的软换行渲染为 `<br>`（模型输出的单换行是段内换行语义）；仅 `MarkdownDoc` 的 `breaks` surface 使用，文件面板预览与 ExtensionView 不开。
 - `gsap`（devDep，渲染层构建期打包）：左侧边栏的展开/折叠、悬浮揭示等交互动效；**必须动态 `import()` 使用**（见下文"动效规范"），不得静态引入。
 - `@electron/rebuild`（dev）：`node-pty` 原生模块针对 Electron ABI 的重编译（`pnpm run rebuild:native`）。

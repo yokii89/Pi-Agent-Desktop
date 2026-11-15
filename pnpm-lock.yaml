@@ -253,6 +253,9 @@ importers:
       '@phosphor-icons/react':
         specifier: ^2.1.7
         version: 2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@types/katex':
+        specifier: ^0.16.8
+        version: 0.16.8
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.2
@@ -283,6 +286,9 @@ importers:
       gsap:
         specifier: ^3.15.0
         version: 3.15.0
+      katex:
+        specifier: ^0.19.1
+        version: 0.19.1
       mermaid:
         specifier: 12.2.0
         version: 12.2.0
@@ -304,6 +310,9 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1(supports-color@7.2.0)
+      remark-math:
+        specifier: ^6.0.0
+        version: 6.0.0(supports-color@7.2.0)
       shiki:
         specifier: ^4.4.3
         version: 4.4.3
@@ -5957,8 +5966,7 @@ snapshots:
 
   '@types/http-cache-semantics@4.2.0': {}
 
-  '@types/katex@0.16.8':
-    optional: true
+  '@types/katex@0.16.8': {}
 
   '@types/keyv@3.1.4':
     dependencies:
@@ -6401,8 +6409,7 @@ snapshots:
 
   commander@7.2.0: {}
 
-  commander@8.3.0:
-    optional: true
+  commander@8.3.0: {}
 
   commander@9.5.0:
     optional: true
@@ -7513,7 +7520,6 @@ snapshots:
   katex@0.16.47:
     dependencies:
       commander: 8.3.0
-    optional: true
 
   katex@0.18.11:
     dependencies:
@@ -7522,7 +7528,6 @@ snapshots:
   katex@0.19.1:
     dependencies:
       commander: 15.0.0
-    optional: true
 
   keyv@4.5.4:
     dependencies:
@@ -7740,7 +7745,6 @@ snapshots:
       unist-util-remove-position: 5.0.0
     transitivePeerDependencies:
       - supports-color
-    optional: true
 
   mdast-util-mdx-expression@2.0.1(supports-color@7.2.0):
     dependencies:
@@ -7852,7 +7856,6 @@ snapshots:
       micromark-util-html-tag-name: 2.0.1
       unist-util-visit: 5.1.0
       zwitch: 2.0.4
-    optional: true
 
   mdast-util-to-string@4.0.0:
     dependencies:
@@ -7999,7 +8002,6 @@ snapshots:
       micromark-util-character: 2.1.1
       micromark-util-symbol: 2.0.1
       micromark-util-types: 2.0.2
-    optional: true
 
   micromark-extension-mdx-expression@3.0.1:
     dependencies:
@@ -8662,7 +8664,6 @@ snapshots:
       unified: 11.0.5
     transitivePeerDependencies:
       - supports-color
-    optional: true
 
   remark-mdx@3.1.1(supports-color@7.2.0):
     dependencies:
@@ -9046,7 +9047,6 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
       unist-util-visit: 5.1.0
-    optional: true
 
   unist-util-stringify-position@4.0.0:
     dependencies:

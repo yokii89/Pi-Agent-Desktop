@@ -325,6 +325,23 @@
   flex: 0 0 auto;
 }
 
+.mathInline,
+.mathDisplay {
+  color: inherit;
+  overflow-wrap: normal;
+}
+
+.mathDisplay {
+  margin: var(--spacing-md) 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.mathDisplay :global(.katex-display) {
+  margin: 0;
+  padding: var(--spacing-xs) 0;
+}
+
 /* 锚点、mailto 等本预览无法处理的引用降级为普通文字 */
 .mdLinkDead {
   color: var(--color-text-muted);

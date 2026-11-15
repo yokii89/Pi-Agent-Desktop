@@ -6,7 +6,7 @@
  * 每个解析窗口只对尾块付出 parse 代价，同时消除未闭合语法在前缀里的闪烁（B3）。
  *
  * 切分规则（写死，便于测试）：
- * 1. 只在围栏外的空行处切——围栏/表格/紧凑列表内部没有空行，天然不会被劈开；
+ * 1. 只在代码围栏和独立公式外的空行处切，保留公式内的空行；
  * 2. 空行后第一条非空行必须从第 0 列起笔且不是列表项：
  *   - 缩进行（`^\s`）是未闭合容器（列表项/嵌套块）的续写，切出去会掉回顶层、
  *     丢失缩进（docs/design/29 缺陷 C）；
@@ -46,6 +46,7 @@ export function splitStableBlocks(md: string): StableSplit {
   // 围栏态：记录字符与长度（关闭必须同字符且不短于开启，``` 可包住 `` 内容行）
   let fenceChar = "";
   let fenceLength = 0;
+  let mathClose = "";
   const candidates: number[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
@@ -57,10 +58,21 @@ export function splitStableBlocks(md: string): StableSplit {
       }
       continue;
     }
+    if (mathClose) {
+      if (line.trimEnd().endsWith(mathClose)) mathClose = "";
+      continue;
+    }
     const open = FENCE_OPEN_RE.exec(line);
     if (open) {
       fenceChar = open[1][0];
       fenceLength = open[1].length;
+      continue;
+    }
+    const mathOpen = /^ {0,3}(\${2,}|\\\[)/.exec(line);
+    if (mathOpen) {
+      const delimiter = mathOpen[1];
+      const close = delimiter === "\\[" ? "\\]" : delimiter;
+      if (!line.slice(mathOpen[0].length).trimEnd().endsWith(close)) mathClose = close;
       continue;
     }
     if (isBlank(line) && i + 1 < lines.length) candidates.push(i + 1);
