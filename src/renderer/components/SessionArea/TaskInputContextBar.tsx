@@ -1,4 +1,4 @@
-import { Check, Circle, Cloud, Folder, Plus } from "@phosphor-icons/react";
+import { Check, Circle, Cloud, Folder, Plus, X } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { useT } from "../../hooks/useT";
 import { useProjectStore } from "../../stores/projectStore";
@@ -90,14 +90,50 @@ export function TaskInputContextBar() {
       <Popover
         direction="top"
         align="left"
-        trigger={({ onClick }) => (
-          <button type="button" className={styles.chip} onClick={onClick}>
-            <Folder size={16} weight="regular" />
-            <span className={styles.chipLabel}>
-              {currentProject?.name ?? t("session.workspace.select")}
-            </span>
-            <GlideChevron size={14} />
-          </button>
+        trigger={({ close, onClick }) => (
+          <div className={styles.chip}>
+            {currentProject ? (
+              <button
+                type="button"
+                className={styles.clearButton}
+                title={t("session.workspace.none")}
+                aria-label={t("session.workspace.none")}
+                onClick={() => {
+                  selectProject(null);
+                  close();
+                }}
+              >
+                <span className={styles.folderIcon} aria-hidden="true">
+                  <Folder size={16} weight="regular" />
+                </span>
+                <span className={styles.closeIcon} aria-hidden="true">
+                  <X size={16} weight="regular" />
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.selectorIcon}
+                aria-label={t("session.workspace.select")}
+                aria-haspopup="listbox"
+                onClick={onClick}
+              >
+                <Folder size={16} weight="regular" />
+              </button>
+            )}
+            <button
+              type="button"
+              className={styles.selector}
+              aria-label={t("session.workspace.select")}
+              aria-haspopup="listbox"
+              onClick={onClick}
+            >
+              <span className={styles.chipLabel}>
+                {currentProject?.name ?? t("session.workspace.select")}
+              </span>
+              <GlideChevron size={14} />
+            </button>
+          </div>
         )}
       >
         <div className={styles.panel}>

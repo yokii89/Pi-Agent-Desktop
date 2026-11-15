@@ -8,16 +8,82 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   max-width: 220px;
-  padding: 6px var(--spacing-sm);
   border-radius: var(--radius-overlay-item);
   color: var(--color-text);
   font-size: var(--font-size-md);
+  cursor: pointer;
 }
 
 .chip:hover {
   background: var(--color-bg-hover);
+}
+
+.selectorIcon,
+.clearButton,
+.selector {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.selectorIcon,
+.clearButton {
+  flex-shrink: 0;
+  padding: 6px 0 6px var(--spacing-sm);
+  border-radius: var(--radius-overlay-item) 0 0 var(--radius-overlay-item);
+}
+
+.selector {
+  gap: 6px;
+  min-width: 0;
+  padding: 6px var(--spacing-sm) 6px 6px;
+  border-radius: 0 var(--radius-overlay-item) var(--radius-overlay-item) 0;
+}
+
+.selectorIcon:hover,
+.selectorIcon:focus-visible,
+.clearButton:hover,
+.clearButton:focus-visible,
+.selector:hover,
+.selector:focus-visible {
+  background: var(--color-bg-active);
+}
+
+.selectorIcon:focus-visible,
+.clearButton:focus-visible,
+.selector:focus-visible {
+  outline: 1px solid var(--color-accent-border);
+  outline-offset: -1px;
+}
+
+.folderIcon,
+.closeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeIcon {
+  display: none;
+}
+
+.clearButton:hover .folderIcon,
+.clearButton:focus-visible .folderIcon,
+.chip:hover .clearButton .folderIcon,
+.chip:focus-within .clearButton .folderIcon {
+  display: none;
+}
+
+.clearButton:hover .closeIcon,
+.clearButton:focus-visible .closeIcon,
+.chip:hover .clearButton .closeIcon,
+.chip:focus-within .clearButton .closeIcon {
+  display: inline-flex;
 }
 
 .chipLabel {

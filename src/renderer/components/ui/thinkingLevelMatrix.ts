@@ -181,12 +181,8 @@ function drawTrack(
       const y = row * (cellHeight + gap);
       const distanceFromHandle = columnNorm - value;
 
-      if (distanceFromHandle > 0.015) {
-        context.fillStyle = palette.muted;
-        context.globalAlpha = 0.12;
-        fillRoundedRect(context, x, y, cellWidth, cellHeight, radius);
-        continue;
-      }
+      // 未激活区域透出轨道的主题背景，不绘制像素格。
+      if (distanceFromHandle > 0.015) continue;
 
       const relativePosition = value > 0.02 ? clamp(columnNorm / value, 0, 1) : 0;
       const intensity = columnNorm ** 1.35 * 0.65 + relativePosition ** 1.6 * 0.35;

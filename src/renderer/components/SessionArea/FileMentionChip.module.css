@@ -1,30 +1,9 @@
 .chip {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  box-sizing: border-box;
-  gap: var(--spacing-xs);
-  margin-inline: calc(var(--spacing-xs) / 2);
-  padding: 2px 6px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-elevated);
-  color: var(--color-text);
-  font-family: inherit;
-  /* 与气泡正文同字号；写死 --font-size-sm 会比周围文字小一圈 */
-  font-size: inherit;
-  font-weight: 500;
-  line-height: 1.3;
-  vertical-align: middle;
+  composes: fileChip from "./Composer.module.css";
 }
 
-button.chip {
-  cursor: pointer;
-}
-
-button.chip:hover {
-  border-color: var(--color-border-strong);
-  background: var(--color-bg-hover);
+.label {
+  composes: label from "./Composer.module.css";
 }
 
 button.chip:focus-visible {
@@ -39,13 +18,7 @@ button.chip:focus-visible {
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  color: var(--color-text-muted);
+  color: inherit;
   line-height: 0;
   object-fit: contain;
-}
-
-/* 文件名一律显示完整（与输入栏芯片同一口径），超长时才在芯片内换行 */
-.label {
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
