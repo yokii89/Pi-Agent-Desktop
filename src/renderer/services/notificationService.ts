@@ -48,6 +48,7 @@ class NotificationService {
   };
   #ready = false;
   #lastPlayedAt = new Map<NotificationScenarioId, number>();
+  #lastToastAt = new Map<NotificationScenarioId, number>();
   #audio = new Map<NotificationSoundId, HTMLAudioElement>();
   #activeSessionResolver: ActiveSessionResolver | null = null;
   #toastSessionResolver: ToastSessionResolver | null = null;
@@ -87,10 +88,10 @@ class NotificationService {
   }
 
   /**
-   * 按场景门禁播放声音，并在窗口未聚焦时请求桌面 toast。
+   * 按场景门禁投递声音 / 桌面 toast；会话的两个通道在各自的收口时机调用。
    * `source === "preview"` 由 preview() 承担，这里不处理。
    */
-  play(request: NotificationPlayRequest): boolean {
+  play(request: NotificationPlayRequest, delivery: "sound" | "toast" | "both" = "both"): boolean {
     if (request.source === "preview") {
       const sound = request.sound ?? this.#settings.scenarios[request.scenario]?.sound ?? "1";
       this.#playRaw(sound, this.#settings.volume);
@@ -104,15 +105,18 @@ class NotificationService {
     const scenario = request.scenario;
     const now = Date.now();
     const debounceMs = settings.debounceMs;
-    const last = this.#lastPlayedAt.get(scenario);
-    if (debounceMs > 0 && last !== undefined && now - last < debounceMs) {
-      return false;
-    }
+    // 音先响、toast 后到：时间戳必须分开，否则快速 settled 会被前面的声音吞掉。
+    const isDebounced = (timestamps: Map<NotificationScenarioId, number>): boolean => {
+      const last = timestamps.get(scenario);
+      return debounceMs > 0 && last !== undefined && now - last < debounceMs;
+    };
 
     const windowFocused = typeof document !== "undefined" ? document.hasFocus() : true;
     const activeSessionId = this.#activeSessionResolver?.() ?? null;
     const scenarioEnabled = settings.scenarios[scenario]?.enabled === true;
     const playSound =
+      delivery !== "toast" &&
+      !isDebounced(this.#lastPlayedAt) &&
       scenarioEnabled &&
       shouldPlayNotification({
         settings,
@@ -125,12 +129,16 @@ class NotificationService {
     // 桌面 toast 只在未聚焦时弹（docs/design/24）；与提示音总开关独立。
     // source=sdk：toast 归 Host（handleNotify）直弹，渲染层再弹会双响，且 SDK 的 toast 是 opt-in。
     const playToast =
-      scenarioEnabled && settings.systemToast && !windowFocused && request.source !== "sdk";
+      delivery !== "sound" &&
+      !isDebounced(this.#lastToastAt) &&
+      scenarioEnabled &&
+      settings.systemToast &&
+      !windowFocused &&
+      request.source !== "sdk";
     if (!playSound && !playToast) return false;
 
-    this.#lastPlayedAt.set(scenario, now);
-
     if (playSound) {
+      this.#lastPlayedAt.set(scenario, now);
       const sound =
         request.sound && isKnownSound(request.sound)
           ? request.sound
@@ -138,6 +146,7 @@ class NotificationService {
       this.#playRaw(sound, settings.volume);
     }
     if (playToast) {
+      this.#lastToastAt.set(scenario, now);
       this.#requestToast(request);
     }
     return true;

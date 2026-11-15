@@ -6,7 +6,7 @@ import { pideskApi } from "../services/pideskApi";
 import { sessionService } from "../services/sessionService";
 import { settingsService } from "../services/settingsService";
 import { useSessionMeta } from "../stores/sessionStore";
-import { createSessionSoundTriggers } from "../utils/sessionSoundTriggers";
+import { createSessionNotificationTriggers } from "../utils/sessionNotificationTriggers";
 import { toastSessionTitle } from "../utils/toastTitle";
 
 function play(
@@ -19,12 +19,17 @@ function play(
 }
 
 /**
- * 订阅会话事件流，把 agent 终态映射为提示音场景（docs/design/18）。
- * 状态机（运行门禁 / 失败去重）在 utils/sessionSoundTriggers，这里只旁路接线。
+ * 订阅会话事件流，声音与桌面通知各按自己的收口时机投递。
+ * 状态机与场景映射在 utils/sessionNotificationTriggers，这里只旁路接线。
  */
 function bindSessionTriggers(): () => void {
   return sessionService.subscribe(
-    createSessionSoundTriggers((scenario, sessionId, reason) => play(scenario, sessionId, reason)),
+    createSessionNotificationTriggers({
+      sound: (scenario, sessionId, reason) =>
+        notificationService.play({ scenario, sessionId, reason, source: "session" }, "sound"),
+      toast: (scenario, sessionId, reason) =>
+        notificationService.play({ scenario, sessionId, reason, source: "session" }, "toast"),
+    }),
   );
 }
 

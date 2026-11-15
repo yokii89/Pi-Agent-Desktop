@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { SessionPushMessage } from "../../shared/ipc";
 import type { NotificationScenarioId } from "../../shared/notification";
-import { createSessionSoundTriggers } from "./sessionSoundTriggers";
+import { createSessionNotificationTriggers } from "./sessionNotificationTriggers";
 
 type Play = { scenario: NotificationScenarioId; sessionId: string; reason?: string };
 
 function harness() {
   const plays: Play[] = [];
-  const handle = createSessionSoundTriggers((scenario, sessionId, reason) => {
-    plays.push({ scenario, sessionId, reason });
+  const handle = createSessionNotificationTriggers({
+    sound: (scenario, sessionId, reason) => plays.push({ scenario, sessionId, reason }),
+    toast: () => {},
   });
   const push = (message: Omit<SessionPushMessage, "sessionId"> & { sessionId?: string }): void => {
     handle({ ...message, sessionId: message.sessionId ?? "sess_a" } as SessionPushMessage);
@@ -28,7 +29,7 @@ function harness() {
   return { plays, push, run };
 }
 
-describe("createSessionSoundTriggers", () => {
+describe("createSessionNotificationTriggers 提示音兼容", () => {
   it("正常 run 结束播 completed", () => {
     const { plays, run } = harness();
     run();

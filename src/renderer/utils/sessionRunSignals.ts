@@ -6,8 +6,8 @@ import type { SessionPushMessage } from "../../shared/ipc";
  * 空闲存活实例也会产生 stderr 推送甚至 agent_end（渲染层重载后 running 清空），
  * 但它们没有在运行，不该被当成一次真实收口。
  *
- * 收口点：终态以 `agent_end(willRetry≠true)` 为准，`agent_settled` 只在 run 仍未收口时
- * 兜底——自动重试退避期被中断时 pi 不会发终态 `agent_end`（docs/design/76）。
+ * 默认收口点（提示音 / 输入栏伙伴）：`agent_end(willRetry≠true)`，`agent_settled` 只兜底。
+ * 桌面通知选择 `agent_settled`：自动重试、压缩恢复与 before_settle 续跑结束后才发终态。
  * `agent_settled.aborted` 是「用户中断」的权威真值，优先于上一 attempt 残留的 stopReason。
  *
  * 失败去重：stderr 噪音与 `agent_end(error)` 可能属于同一 run，只发一次 failed。
@@ -22,8 +22,10 @@ export type SessionRunSignal =
 
 export type SessionRunSignalHandler = (sessionId: string, signal: SessionRunSignal) => void;
 
+/** 按消费方选择收口时机；桌面通知必须等会话级 settled，提示音保留原有时机。 */
 export function createSessionRunSignalTracker(
   emit: SessionRunSignalHandler,
+  settleOn: "agent_end" | "agent_settled" = "agent_end",
 ): (message: SessionPushMessage) => void {
   const stopReasons = new Map<string, string | undefined>();
   const running = new Set<string>();
@@ -34,6 +36,8 @@ export function createSessionRunSignalTracker(
 
   const handleEvent = (sessionId: string, event: PiEvent): void => {
     if (event.type === "agent_start") {
+      // 新 attempt 可能在第一条 assistant 前被中断，不能沿用上一 attempt 的失败原因。
+      if (settleOn === "agent_settled") stopReasons.delete(sessionId);
       running.add(sessionId);
       failedEmitted.delete(sessionId);
       emit(sessionId, { kind: "started" });
@@ -52,6 +56,7 @@ export function createSessionRunSignalTracker(
       return;
     }
     if (event.type === "agent_end") {
+      if (settleOn === "agent_settled") return;
       // willRetry：自动重试/压缩续跑尚未收口，不算终态
       if (event.willRetry === true) return;
       const reason = stopReasons.get(sessionId);
@@ -75,7 +80,7 @@ export function createSessionRunSignalTracker(
       return;
     }
     if (event.type === "agent_settled") {
-      // 兜底收口：只有没被终态 agent_end 收过口的 run 才在这里发终态
+      // 桌面通知在此收口；提示音仅在没有终态 agent_end 时兜底。
       const wasRunning = running.delete(sessionId);
       const reason = stopReasons.get(sessionId);
       stopReasons.delete(sessionId);
@@ -84,7 +89,7 @@ export function createSessionRunSignalTracker(
         return;
       }
       // aborted 优先于 stopReason：退避期残留的是上一 attempt 的 error
-      if (event.aborted === true) {
+      if (event.aborted === true || (settleOn === "agent_settled" && reason === "aborted")) {
         emit(sessionId, { kind: "interrupted" });
       } else if (reason === "error") {
         emit(sessionId, { kind: "failed", reason: "agent error" });
@@ -107,6 +112,8 @@ export function createSessionRunSignalTracker(
       return;
     }
     if (message.type === "error") {
+      // stderr 不是终态证据，桌面通知等 settled 的结果；若进程消失则由 exit 报告。
+      if (settleOn === "agent_settled") return;
       // stderr 行/进程异常不区分失败与噪音，且预热、空闲实例也会写 stderr：
       // 只有 run 在途时才视为失败信号，否则静默（store 仍会记 processError 展示）。
       // 也不在此标记 failedEmitted：预热期的噪音不得吞掉后续首个真实失败。
