@@ -1,0 +1,90 @@
+/* 新动物只定义皮肤与轮廓；关节姿态复用 InputBuddy.module.css 的 animal 骨架。 */
+.fox {
+  --buddy-coat: var(--buddy-fox-coat);
+  --buddy-bib: var(--buddy-fox-bib);
+  --buddy-inner: var(--buddy-fox-inner);
+  --buddy-paw: var(--buddy-fox-paw);
+  --buddy-nose: var(--buddy-ink);
+}
+
+.rabbit {
+  --buddy-coat: var(--buddy-rabbit-coat);
+  --buddy-bib: var(--buddy-rabbit-bib);
+  --buddy-inner: var(--buddy-rabbit-inner);
+  --buddy-paw: var(--buddy-rabbit-coat);
+  --buddy-nose: var(--buddy-rabbit-inner);
+  --buddy-accessory: var(--buddy-rabbit-scarf);
+}
+
+.panda {
+  --buddy-coat: var(--buddy-panda-coat);
+  --buddy-bib: var(--buddy-panda-coat);
+  --buddy-inner: var(--buddy-panda-inner);
+  --buddy-paw: var(--buddy-panda-patch);
+  --buddy-nose: var(--buddy-ink);
+  --buddy-accessory: var(--buddy-snack-leaf);
+}
+
+.raccoon {
+  --buddy-coat: var(--buddy-raccoon-coat);
+  --buddy-bib: var(--buddy-raccoon-bib);
+  --buddy-inner: var(--buddy-raccoon-inner);
+  --buddy-paw: var(--buddy-raccoon-mask);
+  --buddy-nose: var(--buddy-ink);
+}
+
+.hamster {
+  --buddy-coat: var(--buddy-hamster-coat);
+  --buddy-bib: var(--buddy-hamster-bib);
+  --buddy-inner: var(--buddy-hamster-inner);
+  --buddy-paw: var(--buddy-hamster-bib);
+  --buddy-nose: var(--buddy-hamster-inner);
+}
+
+.bear {
+  --buddy-coat: var(--buddy-bear-coat);
+  --buddy-bib: var(--buddy-bear-bib);
+  --buddy-inner: var(--buddy-bear-inner);
+  --buddy-paw: var(--buddy-bear-coat);
+  --buddy-nose: var(--buddy-ink);
+  --buddy-accessory: var(--buddy-bear-scarf);
+}
+
+.koala {
+  --buddy-coat: var(--buddy-koala-coat);
+  --buddy-bib: var(--buddy-koala-bib);
+  --buddy-inner: var(--buddy-koala-inner);
+  --buddy-paw: var(--buddy-koala-coat);
+  --buddy-nose: var(--buddy-koala-nose);
+}
+
+.coat {
+  fill: var(--buddy-coat);
+}
+.bib {
+  fill: var(--buddy-bib);
+}
+.inner {
+  fill: var(--buddy-inner);
+}
+.paw {
+  fill: var(--buddy-paw);
+}
+.nose {
+  fill: var(--buddy-nose);
+}
+.accent {
+  fill: var(--buddy-accessory);
+}
+
+/* 圆脸与尖脸的耳根位于同一高度，和垂耳小狗的锚点分开。 */
+.animal [data-part="ear-left"] {
+  transform-origin: 82px 64px;
+}
+.animal [data-part="ear-right"] {
+  transform-origin: 178px 64px;
+}
+.animal[data-pose="eating"] [data-part="mouth-normal"],
+.animal[data-pose="eating"] [data-part="teeth"] {
+  opacity: 0;
+}

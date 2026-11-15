@@ -1,15 +1,10 @@
 import { Check, CircleDashed } from "@phosphor-icons/react";
 import type { InputBuddyKind } from "../../../shared/inputBuddy";
-import { BuddyCapy } from "../SessionArea/InputBuddy/BuddyCapy";
-import { BuddyCat } from "../SessionArea/InputBuddy/BuddyCat";
-import { BuddyDog } from "../SessionArea/InputBuddy/BuddyDog";
-import { BuddyParrot } from "../SessionArea/InputBuddy/BuddyParrot";
-import { BuddyPea } from "../SessionArea/InputBuddy/BuddyPea";
-import { BuddySteve } from "../SessionArea/InputBuddy/BuddySteve";
+import { BuddyArt } from "../SessionArea/InputBuddy/BuddyArt";
 import styles from "./BuddySwatch.module.css";
 
 /** 「无」档的占位图形尺寸：与会话区伙伴的空槽位视觉重量对齐，不抢小动物的焦点。 */
-const EMPTY_ICON_SIZE = 22;
+const EMPTY_ICON_SIZE = 24;
 
 interface BuddySwatchProps {
   kind: InputBuddyKind;
@@ -38,19 +33,14 @@ export function BuddySwatch({ kind, label, selected, disabled, onSelect }: Buddy
       onClick={() => onSelect(kind)}
     >
       <span className={styles.preview}>
-        {kind === "dog" && <BuddyDog pose="idle" />}
-        {kind === "cat" && <BuddyCat pose="idle" />}
-        {kind === "parrot" && <BuddyParrot pose="idle" />}
-        {kind === "capy" && <BuddyCapy pose="idle" />}
-        {kind === "pea" && <BuddyPea pose="idle" />}
-        {kind === "steve" && <BuddySteve pose="idle" />}
+        <BuddyArt kind={kind} pose="idle" animated={false} />
         {kind === "none" && (
           <CircleDashed size={EMPTY_ICON_SIZE} weight="regular" className={styles.empty} />
         )}
       </span>
       {selected && (
         <span className={styles.check} aria-hidden>
-          <Check size={10} weight="bold" />
+          <Check size={16} weight="regular" />
         </span>
       )}
     </button>

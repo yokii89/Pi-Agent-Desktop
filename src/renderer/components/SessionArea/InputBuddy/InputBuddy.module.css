@@ -1,5 +1,5 @@
 /*
- * 输入栏伙伴（docs/动物形象 四款动物 + 豌豆射手）：
+ * 输入栏伙伴插画：公共骨架 / 姿态 / 特效；新增动物皮肤见 BuddyAnimal.module.css。
  * 各款形象从原设计 360×250 的舞台里裁出「卡沿以上」的部分（x 50–340 / y 0–203），
  * 视图底边正好落在输入卡上沿——爪子、尾巴、叶尖搭在卡沿上，像趴在桌子后面的小家伙。
  * 定位挂在 .inputBox 内（该卡 position: relative 且 overflow: visible）。
@@ -8,8 +8,8 @@
   position: absolute;
   bottom: 100%;
   right: 0;
-  height: 53px;
-  aspect-ratio: 290 / 203;
+  height: var(--buddy-height);
+  aspect-ratio: var(--buddy-aspect-ratio);
   /* 点击彩蛋：整块裁切区可点（角色本体之外的透明余量只有十几像素） */
   padding: 0;
   border: 0;
@@ -88,6 +88,28 @@
 
 .dogBone {
   fill: var(--buddy-bone);
+}
+
+.snackBerry {
+  fill: var(--buddy-snack-berry);
+}
+.snackCarrot {
+  fill: var(--buddy-snack-carrot);
+}
+.snackBamboo {
+  fill: var(--buddy-snack-bamboo);
+}
+.snackLeaf {
+  fill: var(--buddy-snack-leaf);
+}
+.snackCookie {
+  fill: var(--buddy-snack-cookie);
+}
+.snackHoney {
+  fill: var(--buddy-snack-honey);
+}
+.snackEucalyptus {
+  fill: var(--buddy-snack-eucalyptus);
 }
 
 .catCoat {
@@ -381,7 +403,7 @@
 }
 
 /* ---------- 骨骼锚点（viewBox 从 x=50 起，故设计稿坐标统一减 50） ---------- */
-.dog [data-part="head"] {
+:is(.dog, .animal) [data-part="head"] {
   transform-origin: 130px 135px;
 }
 .dog [data-part="ear-left"] {
@@ -390,16 +412,16 @@
 .dog [data-part="ear-right"] {
   transform-origin: 178px 38px;
 }
-.dog [data-part="paw-left"] {
+:is(.dog, .animal) [data-part="paw-left"] {
   transform-origin: 64px 203px;
 }
-.dog [data-part="paw-right"] {
+:is(.dog, .animal) [data-part="paw-right"] {
   transform-origin: 196px 203px;
 }
-.dog [data-part="tag"] {
+:is(.dog, .animal) [data-part="tag"] {
   transform-origin: 130px 168px;
 }
-.dog [data-part="tongue"] {
+:is(.dog, .animal) [data-part="tongue"] {
   transform-origin: 130px 132px;
 }
 
@@ -527,96 +549,96 @@
 }
 
 /* ---------- 小狗姿态 ---------- */
-.dog[data-pose="idle"] [data-part="head"] {
+:is(.dog, .animal)[data-pose="idle"] [data-part="head"] {
   animation: breathe 3s ease-in-out infinite;
 }
 
-.dog[data-pose="happy"] [data-part="head"] {
+:is(.dog, .animal)[data-pose="happy"] [data-part="head"] {
   transform: translateY(-4px);
 }
-.dog[data-pose="happy"] [data-part="ear-left"] {
+:is(.dog, .animal)[data-pose="happy"] [data-part="ear-left"] {
   transform: rotate(14deg) translateY(-2px);
 }
-.dog[data-pose="happy"] [data-part="ear-right"] {
+:is(.dog, .animal)[data-pose="happy"] [data-part="ear-right"] {
   transform: rotate(-14deg) translateY(-2px);
 }
-.dog[data-pose="happy"] [data-part="eyes-normal"] {
+:is(.dog, .animal)[data-pose="happy"] [data-part="eyes-normal"] {
   opacity: 0;
 }
-.dog[data-pose="happy"] [data-part="eyes-happy"] {
+:is(.dog, .animal)[data-pose="happy"] [data-part="eyes-happy"] {
   opacity: 1;
 }
-.dog[data-pose="happy"] [data-part="tongue"] {
+:is(.dog, .animal)[data-pose="happy"] [data-part="tongue"] {
   opacity: 1;
   transform: scaleY(1);
 }
-.dog[data-pose="happy"] [data-part="tag"] {
+:is(.dog, .animal)[data-pose="happy"] [data-part="tag"] {
   animation: dogTagWag 0.4s ease-in-out infinite alternate;
 }
 
-.dog[data-pose="tilt"] [data-part="head"] {
+:is(.dog, .animal)[data-pose="tilt"] [data-part="head"] {
   transform: rotate(15deg) translate(6px, -2px);
 }
-.dog[data-pose="tilt"] [data-part="ear-left"] {
+:is(.dog, .animal)[data-pose="tilt"] [data-part="ear-left"] {
   transform: rotate(18deg);
 }
-.dog[data-pose="tilt"] [data-part="ear-right"] {
+:is(.dog, .animal)[data-pose="tilt"] [data-part="ear-right"] {
   transform: rotate(8deg);
 }
-.dog[data-pose="tilt"] [data-part="question"] {
+:is(.dog, .animal)[data-pose="tilt"] [data-part="question"] {
   opacity: 1;
   transform: translateY(-5px);
 }
 
-.dog[data-pose="wave"] [data-part="head"] {
+:is(.dog, .animal)[data-pose="wave"] [data-part="head"] {
   transform: rotate(-6deg);
 }
-.dog[data-pose="wave"] [data-part="eyes-normal"] {
+:is(.dog, .animal)[data-pose="wave"] [data-part="eyes-normal"] {
   opacity: 0;
 }
-.dog[data-pose="wave"] [data-part="eyes-happy"] {
+:is(.dog, .animal)[data-pose="wave"] [data-part="eyes-happy"] {
   opacity: 1;
 }
-.dog[data-pose="wave"] [data-part="paw-right"] {
+:is(.dog, .animal)[data-pose="wave"] [data-part="paw-right"] {
   animation: dogWavePaw 0.45s ease-in-out infinite alternate;
 }
 
-.dog[data-pose="sleep"] [data-part="head"] {
+:is(.dog, .animal)[data-pose="sleep"] [data-part="head"] {
   transform: translateY(12px) rotate(4deg);
 }
-.dog[data-pose="sleep"] [data-part="ear-left"] {
+:is(.dog, .animal)[data-pose="sleep"] [data-part="ear-left"] {
   transform: rotate(-6deg);
 }
-.dog[data-pose="sleep"] [data-part="ear-right"] {
+:is(.dog, .animal)[data-pose="sleep"] [data-part="ear-right"] {
   transform: rotate(6deg);
 }
-.dog[data-pose="sleep"] [data-part="eyes-normal"] {
+:is(.dog, .animal)[data-pose="sleep"] [data-part="eyes-normal"] {
   opacity: 0;
 }
-.dog[data-pose="sleep"] [data-part="eyes-sleep"] {
+:is(.dog, .animal)[data-pose="sleep"] [data-part="eyes-sleep"] {
   opacity: 1;
 }
-.dog[data-pose="sleep"] [data-part="zzz"] {
+:is(.dog, .animal)[data-pose="sleep"] [data-part="zzz"] {
   opacity: 1;
   animation: floatUp 2s ease-in-out infinite;
 }
 
-.dog[data-pose="alert"] [data-part="head"] {
+:is(.dog, .animal)[data-pose="alert"] [data-part="head"] {
   transform: translateY(-10px) scale(1.03);
 }
-.dog[data-pose="alert"] [data-part="ear-left"] {
+:is(.dog, .animal)[data-pose="alert"] [data-part="ear-left"] {
   transform: rotate(28deg);
 }
-.dog[data-pose="alert"] [data-part="ear-right"] {
+:is(.dog, .animal)[data-pose="alert"] [data-part="ear-right"] {
   transform: rotate(-28deg);
 }
-.dog[data-pose="alert"] [data-part="paw-left"] {
+:is(.dog, .animal)[data-pose="alert"] [data-part="paw-left"] {
   transform: translateY(5px) scale(0.9);
 }
-.dog[data-pose="alert"] [data-part="paw-right"] {
+:is(.dog, .animal)[data-pose="alert"] [data-part="paw-right"] {
   transform: translateY(5px) scale(0.9);
 }
-.dog[data-pose="alert"] [data-part="sweat"] {
+:is(.dog, .animal)[data-pose="alert"] [data-part="sweat"] {
   opacity: 1;
 }
 
@@ -1204,27 +1226,33 @@
  * 圆心 px 与上面的骨骼锚点同口径：设计稿坐标 - 50（viewBox 从 x=50 起）。
  */
 
-/* ① 思考中：眼神上移、身体前倾、头顶转圈 */
-.art[data-pose="thinking"] [data-part="character"] {
-  transform-origin: 130px 203px;
-  animation: thinkLean 2.6s ease-in-out infinite;
+/* ① 思考中：CSS 提供静态姿态；GSAP 只补间节点变量，避免整只角色离开卡沿。 */
+.art[data-pose="thinking"] [data-part] {
+  transition: none;
 }
 .art[data-pose="thinking"] [data-part="head"] {
-  animation: thinkTilt 2.6s ease-in-out infinite;
+  transform: rotate(var(--buddy-think-angle, 2deg)) translateY(var(--buddy-think-lift, -1px));
 }
 .art[data-pose="thinking"] [data-part="eyes-normal"] {
   opacity: 0;
 }
 .art[data-pose="thinking"] [data-part="eyes-thinking"] {
   opacity: 1;
-  animation: thinkLook 2.6s ease-in-out infinite;
+  transform: translate(var(--buddy-think-gaze-x, 1px), var(--buddy-think-gaze-y, -1px));
 }
 .art[data-pose="thinking"] [data-part="thinking"] {
   opacity: 1;
 }
-.art[data-pose="thinking"] [data-part="thinking-spinner"] {
-  transform-origin: 236px 4px;
-  animation: spin 1.4s linear infinite;
+.thoughtBubble {
+  fill: var(--color-bg-surface-solid);
+  stroke: var(--color-accent-fg);
+}
+.thoughtBubble > circle {
+  fill: var(--color-accent-fg);
+}
+.art [data-part="thought-dot"] {
+  opacity: var(--buddy-thought-alpha, 0.65);
+  transform: translateY(var(--buddy-thought-lift, 0px));
 }
 
 /* ② 生气：倒八字眉 + 独立鼓腮 + 头顶十字筋 */
@@ -1361,72 +1389,72 @@
 }
 
 /* ---------- 小狗：情绪姿态的耳朵 / 爪子 / 吊牌 ---------- */
-.dog[data-pose="thinking"] [data-part="ear-left"] {
-  transform: rotate(-8deg) translateY(-4px);
+:is(.dog, .animal)[data-pose="thinking"] [data-part="ear-left"] {
+  transform: rotate(calc(-4deg - var(--buddy-think-detail, 0) * 4deg));
 }
-.dog[data-pose="thinking"] [data-part="ear-right"] {
-  transform: rotate(8deg) translateY(-4px);
+:is(.dog, .animal)[data-pose="thinking"] [data-part="ear-right"] {
+  transform: rotate(calc(4deg + var(--buddy-think-detail, 0) * 4deg));
 }
 
-.dog[data-pose="angry"] [data-part="ear-left"] {
+:is(.dog, .animal)[data-pose="angry"] [data-part="ear-left"] {
   transform: rotate(-14deg) translateY(5px);
 }
-.dog[data-pose="angry"] [data-part="ear-right"] {
+:is(.dog, .animal)[data-pose="angry"] [data-part="ear-right"] {
   transform: rotate(14deg) translateY(5px);
 }
-.dog[data-pose="angry"] [data-part="tag"] {
+:is(.dog, .animal)[data-pose="angry"] [data-part="tag"] {
   animation: tagWag 0.16s ease-in-out infinite alternate;
 }
 
-.dog[data-pose="eating"] [data-part="paw-left"] {
+:is(.dog, .animal)[data-pose="eating"] [data-part="paw-left"] {
   transform: translate(24px, -14px);
 }
-.dog[data-pose="eating"] [data-part="paw-right"] {
+:is(.dog, .animal)[data-pose="eating"] [data-part="paw-right"] {
   transform: translate(-24px, -14px);
 }
-.dog[data-pose="eating"] [data-part="mouth-chew"] {
+:is(.dog, .animal)[data-pose="eating"] [data-part="mouth-chew"] {
   opacity: 1;
   transform-origin: 130px 121px;
   animation: chewMouth 0.28s ease-in-out infinite alternate;
 }
 
-.dog[data-pose="sad"] [data-part="ear-left"] {
+:is(.dog, .animal)[data-pose="sad"] [data-part="ear-left"] {
   transform: rotate(-10deg) translateY(5px);
 }
-.dog[data-pose="sad"] [data-part="ear-right"] {
+:is(.dog, .animal)[data-pose="sad"] [data-part="ear-right"] {
   transform: rotate(10deg) translateY(5px);
 }
 
-.dog[data-pose="celebration"] [data-part="paw-left"] {
+:is(.dog, .animal)[data-pose="celebration"] [data-part="paw-left"] {
   animation: cheerPawLeft 0.72s ease-in-out infinite;
 }
-.dog[data-pose="celebration"] [data-part="paw-right"] {
+:is(.dog, .animal)[data-pose="celebration"] [data-part="paw-right"] {
   animation: cheerPawRight 0.72s ease-in-out infinite;
 }
-.dog[data-pose="celebration"] [data-part="tag"] {
+:is(.dog, .animal)[data-pose="celebration"] [data-part="tag"] {
   animation: dogTagWag 0.22s ease-in-out infinite alternate;
 }
-.dog[data-pose="celebration"] [data-part="tongue"] {
+:is(.dog, .animal)[data-pose="celebration"] [data-part="tongue"] {
   opacity: 1;
   transform: scaleY(1);
 }
 
-.dog[data-pose="dizzy"] [data-part="ear-left"] {
+:is(.dog, .animal)[data-pose="dizzy"] [data-part="ear-left"] {
   animation: earWobbleLeft 1.1s ease-in-out infinite;
 }
-.dog[data-pose="dizzy"] [data-part="ear-right"] {
+:is(.dog, .animal)[data-pose="dizzy"] [data-part="ear-right"] {
   animation: earWobbleRight 1.1s ease-in-out infinite;
 }
 
 /* ---------- 橘猫：情绪姿态的耳朵 / 尾巴 / 铃铛 / 嘴 ---------- */
 .cat[data-pose="thinking"] [data-part="ear-left"] {
-  transform: rotate(-8deg) translateY(-3px);
+  transform: rotate(calc(-4deg - var(--buddy-think-detail, 0) * 4deg));
 }
 .cat[data-pose="thinking"] [data-part="ear-right"] {
-  transform: rotate(8deg) translateY(-3px);
+  transform: rotate(calc(4deg + var(--buddy-think-detail, 0) * 4deg));
 }
 .cat[data-pose="thinking"] [data-part="tail"] {
-  animation: catTailSway 2.6s ease-in-out infinite alternate;
+  transform: rotate(calc(-3deg + var(--buddy-think-detail, 0) * 7deg));
 }
 
 .cat[data-pose="angry"] [data-part="ear-left"] {
@@ -1503,7 +1531,7 @@
 
 /* ---------- 鹦鹉：情绪姿态的羽冠 / 双翅 / 喙 ---------- */
 .parrot[data-pose="thinking"] [data-part="crest"] {
-  transform: rotate(-10deg) scale(1.08);
+  transform: rotate(calc(-6deg - var(--buddy-think-detail, 0) * 5deg));
 }
 
 .parrot[data-pose="angry"] [data-part="crest"] {
@@ -1565,13 +1593,13 @@
 
 /* ---------- 卡皮巴拉：情绪姿态的耳朵 / 橘子 / 吻部 / 前爪 ---------- */
 .capy[data-pose="thinking"] [data-part="ear-left"] {
-  transform: rotate(-10deg) translateY(-3px);
+  transform: rotate(calc(-5deg - var(--buddy-think-detail, 0) * 4deg));
 }
 .capy[data-pose="thinking"] [data-part="ear-right"] {
-  transform: rotate(10deg) translateY(-3px);
+  transform: rotate(calc(5deg + var(--buddy-think-detail, 0) * 4deg));
 }
 .capy[data-pose="thinking"] [data-part="orange"] {
-  animation: capyOrangeBob 1.6s ease-in-out infinite alternate;
+  transform: rotate(calc(var(--buddy-think-detail, 0) * 3deg));
 }
 
 .capy[data-pose="angry"] [data-part="ear-left"] {
@@ -1636,7 +1664,7 @@
 
 /* ---------- 豌豆射手：情绪姿态的嫩芽 / 双叶 / 炮口 ---------- */
 .pea[data-pose="thinking"] [data-part="sprout"] {
-  transform: rotate(-12deg);
+  transform: rotate(calc(-6deg - var(--buddy-think-detail, 0) * 6deg));
 }
 .pea[data-pose="thinking"] [data-part="muzzle"] {
   transform: rotate(4deg);
@@ -1720,7 +1748,6 @@
  * 共享姿态把角色支点写死在 130px（另几款的中心），史蒂夫的身体中心在 180px，
  * 以「卡沿 + 身体中线」为支点重新写一遍，顺序在共享规则之后即生效。
  */
-.steve[data-pose="thinking"] [data-part="character"],
 .steve[data-pose="angry"] [data-part="character"],
 .steve[data-pose="sad"] [data-part="character"],
 .steve[data-pose="celebration"] [data-part="character"],
@@ -1992,37 +2019,6 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-/* 前倾：从卡沿那一端微微抬起，读作「凑近屏幕看」 */
-@keyframes thinkLean {
-  0%,
-  100% {
-    transform: translateY(-2px) scale(1.015);
-  }
-  50% {
-    transform: translateY(-4px) scale(1.022);
-  }
-}
-
-@keyframes thinkTilt {
-  0%,
-  100% {
-    transform: rotate(-2deg) translateY(1px);
-  }
-  50% {
-    transform: rotate(2deg) translateY(-1px);
-  }
-}
-
-@keyframes thinkLook {
-  0%,
-  100% {
-    transform: translate(0, -2px);
-  }
-  55% {
-    transform: translate(-1.6px, -4px);
   }
 }
 
@@ -2447,11 +2443,7 @@
   }
 }
 
-/* 运行态与警觉态统一使用语义色，避免随角色配色变化而失去状态含义。 */
-.art[data-pose="thinking"] [data-part="thinking"] {
-  stroke: var(--color-accent);
-}
-
+/* 警觉态统一使用语义色，避免随角色配色变化而失去状态含义。 */
 .art[data-pose="alert"] [data-part="shock"],
 .art[data-pose="alert"] [data-part="sweat"] {
   stroke: var(--color-warning);
@@ -2459,6 +2451,12 @@
 
 .capy[data-pose="alert"] [data-part="sweat"] path {
   fill: var(--color-warning);
+}
+
+/* 静态预览同时关闭 CSS 与 JS 动作；JS 由 BuddySvg 的 animated 属性在入口处跳过。 */
+.art.art[data-pose][data-motion="still"] * {
+  animation: none;
+  transition: none;
 }
 
 /* 纯装饰的呼吸 / 摆动不参与减弱动效偏好：直接落成静止姿态。

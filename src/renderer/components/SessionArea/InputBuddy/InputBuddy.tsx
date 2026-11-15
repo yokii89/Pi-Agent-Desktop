@@ -2,13 +2,8 @@ import { type Ref, useEffect, useImperativeHandle, useState } from "react";
 import type { InputBuddyKind } from "../../../../shared/inputBuddy";
 import type { SessionId } from "../../../../shared/ipc";
 import { useT } from "../../../hooks/useT";
-import { BuddyCapy } from "./BuddyCapy";
-import { BuddyCat } from "./BuddyCat";
-import { BuddyDog } from "./BuddyDog";
-import { BuddyParrot } from "./BuddyParrot";
-import { BuddyPea } from "./BuddyPea";
-import { BuddySteve } from "./BuddySteve";
-import type { BuddyPose, BuddyStatus } from "./buddyPose";
+import { BuddyArt } from "./BuddyArt";
+import { BUDDY_POSES, type BuddyPose, type BuddyStatus } from "./buddyPose";
 import styles from "./InputBuddy.module.css";
 import { useBuddyMood } from "./useBuddyMood";
 
@@ -17,19 +12,7 @@ const POKE_MS = 1800;
 /** 闲置多久没人理就委屈巴巴。够长，不会在读完一段回答时突然变脸。 */
 const LONELY_MS = 240_000;
 /** 点击可抽到的姿态；idle 是默认态，抽到等于没反应，故不参与。 */
-const POKE_POSES: readonly BuddyPose[] = [
-  "happy",
-  "tilt",
-  "wave",
-  "sleep",
-  "alert",
-  "thinking",
-  "angry",
-  "eating",
-  "sad",
-  "celebration",
-  "dizzy",
-];
+const POKE_POSES = BUDDY_POSES.filter((pose) => pose !== "idle");
 
 export interface InputBuddyHandle {
   /** 一次性情绪（误触发送、点到被禁用的按钮）：不改业务状态，到点自动收回。 */
@@ -145,12 +128,7 @@ export function InputBuddy({ kind, running, switching, alert, sessionId, ref }: 
       onMouseDown={(event) => event.preventDefault()}
       onClick={pokeBuddy}
     >
-      {kind === "dog" && <BuddyDog pose={pose} />}
-      {kind === "cat" && <BuddyCat pose={pose} />}
-      {kind === "parrot" && <BuddyParrot pose={pose} />}
-      {kind === "capy" && <BuddyCapy pose={pose} />}
-      {kind === "pea" && <BuddyPea pose={pose} />}
-      {kind === "steve" && <BuddySteve pose={pose} />}
+      <BuddyArt kind={kind} pose={pose} />
     </button>
   );
 }

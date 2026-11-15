@@ -724,6 +724,34 @@ export const settingsMessages = defineMessages({
     "zh-CN": "史蒂夫",
     "en-US": "Steve",
   },
+  "settings.personalization.buddy.option.fox": {
+    "zh-CN": "赤狐",
+    "en-US": "Red fox",
+  },
+  "settings.personalization.buddy.option.rabbit": {
+    "zh-CN": "垂耳兔",
+    "en-US": "Lop rabbit",
+  },
+  "settings.personalization.buddy.option.panda": {
+    "zh-CN": "熊猫",
+    "en-US": "Panda",
+  },
+  "settings.personalization.buddy.option.raccoon": {
+    "zh-CN": "小浣熊",
+    "en-US": "Raccoon",
+  },
+  "settings.personalization.buddy.option.hamster": {
+    "zh-CN": "仓鼠",
+    "en-US": "Hamster",
+  },
+  "settings.personalization.buddy.option.bear": {
+    "zh-CN": "小熊",
+    "en-US": "Bear",
+  },
+  "settings.personalization.buddy.option.koala": {
+    "zh-CN": "考拉",
+    "en-US": "Koala",
+  },
 
   "settings.config.group.runtime": {
     "zh-CN": "pi 运行时",

@@ -10,13 +10,22 @@ import styles from "./InputBuddy.module.css";
 export function BuddyEffects() {
   return (
     <>
-      {/* 思考中：缺一小口的圆环（转起来就是加载圈）。位置必须在角色轮廓之外——
-          这一色是「应用背景上的记号色」，压到浅色毛面上会整圈消失（狗耳右侧的空档刚好各款共用）。 */}
-      <g data-part="thinking" className={styles.mark} fill="none" strokeWidth={5.5}>
-        <g data-part="thinking-spinner">
-          {/* 缺口摆到左上：正右方的缺口在静止帧里会被读成一个字母 C */}
-          <circle cx="286" cy="4" r="14" strokeDasharray="72 16" transform="rotate(-90 286 4)" />
-        </g>
+      <g data-part="question" className={styles.mark} strokeWidth={5} fill="none">
+        <path d="M 285 38 C 285 22, 312 22, 312 38 C 312 48, 298 50, 298 60" />
+        <circle className={styles.markFill} cx="298" cy="73" r="3" stroke="none" />
+      </g>
+      <g data-part="zzz" className={styles.mark} strokeWidth={4} fill="none">
+        <path d="M 265 45 L 283 45 L 265 63 L 283 63" />
+        <path d="M 292 25 L 305 25 L 292 38 L 305 38" strokeWidth={3.5} />
+      </g>
+      {/* 思绪泡留在头顶右侧，右缘避开输入栏伙伴独立的运行状态点。 */}
+      <g data-part="thinking" className={styles.thoughtBubble} strokeWidth={3}>
+        <rect x={248} y={-8} width={54} height={30} rx={14} />
+        <circle cx={284} cy={29} r={3} stroke="none" />
+        <circle cx={278} cy={37} r={2} stroke="none" />
+        {[260, 275, 290].map((x) => (
+          <circle key={x} data-part="thought-dot" cx={x} cy={7} r={3.3} stroke="none" />
+        ))}
       </g>
 
       <g data-part="anger" className={styles.angerMark} fill="none" strokeWidth={4.5}>

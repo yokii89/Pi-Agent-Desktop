@@ -1,6 +1,6 @@
 /**
  * 输入栏伙伴选择按钮（设置 → 个性化）。swatch 只负责外框与选中态；
- * 内部预览是会话区三联 SVG 的默认姿态，配色来自 InputBuddy.module.css 的 --buddy-* 变量，
+ * 内部预览通过 BuddyArt 渲染默认姿态，配色来自 tokens.css 的 --buddy-* 变量，
  * 这里不重复定义任何角色配色。
  */
 
@@ -54,14 +54,7 @@
   align-items: flex-end;
   justify-content: center;
   width: 100%;
-  aspect-ratio: 290 / 203;
-}
-
-/* 默认姿态自带呼吸 / 摆尾 / 羽冠轻摆，设置页里整排同时动会晃眼：
-   这里按静态快照呈现。选择器要盖过 InputBuddy.module.css 的姿态规则
-   （`.dog[data-pose="idle"] [data-part="head"]` 是 0,3,0），故带上 svg[data-pose] 凑到 0,3,1。 */
-.preview svg[data-pose] [data-part] {
-  animation: none;
+  aspect-ratio: var(--buddy-aspect-ratio);
 }
 
 .empty {

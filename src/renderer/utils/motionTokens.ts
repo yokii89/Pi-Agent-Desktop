@@ -29,6 +29,27 @@ export const NAV_MOTION = {
   easeBack: "back.out(1.6)",
 } as const;
 
+/** Buddy 思考节奏：先抬眼、停顿，再缓慢回正；点阵三轮与头部一轮同时收口。 */
+export const BUDDY_THINKING_MOTION = {
+  cycle: 6.3,
+  lookAt: 0.35,
+  lookDuration: 1.05,
+  settleAt: 2.65,
+  settleDuration: 1.2,
+  returnAt: 4.65,
+  returnDuration: 1.1,
+  detailAt: 0.7,
+  detailDuration: 0.85,
+  detailReturnAt: 2.9,
+  detailReturnDuration: 1.4,
+  dotCycle: 2.1,
+  dotRounds: 3,
+  dotStagger: 0.2,
+  dotRise: 0.32,
+  dotFall: 0.56,
+  ease: "sine.inOut",
+} as const;
+
 /**
  * 下拉浮层动效令牌（docs/design/51，复刻 `docs/ui-design/glide-select-bezier.html`）。
  * 单位秒，与 NAV_MOTION 一致；数值由 utils/glideMotion 的独立时间轴消费，

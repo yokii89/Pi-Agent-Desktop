@@ -9,6 +9,49 @@
    用户启用本地背景壁纸时切成透明，让壁纸层透出来（docs/design/111）。
    弹出层、输入框仍用 --color-bg，不跟着透明。 */
 :root {
+  /* Buddy 插画的固定画布与新动物配色；毛面在两套主题共用，背景记号仍随主题变色。 */
+  --buddy-height: 53px;
+  --buddy-aspect-ratio: 290 / 203;
+  --buddy-coat: var(--buddy-dog-coat);
+  --buddy-bib: var(--buddy-glint);
+  --buddy-inner: var(--buddy-tongue);
+  --buddy-paw: var(--buddy-dog-coat);
+  --buddy-nose: var(--buddy-ink);
+  --buddy-accessory: var(--buddy-gold);
+  --buddy-fox-coat: #e99454;
+  --buddy-fox-bib: #fff2dc;
+  --buddy-fox-inner: #713f35;
+  --buddy-fox-paw: #92553d;
+  --buddy-rabbit-coat: #f4e8dc;
+  --buddy-rabbit-bib: #fffaf2;
+  --buddy-rabbit-inner: #e8a5ad;
+  --buddy-rabbit-scarf: #b2a2d2;
+  --buddy-panda-coat: #fff8e8;
+  --buddy-panda-patch: #646771;
+  --buddy-panda-inner: #a4a4aa;
+  --buddy-raccoon-coat: #b8b3b0;
+  --buddy-raccoon-bib: #f4eee4;
+  --buddy-raccoon-inner: #d6bbb6;
+  --buddy-raccoon-mask: #6f6c75;
+  --buddy-hamster-coat: #efc478;
+  --buddy-hamster-bib: #fff4dd;
+  --buddy-hamster-inner: #e8a296;
+  --buddy-bear-coat: #c49269;
+  --buddy-bear-bib: #f0d6ab;
+  --buddy-bear-inner: #94674c;
+  --buddy-bear-scarf: #94bccf;
+  --buddy-koala-coat: #a8bdc8;
+  --buddy-koala-bib: #edf2ec;
+  --buddy-koala-inner: #d4d9dd;
+  --buddy-koala-nose: #596575;
+  --buddy-snack-berry: #e97883;
+  --buddy-snack-carrot: #f3a348;
+  --buddy-snack-bamboo: #b8d87e;
+  --buddy-snack-leaf: #84b77c;
+  --buddy-snack-cookie: #deb77b;
+  --buddy-snack-honey: #edb74d;
+  --buddy-snack-eucalyptus: #a0c8aa;
+
   /* 文件预览与就地编辑器共用的代码表面规格。 */
   --code-font-family: var(--font-family-mono);
   --code-font-size: var(--font-size-sm);
