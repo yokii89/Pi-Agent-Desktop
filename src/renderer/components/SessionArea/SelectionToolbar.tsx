@@ -3,6 +3,7 @@ import { type RefObject, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useGlideOverlay } from "../../hooks/useGlideOverlay";
 import { useT } from "../../hooks/useT";
+import type { TextSelectionSource } from "../../utils/textSelection";
 import styles from "./SelectionToolbar.module.css";
 
 /** 工具条与选区之间的间距。 */
@@ -13,6 +14,8 @@ const VIEWPORT_MARGIN = 8;
 interface SelectionToolbarProps {
   /** 会话流滚动容器：选区两端都落在它内才算数。 */
   containerRef: RefObject<HTMLDivElement | null>;
+  /** Virtualized surfaces supply document-backed text and selection geometry. */
+  selectionSource?: TextSelectionSource;
   /** 输入栏锁定（切换中 / 阻断浮层）时「添加到输入栏」不可用。 */
   quoteDisabled: boolean;
   /** 引用置灰原因（title 提示）。 */
@@ -31,6 +34,7 @@ interface SelectionToolbarProps {
  */
 export function SelectionToolbar({
   containerRef,
+  selectionSource,
   quoteDisabled,
   quoteDisabledHint,
   onCopy,
@@ -58,23 +62,25 @@ export function SelectionToolbar({
     const panel = panelRef.current;
     const container = containerRef.current;
     if (!panel || !container) return;
-    const selection = window.getSelection();
-    if (!selection) return;
+    const sourceSelection = selectionSource?.read();
+    const selection = selectionSource ? null : window.getSelection();
     // 全应用每次光标移动都会派发 selectionchange（输入栏敲字最频繁）：
     // 折叠且本来就没显示 → 一次属性读取就退，不进任何测量
-    const collapsed = selection.isCollapsed;
+    const collapsed = selectionSource ? !sourceSelection : !selection || selection.isCollapsed;
     if (collapsed && !visible.current) return;
-    const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
     // 先判归属再谈内容：会话流之外的划选（文件面板预览、扩展视图）不该为它序列化选区
     const inStream =
-      range !== null &&
-      container.contains(range.startContainer) &&
-      container.contains(range.endContainer);
+      sourceSelection ||
+      (range !== null &&
+        container.contains(range.startContainer) &&
+        container.contains(range.endContainer));
     if (!inStream || collapsed) {
       hide();
       return;
     }
-    const rect = range.getBoundingClientRect();
+    const rect = sourceSelection?.rect ?? range?.getBoundingClientRect();
+    if (!rect) return;
     const box = container.getBoundingClientRect();
     // 滚动 / 流式排版把选区顶出阅读区后，工具条跟着留在视口里没有意义
     if (rect.bottom < box.top || rect.top > box.bottom) {
@@ -86,7 +92,7 @@ export function SelectionToolbar({
     if (fresh) {
       // 纯空白选区不出现。整段序列化只在「由藏转显」这一帧付一次，
       // 拖选过程中不重复取文本（动作时再读实时选区，见 run）
-      const text = selection.toString();
+      const text = sourceSelection?.getText() ?? selection?.toString() ?? "";
       if (!text.trim()) return;
       textRef.current = text;
       visible.current = true;
@@ -117,7 +123,7 @@ export function SelectionToolbar({
     // 缩放要从贴着选区的那条边长出，否则是"原地呼吸"而不是从选区推开
     panel.style.transformOrigin = above ? "bottom center" : "top center";
     if (fresh) overlay.enter();
-  }, [containerRef, hide, overlay]);
+  }, [containerRef, selectionSource, hide, overlay]);
 
   // 拖选期间 selectionchange 每次指针移动都触发，合帧到每帧至多算一次
   const schedule = useCallback((): void => {
@@ -128,6 +134,7 @@ export function SelectionToolbar({
   useEffect(() => {
     const onWindowResize = (): void => schedule();
     document.addEventListener("selectionchange", schedule);
+    const unsubscribe = selectionSource?.subscribe(schedule);
     window.addEventListener("resize", onWindowResize);
     // 捕获阶段监听 scroll：容器内还挂着二级滚动盒（文件面板的 Markdown 正文、PDF 画布），
     // 只盯容器自己的 scroll 事件会让工具条停在原地。
@@ -136,10 +143,11 @@ export function SelectionToolbar({
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
       frameRef.current = 0;
       document.removeEventListener("selectionchange", schedule);
+      unsubscribe?.();
       document.removeEventListener("scroll", schedule, { capture: true });
       window.removeEventListener("resize", onWindowResize);
     };
-  }, [schedule]);
+  }, [schedule, selectionSource]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -156,15 +164,18 @@ export function SelectionToolbar({
     (action: (text: string) => void): void => {
       // 动作时才取实时选区（根节点 mousedown 已 preventDefault，此刻选区仍在），
       // 被别处清掉时退回「由藏转显」那一帧的快照
-      const live = window.getSelection();
-      const text = live && !live.isCollapsed ? live.toString() : textRef.current;
+      const live = selectionSource ? null : window.getSelection();
+      const text =
+        selectionSource?.read()?.getText() ??
+        (live && !live.isCollapsed ? live.toString() : textRef.current);
       if (!text.trim()) return;
       action(text);
       hide();
       // 动作即本轮终点：留着高亮却没有工具条，读起来像卡住的浮层
-      window.getSelection()?.removeAllRanges();
+      if (selectionSource) selectionSource.clear();
+      else window.getSelection()?.removeAllRanges();
     },
-    [hide],
+    [hide, selectionSource],
   );
 
   return createPortal(

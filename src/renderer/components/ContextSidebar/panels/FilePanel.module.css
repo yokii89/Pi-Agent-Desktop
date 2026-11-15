@@ -122,9 +122,9 @@
   color: var(--color-warning);
 }
 
-/* 编辑态面板体：滚动交给 CodeMirror 自己的 scroller，阅读态的内边距也让出来
+/* 源码面板体：读写模式都由 CodeMirror 的 scroller 负责滚动
    （双类名提权：站点模块的打包顺序排在 ContextSidebar.module.css 之后） */
-.panelBodyEditing.panelBodyEditing {
+.panelBodySource.panelBodySource {
   padding: 0;
   overflow: hidden;
   display: flex;

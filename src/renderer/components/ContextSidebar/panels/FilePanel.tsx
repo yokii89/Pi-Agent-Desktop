@@ -11,7 +11,7 @@ import {
   PencilSimple,
   X,
 } from "@phosphor-icons/react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   isHtmlPath,
   isMarkdownPath,
@@ -32,6 +32,7 @@ import { useProjectStore } from "../../../stores/projectStore";
 import { useSessionMeta } from "../../../stores/sessionStore";
 import { useUiStore } from "../../../stores/uiStore";
 import { copyTextToClipboard } from "../../../utils/clipboard";
+import { countCodeLines } from "../../../utils/codeLines";
 import {
   normalizePathKey,
   parseLineCol,
@@ -41,7 +42,6 @@ import {
   resolvePath,
   toNativePath,
 } from "../../../utils/fileOpen";
-import { formatJsonPreview } from "../../../utils/jsonPreview";
 import { normalizeDirPath, parentDirPath } from "../../../utils/paths";
 import {
   canGoBack,
@@ -51,10 +51,10 @@ import {
   pushPreviewHistory,
   stepPreviewHistory,
 } from "../../../utils/previewHistory";
+import type { TextSelectionSource } from "../../../utils/textSelection";
 import { SelectionToolbar } from "../../SessionArea/SelectionToolbar";
 import { WorkdirChip } from "../../SessionArea/WorkdirChip";
 import { CodeEditor } from "../../ui/CodeEditor";
-import { CodeHighlight, countCodeLines } from "../../ui/CodeHighlight";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { ContextMenu } from "../../ui/ContextMenu";
 import { IconButton } from "../../ui/IconButton";
@@ -102,10 +102,9 @@ function previewMeta(result: FsReadResult, imageSize: string | null, t: Translat
 /** 刚写完盘的一小段时间内，目录 watch 的回推视为自己引发的（不是外部改动）。 */
 const SELF_WRITE_GRACE_MS = 600;
 
-/** 可以在侧栏就地编辑的预览（docs/design/141）。 */
-function isTextEditable(preview: PreviewState, mdMode: MarkdownViewMode): boolean {
-  // 截断过的文本只读到 1MB 那一段，回写等于把后文删掉
-  if (preview.result.kind !== "text" || preview.result.truncated) return false;
+/** 源码与专用排版预览分流；截断源码也走同一视图，但保持只读。 */
+function isSourcePreview(preview: PreviewState, mdMode: MarkdownViewMode): boolean {
+  if (preview.result.kind !== "text") return false;
   // 表格 / Notebook 的专用预览是排版结果，与源码不是一一对应的字符流
   if (isTabularPath(preview.path) || isNotebookPath(preview.path)) return false;
   // Markdown 文档流同理：要编辑得先切到源码态
@@ -116,37 +115,6 @@ function isTextEditable(preview: PreviewState, mdMode: MarkdownViewMode): boolea
 /** 编辑器文档形态：CodeMirror 按 `\n` 切行，基线必须同一形态才能干净地比脏。 */
 function toEditorText(text: string): string {
   return applyLineEnding(text, "lf");
-}
-
-function previewScrollElement(panel: HTMLElement): HTMLElement {
-  const code = panel.querySelector<HTMLElement>("[data-code-preview-scroll]");
-  return code && code.scrollHeight > code.clientHeight ? code : panel;
-}
-
-function readPreviewScrollAnchor(panel: HTMLElement): CodeScrollAnchor {
-  const scrollElement = previewScrollElement(panel);
-  const viewportTop = scrollElement.getBoundingClientRect().top;
-  const lines = panel.querySelectorAll<HTMLElement>(
-    "[data-code-preview-scroll] .line, [data-code-line]",
-  );
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (line && line.getBoundingClientRect().bottom > viewportTop) {
-      return { line: index + 1, offset: line.getBoundingClientRect().top - viewportTop };
-    }
-  }
-  return { line: 1, offset: 0 };
-}
-
-function restorePreviewScrollAnchor(panel: HTMLElement, anchor: CodeScrollAnchor): boolean {
-  const scrollElement = previewScrollElement(panel);
-  const line = panel.querySelectorAll<HTMLElement>(
-    "[data-code-preview-scroll] .line, [data-code-line]",
-  )[Math.max(0, anchor.line - 1)];
-  if (!line) return false;
-  scrollElement.scrollTop +=
-    line.getBoundingClientRect().top - scrollElement.getBoundingClientRect().top - anchor.offset;
-  return true;
 }
 
 /** 右侧"文件"Tab：快速打开搜索 + 项目文件树 + 只读预览 / 就地编辑（docs/design/03 §5）。 */
@@ -173,7 +141,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   const [history, setHistory] = useState<PreviewHistory>(emptyPreviewHistory);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchSeqRef = useRef(0);
-  /** 编辑态（docs/design/141）：与预览体互斥渲染，草稿归 CodeMirror 所有。 */
+  /** 源码读写共用 CodeMirror 实例，草稿归编辑器所有。 */
   const [editing, setEditing] = useState(false);
   const [dirty, setDirty] = useState(false);
   /** 编辑器基线（LF 形态，与编辑器文档同形）；预览内容是磁盘原文，可能是 CRLF。 */
@@ -186,9 +154,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
   const editorRef = useRef<CodeEditorHandle | null>(null);
-  const previewScrollAnchorRef = useRef<CodeScrollAnchor>({ line: 1, offset: 0 });
-  const previewRestorePendingRef = useRef(false);
-  const wasEditingRef = useRef(editing);
+  const previewScrollAnchorRef = useRef<CodeScrollAnchor | undefined>(undefined);
   /** 脏内容离开时暂存的动作：放弃 / 保存并继续后再执行。 */
   const pendingLeaveRef = useRef<(() => void) | null>(null);
   /** 自己刚写盘的时刻：目录 watch 会回推同一次改动，别把自家保存读成外部改动。 */
@@ -214,15 +180,19 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   activePreviewRef.current = activePreview;
   const editingRef = useRef(editing);
   editingRef.current = editing;
+  const sourcePreview = activePreview !== null && isSourcePreview(activePreview, mdViewMode);
+  const sourceSelection = useMemo<TextSelectionSource>(
+    () => ({
+      read: () => editorRef.current?.getSelection() ?? null,
+      clear: () => editorRef.current?.clearSelection(),
+      subscribe: (listener) => editorRef.current?.subscribeSelection(listener) ?? (() => {}),
+    }),
+    [],
+  );
   /** 内容身份：换文件 / md 预览与源码切换时查找条自行收起并重算。 */
   const findContentKey =
-    preview && preview.root === rootKey ? `${preview.path}:${mdViewMode}` : null;
+    !sourcePreview && preview && preview.root === rootKey ? `${preview.path}:${mdViewMode}` : null;
   const find = usePreviewFind(panelBodyRef, findContentKey);
-  const restorePreviewAfterCodeLayout = useCallback((stable: boolean): void => {
-    if (!previewRestorePendingRef.current || !panelBodyRef.current) return;
-    restorePreviewScrollAnchor(panelBodyRef.current, previewScrollAnchorRef.current);
-    if (stable) previewRestorePendingRef.current = false;
-  }, []);
 
   // Ctrl+F 在预览内容里查找（渲染层没有浏览器级查找条，不抢就没人接这个键）
   const openFind = find.openFind;
@@ -230,16 +200,16 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   useEffect(() => {
     if (!active || !hasActivePreview) return;
     const onKeyDown = (event: KeyboardEvent): void => {
-      // 编辑态归 CodeMirror 的查找面板（它自己 preventDefault 过，这里也不再抢）
-      if (editing || event.defaultPrevented) return;
+      if (event.defaultPrevented) return;
       if (!event.ctrlKey || event.altKey || event.metaKey) return;
       if (event.key.toLowerCase() !== "f") return;
       event.preventDefault();
-      openFind();
+      if (sourcePreview) editorRef.current?.openFind();
+      else openFind();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [active, hasActivePreview, openFind, editing]);
+  }, [active, hasActivePreview, openFind, sourcePreview]);
 
   // Ctrl+P 打开/重复触发时聚焦搜索框（fileSearchTick 每次触发都递增）
   useEffect(() => {
@@ -275,7 +245,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     ): void => {
       setSelectedPath(path);
       setPreviewLoading(true);
-      previewRestorePendingRef.current = false;
+      previewScrollAnchorRef.current = undefined;
       setImageSize(null);
       // 换文件即退出编辑：草稿只属于当前文件（脏内容已在 guardLeave 里问过）
       setEditing(false);
@@ -287,6 +257,8 @@ export function FilePanel({ active = true }: { active?: boolean }) {
       load
         .then((result) => {
           if (seq !== previewSeqRef.current) return;
+          setEditorBaseline(result.kind === "text" ? toEditorText(result.content) : "");
+          setEditorReloadTick((n) => n + 1);
           setPreview({ root: rootKey, path, result, focusLine });
           // 历史导航（silent）不重复入栈；读取失败同样不入栈
           if (mode === "push") {
@@ -335,23 +307,14 @@ export function FilePanel({ active = true }: { active?: boolean }) {
 
   /** 退出编辑态、保留预览（不带确认的那一步）。 */
   const dropEditing = useCallback((): void => {
-    if (editingRef.current && editorRef.current) {
-      previewScrollAnchorRef.current = editorRef.current.getScrollAnchor();
+    const target = activePreviewRef.current;
+    if (editingRef.current && target?.result.kind === "text") {
+      editorRef.current?.resetDocument(toEditorText(target.result.content));
     }
     setEditing(false);
     setDirty(false);
     setExternalChanged(false);
   }, []);
-
-  useLayoutEffect(() => {
-    if (!wasEditingRef.current || editing || !panelBodyRef.current) {
-      wasEditingRef.current = editing;
-      return;
-    }
-    previewRestorePendingRef.current = true;
-    restorePreviewAfterCodeLayout(false);
-    wasEditingRef.current = editing;
-  }, [editing, restorePreviewAfterCodeLayout]);
 
   // 项目切换后浏览历史整体失效；有脏草稿时必须先确认再清掉旧预览
   useEffect(() => {
@@ -380,7 +343,14 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     async (force = false): Promise<boolean> => {
       const editor = editorRef.current;
       const target = activePreviewRef.current;
-      if (!editor || !target || target.result.kind !== "text") return false;
+      if (
+        !editingRef.current ||
+        !editor?.isReady() ||
+        !target ||
+        target.result.kind !== "text" ||
+        target.result.truncated
+      )
+        return false;
       const edited = editor.getValue();
       // 写盘内容还原原文件的换行风格；编辑器文档本身是纯 LF 形态（基线同形）
       const content = toSavedContent(edited, target.result.content);
@@ -397,6 +367,20 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           return false;
         }
         selfWriteAtRef.current = Date.now();
+        if (editorRef.current !== editor) return false;
+        // Save-and-continue may run before React commits this update.
+        // Keep the authoritative disk snapshot current before leaving edit mode.
+        const current = activePreviewRef.current;
+        if (current?.result.kind !== "text" || current.path !== target.path) return false;
+        activePreviewRef.current = {
+          ...current,
+          result: {
+            ...current.result,
+            content,
+            byteLength: result.byteLength,
+            mtimeMs: result.mtimeMs,
+          },
+        };
         setPreview((prev) =>
           prev &&
           prev.result.kind === "text" &&
@@ -414,7 +398,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
         );
         editor.setBaseline(edited);
         setEditorBaseline(edited);
-        setDirty(false);
+        setDirty(editor.isDirty());
         setExternalChanged(false);
         showToast(t("panels.files.savedToast"));
         return true;
@@ -471,7 +455,6 @@ export function FilePanel({ active = true }: { active?: boolean }) {
 
     setPreview({ ...latest, result });
     setExternalChanged(false);
-    if (!editingRef.current) return;
     if (result.kind === "text") {
       setEditorBaseline(toEditorText(result.content));
       if (editorRef.current) {
@@ -479,6 +462,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
       }
       setEditorReloadTick((n) => n + 1);
       setDirty(false);
+      if (result.truncated) setEditing(false);
       return;
     }
     // 文件在磁盘上变成了二进制 / 图片：编辑态失效
@@ -526,6 +510,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
       showToast(t("panels.files.fileGone"));
       return;
     }
+    if (activePreviewRef.current !== target) return;
     setPreview((prev) =>
       prev && normalizePathKey(prev.path) === normalizePathKey(target.path)
         ? { ...prev, result }
@@ -536,26 +521,20 @@ export function FilePanel({ active = true }: { active?: boolean }) {
       dropEditing();
       return;
     }
-    if (!editingRef.current) return;
     setEditorBaseline(toEditorText(result.content));
     if (editorRef.current) {
       previewScrollAnchorRef.current = editorRef.current.getScrollAnchor();
     }
     setEditorReloadTick((n) => n + 1);
     setDirty(false);
+    if (result.truncated) setEditing(false);
   }, [dropEditing, showToast, t]);
 
-  /** 进编辑态：查找条让位，基线取当前磁盘内容。 */
+  /** 进编辑态只切配置，滚动、选区、查找都留在原视图。 */
   const beginEdit = (): void => {
     const target = activePreviewRef.current;
     if (!target) return;
-    if (target.result.kind !== "text") return;
-    find.close();
-    previewRestorePendingRef.current = false;
-    const previewBody = panelBodyRef.current;
-    previewScrollAnchorRef.current = previewBody
-      ? readPreviewScrollAnchor(previewBody)
-      : { line: 1, offset: 0 };
+    if (target.result.kind !== "text" || target.result.truncated || !sourcePreview) return;
     setEditorBaseline(toEditorText(target.result.content));
     setDirty(false);
     setExternalChanged(false);
@@ -714,7 +693,8 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   /** 可复制的全文：仅文本类预览有（图片/PDF/二进制不提供「复制全文」）。 */
   const previewText = activePreview?.result.kind === "text" ? activePreview.result.content : null;
   /** 当前预览能不能就地编辑（纯文本 + 未截断 + 非表格/Notebook；md 需源码态）。 */
-  const editablePreview = activePreview !== null && isTextEditable(activePreview, mdViewMode);
+  const editablePreview =
+    sourcePreview && activePreview?.result.kind === "text" && !activePreview.result.truncated;
 
   // 划选工具条的引用落点在输入栏：与会话区同一套置灰口径（切换中 / 阻断浮层 / 无会话）
   const hasBlockingView = hasBlockingViewFor(activeSessionId);
@@ -740,6 +720,10 @@ export function FilePanel({ active = true }: { active?: boolean }) {
 
   /** 「全选预览内容」：直接对滚动容器建选区，不依赖用户光标位置。 */
   const selectAllPreview = useCallback((): void => {
+    if (sourcePreview) {
+      editorRef.current?.selectAll();
+      return;
+    }
     const body = panelBodyRef.current;
     const selection = window.getSelection();
     if (!body || !selection) return;
@@ -747,7 +731,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     range.selectNodeContents(body);
     selection.removeAllRanges();
     selection.addRange(range);
-  }, []);
+  }, [sourcePreview]);
 
   /**
    * 预览区右键：先抑掉 Chromium 默认菜单，再开自绘菜单（与会话区 docs/design/12 同口径）。
@@ -770,7 +754,11 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     setPreviewMenu({
       x: event.clientX,
       y: event.clientY,
-      selected: insideSelection ? selection.toString() : "",
+      selected: sourcePreview
+        ? (editorRef.current?.getSelectedText() ?? "")
+        : insideSelection
+          ? selection.toString()
+          : "",
     });
   };
 
@@ -888,7 +876,10 @@ export function FilePanel({ active = true }: { active?: boolean }) {
                         ? t("panels.files.mdSource")
                         : t("panels.files.mdPreview"),
                   })}
-                  onClick={() => setMdViewMode(mdViewMode === "preview" ? "source" : "preview")}
+                  onClick={() => {
+                    previewScrollAnchorRef.current = undefined;
+                    setMdViewMode(mdViewMode === "preview" ? "source" : "preview");
+                  }}
                 >
                   {mdViewMode === "preview" ? (
                     <Eye size={16} weight="regular" />
@@ -944,7 +935,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           {rootDir && <WorkdirChip dir={rootDir} />}
         </div>
       )}
-      {activePreview && find.open && !editing && (
+      {activePreview && find.open && !sourcePreview && (
         <PreviewFindBar
           query={find.query}
           count={find.count}
@@ -956,29 +947,33 @@ export function FilePanel({ active = true }: { active?: boolean }) {
       )}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: 预览是只读阅读面，右键只用来开复制菜单/抑制浏览器默认菜单，不伪装成交互 role */}
       <div
-        className={[styles.panelBody, editing ? panelStyles.panelBodyEditing : ""]
+        className={[styles.panelBody, sourcePreview ? panelStyles.panelBodySource : ""]
           .filter(Boolean)
           .join(" ")}
         ref={panelBodyRef}
         onContextMenu={openPreviewMenu}
       >
-        {editing && activePreview ? (
-          <CodeEditor
-            key={`${activePreview.path}#${editorReloadTick}`}
-            ref={editorRef}
-            filePath={activePreview.path}
-            doc={
-              activePreview.result.kind === "text" ? toEditorText(activePreview.result.content) : ""
-            }
-            baseline={editorBaseline}
-            focusLine={activePreview.focusLine}
-            scrollAnchor={previewScrollAnchorRef.current}
-            loadingLabel={t("panels.files.editorLoading")}
-            failedLabel={t("panels.files.editorFailed")}
-            ariaLabel={t("panels.files.editorAria", { path: activePreview.path })}
-            onDirtyChange={setDirty}
-            onSave={() => void saveDraftRef.current()}
-          />
+        {sourcePreview && activePreview?.result.kind === "text" ? (
+          <>
+            {activePreview.result.truncated && (
+              <p className={panelStyles.truncatedNote}>{t("panels.files.truncatedNote")}</p>
+            )}
+            <CodeEditor
+              key={`${activePreview.root}:${activePreview.path}#${editorReloadTick}`}
+              ref={editorRef}
+              filePath={activePreview.path}
+              doc={toEditorText(activePreview.result.content)}
+              readOnly={!editing}
+              baseline={editorBaseline}
+              focusLine={activePreview.focusLine}
+              scrollAnchor={previewScrollAnchorRef.current}
+              loadingLabel={t("panels.files.editorLoading")}
+              failedLabel={t("panels.files.editorFailed")}
+              ariaLabel={t("panels.files.editorAria", { path: activePreview.path })}
+              onDirtyChange={setDirty}
+              onSave={() => void saveDraftRef.current()}
+            />
+          </>
         ) : !rootDir && !activePreview ? (
           <p className={panelStyles.noMatch}>{t("panels.files.selectProject")}</p>
         ) : activePreview ? (
@@ -986,8 +981,6 @@ export function FilePanel({ active = true }: { active?: boolean }) {
             preview={activePreview}
             onImageSize={setImageSize}
             onOpenInSystem={() => openInSystem(activePreview.path)}
-            mdMode={mdViewMode}
-            onCodeLayout={restorePreviewAfterCodeLayout}
           />
         ) : previewLoading ? (
           <p className={panelStyles.noMatch}>{t("panels.files.loading")}</p>
@@ -1042,7 +1035,9 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           编辑态撤掉：工具条会压在正当输入的文本上 */}
       {!editing && (
         <SelectionToolbar
+          key={sourcePreview ? `${activePreview?.path}#${editorReloadTick}` : "document"}
           containerRef={panelBodyRef}
+          selectionSource={sourcePreview ? sourceSelection : undefined}
           quoteDisabled={quoteDisabled}
           quoteDisabledHint={quoteDisabledHint}
           onCopy={copyToClipboard}
@@ -1070,7 +1065,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           pendingLeaveRef.current = null;
           setLeaveOpen(false);
           void saveDraft().then((saved) => {
-            if (saved) action?.();
+            if (saved && action) guardLeave(action);
           });
         }}
         onCancel={() => {
@@ -1097,19 +1092,15 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   );
 }
 
-/** 预览本体：按读取结果 kind 分流（代码高亮 / 图片 / 二进制占位 / Markdown 文档流）。 */
+/** 专用排版预览：图片、PDF、二进制占位、Markdown、表格与 Notebook。 */
 function FilePreviewBody({
   preview,
   onImageSize,
   onOpenInSystem,
-  mdMode,
-  onCodeLayout,
 }: {
   preview: PreviewState;
   onImageSize: (size: string | null) => void;
   onOpenInSystem: () => void;
-  mdMode: MarkdownViewMode;
-  onCodeLayout: (stable: boolean) => void;
 }) {
   const t = useT();
   const { result } = preview;
@@ -1151,16 +1142,10 @@ function FilePreviewBody({
     );
   }
 
-  // Markdown 按文档流渲染（预览/源码切换）；其余文本走源码高亮
+  // 这里只承接排版预览，源码已经在上层进入统一视图。
   if (isMarkdownPath(preview.path)) {
     return (
-      <MarkdownPreview
-        path={preview.path}
-        content={result.content}
-        truncated={result.truncated}
-        mode={mdMode}
-        focusLine={preview.focusLine}
-      />
+      <MarkdownPreview path={preview.path} content={result.content} truncated={result.truncated} />
     );
   }
 
@@ -1178,19 +1163,5 @@ function FilePreviewBody({
     return <NotebookPreview path={preview.path} content={result.content} />;
   }
 
-  return (
-    <>
-      {result.truncated && (
-        <p className={panelStyles.truncatedNote}>{t("panels.files.truncatedNote")}</p>
-      )}
-      <CodeHighlight
-        key={`${preview.path}:${preview.focusLine ?? 0}`}
-        code={formatJsonPreview(preview.path, result.content, result.truncated)}
-        filePath={preview.path}
-        className={panelStyles.previewContent}
-        focusLine={preview.focusLine}
-        onLayout={onCodeLayout}
-      />
-    </>
-  );
+  return null;
 }

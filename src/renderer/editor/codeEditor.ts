@@ -1,14 +1,30 @@
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  selectAll,
+} from "@codemirror/commands";
 import {
   bracketMatching,
   HighlightStyle,
   indentOnInput,
   syntaxHighlighting,
 } from "@codemirror/language";
-import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
-import { Compartment, EditorState, Text } from "@codemirror/state";
 import {
+  closeSearchPanel,
+  getSearchQuery,
+  highlightSelectionMatches,
+  openSearchPanel,
+  search,
+  searchKeymap,
+  searchPanelOpen,
+  setSearchQuery,
+} from "@codemirror/search";
+import { Compartment, EditorSelection, EditorState, Text } from "@codemirror/state";
+import {
+  Decoration,
   drawSelection,
   dropCursor,
   EditorView,
@@ -31,7 +47,7 @@ const DIRTY_DEBOUNCE_MS = 180;
 
 /**
  * 语法色：一律吃 `tokens.css` 的 `--syn-*`（两套主题各一份），
- * 与预览态 shiki 的 github 主题同一套观感，编辑/预览切换不闪色。
+ * 源码读写共用高亮规则，主题变化不需要替换文档。
  */
 const highlightStyle = HighlightStyle.define([
   {
@@ -110,6 +126,7 @@ function buildTheme(dark: boolean): ReturnType<typeof EditorView.theme> {
         color: "var(--color-text-muted)",
       },
       ".cm-activeLine": { backgroundColor: "transparent" },
+      ".cm-sourceFocusLine": { backgroundColor: "var(--color-accent-soft)" },
       ".cm-matchingBracket, &.cm-focused .cm-matchingBracket": {
         backgroundColor: "var(--color-accent-soft)",
         outline: "1px solid var(--color-border-strong)",
@@ -117,7 +134,7 @@ function buildTheme(dark: boolean): ReturnType<typeof EditorView.theme> {
       ".cm-nonmatchingBracket": { color: "var(--color-danger)" },
       ".cm-selectionMatch": { backgroundColor: "var(--color-accent-soft)" },
       ".cm-specialChar": { color: "var(--color-warning)" },
-      // 编辑态查找（Ctrl+F）：CM 自带面板，配色与图层面板对齐
+      // 源码读写共用查找面板。
       ".cm-panels": {
         backgroundColor: "var(--color-bg-surface)",
         color: "var(--color-text)",
@@ -176,7 +193,29 @@ function buildTheme(dark: boolean): ReturnType<typeof EditorView.theme> {
 export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMountHandle {
   const languageCompartment = new Compartment();
   const themeCompartment = new Compartment();
+  const modeCompartment = new Compartment();
+  const focusLineCompartment = new Compartment();
   const initialTheme = options.dark;
+  let readOnly = options.readOnly;
+  const selectionListeners = new Set<() => void>();
+  const notifySelection = (): void => {
+    options.onSelectionChange();
+    for (const listener of selectionListeners) listener();
+  };
+
+  const modeExtensions = () => [
+    EditorState.readOnly.of(readOnly),
+    EditorView.editable.of(!readOnly),
+    EditorView.contentAttributes.of({ tabindex: "0" }),
+    ...(readOnly
+      ? []
+      : [
+          dropCursor(),
+          indentOnInput(),
+          closeBrackets(),
+          keymap.of([...closeBracketsKeymap, ...historyKeymap, indentWithTab]),
+        ]),
+  ];
 
   let baseline = Text.of(options.doc.split("\n"));
   let dirty = false;
@@ -206,21 +245,18 @@ export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMoun
     dirtyTimer = window.setTimeout(flushDirty, DIRTY_DEBOUNCE_MS);
   };
 
-  const view = new EditorView({
-    parent: options.parent,
-    state: EditorState.create({
-      doc: options.doc,
+  const createState = (doc: string, selection?: EditorState["selection"]) =>
+    EditorState.create({
+      doc,
+      selection,
       extensions: [
         lineNumbers(),
         highlightActiveLineGutter(),
         highlightSpecialChars(),
         history(),
         drawSelection(),
-        dropCursor(),
         EditorState.allowMultipleSelections.of(true),
-        indentOnInput(),
         bracketMatching(),
-        closeBrackets(),
         highlightActiveLine(),
         highlightSelectionMatches(),
         search({ top: true }),
@@ -228,46 +264,137 @@ export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMoun
         syntaxHighlighting(highlightStyle),
         languageCompartment.of([]),
         themeCompartment.of(buildTheme(initialTheme)),
+        modeCompartment.of(modeExtensions()),
+        focusLineCompartment.of([]),
         keymap.of([
           {
             key: "Mod-s",
             preventDefault: true,
             run: () => {
-              callbacks.onSave();
+              if (!view.state.readOnly) callbacks.onSave();
               return true;
             },
           },
-          ...closeBracketsKeymap,
           ...defaultKeymap,
           ...searchKeymap,
-          ...historyKeymap,
-          indentWithTab,
         ]),
         EditorView.contentAttributes.of({ "aria-label": options.ariaLabel, spellcheck: "false" }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) scheduleDirty();
+          if (update.selectionSet || update.viewportChanged || update.focusChanged)
+            notifySelection();
         }),
       ],
-    }),
+    });
+
+  const view = new EditorView({
+    parent: options.parent,
+    state: createState(options.doc),
   });
 
-  view.focus();
+  if (!readOnly) view.focus();
   if (options.scrollAnchor) {
     restoreScrollAnchor(view, options.scrollAnchor);
   } else if (options.focusLine != null && options.focusLine >= 1) {
     revealLine(view, options.focusLine);
+    const line = view.state.doc.line(Math.min(options.focusLine, view.state.doc.lines));
+    view.dispatch({
+      effects: focusLineCompartment.reconfigure(
+        EditorView.decorations.of(
+          Decoration.set([Decoration.line({ class: "cm-sourceFocusLine" }).range(line.from)]),
+        ),
+      ),
+    });
   }
 
+  let languageExtension: Awaited<ReturnType<typeof loadEditorLanguage>> = null;
+  let dark = initialTheme;
   const languageId = editorLanguageFor(options.filePath);
   if (languageId) {
     void loadEditorLanguage(languageId).then((extension) => {
       if (destroyed || !extension) return;
+      languageExtension = extension;
       view.dispatch({ effects: languageCompartment.reconfigure(extension) });
     });
   }
 
   return {
     getValue: () => view.state.doc.toString(),
+    isReady: () => !destroyed,
+    getSelectedText: () => selectedText(view),
+    getSelection: () => {
+      const selection = view.state.selection.main;
+      if (!view.hasFocus || selection.empty) return null;
+      const from = Math.max(selection.from, view.viewport.from);
+      const to = Math.min(selection.to, view.viewport.to);
+      if (from > to) return null;
+      const start = view.coordsAtPos(from);
+      const end = view.coordsAtPos(to);
+      if (!start || !end) return null;
+      return {
+        rect: {
+          left: Math.min(start.left, end.left),
+          top: start.top,
+          bottom: end.bottom,
+          width: Math.abs(end.right - start.left),
+        },
+        getText: () => selectedText(view),
+      };
+    },
+    subscribeSelection(listener) {
+      selectionListeners.add(listener);
+      return () => {
+        selectionListeners.delete(listener);
+      };
+    },
+    selectAll() {
+      view.focus();
+      selectAll(view);
+    },
+    clearSelection() {
+      view.dispatch({ selection: { anchor: view.state.selection.main.head } });
+    },
+    openFind: () => {
+      openSearchPanel(view);
+    },
+    resetDocument(text) {
+      if (destroyed) return;
+      const anchor = readScrollAnchor(view);
+      const selection = view.state.selection;
+      const query = getSearchQuery(view.state);
+      const finding = searchPanelOpen(view.state);
+      baseline = Text.of(text.split("\n"));
+      if (view.state.doc.eq(baseline)) {
+        reportDirty(false);
+        return;
+      }
+      // A discarded draft must not return through Undo on the next edit session.
+      view.setState(
+        createState(
+          text,
+          EditorSelection.create(
+            selection.ranges.map((range) =>
+              EditorSelection.range(
+                Math.min(range.anchor, text.length),
+                Math.min(range.head, text.length),
+              ),
+            ),
+            selection.mainIndex,
+          ),
+        ),
+      );
+      view.dispatch({
+        effects: [
+          languageCompartment.reconfigure(languageExtension ?? []),
+          themeCompartment.reconfigure(buildTheme(dark)),
+        ],
+      });
+      if (finding) openSearchPanel(view);
+      view.dispatch({ effects: setSearchQuery.of(query) });
+      restoreScrollAnchor(view, anchor);
+      reportDirty(false);
+      notifySelection();
+    },
     getScrollAnchor: () => readScrollAnchor(view),
     isDirty: () => computeDirty(),
     recomputeDirty: () => {
@@ -285,18 +412,45 @@ export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMoun
       }
       reportDirty(computeDirty());
     },
-    setTheme(dark: boolean) {
+    setTheme(nextDark: boolean) {
       if (destroyed) return;
+      dark = nextDark;
       view.dispatch({ effects: themeCompartment.reconfigure(buildTheme(dark)) });
+    },
+    setReadOnly(nextReadOnly: boolean) {
+      if (destroyed || nextReadOnly === readOnly) return;
+      const finding = searchPanelOpen(view.state);
+      const query = getSearchQuery(view.state);
+      // The built-in search panel creates its replace controls at mount time.
+      if (finding) closeSearchPanel(view);
+      readOnly = nextReadOnly;
+      view.dispatch({
+        effects: [
+          modeCompartment.reconfigure(modeExtensions()),
+          focusLineCompartment.reconfigure([]),
+        ],
+      });
+      if (finding) openSearchPanel(view);
+      else if (!readOnly) view.focus();
+      view.dispatch({ effects: setSearchQuery.of(query) });
+      notifySelection();
     },
     focus: () => view.focus(),
     destroy() {
       destroyed = true;
       if (dirtyTimer !== null) window.clearTimeout(dirtyTimer);
       dirtyTimer = null;
+      selectionListeners.clear();
       view.destroy();
     },
   };
+}
+
+function selectedText(view: EditorView): string {
+  return view.state.selection.ranges
+    .filter((range) => !range.empty)
+    .map((range) => view.state.sliceDoc(range.from, range.to))
+    .join("\n");
 }
 
 /** 读取当前视口顶部对应的源码行及其相对偏移。 */
@@ -311,13 +465,13 @@ function readScrollAnchor(view: EditorView): CodeScrollAnchor {
   };
 }
 
-/** 挂载后恢复到与只读预览相同的源码行位置。 */
+/** 重载后恢复阅读位置。模式切换直接复用视图，无需同步滚动。 */
 function restoreScrollAnchor(view: EditorView, anchor: CodeScrollAnchor): void {
   const line = view.state.doc.line(Math.min(Math.max(anchor.line, 1), view.state.doc.lines));
   view.dispatch({ effects: EditorView.scrollIntoView(line.from, { y: "start" }) });
   let frame = 0;
   const adjust = (): void => {
-    if (frame++ >= 4) return;
+    if (!view.dom.isConnected || frame++ >= 4) return;
     const coords = view.coordsAtPos(line.from);
     const scrollerTop = view.scrollDOM.getBoundingClientRect().top;
     if (coords) {

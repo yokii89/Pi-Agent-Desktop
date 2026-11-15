@@ -6,7 +6,9 @@
  * 类型若写在实现文件里，很容易被人顺手写成值导入，把整个编辑器拖进主 bundle。
  */
 
-/** 两种代码视图之间的阅读锚点。 */
+import type { TextSelectionSnapshot } from "../utils/textSelection";
+
+/** 文件重载前的阅读锚点。 */
 export interface CodeScrollAnchor {
   /** 1-based 源码行号。 */
   line: number;
@@ -18,13 +20,24 @@ export interface CodeScrollAnchor {
 export interface CodeEditorHandle {
   /** 当前文档内容（保存时以此为准，父组件不维护受控文本）。 */
   getValue(): string;
+  /** 懒加载完成前禁止保存，避免把占位状态当成空文档。 */
+  isReady(): boolean;
+  /** 从完整文档取选区，不依赖虚拟化视口里的 DOM。 */
+  getSelectedText(): string;
+  getSelection(): TextSelectionSnapshot | null;
+  subscribeSelection(listener: () => void): () => void;
+  selectAll(): void;
+  clearSelection(): void;
+  openFind(): void;
+  /** 丢弃草稿时重置文档、基线与撤销历史，保留同一个视图。 */
+  resetDocument(text: string): void;
   /** 当前内容是否与基线不同。 */
   isDirty(): boolean;
   /** 立即重算脏状态（离开 / 保存这类关键节点别等去抖）。 */
   recomputeDirty(): void;
   /** 保存成功后由父组件推进基线（同一内容不再算脏）。 */
   setBaseline(text: string): void;
-  /** 当前编辑器阅读锚点，供切回只读预览时恢复。 */
+  /** 当前编辑器阅读锚点，供外部重载时恢复。 */
   getScrollAnchor(): CodeScrollAnchor;
   focus(): void;
 }
@@ -38,6 +51,7 @@ export interface CodeEditorMountOptions {
   filePath: string;
   /** 当前是否暗色主题：决定 CodeMirror 的 dark 标记与原生选区取色。 */
   dark: boolean;
+  readOnly: boolean;
   /** `path:line` 打开时滚到该行（1-based）。 */
   focusLine?: number | null;
   /** 挂载后恢复的阅读锚点。 */
@@ -48,10 +62,12 @@ export interface CodeEditorMountOptions {
   onDirtyChange: (dirty: boolean) => void;
   /** Ctrl+S / Cmd+S。 */
   onSave: () => void;
+  onSelectionChange: () => void;
 }
 
 /** 实现侧句柄：比对外契约多出主题与销毁。 */
 export interface CodeEditorMountHandle extends CodeEditorHandle {
   setTheme(dark: boolean): void;
+  setReadOnly(readOnly: boolean): void;
   destroy(): void;
 }

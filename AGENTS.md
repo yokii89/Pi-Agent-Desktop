@@ -80,13 +80,12 @@ node_modules 解析**的包（当前仅 `electron-updater` / `node-pty`——主
 - `remark-breaks`（devDep，渲染层构建期打包）：会话正文与思考流的软换行渲染为 `<br>`（模型输出的单换行是段内换行语义）；仅 `MarkdownDoc` 的 `breaks` surface 使用，文件面板预览与 ExtensionView 不开。
 - `gsap`（devDep，渲染层构建期打包）：左侧边栏的展开/折叠、悬浮揭示等交互动效；**必须动态 `import()` 使用**（见下文"动效规范"），不得静态引入。
 - `@electron/rebuild`（dev）：`node-pty` 原生模块针对 Electron ABI 的重编译（`pnpm run rebuild:native`）。
-- `shiki`（devDep，渲染层构建期打包）：右侧「文件」面板只读预览的代码语法高亮（TextMate 文法 + 双主题 CSS 变量）；经 `shiki/core` 细粒度动态加载，禁止整包 `import "shiki"` 静态引入。
+- `shiki`（devDep，渲染层构建期打包）：Markdown 围栏代码与 Notebook 单元格等文档内代码块的高亮；工作区文件的源码视图统一由 CodeMirror 承接。经 `shiki/core` 细粒度动态加载，禁止整包 `import "shiki"` 静态引入。
 - `pdfjs-dist`（devDep，渲染层构建期打包）：右侧「文件」面板的 PDF 按页只读预览；PDF.js 与 worker 均通过动态 import / Vite 资源 URL 按需加载，不作为主进程运行时依赖。
 - `@vitest/coverage-v8`（dev）：`packages/view-sdk` 的行/分支覆盖率口径（`pnpm test:sdk:coverage`）。版本必须与 `vitest` 主版本配对；**仅 SDK 测试用**，不扩展到主进程 / 渲染层（后者仍按本文件"测试"条款只跑断言）。`NODE_V8_COVERAGE` 对 vitest worker 无效，不要再试。
 - `electron-updater`（runtime，主进程运行时依赖）：设置 →「应用更新」的检查/下载/安装。GitHub Releases + NSIS `latest.yml`/blockmap（差分更新：本地缓存有旧安装包时自动差分下载）；发布流程见 `scripts/release.mjs` 与 `.github/workflows/release.yml`。
 - `mermaid`（devDep，渲染层构建期打包）：会话区 / 文件面板 / ExtensionView 的 ` ```mermaid ` 围栏出图。**只能经 `src/renderer/utils/mermaidLoader.ts` 动态 `import()`**（同 GSAP 条款）——它自带 60+ 个按图表类型切分的惰性 chunk（含 elk 布局引擎），静态引入会把它们全部塞进主 bundle。**不写 `manualChunks` 规则**：mermaid 内部已是动态 import，强行归组反而废掉惰性分块。CSP 无需放宽（`securityLevel: "strict"` 下生产策略实测可跑）。
-- `json5`（devDep，渲染层构建期打包）：文件面板预览中对单行 `.json` / `.jsonc` / `.json5` 内容进行容错解析与缩进格式化；解析失败或内容截断时保留原文。
-- `@codemirror/*` + `@lezer/highlight` + `@codemirror/lang-*`（devDep，渲染层构建期打包）：右侧「文件」面板的就地编辑器内核与 13 个按后缀懒加载的语法包（docs/design/141）。**只能经 `src/renderer/editor/codeEditor.ts` 动态 `import()`**（同 GSAP / mermaid 条款）——它把 CodeMirror 切成 `codeEditor` 独立 chunk，语言包各自一个 chunk，静态引入会把这 ~350KB 塞回主 bundle。高亮配色只允许 `tokens.css` 的 `--syn-*`，主题差异不改代码。
+- `@codemirror/*` + `@lezer/highlight` + `@codemirror/lang-*`（devDep，渲染层构建期打包）：右侧「文件」面板的统一源码视图（docs/design/141、142）。首次打开源码时加载内核及所需语法，读写切换只重配同一个 `EditorView`。**只能经 `src/renderer/editor/codeEditor.ts` 动态 `import()`**（同 GSAP / mermaid 条款），语言包各自按需拆分。高亮配色只允许 `tokens.css` 的 `--syn-*`，主题差异不改代码。
 
 多模态图片附件**零新依赖**：解码/缩放用浏览器 `createImageBitmap` + `canvas`，不引入 sharp / jimp 等图像库。
 
@@ -165,7 +164,11 @@ import { Play } from "@phosphor-icons/react";
 
 ## 文件面板就地编辑（docs/design/141）
 
-右侧「文件」面板的编辑态是**轻量就地编辑**，不是 IDE：单文件、手动保存、与预览互斥渲染。
+右侧「文件」面板是**轻量就地编辑**：单文件、手动保存。源码只读与编辑共用同一个 CodeMirror 视图，只切换 `readOnly` / `editable` 配置；Markdown 排版、表格、Notebook、图片与 PDF 保留专用预览（docs/design/142）。
+
+- **源码只维护一份原文**：JSON / JSONC / JSON5 不在只读时自动美化；LF 文档与磁盘换行格式分离，进入编辑不能产生格式化改动。
+- **源码交互读编辑器状态**：Ctrl+F、全选、复制、引用均由完整文档与选区驱动，禁止用可见 DOM 遍历全文（CodeMirror 是虚拟化视图）。文档排版预览仍用 DOM 查找。
+- **退出编辑不重建视图**：普通切换保留选区、滚动与撤销历史；放弃草稿在原视图内重置文档和撤销历史，避免下次编辑撤销出已放弃的内容。换文件与磁盘重载才重挂载。
 
 - **写盘只有一个入口**：`FS_IPC.save`（`main/fs/fsService.saveTextFile`）。**冲突判定必须在主进程**（stat 真实
   mtime 对比渲染层基线），冲突走 `{ status: "conflict" }` 返回值而**不是** throw——它是正常分支，用户要在
@@ -180,8 +183,7 @@ import { Play } from "@phosphor-icons/react";
   少了这一步，改一行就会在 git 里显示成「整个文件都改了」。
 - **外部改动靠目录 watch**（复用 `fsService.watch` 引用计数）：无脏内容静默换版本，有脏内容只标「磁盘已更新」不打断输入；
   自家保存的目录回推用 `SELF_WRITE_GRACE_MS` 跳过，否则每次保存都自弹冲突。
-- **编辑态不使用预览态的那套交互**：右键回 Chromium 原生菜单（剪切/粘贴刚需）、Ctrl+F 交给 CodeMirror 查找面板、
-  划选工具条与自绘右键菜单都不挂。
+- **编辑态的交互差异**：右键回 Chromium 原生菜单（剪切/粘贴刚需），划选工具条与自绘右键菜单撤掉；源码两种模式的 Ctrl+F 共用 CodeMirror 查找，替换入口仅在编辑态出现。
 
 ## 数据持久化
 

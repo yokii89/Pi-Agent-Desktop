@@ -137,16 +137,16 @@ export const panelMessages = defineMessages({
   "panels.files.savedToast": { "zh-CN": "已保存", "en-US": "Saved" },
   "panels.files.saveFailed": { "zh-CN": "保存失败：{message}", "en-US": "Save failed: {message}" },
   "panels.files.editorLoading": {
-    "zh-CN": "正在加载编辑器…",
-    "en-US": "Loading editor…",
+    "zh-CN": "正在加载源码…",
+    "en-US": "Loading source…",
   },
   "panels.files.editorFailed": {
-    "zh-CN": "编辑器加载失败，请重新打开预览",
-    "en-US": "Editor failed to load; reopen the preview",
+    "zh-CN": "源码加载失败，请重新打开文件",
+    "en-US": "Source failed to load; reopen the file",
   },
   "panels.files.editorAria": {
-    "zh-CN": "文件内容编辑器：{path}",
-    "en-US": "File content editor: {path}",
+    "zh-CN": "文件源码：{path}",
+    "en-US": "File source: {path}",
   },
   "panels.files.externalChanged": {
     "zh-CN": "磁盘已更新",

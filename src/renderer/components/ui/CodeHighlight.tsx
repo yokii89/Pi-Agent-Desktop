@@ -1,5 +1,6 @@
-import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import type { HighlighterCore } from "shiki/core";
+import { countCodeLines } from "../../utils/codeLines";
 import { normalizeFenceLang } from "../../utils/markdownRefs";
 import styles from "./CodeHighlight.module.css";
 
@@ -239,16 +240,6 @@ interface CodeHighlightProps {
   className?: string;
   /** 1-based 目标行：渲染后滚到该行并高亮（会话区 `path:line` 打开）。 */
   focusLine?: number | null;
-  /** 只读 DOM 完成布局时触发，参数表示后续不会再异步替换代码 DOM。 */
-  onLayout?: (stable: boolean) => void;
-}
-
-/** 与编辑器一致的行数：末尾换行不额外计空行。 */
-export function countCodeLines(code: string): number {
-  if (code.length === 0) return 1;
-  const parts = code.split("\n");
-  if (parts.length > 1 && parts.at(-1) === "") return parts.length - 1;
-  return parts.length;
 }
 
 /**
@@ -257,14 +248,7 @@ export function countCodeLines(code: string): number {
  * 按需动态加载。加载中/未知语言/过大文件回退纯文本。
  * 两种路径都带左侧行号槽（CSS counter，宽度随行数位数变化）。
  */
-export function CodeHighlight({
-  code,
-  filePath,
-  lang,
-  className,
-  focusLine,
-  onLayout,
-}: CodeHighlightProps) {
+export function CodeHighlight({ code, filePath, lang, className, focusLine }: CodeHighlightProps) {
   const [html, setHtml] = useState<string | null>(null);
   const preRef = useRef<HTMLPreElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -336,10 +320,6 @@ export function CodeHighlight({
     raf = requestAnimationFrame(apply);
     return () => cancelAnimationFrame(raf);
   }, [focusLine, html]);
-
-  useLayoutEffect(() => {
-    onLayout?.(code.length > MAX_HIGHLIGHT_BYTES || html !== null);
-  }, [code.length, html, onLayout]);
 
   if (html === null) {
     const cls = [styles.block, className ?? ""].join(" ").trim();
