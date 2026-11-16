@@ -5,6 +5,7 @@ import { normalizeAccentColor } from "../../shared/accentColor";
 import { normalizeFontMonoPreset, normalizeFontUiPreset } from "../../shared/fontPresets";
 import { normalizeLocalePreference, resolveLocale, setI18nLocale } from "../../shared/i18n";
 import { normalizeInputBuddy } from "../../shared/inputBuddy";
+import { normalizeInputEffect } from "../../shared/inputEffect";
 import type { PideskSettings } from "../../shared/ipc";
 import { clampNavWidth } from "../../shared/navWidth";
 import { normalizeNotificationSettings } from "../../shared/notification";
@@ -160,6 +161,7 @@ export function getSettings(): PideskSettings {
     inputBuddy: normalizeInputBuddy(loaded.inputBuddy),
     // 手改设置文件时把未知思考动画 id 回退为原有 π 标记
     thinkingAnimation: normalizeThinkingAnimation(loaded.thinkingAnimation),
+    inputEffect: normalizeInputEffect(loaded.inputEffect),
     // 快捷键只做结构校验：合法清单由渲染层注册表归一（hydrate 必经，兜底等价前移）
     shortcuts: sanitizeShortcutsRecord(loaded.shortcuts),
     // 启动动画：手改设置文件时也把标识 / 字号 / 速度 / 字体归一
@@ -188,6 +190,7 @@ export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   next.questionRailStyle = normalizeRailStyle(next.questionRailStyle);
   next.inputBuddy = normalizeInputBuddy(next.inputBuddy);
   next.thinkingAnimation = normalizeThinkingAnimation(next.thinkingAnimation);
+  next.inputEffect = normalizeInputEffect(next.inputEffect);
   next.accentColor = normalizeAccentColor(next.accentColor);
   next.wallpaperPath = normalizeWallpaperPath(next.wallpaperPath);
   next.wallpaperDim = clampWallpaperDim(next.wallpaperDim);

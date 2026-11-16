@@ -8,6 +8,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { Segmented } from "../ui/Segmented";
 import { Select } from "../ui/Select";
 import { BuddySwatch } from "./BuddySwatch";
+import { InputEffectSettings } from "./InputEffectSettings";
 import { RailStyleSwatch } from "./RailStyleSwatch";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import styles from "./Settings.module.css";
@@ -124,6 +125,8 @@ export function PersonalizationPanel() {
           }
         />
       </SettingsSection>
+
+      <InputEffectSettings />
 
       <SettingsSection title={t("settings.personalization.group.thinkingAnimation")}>
         <SettingRow

@@ -22,6 +22,7 @@ export const SYNCABLE_SETTINGS_KEYS = [
   "questionRailStyle",
   "inputBuddy",
   "thinkingAnimation",
+  "inputEffect",
   "shortcuts",
   // 启动动画偏好可跨端同步；splashLogoImage 是本机资产（data URL），不进 Gist
   "splashEnabled",
@@ -69,6 +70,7 @@ export function pickSyncableSettings(settings: PideskSettings): SyncableSettings
     questionRailStyle: settings.questionRailStyle,
     inputBuddy: settings.inputBuddy,
     thinkingAnimation: settings.thinkingAnimation,
+    inputEffect: settings.inputEffect,
     shortcuts: settings.shortcuts,
     splashEnabled: settings.splashEnabled,
     splashLogoSize: settings.splashLogoSize,

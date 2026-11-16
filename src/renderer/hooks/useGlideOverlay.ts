@@ -5,6 +5,16 @@ import { GLIDE_MOTION } from "../utils/motionTokens";
 /** 入场起点缩放（对齐 docs/ui-design/glide-select-bezier.html 的 scale(0.95)）。 */
 const ENTER_SCALE = 0.95;
 
+interface GlideOverlayOptions {
+  enterDuration?: number;
+  exitDuration?: number;
+  enterScale?: number;
+  enterX?: number;
+  ease?: (progress: number) => number;
+}
+
+const DEFAULT_OPTIONS: GlideOverlayOptions = {};
+
 export interface GlideOverlayApi {
   /** 首帧前把面板写到"未展开"起点（opacity 0 + scale 0.95），避免出现全尺寸闪帧。 */
   prime: () => void;
@@ -23,24 +33,36 @@ export interface GlideOverlayApi {
  * 归各组件的定位逻辑写，因为锚点关系只有它们知道。中途打断的补间从当前值继续，
  * 所以连点触发器不会出现"闪回起点再弹一次"。
  */
-export function useGlideOverlay(panelRef: RefObject<HTMLElement | null>): GlideOverlayApi {
+export function useGlideOverlay(
+  panelRef: RefObject<HTMLElement | null>,
+  options: GlideOverlayOptions = DEFAULT_OPTIONS,
+): GlideOverlayApi {
+  const {
+    enterDuration = GLIDE_MOTION.pop,
+    exitDuration = GLIDE_MOTION.popOut,
+    enterScale = ENTER_SCALE,
+    enterX = 0,
+    ease,
+  } = options;
   const tween = useRef<GlideCancel>(() => {});
-  const visual = useRef({ opacity: 0, scale: ENTER_SCALE });
+  const visual = useRef({ opacity: 0, scale: enterScale });
 
   const write = useCallback((): void => {
     const panel = panelRef.current;
     if (!panel) return;
     panel.style.opacity = String(visual.current.opacity);
-    panel.style.transform = `scale(${visual.current.scale})`;
-  }, [panelRef]);
+    panel.style.transform = `translateX(${enterX * (1 - visual.current.opacity)}px) scale(${visual.current.scale})`;
+  }, [panelRef, enterX]);
 
   const run = useCallback(
     (target: { opacity: number; scale: number }, duration: number, done?: () => void): void => {
       tween.current();
       const from = { ...visual.current };
       const opening = target.opacity === 1;
+      if (opening && panelRef.current) panelRef.current.style.pointerEvents = "";
       tween.current = glide({
         duration,
+        ease,
         onUpdate: (p) => {
           visual.current = {
             opacity: mix(from.opacity, target.opacity, p),
@@ -65,26 +87,26 @@ export function useGlideOverlay(panelRef: RefObject<HTMLElement | null>): GlideO
         },
       });
     },
-    [panelRef, write],
+    [panelRef, write, ease],
   );
 
   const prime = useCallback((): void => {
-    visual.current = { opacity: 0, scale: ENTER_SCALE };
+    visual.current = { opacity: 0, scale: enterScale };
     write();
-  }, [write]);
+  }, [write, enterScale]);
 
   const enter = useCallback((): void => {
-    run({ opacity: 1, scale: 1 }, GLIDE_MOTION.pop);
-  }, [run]);
+    run({ opacity: 1, scale: 1 }, enterDuration);
+  }, [run, enterDuration]);
 
   const exit = useCallback(
     (done: () => void): void => {
       const panel = panelRef.current;
       // 收起动画期间面板还在 DOM 里，不能再吃掉一次点击
       if (panel) panel.style.pointerEvents = "none";
-      run({ opacity: 0, scale: ENTER_SCALE }, GLIDE_MOTION.popOut, done);
+      run({ opacity: 0, scale: enterScale }, exitDuration, done);
     },
-    [panelRef, run],
+    [panelRef, run, enterScale, exitDuration],
   );
 
   const cancel = useCallback((): void => {

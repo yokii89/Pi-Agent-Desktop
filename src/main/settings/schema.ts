@@ -1,5 +1,6 @@
 import { DEFAULT_FONT_MONO_PRESET, DEFAULT_FONT_UI_PRESET } from "../../shared/fontPresets";
 import { DEFAULT_INPUT_BUDDY } from "../../shared/inputBuddy";
+import { DEFAULT_INPUT_EFFECT } from "../../shared/inputEffect";
 import {
   clampSessionStreamFontPx,
   DEFAULT_SESSION_STREAM_FONT_PX,
@@ -81,6 +82,7 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   inputBuddy: DEFAULT_INPUT_BUDDY,
   // 会话运行中的动画（设置 → 个性化）；默认保留原有 π 标记
   thinkingAnimation: DEFAULT_THINKING_ANIMATION,
+  inputEffect: DEFAULT_INPUT_EFFECT,
   // 渲染层全局快捷键（设置 → 键盘快捷键）；默认映射由渲染层动作注册表提供，
   // 主进程只持有结构校验后的透传值（hydrate 时归一）
   shortcuts: {} as ShortcutsMap,
@@ -176,6 +178,7 @@ export const SETTABLE_KEYS = [
   "questionRailStyle",
   "inputBuddy",
   "thinkingAnimation",
+  "inputEffect",
   "shortcuts",
   "splashEnabled",
   "splashLogoImage",

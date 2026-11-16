@@ -51,6 +51,7 @@ function fakeSettings(): PideskSettings {
     questionRailStyle: "line",
     inputBuddy: "dog",
     thinkingAnimation: "pi",
+    inputEffect: "ember",
     shortcuts: {},
     splashEnabled: true,
     splashLogoImage: "data:image/png;base64,AAAA",
@@ -80,6 +81,7 @@ describe("settingsSync whitelist", () => {
     expect(picked.navWidth).toBe(248);
     expect(picked.welcomeRecentsEnabled).toBe(true);
     expect(picked.thinkingAnimation).toBe("pi");
+    expect(picked.inputEffect).toBe("ember");
   });
 
   it("解析合法信封", () => {
@@ -109,10 +111,12 @@ describe("settingsSync whitelist", () => {
       theme: "light" as const,
       welcomeRecentsEnabled: false,
       thinkingAnimation: "twins" as const,
+      inputEffect: "nebula" as const,
       navWidth: 320,
     };
     const changes = diffSyncableSettings(local, remote);
     expect(changes.map((c) => c.key).sort()).toEqual([
+      "inputEffect",
       "navWidth",
       "theme",
       "thinkingAnimation",

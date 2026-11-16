@@ -9,6 +9,7 @@ import type { MediaKind } from "./fileKinds";
 import type { FontMonoPreset, FontUiPreset } from "./fontPresets";
 import type { LocalePreference } from "./i18n";
 import type { InputBuddyKind } from "./inputBuddy";
+import type { InputEffect } from "./inputEffect";
 import type { NotificationSettings } from "./notification";
 import type { OfficePreviewFormat, OfficePreviewIssue } from "./officePreview";
 import type { RailStyle } from "./railStyles";
@@ -249,6 +250,8 @@ export interface PideskSettings {
   inputBuddy: InputBuddyKind;
   /** 会话 run 进行中的状态动画；默认保留 PiDesk π 标记。 */
   thinkingAnimation: ThinkingAnimation;
+  /** 最高思考档的输入栏背景特效；none 关闭背景，运行状态边框独立。 */
+  inputEffect: InputEffect;
   /** 渲染层全局快捷键映射（设置 → 键盘快捷键）；见 shared/shortcuts。 */
   shortcuts: ShortcutsMap;
   /** 启动动画总开关（设置 → 启动动画）；每次启动播放一次。 */
