@@ -58,7 +58,10 @@ export function registerWallpaperProtocol(): void {
     }
     const filePath = getSettings().wallpaperPath;
     const mime = filePath ? wallpaperMimeType(filePath) : null;
-    if (!filePath || !mime) return new Response(null, { status: 404 });
+    if (!filePath || !mime || url.searchParams.get("v") !== filePath) {
+      // 迟到的旧请求不能拿到新文件，更不能把旧文件当作新选择的媒体返回。
+      return new Response(null, { status: 404 });
+    }
 
     let stat: fs.Stats;
     try {

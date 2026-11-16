@@ -13,6 +13,7 @@ import {
 describe("wallpaperKindFromPath", () => {
   it("recognizes images and videos case-insensitively", () => {
     expect(wallpaperKindFromPath("C:\\art\\asuka.JPG")).toBe("image");
+    expect(wallpaperKindFromPath("C:\\壁纸\\屋檐.WEBP")).toBe("image");
     expect(wallpaperKindFromPath("/home/u/dust.webm")).toBe("video");
     expect(wallpaperKindFromPath("C:\\art\\scene.mp4")).toBe("video");
   });
@@ -55,6 +56,7 @@ describe("clampWallpaperDim", () => {
 describe("wallpaper media helpers", () => {
   it("maps extensions to MIME types", () => {
     expect(wallpaperMimeType("a.jpg")).toBe("image/jpeg");
+    expect(wallpaperMimeType("a.WEBP")).toBe("image/webp");
     expect(wallpaperMimeType("a.webm")).toBe("video/webm");
     expect(wallpaperMimeType("a.pkg")).toBeNull();
   });
@@ -63,6 +65,14 @@ describe("wallpaper media helpers", () => {
     const url = wallpaperMediaUrl("C:\\art\\a b.png");
     expect(url.startsWith("pidesk-media://wallpaper/?v=")).toBe(true);
     expect(url).toContain(encodeURIComponent("C:\\art\\a b.png"));
+  });
+
+  it("reloads the same path with a new selection revision", () => {
+    const path = "C:\\壁纸\\a #&%.webp";
+    const first = wallpaperMediaUrl(path, 1);
+    const retry = wallpaperMediaUrl(path, 2);
+    expect(first).not.toBe(retry);
+    expect(new URL(retry).searchParams.get("v")).toBe(path);
   });
 
   it("extracts the file name for display", () => {

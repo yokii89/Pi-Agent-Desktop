@@ -164,6 +164,7 @@ function AppLayout() {
     reviewWindowOpen,
     page,
     wallpaperPath,
+    wallpaperRevision,
     wallpaperDim,
   } = useUiStore();
   const { phase } = useSessionMeta();
@@ -201,7 +202,14 @@ function AppLayout() {
         } as CSSProperties
       }
     >
-      {wallpaperPath ? <WallpaperBackground path={wallpaperPath} dim={wallpaperDim} /> : null}
+      {wallpaperPath ? (
+        <WallpaperBackground
+          key={`${wallpaperPath}:${wallpaperRevision}`}
+          path={wallpaperPath}
+          revision={wallpaperRevision}
+          dim={wallpaperDim}
+        />
+      ) : null}
       <TitleBar />
       <SideNav />
       <main className={styles.main}>

@@ -71,9 +71,9 @@ export function clampWallpaperDim(value: unknown): number {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
 
-/** 壁纸 `<img>` / `<video>` 的地址；查询串只用于换图时打破缓存，主进程只认当前设置里的路径。 */
-export function wallpaperMediaUrl(filePath: string): string {
-  return `${WALLPAPER_MEDIA_SCHEME}://${WALLPAPER_MEDIA_HOST}/?v=${encodeURIComponent(filePath)}`;
+/** 媒体 URL 绑定已保存的路径；revision 支持同一文件重新选择后的强制加载。 */
+export function wallpaperMediaUrl(filePath: string, revision = 0): string {
+  return `${WALLPAPER_MEDIA_SCHEME}://${WALLPAPER_MEDIA_HOST}/?v=${encodeURIComponent(filePath)}&revision=${revision}`;
 }
 
 export function wallpaperFileName(filePath: string): string {

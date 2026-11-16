@@ -515,6 +515,27 @@ export const settingsMessages = defineMessages({
     "zh-CN": "不支持这个文件格式",
     "en-US": "This file format isn't supported",
   },
+  "settings.personalization.wallpaper.unavailable": {
+    "zh-CN": "桌面服务不可用，请重启应用后重试",
+    "en-US": "Desktop services are unavailable. Restart the app and try again.",
+  },
+  "settings.personalization.wallpaper.invalidPath": {
+    "zh-CN": "壁纸路径无效，请重新选择文件",
+    "en-US": "The wallpaper path is invalid. Select the file again.",
+  },
+  "settings.personalization.wallpaper.pickFailed": {
+    "zh-CN": "无法选择壁纸：{error}",
+    "en-US": "Couldn't choose a wallpaper: {error}",
+  },
+  "settings.personalization.wallpaper.saveFailed": {
+    "zh-CN": "壁纸设置保存失败，未应用更改：{error}",
+    "en-US": "Couldn't save wallpaper settings. Changes weren't applied: {error}",
+  },
+  "settings.personalization.wallpaper.loadFailed": {
+    "zh-CN": "壁纸“{name}”加载失败。请确认文件可读取且图片或视频未损坏，然后重新选择。",
+    "en-US":
+      "Couldn't load wallpaper “{name}”. Check that the file is accessible and the image or video isn't damaged, then select it again.",
+  },
   "settings.personalization.wallpaper.dialogTitle": {
     "zh-CN": "选择背景壁纸",
     "en-US": "Choose a wallpaper",
