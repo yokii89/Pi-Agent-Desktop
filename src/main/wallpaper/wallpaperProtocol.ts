@@ -10,20 +10,6 @@ import {
 } from "../../shared/wallpaper";
 import { getSettings } from "../settings/settings";
 
-/**
- * 本地壁纸媒体协议（docs/design/111）：渲染层不能直接读 `file://`（CSP 收紧、
- * contextIsolation），4K 图片 / 视频也不适合走 data URL 进 settings.json。
- * 协议只暴露当前设置里的那一个文件，不把任意路径开放给渲染层。
- */
-export function registerWallpaperScheme(): void {
-  protocol.registerSchemesAsPrivileged([
-    {
-      scheme: WALLPAPER_MEDIA_SCHEME,
-      privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
-    },
-  ]);
-}
-
 function createMediaStream(filePath: string, range: ByteRange | null): fs.ReadStream {
   return range
     ? fs.createReadStream(filePath, { start: range.start, end: range.end })

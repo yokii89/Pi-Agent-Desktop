@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import type {
   FsListResult,
+  FsPreviewResult,
   FsReadResult,
   FsSaveImageRequest,
   FsSaveImageResult,
@@ -23,6 +24,7 @@ import {
   saveTextFile,
   searchFiles,
 } from "./fsService";
+import { readPreviewImage } from "./imagePreview";
 import { unwatchDirectory, watchDirectory } from "./watcher";
 
 /** 注册文件系统 IPC（docs/design/03 §5 / §8）。 */
@@ -36,6 +38,18 @@ export function registerFsIpc(): void {
   ipcMain.handle(
     FS_IPC.read,
     (_event, req: { path: string }): IpcResult<FsReadResult> => envelope(() => readFile(req.path)),
+  );
+
+  ipcMain.handle(
+    FS_IPC.preview,
+    (_event, req: { path: string }): Promise<IpcResult<FsPreviewResult>> =>
+      envelopeAsync(async () => {
+        const image = await readPreviewImage(req.path);
+        if (image) return image;
+        const result = readFile(req.path);
+        if (result.kind === "image") throw new Error("Image preview routing mismatch");
+        return result;
+      }),
   );
 
   ipcMain.handle(

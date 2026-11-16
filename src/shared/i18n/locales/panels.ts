@@ -46,6 +46,14 @@ export const panelMessages = defineMessages({
     "en-US": "{title}, updated",
   },
 
+  "panels.files.imageTooLarge": {
+    "zh-CN": "图片过大，无法在侧栏预览（上限 40MiB）",
+    "en-US": "Image is too large to preview (limit: 40MiB)",
+  },
+  "panels.files.imageNotFile": {
+    "zh-CN": "图片路径不是常规文件",
+    "en-US": "Image path is not a regular file",
+  },
   "panels.files.searchPlaceholder": {
     "zh-CN": "搜索文件…",
     "en-US": "Search files…",

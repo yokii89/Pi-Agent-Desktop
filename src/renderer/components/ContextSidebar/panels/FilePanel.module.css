@@ -177,6 +177,10 @@
   box-shadow: var(--shadow-overlay);
 }
 
+.image[hidden] {
+  display: none;
+}
+
 .binaryWrap {
   display: flex;
   flex-direction: column;

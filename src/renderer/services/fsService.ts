@@ -1,5 +1,6 @@
 import type {
   FsListResult,
+  FsPreviewResult,
   FsReadResult,
   FsSaveImageResult,
   FsSaveTextRequest,
@@ -16,6 +17,19 @@ export const fsService = {
     const api = pideskApi();
     if (!api) return Promise.resolve({ entries: [], truncated: false });
     return unwrap(api.fs.list(dir));
+  },
+  /** 侧栏读取：图片返回版本化 URL，不将大图 base64 留在 React 状态中。 */
+  preview(path: string): Promise<FsPreviewResult> {
+    const api = pideskApi();
+    if (!api)
+      return Promise.resolve({
+        kind: "text",
+        content: "",
+        truncated: false,
+        byteLength: 0,
+        mtimeMs: 0,
+      });
+    return unwrap(api.fs.preview(path));
   },
   read(path: string): Promise<FsReadResult> {
     const api = pideskApi();

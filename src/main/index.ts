@@ -7,6 +7,7 @@ import { registerBrowserLifecycle } from "./browser/browserView";
 import { disposeExtensionWorker } from "./extension/extensionWorkerManager";
 import { registerWatcherLifecycle } from "./fs/watcher";
 import { registerIpc } from "./ipc";
+import { registerImagePreviewProtocol, registerMediaSchemes } from "./mediaProtocols";
 import { registerToastActivation } from "./notification/toastService";
 import { procService } from "./proc/procService";
 import { disposeTaskScheduler, initTaskScheduler } from "./scheduler/taskScheduler";
@@ -19,7 +20,7 @@ import { getSettings, updateSettings } from "./settings/settings";
 import { registerTerminalLifecycle } from "./terminal/terminal";
 import { disposeUpdater, scheduleStartupCheck } from "./updater/updaterService";
 import { disposeViewHost, ensureViewHost } from "./view/viewHost";
-import { registerWallpaperProtocol, registerWallpaperScheme } from "./wallpaper/wallpaperProtocol";
+import { registerWallpaperProtocol } from "./wallpaper/wallpaperProtocol";
 import { createMainWindow, getMainWindow } from "./window/createMainWindow";
 import { disposeInspectorWindow } from "./window/inspectorWindow";
 import { getQuitProcPolicy, setQuitProcPolicy } from "./window/quitPolicy";
@@ -30,8 +31,8 @@ if (!registerToastActivation()) app.exit(0);
 registerTerminalLifecycle();
 registerBrowserLifecycle();
 registerWatcherLifecycle();
-// 壁纸媒体协议必须在 app ready 之前登记 scheme，窗口才能加载 pidesk-media:// 素材
-registerWallpaperScheme();
+// 本地媒体协议必须在 app ready 之前统一登记 scheme。
+registerMediaSchemes();
 
 /**
  * 后台进程残留锁（docs/design/37 §5.4 P0）：
@@ -87,6 +88,7 @@ function bootstrapEnvironmentProbe(): void {
 app.whenReady().then(async () => {
   registerIpc();
   registerWallpaperProtocol();
+  registerImagePreviewProtocol();
   // 旧 settings.sessionTitles → pi session_info：先于窗口，首屏列表就带名字
   try {
     await migrateLegacySessionTitles();

@@ -32,6 +32,7 @@ import type {
   BrowserZoomRequest,
   ExtensionPushMessage,
   FsListResult,
+  FsPreviewResult,
   FsReadResult,
   FsSaveImageRequest,
   FsSaveImageResult,
@@ -313,6 +314,8 @@ export interface PideskGlobalApi {
   fs: {
     list(dir: string): Promise<IpcResult<FsListResult>>;
     read(path: string): Promise<IpcResult<FsReadResult>>;
+    /** 图片通过受限本地协议加载，IPC 仅返回元信息。 */
+    preview(path: string): Promise<IpcResult<FsPreviewResult>>;
     search(dir: string, query: string): Promise<IpcResult<FsSearchHit[]>>;
     pickFile(): Promise<IpcResult<string | null>>;
     openPath(dir: string): Promise<IpcResult<null>>;

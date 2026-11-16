@@ -451,7 +451,7 @@ export function ContextSidebar() {
                 关闭文件页签才卸载。 */}
             {rightSidebarTabs.includes("files") && (
               <div className={activeTab === "files" ? styles.panelAlive : styles.panelAliveHidden}>
-                <FilePanel active={activeTab === "files"} />
+                <FilePanel active={activeTab === "files" && rightSidebarOpen} />
               </div>
             )}
             {activeTab === "review" && reviewMode === "docked" && <ReviewPanel />}

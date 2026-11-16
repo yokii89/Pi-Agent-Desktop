@@ -19,7 +19,7 @@ import {
   isTabularPath,
 } from "../../../../shared/fileKinds";
 import type { TranslateFn } from "../../../../shared/i18n";
-import type { FsReadResult, FsSearchHit } from "../../../../shared/ipc";
+import type { FsPreviewResult, FsSearchHit } from "../../../../shared/ipc";
 import { applyLineEnding, toSavedContent } from "../../../../shared/lineEndings";
 import type { CodeEditorHandle, CodeScrollAnchor } from "../../../editor/codeEditorTypes";
 import { usePreviewFind } from "../../../hooks/usePreviewFind";
@@ -63,6 +63,7 @@ import styles from "../ContextSidebar.module.css";
 import { DelimitedPreview } from "./DelimitedPreview";
 import panelStyles from "./FilePanel.module.css";
 import { FileTree } from "./FileTree";
+import { ImagePreview } from "./ImagePreview";
 import { MarkdownPreview, type MarkdownViewMode } from "./MarkdownPreview";
 import { NotebookPreview } from "./NotebookPreview";
 import { PdfPreview } from "./PdfPreview";
@@ -72,7 +73,7 @@ interface PreviewState {
   /** 所属项目根目录：项目切换后旧预览/搜索结果直接失效，避免误展示。 */
   root: string;
   path: string;
-  result: FsReadResult;
+  result: FsPreviewResult;
   /** `path:line` 打开时的目标行（1-based）；树/搜索打开为 null。 */
   focusLine: number | null;
 }
@@ -89,7 +90,7 @@ function formatBytes(n: number): string {
 }
 
 /** 标题栏右侧元信息：文本看行数，图片/二进制看体积（图片加载后补分辨率）。 */
-function previewMeta(result: FsReadResult, imageSize: string | null, t: TranslateFn): string {
+function previewMeta(result: FsPreviewResult, imageSize: string | null, t: TranslateFn): string {
   if (result.kind === "text") {
     return t("panels.files.lineCount", {
       count: countCodeLines(result.content),
@@ -169,6 +170,12 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   } | null>(null);
   /** 预览读取序号：丢弃过期读取结果（快速连开文件 / 历史导航连点）。 */
   const previewSeqRef = useRef(0);
+  useEffect(
+    () => () => {
+      previewSeqRef.current += 1;
+    },
+    [],
+  );
   /** 预览/打开请求的 root 标记：无项目时用 ""，切项目后旧预览失效。 */
   const rootKey = rootDir ?? "";
   /** 上一次已提交的项目根目录；项目切换也必须经过脏草稿离开保护。 */
@@ -239,12 +246,13 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   const openPreview = useCallback(
     (
       path: string,
-      preloaded?: FsReadResult,
+      preloaded?: FsPreviewResult,
       focusLine: number | null = null,
       mode: "push" | "silent" = "push",
     ): void => {
       setSelectedPath(path);
       setPreviewLoading(true);
+      setPreview((current) => (current?.result.kind === "image" ? null : current));
       previewScrollAnchorRef.current = undefined;
       setImageSize(null);
       // 换文件即退出编辑：草稿只属于当前文件（脏内容已在 guardLeave 里问过）
@@ -253,7 +261,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
       setExternalChanged(false);
       // 序号守卫：快速连开两个文件时，慢的旧读取不得覆盖新内容/历史
       const seq = ++previewSeqRef.current;
-      const load = preloaded ? Promise.resolve(preloaded) : fsService.read(path);
+      const load = preloaded ? Promise.resolve(preloaded) : fsService.preview(path);
       load
         .then((result) => {
           if (seq !== previewSeqRef.current) return;
@@ -320,6 +328,8 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   useEffect(() => {
     if (previousRootRef.current === rootKey) return;
     previousRootRef.current = rootKey;
+    previewSeqRef.current += 1;
+    setPreviewLoading(false);
     setHistory(emptyPreviewHistory);
 
     if (editingRef.current && hasUnsavedDraft()) {
@@ -423,14 +433,14 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   const applyDiskVersion = useCallback(async (): Promise<void> => {
     const target = activePreviewRef.current;
     if (!target) return;
-    const result = await fsService.read(target.path).catch(() => null);
+    const result = await fsService.preview(target.path).catch(() => null);
     if (!result) {
       showToast(t("panels.files.fileGone"));
       return;
     }
     // 读完再确认一次目标：期间可能已经切走 / 关了预览
     const latest = activePreviewRef.current;
-    if (!latest || normalizePathKey(latest.path) !== normalizePathKey(target.path)) return;
+    if (!latest || latest !== target) return;
 
     if (
       latest.result.kind === "text" &&
@@ -505,7 +515,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     setConflictOpen(false);
     const target = activePreviewRef.current;
     if (!target) return;
-    const result = await fsService.read(target.path).catch(() => null);
+    const result = await fsService.preview(target.path).catch(() => null);
     if (!result) {
       showToast(t("panels.files.fileGone"));
       return;
@@ -575,6 +585,8 @@ export function FilePanel({ active = true }: { active?: boolean }) {
 
   /** 关闭预览回到文件树：浏览历史一并作废，下次打开重新建栈。 */
   const closePreview = useCallback((): void => {
+    previewSeqRef.current += 1;
+    setPreviewLoading(false);
     setPreview(null);
     setHistory(emptyPreviewHistory);
     dropEditing();
@@ -978,6 +990,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           <p className={panelStyles.noMatch}>{t("panels.files.selectProject")}</p>
         ) : activePreview ? (
           <FilePreviewBody
+            active={active}
             preview={activePreview}
             onImageSize={setImageSize}
             onOpenInSystem={() => openInSystem(activePreview.path)}
@@ -1094,10 +1107,12 @@ export function FilePanel({ active = true }: { active?: boolean }) {
 
 /** 专用排版预览：图片、PDF、二进制占位、Markdown、表格与 Notebook。 */
 function FilePreviewBody({
+  active,
   preview,
   onImageSize,
   onOpenInSystem,
 }: {
+  active: boolean;
   preview: PreviewState;
   onImageSize: (size: string | null) => void;
   onOpenInSystem: () => void;
@@ -1106,20 +1121,15 @@ function FilePreviewBody({
   const { result } = preview;
 
   if (result.kind === "image") {
+    if (!active) return null;
     return (
-      <div className={panelStyles.imageWrap}>
-        <img
-          className={panelStyles.image}
-          src={result.dataUrl}
-          alt={preview.path}
-          draggable={false}
-          onLoad={(event) => {
-            const img = event.currentTarget;
-            onImageSize(`${img.naturalWidth}×${img.naturalHeight}`);
-          }}
-          onError={() => onImageSize(null)}
-        />
-      </div>
+      <ImagePreview
+        key={result.url}
+        result={result}
+        path={preview.path}
+        onImageSize={onImageSize}
+        onOpenInSystem={onOpenInSystem}
+      />
     );
   }
 
