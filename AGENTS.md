@@ -153,7 +153,12 @@ import { Play } from "@phosphor-icons/react";
 
 - **架构**：pi 以 `--mode rpc` 子进程运行（stdin/stdout 严格 JSONL，LF 分隔）。主进程（`src/main/session/`）只负责传输层：进程生命周期、行分割、请求-响应按 `id` 关联、事件白名单转发；消息组装与渲染全部在渲染层。禁止再以内嵌 pty + xterm 方式承载 pi 会话。
 - **渲染规则（固定，不允许做成传统聊天 UI）**：
-  - 用户消息：**可用气泡**（右对齐、强调底色）。
+  - 用户消息：**可用气泡**（右对齐、强调底色）。正文超过 **4 行**默认收起（`USER_BUBBLE_COLLAPSED_LINES`）：
+    底部 44px **由下向上的渐隐**（渐隐色即气泡底色，禁止用 `mask-image`，会把芯片描边/引用块左边线拆出半截痕迹）
+    + 居中「展开全文 / 收起」胶囊，点气泡正文同样切换。折叠逻辑在 `hooks/useClampedCollapse`
+    （按计算行高换算而非写死 px、layout effect 在绘制前落位、ResizeObserver 复核字号/宽度变化）；
+    **不夹图片与冷启动进度条**，也不要换成 `useCollapseAnimation`——那个终态是「高度 0 + 内容淡出 + 可卸载」。
+    文档：[docs/design/144](./docs/design/144-用户消息长文本折叠.md)。
   - AI 回复：**一律文档流渲染**（Markdown 全宽排版），**禁止气泡**；AI 输出是"文档"，不是聊天气泡。
   - 工具调用：单条为紧凑状态行（图标 + 主体 + 状态，可展开结果）；连续 ≥2 条收成可折叠摘要头（「已读取 4 个文件 · 已搜索 2 次」）。默认一律收起，不跟随 running 自动展开，避免对话流跳动。
   - 思考（thinking）内容：默认折叠成一行（「思考中 / 思考过程」），点开才渲染 muted Markdown，不套卡片壳。

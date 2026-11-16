@@ -1,6 +1,7 @@
-import { ArrowClockwise, Copy } from "@phosphor-icons/react";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowClockwise, CaretDown, Copy } from "@phosphor-icons/react";
+import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { TranslateFn } from "../../../shared/i18n";
+import { useClampedCollapse } from "../../hooks/useClampedCollapse";
 import { useT } from "../../hooks/useT";
 import type { BrowserContextItem } from "../../services/browserService";
 import { useSessionMeta } from "../../stores/sessionStore";
@@ -87,6 +88,37 @@ export function UserMessage({
   const { phase, processAlive, retryLastUserMessage } = useSessionMeta();
   const segments = useMemo(() => parseUserMessageSegments(text), [text]);
 
+  // 长消息折叠（docs/design/144）：只夹正文，图片与冷启动进度条永远露在外面。
+  // 展开态是组件内状态：会话流条目按 id 复用，切换会话回来会重新收起，与「读一眼就够了」的心智一致。
+  const [expanded, setExpanded] = useState(false);
+  const { ref: bodyRef, innerRef, collapsible } = useClampedCollapse(expanded);
+  const collapsed = collapsible && !expanded;
+
+  const toggleExpanded = useCallback(() => setExpanded((value) => !value), []);
+
+  const handleBubbleClick = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (!collapsible) return;
+      // 双击的第二下不翻转：双击选词是阅读时的常见动作，不该顺手把气泡开合一次
+      if (event.detail > 1) return;
+      // 链接与按钮各管各的点击（外链、复制、重新发送）
+      if (event.target instanceof Element && event.target.closest("a, button")) return;
+      // 正在拖选正文时这一下只是收尾：会话流支持划选复制 / 引用，不要顺手折叠
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed && selection.toString().length > 0) return;
+      toggleExpanded();
+    },
+    [collapsible, toggleExpanded],
+  );
+
+  const handleToggleClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      toggleExpanded();
+    },
+    [toggleExpanded],
+  );
+
   // 进度条要在启动完成后补一段「100% + 淡出」再卸载，父级需短暂保活：
   // coldStart 置 true 时挂载；onFinished（收尾播完）才卸载。
   // 启动失败不走收尾——processAlive=false 直接停渲染，立即消失。
@@ -125,14 +157,41 @@ export function UserMessage({
     [segments, images, showToast, canResend, phase, retryLastUserMessage, t],
   );
 
+  const bubbleClassName = [
+    styles.bubble,
+    collapsible ? styles.interactive : "",
+    collapsed ? styles.collapsed : "",
+    expanded && collapsible ? styles.expanded : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  // 冷启动进度条与胶囊同屏时，胶囊落回文档流，避免压在进度条上
+  const barVisible = coldStart || (barMounted && processAlive);
+
   return (
     <div className={styles.row}>
-      <div className={styles.bubble}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: 整块点击是鼠标快捷方式，键盘路径是内部真实 <button> */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: 同上：气泡本身不可聚焦，键盘用户走胶囊按钮的 aria-expanded */}
+      <div className={bubbleClassName} onClick={handleBubbleClick}>
         {images && images.length > 0 ? <UserImageStrip images={images} /> : null}
-        {renderSegments(segments, items, t)}
-        {(coldStart || (barMounted && processAlive)) && (
-          <PiColdStartBar active={coldStart} onFinished={handleBarFinished} />
-        )}
+        <div className={styles.body} ref={bodyRef}>
+          <div className={styles.content} ref={innerRef}>
+            {renderSegments(segments, items, t)}
+          </div>
+        </div>
+        {collapsible ? (
+          <button
+            type="button"
+            className={styles.toggle}
+            data-in-flow={barVisible ? "" : undefined}
+            aria-expanded={expanded}
+            onClick={handleToggleClick}
+          >
+            <span>{expanded ? t("session.collapseMessage") : t("session.expandMessage")}</span>
+            <CaretDown size={16} weight="regular" className={styles.toggleIcon} />
+          </button>
+        ) : null}
+        {barVisible && <PiColdStartBar active={coldStart} onFinished={handleBarFinished} />}
       </div>
       <MessageActionBar items={actions} className={styles.actions} />
     </div>

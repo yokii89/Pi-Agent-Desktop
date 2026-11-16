@@ -638,6 +638,9 @@ export const sessionMessages = defineMessages({
 
   "session.copyMessage": { "zh-CN": "复制", "en-US": "Copy" },
   "session.copyMessage.title": { "zh-CN": "复制消息", "en-US": "Copy message" },
+  /* 长用户消息折叠（docs/design/144） */
+  "session.expandMessage": { "zh-CN": "展开全文", "en-US": "Show full message" },
+  "session.collapseMessage": { "zh-CN": "收起", "en-US": "Collapse" },
   "session.copyMarkdown": { "zh-CN": "复制 Markdown", "en-US": "Copy Markdown" },
   "session.copyPlainText": { "zh-CN": "复制为纯文本", "en-US": "Copy as plain text" },
   "session.quoteMessage": {

@@ -31,6 +31,131 @@
   white-space: pre-wrap;
 }
 
+/* ---------- 长消息折叠（docs/design/144） ----------
+   收起后保留 4 行、底部由下向上渐隐、接一枚「展开全文」胶囊；点气泡正文同样可切换。
+   折叠行数在 hooks/useClampedCollapse（按计算行高换算），这里只管形态。 */
+
+/* 可折叠时整块可点：只是把指针变成「可操作」，不做位移/缩放（会话流里一动就是整列跳动） */
+.interactive {
+  cursor: pointer;
+}
+
+/* 被裁剪的正文盒：命中裁剪与渐隐都以它为锚，图片与冷启动进度条在它外面（永远可见）。
+   `overflow: clip` 而不是 `hidden`：hidden 仍是滚动容器，标签页聚焦到折叠区内的链接时
+   会把这个夹子内部滚一段，露出的 4 行就跑位了（clip 不建立滚动容器）。 */
+.body {
+  position: relative;
+  overflow: clip;
+  /* 渐隐高度：约两行，够把被切断的那一行化开，又不至于吃掉整段可见内容 */
+  --user-bubble-fade-height: 44px;
+}
+
+/* 正文段落列：段与段之间的间距原本由 .bubble 的 gap 承担，现改由这里承担 */
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+/* 底部渐隐：由下向上，颜色就是气泡底色。
+   用底色渐隐而不是 `mask-image`：mask 会把半透明前景与不透明背景拆开处理，
+   芯片描边、引用块左边线会留下"半截"的痕迹。 */
+.body::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--user-bubble-fade-height);
+  pointer-events: none;
+  opacity: 0;
+  /* 时长与 NAV_MOTION.fade 一致，只做"渐隐层"的进出，不参与高度补间 */
+  transition: opacity 0.16s ease;
+  background: linear-gradient(
+    to top,
+    var(--color-accent-bubble) 0%,
+    color-mix(in srgb, var(--color-accent-bubble) 88%, transparent) 26%,
+    color-mix(in srgb, var(--color-accent-bubble) 58%, transparent) 55%,
+    color-mix(in srgb, var(--color-accent-bubble) 26%, transparent) 80%,
+    color-mix(in srgb, var(--color-accent-bubble) 0%, transparent) 100%
+  );
+}
+
+.collapsed .body::after {
+  opacity: 1;
+}
+
+/* 展开 / 收起胶囊。收起态浮在渐隐上（不占正文高度），展开态落回气泡底部（不压正文）。 */
+.toggle {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  transform: translateX(-50%);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 13px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--color-accent-bubble-text) 16%, transparent);
+  background: color-mix(in srgb, var(--color-accent-bubble) 88%, #fff);
+  color: var(--color-accent-bubble-text);
+  font-family: inherit;
+  /* 比正文小一档，且跟随「对话流字号」缩放；不要写死 px，否则改字号后胶囊与正文脱节 */
+  font-size: calc(var(--session-stream-font-md) - 3px);
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-accent-bubble-text) 12%, transparent);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.toggle:hover {
+  background: color-mix(in srgb, var(--color-accent-bubble) 72%, #fff);
+  border-color: color-mix(in srgb, var(--color-accent-bubble-text) 30%, transparent);
+}
+
+/* 按压反馈只改底色：居中靠 translateX(-50%)，写 scale 会把胶囊弹到左边 */
+.toggle:active {
+  background: color-mix(in srgb, var(--color-accent-bubble) 58%, #fff);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent-bubble-text) 40%, transparent);
+  outline-offset: 2px;
+}
+
+/* 展开后回到文档流：居中放在气泡底部，常驻但不抢眼（悬浮回满） */
+.expanded .toggle {
+  position: static;
+  transform: none;
+  align-self: center;
+  opacity: 0.72;
+}
+
+/* 冷启动进度条同屏时胶囊也落回文档流：否则它会压在进度条上（绝对定位的锚是气泡底缘） */
+.toggle[data-in-flow] {
+  position: static;
+  transform: none;
+  align-self: center;
+}
+
+.expanded .toggle:hover {
+  opacity: 1;
+}
+
+.toggleIcon {
+  flex-shrink: 0;
+  transition: transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.expanded .toggleIcon {
+  transform: rotate(180deg);
+}
+
 /* 正文里的 http(s) 外链：继承气泡反白文字色 + 下划线，点击交系统浏览器。
    图标槽配方在 styles/linkIcon.module.css（三处同源，docs/design/131） */
 .link {
