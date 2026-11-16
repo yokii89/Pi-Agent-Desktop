@@ -38,6 +38,32 @@ export const IMAGE_MIME: Record<ImageExt, string> = {
 /** 按 Markdown 文档流渲染预览的扩展名；.mdx 含 JSX，故意排除（渲染出来是误导性文本）。 */
 export const MARKDOWN_EXTS = ["md", "markdown"] as const;
 
+/** 独立 Mermaid 文件使用图表预览，源码态仍可就地编辑。 */
+export const MERMAID_EXTS = ["mmd", "mermaid"] as const;
+
+/** 音视频由 Electron 内置解码器读取；具体编码不支持时保留系统打开入口。 */
+export const AUDIO_EXTS = ["mp3", "wav", "ogg", "oga", "m4a", "aac", "flac", "opus"] as const;
+export const VIDEO_EXTS = ["mp4", "webm", "m4v", "ogv", "mov"] as const;
+
+export type MediaKind = "audio" | "video";
+type MediaExt = (typeof AUDIO_EXTS)[number] | (typeof VIDEO_EXTS)[number];
+
+const MEDIA_MIME: Record<MediaExt, string> = {
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  flac: "audio/flac",
+  opus: "audio/ogg",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  m4v: "video/mp4",
+  ogv: "video/ogg",
+  mov: "video/quicktime",
+};
+
 /** 可交由侧栏浏览器渲染的网页扩展名（file:// 专用通道，docs/文件面板文件渲染方案.md）。 */
 export const HTML_EXTS = ["html", "htm"] as const;
 
@@ -64,6 +90,21 @@ function extOf(path: string): string {
 /** 是否 Markdown 文件（文件面板按文档流渲染预览的分流依据）。 */
 export function isMarkdownPath(path: string): boolean {
   return (MARKDOWN_EXTS as readonly string[]).includes(extOf(path));
+}
+
+/** 是否独立 Mermaid 图表文件。 */
+export function isMermaidPath(path: string): boolean {
+  return (MERMAID_EXTS as readonly string[]).includes(extOf(path));
+}
+
+/** 音视频类型和 MIME 的共享分流口径；未知扩展名返回 null。 */
+export function mediaInfoForPath(path: string): { kind: MediaKind; mime: string } | null {
+  const ext = extOf(path);
+  if (!Object.hasOwn(MEDIA_MIME, ext)) return null;
+  return {
+    kind: (AUDIO_EXTS as readonly string[]).includes(ext) ? "audio" : "video",
+    mime: MEDIA_MIME[ext as MediaExt],
+  };
 }
 
 /** 是否网页文件（文件面板「在侧栏浏览器中打开」的分流依据）。 */

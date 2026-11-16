@@ -222,6 +222,21 @@
   border-color: var(--color-border-strong);
 }
 
+.diagramWrap {
+  padding: var(--spacing-sm);
+}
+
+.diagramWrap pre {
+  margin: 0;
+  padding: var(--spacing-sm);
+  overflow: auto;
+  color: var(--color-text);
+  font-family: var(--code-font-family);
+  font-size: var(--code-font-size);
+  line-height: var(--code-line-height);
+  white-space: pre;
+}
+
 /*
  * Ctrl+F 命中高亮：走 CSS Custom Highlight（登记名见 hooks/usePreviewFind），
  * 不给 DOM 包 <mark> ——Markdown 预览的节点归 React 所有，改动会被对账抹掉。

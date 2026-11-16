@@ -25,6 +25,7 @@ import {
   searchFiles,
 } from "./fsService";
 import { readPreviewImage } from "./imagePreview";
+import { readPreviewMedia } from "./mediaPreview";
 import { unwatchDirectory, watchDirectory } from "./watcher";
 
 /** 注册文件系统 IPC（docs/design/03 §5 / §8）。 */
@@ -45,6 +46,8 @@ export function registerFsIpc(): void {
     FS_IPC.preview,
     (_event, req: { path: string }): Promise<IpcResult<FsPreviewResult>> =>
       envelopeAsync(async () => {
+        const media = await readPreviewMedia(req.path);
+        if (media) return media;
         const image = await readPreviewImage(req.path);
         if (image) return image;
         const result = await readFile(req.path);

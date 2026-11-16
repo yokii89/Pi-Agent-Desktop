@@ -25,6 +25,8 @@ export interface ElementPngOptions {
    * 开启后根元素与各滚动容器一起拉到 `scrollWidth`，长行完整进图。
    */
   expandWidth?: boolean;
+  /** 图表等纵向滚动内容按完整高度成像，避免只复制当前可见的一段。 */
+  expandHeight?: boolean;
 }
 
 const BASE_SCALE = 2;
@@ -212,7 +214,8 @@ export async function elementToPng(
 ): Promise<ElementPng> {
   const rect = el.getBoundingClientRect();
   const measured = Math.ceil(rect.width);
-  const height = Math.ceil(rect.height);
+  const measuredHeight = Math.ceil(rect.height);
+  const height = options.expandHeight ? Math.max(measuredHeight, el.scrollHeight) : measuredHeight;
   const width = options.expandWidth ? Math.max(measured, overflowWidth(el)) : measured;
   if (width < 1 || height < 1) throw new Error("元素没有可见尺寸");
 
@@ -235,6 +238,7 @@ export async function elementToPng(
   clone.style.margin = "0";
   clone.style.width = `${width}px`;
   clone.style.height = `${height}px`;
+  if (options.expandHeight) clone.style.maxHeight = "none";
   clone.style.overflow = "hidden";
 
   const body =

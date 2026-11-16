@@ -80,39 +80,4 @@ export function wallpaperFileName(filePath: string): string {
   return filePath.split(/[\\/]/).pop() || filePath;
 }
 
-export interface ByteRange {
-  start: number;
-  end: number;
-}
-
-/**
- * 解析单段 `Range: bytes=...`（视频拖动进度条依赖）。
- * null = 按完整响应处理（缺失 / 语法不认识 / 多段）；"unsatisfiable" = 416。
- */
-export function parseByteRange(
-  header: string | null,
-  size: number,
-): ByteRange | "unsatisfiable" | null {
-  if (!header) return null;
-  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
-  if (!match) return null;
-  const [, rawStart, rawEnd] = match;
-  if (!rawStart && !rawEnd) return null;
-  if (size <= 0) return "unsatisfiable";
-  let start: number;
-  let end: number;
-  if (!rawStart) {
-    const suffix = Number(rawEnd);
-    if (!Number.isFinite(suffix) || suffix <= 0) return "unsatisfiable";
-    start = Math.max(0, size - suffix);
-    end = size - 1;
-  } else {
-    start = Number(rawStart);
-    end = rawEnd ? Number(rawEnd) : size - 1;
-    if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-    if (end < start) return "unsatisfiable";
-    if (start >= size) return "unsatisfiable";
-    end = Math.min(end, size - 1);
-  }
-  return { start, end };
-}
+export { type ByteRange, parseByteRange } from "./mediaPreview";

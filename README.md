@@ -49,13 +49,15 @@ PiDesk is the Windows desktop client for the open-source coding agent [pi](https
 
 Real components, not iframe placeholders: a real terminal on node-pty, a real embedded Chromium, a real git working-tree diff.
 
-| ![File tree with Shiki preview](./assets/images/file-preview.webp) | ![Terminal split into two panes](./assets/images/terminal-split.webp) |
+| ![File tree with source preview](./assets/images/file-preview.webp) | ![Terminal split into two panes](./assets/images/terminal-split.webp) |
 | :---: | :---: |
-| **Files** — project tree, Shiki-highlighted read-only preview, fuzzy quick-open. Edits belong to the agent. | **Terminal** — node-pty + xterm, tabs and side-by-side / stacked splits, cwd bound to the project. |
+| **Files** — project tree, fuzzy quick-open, CodeMirror source viewing and editing, document previews, audio/video playback, and Mermaid diagrams. | **Terminal** — node-pty + xterm, tabs and side-by-side / stacked splits, cwd bound to the project. |
 
 | ![Element picking in the embedded browser](./assets/images/browser-pick-hover.webp) | ![Floating review panel](./assets/images/review-floating.webp) |
 | :---: | :---: |
 | **Browser** — import your cookie session, hover-highlight and select in pick mode, press Enter to drop the element into the composer, hot-edit styles, inspect. | **Review** — working-tree change list plus line-by-line diff, docked or floating, with stage / commit / push and rollbackable git snapshots. |
+
+Audio and video previews include seeking, volume and playback speed, and pause when the file panel is hidden. Playback depends on the file's codec; unavailable files retain a system-open action. Standalone `.mmd` and `.mermaid` files open as diagrams, with zoom, image copy and a source view for editing.
 
 Splitting reuses a terminal that is already running rather than starting another session, and hiding the panel never kills the pty — panes are a way of looking at terminals, not a way of killing them.
 

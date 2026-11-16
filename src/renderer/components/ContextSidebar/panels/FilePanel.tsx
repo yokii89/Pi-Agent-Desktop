@@ -15,6 +15,7 @@ import { type Ref, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import {
   isHtmlPath,
   isMarkdownPath,
+  isMermaidPath,
   isNotebookPath,
   isTabularPath,
 } from "../../../../shared/fileKinds";
@@ -43,6 +44,7 @@ import {
   resolvePath,
   toNativePath,
 } from "../../../utils/fileOpen";
+import { canRenderMermaid } from "../../../utils/mermaidPreview";
 import { officeSelectionSource } from "../../../utils/officeSelection";
 import { normalizeDirPath, parentDirPath } from "../../../utils/paths";
 import { previewDocumentRoot } from "../../../utils/previewDocument";
@@ -55,6 +57,7 @@ import {
   stepPreviewHistory,
 } from "../../../utils/previewHistory";
 import type { TextSelectionSource } from "../../../utils/textSelection";
+import { MermaidBlock } from "../../markdown/MermaidBlock";
 import { SelectionToolbar } from "../../SessionArea/SelectionToolbar";
 import { WorkdirChip } from "../../SessionArea/WorkdirChip";
 import { CodeEditor } from "../../ui/CodeEditor";
@@ -68,6 +71,7 @@ import panelStyles from "./FilePanel.module.css";
 import { FileTree } from "./FileTree";
 import { ImagePreview } from "./ImagePreview";
 import { MarkdownPreview, type MarkdownViewMode } from "./MarkdownPreview";
+import { MediaPreview } from "./MediaPreview";
 import { NotebookPreview } from "./NotebookPreview";
 import { OfficePreview } from "./office/OfficePreview";
 import { PdfPreview } from "./PdfPreview";
@@ -108,12 +112,23 @@ function previewMeta(result: FsPreviewResult, imageSize: string | null, t: Trans
 const SELF_WRITE_GRACE_MS = 600;
 
 /** 源码与专用排版预览分流；截断源码也走同一视图，但保持只读。 */
-function isSourcePreview(preview: PreviewState, mdMode: MarkdownViewMode): boolean {
+function isSourcePreview(
+  preview: PreviewState,
+  mdMode: MarkdownViewMode,
+  mermaidMode: MarkdownViewMode,
+): boolean {
   if (preview.result.kind !== "text") return false;
   // 表格 / Notebook 的专用预览是排版结果，与源码不是一一对应的字符流
   if (isTabularPath(preview.path) || isNotebookPath(preview.path)) return false;
   // Markdown 文档流同理：要编辑得先切到源码态
   if (isMarkdownPath(preview.path)) return mdMode === "source";
+  if (isMermaidPath(preview.path)) {
+    return (
+      mermaidMode === "source" ||
+      preview.result.truncated ||
+      !canRenderMermaid(preview.result.content)
+    );
+  }
   return true;
 }
 
@@ -142,6 +157,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   const [imageSize, setImageSize] = useState<string | null>(null);
   /** Markdown 预览/源码两态：提升到面板层，跨文件切换与返回文件树后保持。 */
   const [mdViewMode, setMdViewMode] = useState<MarkdownViewMode>("preview");
+  const [mermaidViewMode, setMermaidViewMode] = useState<MarkdownViewMode>("preview");
   /** 预览回退/前进历史：项目切换即整体失效。 */
   const [history, setHistory] = useState<PreviewHistory>(emptyPreviewHistory);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -191,7 +207,12 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   activePreviewRef.current = activePreview;
   const editingRef = useRef(editing);
   editingRef.current = editing;
-  const sourcePreview = activePreview !== null && isSourcePreview(activePreview, mdViewMode);
+  const sourcePreview =
+    activePreview !== null && isSourcePreview(activePreview, mdViewMode, mermaidViewMode);
+  const mermaidLimited =
+    activePreview?.result.kind === "text" &&
+    isMermaidPath(activePreview.path) &&
+    (activePreview.result.truncated || !canRenderMermaid(activePreview.result.content));
   const officeFramePreview =
     activePreview?.result.kind === "office" &&
     activePreview.result.status === "ready" &&
@@ -210,14 +231,19 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   );
   /** 内容身份：换文件 / md 预览与源码切换时查找条自行收起并重算。 */
   const findContentKey =
-    !sourcePreview && !officeReady && preview && preview.root === rootKey
-      ? `${preview.path}:${mdViewMode}`
+    !sourcePreview &&
+    !officeReady &&
+    preview &&
+    preview.result.kind !== "media" &&
+    preview.root === rootKey
+      ? `${preview.path}:${mdViewMode}:${mermaidViewMode}`
       : null;
   const find = usePreviewFind(panelBodyRef, findContentKey);
 
   // Ctrl+F 在预览内容里查找（渲染层没有浏览器级查找条，不抢就没人接这个键）
   const openFind = find.openFind;
-  const hasActivePreview = preview !== null && preview.root === rootKey;
+  const hasActivePreview =
+    preview !== null && preview.root === rootKey && preview.result.kind !== "media";
   useEffect(() => {
     if (!active || !hasActivePreview) return;
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -267,7 +293,10 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     ): void => {
       setSelectedPath(path);
       setPreviewLoading(true);
-      setPreview((current) => (current?.result.kind === "image" ? null : current));
+      setPreview((current) =>
+        current?.result.kind === "image" || current?.result.kind === "media" ? null : current,
+      );
+      if (isMermaidPath(path)) setMermaidViewMode(focusLine === null ? "preview" : "source");
       previewScrollAnchorRef.current = undefined;
       setImageSize(null);
       // 换文件即退出编辑：草稿只属于当前文件（脏内容已在 guardLeave 里问过）
@@ -457,6 +486,15 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     const latest = activePreviewRef.current;
     if (!latest || latest !== target) return;
 
+    // URL 已绑定路径、大小与 mtime；目录通知可能来自相邻文件，版本相同就保留播放器。
+    if (
+      latest.result.kind === "media" &&
+      result.kind === "media" &&
+      result.url === latest.result.url
+    ) {
+      return;
+    }
+
     if (
       latest.result.kind === "text" &&
       result.kind === "text" &&
@@ -560,6 +598,8 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     const target = activePreviewRef.current;
     if (!target) return;
     if (target.result.kind !== "text" || target.result.truncated || !sourcePreview) return;
+    // 超限图表原本是自动源码态，保存缩小后也不能提前卸载正在编辑的视图。
+    if (isMermaidPath(target.path)) setMermaidViewMode("source");
     setEditorBaseline(toEditorText(target.result.content));
     setDirty(false);
     setExternalChanged(false);
@@ -766,7 +806,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
    */
   const openPreviewMenu = (event: React.MouseEvent<HTMLDivElement>): void => {
     // 编辑态交回 Chromium 原生菜单：剪切 / 粘贴是编辑的刚需，自绘菜单还没有剪贴板读写通道
-    if (editing) return;
+    if (editing || activePreview?.result.kind === "media") return;
     event.preventDefault();
     if (!activePreview) return;
     const selection = window.getSelection();
@@ -916,6 +956,25 @@ export function FilePanel({ active = true }: { active?: boolean }) {
                   )}
                 </IconButton>
               )}
+              {isMermaidPath(activePreview.path) && !mermaidLimited && (
+                <IconButton
+                  title={t(
+                    mermaidViewMode === "preview"
+                      ? "common.mermaid.showSource"
+                      : "common.mermaid.showGraph",
+                  )}
+                  onClick={() => {
+                    previewScrollAnchorRef.current = undefined;
+                    setMermaidViewMode(mermaidViewMode === "preview" ? "source" : "preview");
+                  }}
+                >
+                  {mermaidViewMode === "preview" ? (
+                    <Eye size={16} weight="regular" />
+                  ) : (
+                    <EyeSlash size={16} weight="regular" />
+                  )}
+                </IconButton>
+              )}
               {isHtmlPath(activePreview.path) && browserEnabled && (
                 <IconButton
                   title={t("panels.files.openInBrowser")}
@@ -986,6 +1045,9 @@ export function FilePanel({ active = true }: { active?: boolean }) {
             {activePreview.result.truncated && (
               <p className={panelStyles.truncatedNote}>{t("panels.files.truncatedNote")}</p>
             )}
+            {mermaidLimited && !activePreview.result.truncated && (
+              <p className={panelStyles.truncatedNote}>{t("panels.files.mermaid.tooLarge")}</p>
+            )}
             <CodeEditor
               key={`${activePreview.root}:${activePreview.path}#${editorReloadTick}`}
               ref={editorRef}
@@ -1012,6 +1074,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
             officeRef={officeRef}
             onImageSize={setImageSize}
             onOpenInSystem={() => openInSystem(activePreview.path)}
+            onShowMermaidSource={() => setMermaidViewMode("source")}
           />
         ) : previewLoading ? (
           <p className={panelStyles.noMatch}>{t("panels.files.loading")}</p>
@@ -1138,12 +1201,14 @@ function FilePreviewBody({
   onImageSize,
   onOpenInSystem,
   officeRef,
+  onShowMermaidSource,
 }: {
   active: boolean;
   preview: PreviewState;
   officeRef: Ref<OfficePreviewHandle>;
   onImageSize: (size: string | null) => void;
   onOpenInSystem: () => void;
+  onShowMermaidSource: () => void;
 }) {
   const t = useT();
   const { result } = preview;
@@ -1156,6 +1221,18 @@ function FilePreviewBody({
         result={result}
         path={preview.path}
         onImageSize={onImageSize}
+        onOpenInSystem={onOpenInSystem}
+      />
+    );
+  }
+
+  if (result.kind === "media") {
+    return (
+      <MediaPreview
+        key={result.url}
+        result={result}
+        path={preview.path}
+        active={active}
         onOpenInSystem={onOpenInSystem}
       />
     );
@@ -1188,6 +1265,20 @@ function FilePreviewBody({
   if (isMarkdownPath(preview.path)) {
     return (
       <MarkdownPreview path={preview.path} content={result.content} truncated={result.truncated} />
+    );
+  }
+
+  if (isMermaidPath(preview.path)) {
+    return (
+      <div className={panelStyles.diagramWrap} data-selectable-text="">
+        <MermaidBlock
+          code={result.content}
+          source={<pre>{result.content}</pre>}
+          codeCopy={false}
+          imageCopy
+          onShowSource={onShowMermaidSource}
+        />
+      </div>
     );
   }
 

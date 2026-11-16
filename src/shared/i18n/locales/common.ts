@@ -60,6 +60,10 @@ export const commonMessages = defineMessages({
     "zh-CN": "查看图表",
     "en-US": "View diagram",
   },
+  "common.mermaid.imageCopied": {
+    "zh-CN": "图表已复制为图片",
+    "en-US": "Diagram copied as image",
+  },
   "common.mermaid.zoom": { "zh-CN": "放大查看", "en-US": "Zoom in" },
   "common.delete": { "zh-CN": "删除", "en-US": "Delete" },
   "common.rename": { "zh-CN": "重命名", "en-US": "Rename" },

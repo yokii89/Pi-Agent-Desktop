@@ -49,13 +49,15 @@ PiDesk 是开源 coding agent [pi](https://github.com/earendil-works/pi) 的 Win
 
 都是真组件，不是 iframe 占位：node-pty 起的真终端、内嵌的真 Chromium、读 git working tree 的真 diff。
 
-| ![文件树与 Shiki 高亮预览](./assets/images/file-preview.webp) | ![终端左右分屏](./assets/images/terminal-split.webp) |
+| ![文件树与源码预览](./assets/images/file-preview.webp) | ![终端左右分屏](./assets/images/terminal-split.webp) |
 | :---: | :---: |
-| **文件** —— 项目文件树 + Shiki 语法高亮只读预览 + 模糊搜索快速打开。改文件这件事交给 agent。 | **终端** —— node-pty + xterm，多页签、左右或上下分屏，cwd 跟随当前项目。 |
+| **文件** —— 项目文件树、模糊搜索快速打开、CodeMirror 源码查看与就地编辑、文档预览、音视频播放与 Mermaid 图表。 | **终端** —— node-pty + xterm，多页签、左右或上下分屏，cwd 跟随当前项目。 |
 
 | ![内嵌浏览器的元素拾取](./assets/images/browser-pick-hover.webp) | ![浮窗形态的代码审查](./assets/images/review-floating.webp) |
 | :---: | :---: |
 | **浏览器** —— 导入登录态（Cookie）；拾取模式悬停高亮、点选展开检查器，按 Enter 把元素送进输入框；样式可热改。 | **审查** —— working tree 变更列表 + 逐行 diff，可停靠可浮窗，底部直接暂存 / 提交 / 推送，还有可回滚的 git 快照。 |
+
+音视频预览支持拖动进度、音量与倍速，隐藏文件面板时暂停。实际能否播放取决于文件编码；无法播放时可用系统应用打开。独立 `.mmd` / `.mermaid` 文件默认显示图表，可放大查看、复制为图片，也可切换到源码进行编辑。
 
 分屏会优先复用一个已经在跑的终端，而不是再开一个会话；隐藏面板也不会 kill pty——窗格是看终端的方式，不是关终端的方式。
 

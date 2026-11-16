@@ -18,11 +18,17 @@ let mermaidPromise: Promise<Mermaid> | null = null;
 
 /** 首次调用才加载 mermaid 主 chunk；后续复用同一 Promise。 */
 export function loadMermaid(): Promise<Mermaid> {
-  mermaidPromise ??= import("mermaid").then((mod) => mod.default);
+  mermaidPromise ??= import("mermaid")
+    .then((mod) => mod.default)
+    .catch((error: unknown) => {
+      mermaidPromise = null;
+      throw error;
+    });
   return mermaidPromise;
 }
 
 let configuredTheme: MermaidTheme | null = null;
+let configuredFont: string | undefined;
 
 /** 取 tokens.css 的界面字体，避免图内标注用 mermaid 自带的 trebuchet 而跟正文脱节。 */
 function uiFontFamily(): string | undefined {
@@ -33,10 +39,12 @@ function uiFontFamily(): string | undefined {
 }
 
 /** 加载并按当前主题配置好；返回可直接 `parse` / `render` 的实例。 */
-export async function prepareMermaid(theme: MermaidTheme): Promise<Mermaid> {
+export async function prepareMermaid(
+  theme: MermaidTheme,
+  fontFamily = uiFontFamily(),
+): Promise<Mermaid> {
   const mermaid = await loadMermaid();
-  if (configuredTheme !== theme) {
-    const fontFamily = uiFontFamily();
+  if (configuredTheme !== theme || configuredFont !== fontFamily) {
     mermaid.initialize({
       startOnLoad: false,
       // strict：输出经 DOMPurify 消毒，图内不注入脚本；生产 CSP 无需为此放宽
@@ -45,6 +53,7 @@ export async function prepareMermaid(theme: MermaidTheme): Promise<Mermaid> {
       ...(fontFamily ? { themeVariables: { fontFamily } } : {}),
     });
     configuredTheme = theme;
+    configuredFont = fontFamily;
   }
   return mermaid;
 }

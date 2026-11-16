@@ -5,10 +5,12 @@ import {
   isHtmlPath,
   isJsonPath,
   isMarkdownPath,
+  isMermaidPath,
   isNotebookPath,
   isPdfPath,
   isTabularPath,
   MARKDOWN_EXTS,
+  mediaInfoForPath,
 } from "./fileKinds";
 
 describe("isMarkdownPath", () => {
@@ -49,6 +51,25 @@ describe("isHtmlPath", () => {
     expect(isHtmlPath("style.css")).toBe(false);
     expect(isHtmlPath("html")).toBe(false);
     expect(isHtmlPath("")).toBe(false);
+  });
+});
+
+describe("media and standalone diagrams", () => {
+  it("recognizes Mermaid files without claiming Markdown or extensionless files", () => {
+    expect(isMermaidPath("图表.MMD")).toBe(true);
+    expect(isMermaidPath("D:\\docs\\flow.mermaid")).toBe(true);
+    expect(isMermaidPath("flow.md")).toBe(false);
+    expect(isMermaidPath(".mmd")).toBe(false);
+  });
+
+  it("distinguishes audio from video and leaves unsupported containers alone", () => {
+    expect(mediaInfoForPath("录屏.MP4")).toEqual({ kind: "video", mime: "video/mp4" });
+    expect(mediaInfoForPath("声音.wav")).toEqual({ kind: "audio", mime: "audio/wav" });
+    expect(mediaInfoForPath("voice.opus")).toEqual({ kind: "audio", mime: "audio/ogg" });
+    expect(mediaInfoForPath("clip.mov")).toEqual({ kind: "video", mime: "video/quicktime" });
+    expect(mediaInfoForPath("clip.avi")).toBeNull();
+    expect(mediaInfoForPath("file.json")).toBeNull();
+    expect(mediaInfoForPath(".mp3")).toBeNull();
   });
 });
 

@@ -1,17 +1,16 @@
-import { Code, Copy, Graph, MagnifyingGlassPlus } from "@phosphor-icons/react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Code, Copy, Graph, ImageSquare, MagnifyingGlassPlus } from "@phosphor-icons/react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { resolveFontUiStack } from "../../../shared/fontPresets";
 import { useResolvedTheme } from "../../hooks/useResolvedTheme";
 import { useT } from "../../hooks/useT";
+import { clipboardService } from "../../services/clipboardService";
 import { useUiStore } from "../../stores/uiStore";
-import { prepareMermaid } from "../../utils/mermaidLoader";
+import { elementToPng } from "../../utils/elementToPng";
+import { namespaceMermaidSvg, renderMermaid } from "../../utils/mermaidRenderer";
 import { ImageLightbox } from "../SessionArea/ImageLightbox";
 import styles from "./MermaidBlock.module.css";
 import fenceStyles from "./markdown.module.css";
 
-/** mermaid 实例的 render id 递增：同 id 重复渲染会命中上一张图的残留节点。 */
-let renderSeq = 0;
-
-/** SVG 走 `<img>` 需要 data URL；btoa 处理不了中文字符，用百分号编码。 */
 function svgToDataUrl(svg: string): string {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
@@ -19,64 +18,81 @@ function svgToDataUrl(svg: string): string {
 type GraphState = { kind: "pending" } | { kind: "ok"; svg: string } | { kind: "failed" };
 
 interface MermaidBlockProps {
-  /** 围栏内的图表源码。 */
   code: string;
-  /** 非图态内容：沿用 FenceShell 原分支产物的 `<pre>`（源码 / 失败回退都靠它）。 */
+  /** 围栏源码与解析失败的回退内容。 */
   source: ReactNode;
-  /** 复制按钮开关，跟随围栏的 codeCopy。 */
   codeCopy: boolean;
+  /** 独立文件提供图像复制；已有围栏维持原来的操作组。 */
+  imageCopy?: boolean;
+  /** 独立文件把源码交回 FilePanel 的 CodeMirror；围栏继续在块内切换。 */
+  onShowSource?: () => void;
 }
 
-/**
- * ` ```mermaid ` 围栏的图表块（docs/design/125）：自带围栏外壳（沿用 .fence 一套类，
- * 与代码围栏视觉一致），状态为 pending / ok / failed，失败与源码视图都回退到
- * `<pre>` 原文——模型写的 mermaid 常有语法错，白屏等于把内容也一起吞了。
- *
- * 只在块定型后由 FenceShell 挂载：流式期间半截围栏必然解析失败，逐 delta 试错会让
- * 图反复闪、每次重排整段对话，那时维持普通源码围栏的渲染。
- */
-export function MermaidBlock({ code, source, codeCopy }: MermaidBlockProps) {
+/** Mermaid 围栏与独立文件共用出图、宽图滚动、主题和放大能力。 */
+export function MermaidBlock({
+  code,
+  source,
+  codeCopy,
+  imageCopy = false,
+  onShowSource,
+}: MermaidBlockProps) {
   const t = useT();
   const theme = useResolvedTheme();
-  const { showToast } = useUiStore();
+  const { showToast, fontUiPreset } = useUiStore();
+  const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "_");
+  const fontFamily = resolveFontUiStack(fontUiPreset);
+  const [readyToRender, setReadyToRender] = useState(false);
+  const fenceRef = useRef<HTMLDivElement>(null);
   const [graph, setGraph] = useState<GraphState>({ kind: "pending" });
-  /** 用户手动切到源码视图；graph 变了要复位，否则新图永远看不见。 */
   const [showSource, setShowSource] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  const [copyingImage, setCopyingImage] = useState(false);
   const graphRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    // 换源码 = 换图：视图选择器回到「图」，别让上一次的源码视图盖住新图
+    const fence = fenceRef.current;
+    if (!fence) return;
+    // 长文档先展示源码占位；接近视口才下载引擎与布局，隐藏页签也不会抢占首屏。
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setReadyToRender(true);
+        observer.disconnect();
+      },
+      { rootMargin: "200px 0px" },
+    );
+    observer.observe(fence);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!readyToRender) return;
+    const controller = new AbortController();
     setShowSource(false);
+    setZoomed(false);
     setGraph({ kind: "pending" });
-    void (async () => {
-      try {
-        const mermaid = await prepareMermaid(theme === "light" ? "default" : "dark");
-        // suppressErrors：不合法时返回 false，避免 mermaid 往控制台与 DOM 写错误标记
-        const valid = await mermaid.parse(code, { suppressErrors: true });
-        if (!valid) {
-          if (!cancelled) setGraph({ kind: "failed" });
-          return;
-        }
-        renderSeq += 1;
-        const { svg } = await mermaid.render(`pidesk-mmd-${renderSeq}`, code);
-        if (!cancelled) setGraph({ kind: "ok", svg });
-      } catch {
-        if (!cancelled) setGraph({ kind: "failed" });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [code, theme]);
+    void renderMermaid(
+      { code, theme: theme === "light" ? "default" : "dark", fontFamily },
+      controller.signal,
+    )
+      .then((svg) => {
+        if (controller.signal.aborted) return;
+        setGraph(
+          svg === null
+            ? { kind: "failed" }
+            : { kind: "ok", svg: namespaceMermaidSvg(svg, `pidesk-diagram-${instanceId}`) },
+        );
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setGraph({ kind: "failed" });
+      });
+    return () => controller.abort();
+  }, [code, theme, fontFamily, instanceId, readyToRender]);
 
   const svg = graph.kind === "ok" ? graph.svg : null;
   const showingGraph = svg !== null && !showSource;
 
-  // mermaid 只写 max-width（= 自然宽度），容器比它窄时整张图会被等比缩到看不清。
-  // 同值补一份 min-width：窄图按自然宽不放大，宽图按自然宽横向滚动。
-  // 图区是条件渲染，切回「图」时节点是新的，所以 showSource 也在依赖里。
+  // Mermaid 只写 max-width；补同值 min-width，宽图按自然尺寸滚动，避免挤成小图。
   useEffect(() => {
     if (!svg || showSource) return;
     const target = graphRef.current?.querySelector("svg");
@@ -85,73 +101,102 @@ export function MermaidBlock({ code, source, codeCopy }: MermaidBlockProps) {
     if (natural && natural !== "none" && natural !== "100%") target.style.minWidth = natural;
   }, [svg, showSource]);
 
-  const header = (
-    <div className={fenceStyles.fenceHeader}>
-      <span className={fenceStyles.fenceLang}>mermaid</span>
-      <div className={styles.actions}>
-        {showingGraph && (
-          <button
-            type="button"
-            className={fenceStyles.fenceCopy}
-            title={t("common.mermaid.zoom")}
-            aria-label={t("common.mermaid.zoom")}
-            onClick={() => setZoomed(true)}
-          >
-            <MagnifyingGlassPlus size={14} weight="regular" />
-          </button>
-        )}
-        {svg !== null && (
-          <button
-            type="button"
-            className={fenceStyles.fenceCopy}
-            title={t(showingGraph ? "common.mermaid.showSource" : "common.mermaid.showGraph")}
-            aria-label={t(showingGraph ? "common.mermaid.showSource" : "common.mermaid.showGraph")}
-            onClick={() => setShowSource((value) => !value)}
-          >
-            {showingGraph ? (
-              <Code size={14} weight="regular" />
-            ) : (
-              <Graph size={14} weight="regular" />
-            )}
-          </button>
-        )}
-        {codeCopy && (
-          <button
-            type="button"
-            className={fenceStyles.fenceCopy}
-            title={t("common.copyCode")}
-            aria-label={t("common.copyCode")}
-            onClick={() => {
-              void navigator.clipboard
-                .writeText(code)
-                .then(() => showToast(t("common.copied")))
-                .catch(() => showToast(t("common.copyFailed")));
-            }}
-          >
-            <Copy size={14} weight="regular" />
-          </button>
-        )}
-      </div>
-    </div>
-  );
+  const copyGraphImage = (): void => {
+    const element = graphRef.current;
+    if (!element || copyingImage) return;
+    setCopyingImage(true);
+    void elementToPng(element, { expandWidth: true, expandHeight: true })
+      .then((png) => clipboardService.writeImageDataUrl(png.dataUrl))
+      .then(() => showToast(t("common.mermaid.imageCopied")))
+      .catch(() => showToast(t("common.copyFailed")))
+      .finally(() => setCopyingImage(false));
+  };
 
   return (
-    <div className={fenceStyles.fence}>
-      {header}
+    <div ref={fenceRef} className={fenceStyles.fence}>
+      <div className={fenceStyles.fenceHeader}>
+        <span className={fenceStyles.fenceLang}>mermaid</span>
+        <div className={styles.actions}>
+          {showingGraph && (
+            <button
+              type="button"
+              className={fenceStyles.fenceCopy}
+              title={t("common.mermaid.zoom")}
+              aria-label={t("common.mermaid.zoom")}
+              onClick={() => setZoomed(true)}
+            >
+              <MagnifyingGlassPlus size={16} weight="regular" />
+            </button>
+          )}
+          {showingGraph && imageCopy && (
+            <button
+              type="button"
+              className={fenceStyles.fenceCopy}
+              title={t("common.copyCodeImage")}
+              aria-label={t("common.copyCodeImage")}
+              disabled={copyingImage}
+              onClick={copyGraphImage}
+            >
+              <ImageSquare size={16} weight="regular" />
+            </button>
+          )}
+          {(svg !== null || onShowSource) && (
+            <button
+              type="button"
+              className={fenceStyles.fenceCopy}
+              title={t(
+                onShowSource || showingGraph
+                  ? "common.mermaid.showSource"
+                  : "common.mermaid.showGraph",
+              )}
+              aria-label={t(
+                onShowSource || showingGraph
+                  ? "common.mermaid.showSource"
+                  : "common.mermaid.showGraph",
+              )}
+              onClick={() => (onShowSource ? onShowSource() : setShowSource((value) => !value))}
+            >
+              {onShowSource || showingGraph ? (
+                <Code size={16} weight="regular" />
+              ) : (
+                <Graph size={16} weight="regular" />
+              )}
+            </button>
+          )}
+          {codeCopy && (
+            <button
+              type="button"
+              className={fenceStyles.fenceCopy}
+              title={t("common.copyCode")}
+              aria-label={t("common.copyCode")}
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(code)
+                  .then(() => showToast(t("common.copied")))
+                  .catch(() => showToast(t("common.copyFailed")));
+              }}
+            >
+              <Copy size={16} weight="regular" />
+            </button>
+          )}
+        </div>
+      </div>
       {showingGraph ? (
         <div
           ref={graphRef}
           className={styles.graph}
           role="img"
           aria-label={t("common.mermaid.diagram")}
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: securityLevel 为 strict，mermaid 输出已经 DOMPurify 消毒
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: Mermaid strict 模式的输出经 DOMPurify 消毒。
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       ) : (
         source
       )}
       {graph.kind === "failed" && (
-        <div className={styles.hint}>{t("common.mermaid.renderFailed")}</div>
+        <div className={styles.hint} role="status">
+          {t("common.mermaid.renderFailed")}
+        </div>
       )}
       {zoomed && svg !== null && (
         <ImageLightbox

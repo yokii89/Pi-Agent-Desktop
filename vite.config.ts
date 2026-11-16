@@ -22,7 +22,7 @@ const DEV_CSP = [
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https: http: pidesk-media: pidesk-image:",
-  "media-src 'self' pidesk-media:",
+  "media-src 'self' pidesk-media: pidesk-av:",
   "font-src 'self' data:",
   "connect-src 'self' ws: wss: pidesk-image:",
 ].join("; ");

@@ -5,6 +5,7 @@
 
 import type { AccentColorPreference } from "./accentColor";
 import type { SessionStartReason } from "./contribution";
+import type { MediaKind } from "./fileKinds";
 import type { FontMonoPreset, FontUiPreset } from "./fontPresets";
 import type { LocalePreference } from "./i18n";
 import type { InputBuddyKind } from "./inputBuddy";
@@ -1719,8 +1720,20 @@ export interface FsPreviewImageResult {
   byteLength: number;
 }
 
+/** 音视频预览仅返回版本化的流 URL，不将文件字节放入 IPC。 */
+export interface FsPreviewMediaResult {
+  kind: "media";
+  mediaKind: MediaKind;
+  url: string;
+  mime: string;
+  byteLength: number;
+}
+
 /** 侧栏专用读取结果；原 read/dataUrl 接口仍供附件、Markdown 与保存流程使用。 */
-export type FsPreviewResult = Exclude<FsReadResult, FsReadImageResult> | FsPreviewImageResult;
+export type FsPreviewResult =
+  | Exclude<FsReadResult, FsReadImageResult>
+  | FsPreviewImageResult
+  | FsPreviewMediaResult;
 
 /** PDF 页面数据，供渲染层 PDF.js 只读绘制。 */
 export interface FsReadPdfResult {
@@ -1784,7 +1797,7 @@ export const FS_IPC = {
   list: "pidesk:fs:list",
   /** 只读读取文件，按文本、图片、PDF、Office 或二进制分流（有大小上限）。 */
   read: "pidesk:fs:read",
-  /** 侧栏读取：图片只签发流式 URL，其他文件沿用 read 结果。 */
+  /** 侧栏读取：图片与音视频只签发流式 URL，其他文件沿用 read 结果。 */
   preview: "pidesk:fs:preview",
   /** 覆盖写入文本文件（就地编辑保存；带 mtime 冲突判定）。 */
   save: "pidesk:fs:save",

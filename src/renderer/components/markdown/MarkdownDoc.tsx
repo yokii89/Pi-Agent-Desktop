@@ -17,6 +17,7 @@ import { isExternalHttpUrl } from "../../utils/linkify";
 import { markdownUrlTransform } from "../../utils/markdownImageSource";
 import { normalizeMathDelimiters } from "../../utils/markdownMath";
 import { normalizeFenceLang, resolveMarkdownRef } from "../../utils/markdownRefs";
+import { canRenderMermaid } from "../../utils/mermaidPreview";
 import { FileLink, looksLikeFilePath } from "../SessionArea/FileLink";
 import { CodeHighlight } from "../ui/CodeHighlight";
 import { UrlLink } from "../ui/UrlLink";
@@ -34,13 +35,6 @@ const remarkPluginsWithBreaks = [remarkGfm, remarkMath, remarkBreaks];
 /** 流式代码块高亮护栏（docs/design/10 §3.9）：超过即退回纯 <pre>，避免长代码拖慢流式。 */
 const MAX_HIGHLIGHT_CHARS = 20_000;
 const MAX_HIGHLIGHT_LINES = 200;
-
-/**
- * mermaid 出图护栏（docs/design/125）：渲染代价随节点数增长，超限直接留在源码视图，
- * 不让模型偶尔吐出的巨型图把渲染进程卡住。
- */
-const MAX_MERMAID_CHARS = 8_000;
-const MAX_MERMAID_LINES = 200;
 
 interface MarkdownDocProps {
   text: string;
@@ -123,14 +117,7 @@ function FenceShell({
   const code = flattenText(child?.children).replace(/\n$/, "");
   // 空围栏仍走原路径：紧凑态是给「一行内容」用的，空块没有可居中的东西
   const singleLine = code.length > 0 && countCodeLines(code) <= 1;
-  if (
-    mermaid &&
-    !streaming &&
-    lang === "mermaid" &&
-    !singleLine &&
-    code.length <= MAX_MERMAID_CHARS &&
-    countCodeLines(code) <= MAX_MERMAID_LINES
-  ) {
+  if (mermaid && !streaming && lang === "mermaid" && !singleLine && canRenderMermaid(code)) {
     return <MermaidBlock code={code} codeCopy={codeCopy} source={<pre>{children}</pre>} />;
   }
   const highlightable =

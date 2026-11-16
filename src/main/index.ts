@@ -7,7 +7,11 @@ import { registerBrowserLifecycle } from "./browser/browserView";
 import { disposeExtensionWorker } from "./extension/extensionWorkerManager";
 import { registerWatcherLifecycle } from "./fs/watcher";
 import { registerIpc } from "./ipc";
-import { registerImagePreviewProtocol, registerMediaSchemes } from "./mediaProtocols";
+import {
+  registerImagePreviewProtocol,
+  registerMediaPreviewProtocol,
+  registerMediaSchemes,
+} from "./mediaProtocols";
 import { registerToastActivation } from "./notification/toastService";
 import { procService } from "./proc/procService";
 import { disposeTaskScheduler, initTaskScheduler } from "./scheduler/taskScheduler";
@@ -89,6 +93,7 @@ app.whenReady().then(async () => {
   registerIpc();
   registerWallpaperProtocol();
   registerImagePreviewProtocol();
+  registerMediaPreviewProtocol();
   // 旧 settings.sessionTitles → pi session_info：先于窗口，首屏列表就带名字
   try {
     await migrateLegacySessionTitles();

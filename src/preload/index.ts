@@ -506,6 +506,7 @@ contextBridge.exposeInMainWorld("pidesk", {
       ipcRenderer.invoke(FS_IPC.list, { dir }),
     read: (path: string): Promise<IpcResult<FsReadResult>> =>
       ipcRenderer.invoke(FS_IPC.read, { path }),
+    /** 图片与音视频仅返回主进程签发的版本化 URL。 */
     preview: (path: string): Promise<IpcResult<FsPreviewResult>> =>
       ipcRenderer.invoke(FS_IPC.preview, { path }),
     search: (dir: string, query: string): Promise<IpcResult<FsSearchHit[]>> =>

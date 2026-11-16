@@ -196,6 +196,15 @@ import { Play } from "@phosphor-icons/react";
   自家保存的目录回推用 `SELF_WRITE_GRACE_MS` 跳过，否则每次保存都自弹冲突。
 - **编辑态的交互差异**：右键回 Chromium 原生菜单（剪切/粘贴刚需），划选工具条与自绘右键菜单撤掉；源码两种模式的 Ctrl+F 共用 CodeMirror 查找，替换入口仅在编辑态出现。
 
+## 音视频与独立 Mermaid 预览（docs/design/148）
+
+- 文件面板音视频只走 `FS_IPC.preview` 的 `kind: "media"`；IPC 仅返回 URL 和元信息，原 `fs:read` 不变。扩展名/MIME 只认 `shared/fileKinds`，具体编码由 Electron 解码，失败保留系统打开，不引入整文件 base64 或转码进程。
+- `pidesk-av` URL 由 `main/fs/mediaPreview` 签发并绑定磁盘版本，禁止渲染层拼路径；实际读取复用 `main/mediaStream` 的单句柄校验、Range 与取消释放。壁纸保留独立授权，共用底层流。新增协议时开发与生产 CSP 必须同步。
+- 播放由用户主动触发；首次可见前不挂载媒体源，隐藏文件面板或窗口时暂停，重新显示不自动续播；切文件、卸载和失败时释放媒体源。目录刷新若签发 URL 未变，必须保留播放器与进度，不能递增重挂载 key。进度/音量沿用原生播放控件，倍速使用 `ui/Select`。
+- `.mmd` / `.mermaid` 复用 `MermaidBlock`，源码态走 FilePanel 的 CodeMirror 与保存/离开保护。进入编辑必须固定源码态，避免超限图表缩小保存后编辑器被提前卸载。
+- Mermaid 布局预算只认 `utils/mermaidPreview`（与 Markdown 围栏共用），截断/超限文件显示源码，语法错误保留原文。引擎仍只经 `utils/mermaidLoader` 动态加载；复制 PNG 复用共享成像工具，完整宽高不能被侧栏滚动窗口裁断。
+- Mermaid 首次接近视口才布局，统一经过 `utils/mermaidRenderer` 的串行队列与有界 LRU（源码 / 主题 / 字体为键），相同在途请求共享布局。卸载或换输入必须取消消费者；SVG 缓存只存字符串，挂载前分配实例 ID 并改写内部引用，禁止多张图直接复用同一组 DOM ID。
+
 ## Office 文档只读预览（docs/design/145）
 
 - 首批 DOCX / PPTX / XLSX / XLS / XLSM / XLSB 使用应用内置解析；Office/WPS 保存的兼容格式同路处理。DOC / PPT 与 WPS / DPS / ET 等专有格式明确提示另存为兼容格式，保留系统打开。

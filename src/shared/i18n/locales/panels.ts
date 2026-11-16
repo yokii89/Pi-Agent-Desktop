@@ -54,6 +54,21 @@ export const panelMessages = defineMessages({
     "zh-CN": "图片路径不是常规文件",
     "en-US": "Image path is not a regular file",
   },
+  "panels.files.media.notFile": {
+    "zh-CN": "媒体路径不是常规文件",
+    "en-US": "Media path is not a regular file",
+  },
+  "panels.files.media.failed": {
+    "zh-CN": "无法播放此文件，可能是文件已变更、已损坏或编码不受支持。可用系统应用打开。",
+    "en-US":
+      "Cannot play this file. It may have changed, be damaged, or use an unsupported codec. Try opening it with a system app.",
+  },
+  "panels.files.media.playbackRate": { "zh-CN": "播放速度", "en-US": "Playback speed" },
+  "panels.files.media.duration": { "zh-CN": "时长 {duration}", "en-US": "Duration {duration}" },
+  "panels.files.mermaid.tooLarge": {
+    "zh-CN": "图表较大，已显示源码。",
+    "en-US": "This diagram is large; showing source.",
+  },
   "panels.files.searchPlaceholder": {
     "zh-CN": "搜索文件…",
     "en-US": "Search files…",

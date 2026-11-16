@@ -18,7 +18,7 @@ export const fsService = {
     if (!api) return Promise.resolve({ entries: [], truncated: false });
     return unwrap(api.fs.list(dir));
   },
-  /** 侧栏读取：图片返回版本化 URL，不将大图 base64 留在 React 状态中。 */
+  /** 侧栏图片与音视频通过受限本地协议加载，IPC 仅返回元信息。 */
   preview(path: string): Promise<FsPreviewResult> {
     const api = pideskApi();
     if (!api)
