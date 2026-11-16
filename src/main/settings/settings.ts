@@ -207,13 +207,14 @@ export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   next.splashTextEn = normalizeSplashText(next.splashTextEn, DEFAULT_SPLASH_TEXT_EN);
   next.splashTextSub = normalizeSplashText(next.splashTextSub, DEFAULT_SPLASH_TEXT_SUB);
   next.splashSpeed = clampSplashSpeed(next.splashSpeed);
-  cache = next;
-  setI18nLocale(resolveLocale(next.locale, app.getLocale()));
   const file = settingsFilePath();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const payload = legacySessionTitlesPresent
     ? { ...next, sessionTitles: legacySessionTitles }
     : next;
   fs.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
+  // 写盘失败时保留已生效的设置，媒体协议不能读到尚未保存的新壁纸路径。
+  cache = next;
+  setI18nLocale(resolveLocale(next.locale, app.getLocale()));
   return next;
 }

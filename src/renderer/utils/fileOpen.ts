@@ -1,4 +1,4 @@
-import type { FsReadResult, FsSearchHit } from "../../shared/ipc";
+import type { FsPreviewResult, FsSearchHit } from "../../shared/ipc";
 import { fsService } from "../services/fsService";
 
 /** 去掉 :line[:column] 定位后缀。 */
@@ -94,13 +94,13 @@ export function resolvePath(raw: string, cwd: string | null): string {
 }
 
 export type PreviewResolveResult =
-  | { status: "ok"; path: string; result: FsReadResult }
+  | { status: "ok"; path: string; result: FsPreviewResult }
   | { status: "missing" }
   | { status: "ambiguous"; hits: FsSearchHit[] };
 
-async function tryRead(path: string): Promise<FsReadResult | null> {
+async function tryRead(path: string): Promise<FsPreviewResult | null> {
   try {
-    return await fsService.read(path);
+    return await fsService.preview(path);
   } catch {
     return null;
   }
@@ -116,7 +116,7 @@ function exactBasenameHits(hits: FsSearchHit[], name: string): FsSearchHit[] {
 }
 
 type SearchOutcome =
-  | { kind: "ok"; path: string; result: FsReadResult }
+  | { kind: "ok"; path: string; result: FsPreviewResult }
   | { kind: "ambiguous"; hits: FsSearchHit[] }
   | { kind: "missing" };
 

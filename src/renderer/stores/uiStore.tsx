@@ -208,6 +208,8 @@ interface UiState {
   accentColor: AccentColorPreference;
   /** 本地背景壁纸绝对路径（设置 → 个性化）；null = 主题纯色背景（docs/design/111）。 */
   wallpaperPath: string | null;
+  /** 每次确认选择都重载媒体，使同一路径在失败或文件被替换后仍可重试。 */
+  wallpaperRevision: number;
   /** 壁纸遮罩强度（0–100）：越高背景越淡、正文越清晰。 */
   wallpaperDim: number;
   /** 输入栏右上角的伙伴形象（设置 → 个性化）；none 表示不显示。 */
@@ -254,6 +256,7 @@ type UiAction =
   | { type: "setQuestionRailStyle"; style: RailStyle }
   | { type: "setThinkingAnimation"; animation: ThinkingAnimation }
   | { type: "setAccentColor"; color: AccentColorPreference }
+  /** 仅在 wallpaperService.save 确认成功后提交；路径不走通用设置回写。 */
   | { type: "setWallpaperPath"; path: string | null }
   | { type: "setWallpaperDim"; dim: number }
   | { type: "setInputBuddy"; kind: InputBuddyKind }
@@ -325,6 +328,7 @@ const initialState: UiState = {
   thinkingAnimation: DEFAULT_THINKING_ANIMATION,
   accentColor: null,
   wallpaperPath: null,
+  wallpaperRevision: 0,
   wallpaperDim: DEFAULT_WALLPAPER_DIM,
   inputBuddy: DEFAULT_INPUT_BUDDY,
   shortcuts: { ...DEFAULT_SHORTCUTS },
@@ -486,8 +490,7 @@ function uiReducer(state: UiState, action: UiAction): UiState {
     }
     case "setWallpaperPath": {
       const path = normalizeWallpaperPath(action.path);
-      if (state.wallpaperPath === path) return state;
-      return { ...state, wallpaperPath: path };
+      return { ...state, wallpaperPath: path, wallpaperRevision: state.wallpaperRevision + 1 };
     }
     case "setWallpaperDim": {
       const dim = clampWallpaperDim(action.dim);
@@ -672,7 +675,6 @@ export function UiProvider({ children }: { children: ReactNode }) {
       questionRailStyle: state.questionRailStyle,
       thinkingAnimation: state.thinkingAnimation,
       accentColor: state.accentColor,
-      wallpaperPath: state.wallpaperPath,
       inputBuddy: state.inputBuddy,
       locale: state.localePreference,
       shortcuts: state.shortcuts,
@@ -690,7 +692,6 @@ export function UiProvider({ children }: { children: ReactNode }) {
     state.questionRailStyle,
     state.thinkingAnimation,
     state.accentColor,
-    state.wallpaperPath,
     state.inputBuddy,
     state.localePreference,
     state.shortcuts,

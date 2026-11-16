@@ -21,10 +21,10 @@ const DEV_CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https: http: pidesk-media:",
+  "img-src 'self' data: blob: https: http: pidesk-media: pidesk-image:",
   "media-src 'self' pidesk-media:",
   "font-src 'self' data:",
-  "connect-src 'self' ws: wss:",
+  "connect-src 'self' ws: wss: pidesk-image:",
 ].join("; ");
 
 function devCsp(): Plugin {

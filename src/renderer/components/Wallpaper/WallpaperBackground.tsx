@@ -1,5 +1,11 @@
 import { type CSSProperties, useEffect, useRef, useState } from "react";
-import { wallpaperKindFromPath, wallpaperMediaUrl } from "../../../shared/wallpaper";
+import {
+  wallpaperFileName,
+  wallpaperKindFromPath,
+  wallpaperMediaUrl,
+} from "../../../shared/wallpaper";
+import { useT } from "../../hooks/useT";
+import { useUiStore } from "../../stores/uiStore";
 import { prefersReducedMotion } from "../../utils/animation";
 import styles from "./WallpaperBackground.module.css";
 
@@ -8,13 +14,30 @@ import styles from "./WallpaperBackground.module.css";
  * 上面盖一层随主题取色的遮罩（强度由设置里的 wallpaperDim 控制）。
  * 素材经主进程的 pidesk-media 协议提供，渲染层不直接读 file://。
  */
-export function WallpaperBackground({ path, dim }: { path: string; dim: number }) {
+export function WallpaperBackground({
+  path,
+  revision,
+  dim,
+}: {
+  path: string;
+  revision: number;
+  dim: number;
+}) {
+  const t = useT();
+  const { showToast } = useUiStore();
   const kind = wallpaperKindFromPath(path);
-  const src = wallpaperMediaUrl(path);
+  const src = wallpaperMediaUrl(path, revision);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  // 记住"失败的是哪一个源"：换图后 src 变了，失败态自然失效，不必再写一个重置 effect
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const failed = failedSrc === src;
+  const [failed, setFailed] = useState(false);
+  const reported = useRef(false);
+  const reportFailure = (): void => {
+    if (reported.current) return;
+    reported.current = true;
+    setFailed(true);
+    showToast(
+      t("settings.personalization.wallpaper.loadFailed", { name: wallpaperFileName(path) }),
+    );
+  };
 
   useEffect(() => {
     if (kind !== "video") return;
@@ -51,7 +74,7 @@ export function WallpaperBackground({ path, dim }: { path: string; dim: number }
           loop
           playsInline
           preload="auto"
-          onError={() => setFailedSrc(src)}
+          onError={reportFailure}
         />
       ) : (
         <img
@@ -60,7 +83,7 @@ export function WallpaperBackground({ path, dim }: { path: string; dim: number }
           alt=""
           draggable={false}
           decoding="async"
-          onError={() => setFailedSrc(src)}
+          onError={reportFailure}
         />
       )}
       <div className={styles.veil} style={{ "--wallpaper-dim": dim } as CSSProperties} />

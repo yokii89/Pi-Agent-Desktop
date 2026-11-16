@@ -1711,6 +1711,17 @@ export interface FsReadImageResult {
   byteLength: number;
 }
 
+/** 侧栏图片预览：进程内有效、绑定磁盘版本的 URL，不经 IPC 传输图片内容。 */
+export interface FsPreviewImageResult {
+  kind: "image";
+  url: string;
+  mime: string;
+  byteLength: number;
+}
+
+/** 侧栏专用读取结果；原 read/dataUrl 接口仍供附件、Markdown 与保存流程使用。 */
+export type FsPreviewResult = Exclude<FsReadResult, FsReadImageResult> | FsPreviewImageResult;
+
 /** PDF 页面数据，供渲染层 PDF.js 只读绘制。 */
 export interface FsReadPdfResult {
   kind: "pdf";
@@ -1773,6 +1784,8 @@ export const FS_IPC = {
   list: "pidesk:fs:list",
   /** 只读读取文件，按文本、图片、PDF、Office 或二进制分流（有大小上限）。 */
   read: "pidesk:fs:read",
+  /** 侧栏读取：图片只签发流式 URL，其他文件沿用 read 结果。 */
+  preview: "pidesk:fs:preview",
   /** 覆盖写入文本文件（就地编辑保存；带 mtime 冲突判定）。 */
   save: "pidesk:fs:save",
   /** 递归按文件名模糊搜索（跳过 node_modules/.git 等）。 */

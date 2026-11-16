@@ -12,6 +12,7 @@ export default defineConfig({
     include: [
       "view/**/*.test.ts",
       "window/**/*.test.ts",
+      "wallpaper/**/*.test.ts",
       "notification/**/*.test.ts",
       "browser/**/*.test.ts",
       "session/**/*.test.ts",
