@@ -671,6 +671,37 @@ export const settingsMessages = defineMessages({
     "en-US": "function explore() { return infinite(); }",
   },
 
+  "settings.personalization.inputEffect": { "zh-CN": "输入栏特效", "en-US": "Input effects" },
+  "settings.personalization.inputEffect.style": {
+    "zh-CN": "背景样式",
+    "en-US": "Background style",
+  },
+  "settings.personalization.inputEffect.description": {
+    "zh-CN":
+      "在最高思考档显示所选背景。输入时增强既有图案的速度与亮度；选择立即生效并保存。运行中边框独立显示。",
+    "en-US":
+      "Show the selected background at the highest thinking level. Typing increases the motion and brightness of existing patterns. Changes apply immediately and are saved. The running border remains independent.",
+  },
+  "settings.personalization.inputEffect.option.none": { "zh-CN": "关闭", "en-US": "Off" },
+  "settings.personalization.inputEffect.option.ember": { "zh-CN": "星火上浮", "en-US": "Embers" },
+  "settings.personalization.inputEffect.option.aurora": { "zh-CN": "极光谐振", "en-US": "Aurora" },
+  "settings.personalization.inputEffect.option.triforce": {
+    "zh-CN": "希卡法阵",
+    "en-US": "Sheikah circle",
+  },
+  "settings.personalization.inputEffect.option.nebula": {
+    "zh-CN": "静谧星云",
+    "en-US": "Quiet nebula",
+  },
+  "settings.personalization.inputEffect.preview": {
+    "zh-CN": "输入栏特效预览",
+    "en-US": "Input effect preview",
+  },
+  "settings.personalization.inputEffect.previewHint": {
+    "zh-CN": "在这里输入文字，预览所选特效…",
+    "en-US": "Type here to preview the selected effect…",
+  },
+
   "settings.personalization.group.thinkingAnimation": {
     "zh-CN": "思考动画",
     "en-US": "Thinking animation",

@@ -35,6 +35,11 @@ import {
   type InputBuddyKind,
   normalizeInputBuddy,
 } from "../../shared/inputBuddy";
+import {
+  DEFAULT_INPUT_EFFECT,
+  type InputEffect,
+  normalizeInputEffect,
+} from "../../shared/inputEffect";
 import { clampSessionStreamFontPx, DEFAULT_SESSION_STREAM_FONT_PX } from "../../shared/ipc";
 import { clampNavWidth, NAV_WIDTH_DEFAULT } from "../../shared/navWidth";
 import { DEFAULT_RAIL_STYLE, normalizeRailStyle, type RailStyle } from "../../shared/railStyles";
@@ -204,6 +209,7 @@ interface UiState {
   questionRailStyle: RailStyle;
   /** 会话 run 进行中的状态动画（设置 → 个性化）。 */
   thinkingAnimation: ThinkingAnimation;
+  inputEffect: InputEffect;
   /** 主题色偏好；实际系统色不存入此字段，见 applyAccentColor。 */
   accentColor: AccentColorPreference;
   /** 本地背景壁纸绝对路径（设置 → 个性化）；null = 主题纯色背景（docs/design/111）。 */
@@ -253,6 +259,7 @@ type UiAction =
   | { type: "setSessionStreamFont"; px: number }
   | { type: "setFontUiPreset"; preset: FontUiPreset }
   | { type: "setFontMonoPreset"; preset: FontMonoPreset }
+  | { type: "setInputEffect"; effect: InputEffect }
   | { type: "setQuestionRailStyle"; style: RailStyle }
   | { type: "setThinkingAnimation"; animation: ThinkingAnimation }
   | { type: "setAccentColor"; color: AccentColorPreference }
@@ -282,6 +289,7 @@ type UiAction =
       fontMonoPreset: FontMonoPreset;
       questionRailStyle: RailStyle;
       thinkingAnimation: ThinkingAnimation;
+      inputEffect: InputEffect;
       accentColor: AccentColorPreference;
       wallpaperPath: string | null;
       wallpaperDim: number;
@@ -326,6 +334,7 @@ const initialState: UiState = {
   fontMonoPreset: "default",
   questionRailStyle: DEFAULT_RAIL_STYLE,
   thinkingAnimation: DEFAULT_THINKING_ANIMATION,
+  inputEffect: DEFAULT_INPUT_EFFECT,
   accentColor: null,
   wallpaperPath: null,
   wallpaperRevision: 0,
@@ -478,6 +487,10 @@ function uiReducer(state: UiState, action: UiAction): UiState {
       if (state.questionRailStyle === style) return state;
       return { ...state, questionRailStyle: style };
     }
+    case "setInputEffect": {
+      const effect = normalizeInputEffect(action.effect);
+      return state.inputEffect === effect ? state : { ...state, inputEffect: effect };
+    }
     case "setThinkingAnimation": {
       const animation = normalizeThinkingAnimation(action.animation);
       if (state.thinkingAnimation === animation) return state;
@@ -572,6 +585,7 @@ function uiReducer(state: UiState, action: UiAction): UiState {
         fontMonoPreset: normalizeFontMonoPreset(action.fontMonoPreset),
         questionRailStyle: normalizeRailStyle(action.questionRailStyle),
         thinkingAnimation: normalizeThinkingAnimation(action.thinkingAnimation),
+        inputEffect: normalizeInputEffect(action.inputEffect),
         accentColor: normalizeAccentColor(action.accentColor),
         wallpaperPath: normalizeWallpaperPath(action.wallpaperPath),
         wallpaperDim: clampWallpaperDim(action.wallpaperDim),
@@ -647,6 +661,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
         fontMonoPreset: settings.fontMonoPreset ?? "default",
         questionRailStyle: settings.questionRailStyle ?? DEFAULT_RAIL_STYLE,
         thinkingAnimation: settings.thinkingAnimation ?? DEFAULT_THINKING_ANIMATION,
+        inputEffect: normalizeInputEffect(settings.inputEffect),
         accentColor: settings.accentColor ?? null,
         wallpaperPath: settings.wallpaperPath ?? null,
         wallpaperDim: settings.wallpaperDim ?? DEFAULT_WALLPAPER_DIM,
@@ -674,6 +689,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
       fontMonoPreset: state.fontMonoPreset,
       questionRailStyle: state.questionRailStyle,
       thinkingAnimation: state.thinkingAnimation,
+      inputEffect: state.inputEffect,
       accentColor: state.accentColor,
       inputBuddy: state.inputBuddy,
       locale: state.localePreference,
@@ -691,6 +707,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     state.fontMonoPreset,
     state.questionRailStyle,
     state.thinkingAnimation,
+    state.inputEffect,
     state.accentColor,
     state.inputBuddy,
     state.localePreference,

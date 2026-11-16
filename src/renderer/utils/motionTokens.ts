@@ -76,6 +76,28 @@ export const GLIDE_MOTION = {
   swap: 0.16,
 } as const;
 
+/** 输入栏 Canvas 特效的输入能量衰减，时间单位秒。 */
+export const INPUT_AURA_MOTION = {
+  strokeEnergy: 0.24,
+  energyMax: 1.8,
+  energyDecay: 0.85,
+  pulseDecay: 0.16,
+  speedResponse: 0.15,
+} as const;
+
+/** 对话目录：柔和起步，避免短时强缓出看起来像瞬时弹出。 */
+export const QUESTION_NAV_MOTION = {
+  openDelay: 90,
+  closeDelay: 180,
+  overlay: {
+    enterDuration: 0.32,
+    exitDuration: 0.22,
+    enterScale: 0.92,
+    enterX: -16,
+    ease: (progress: number) => progress * progress * (3 - 2 * progress),
+  },
+} as const;
+
 /**
  * 横向分段控件的橡皮筋动效令牌（docs/design/52，复刻 `docs/ui-design/rubber-segment-rubber-band.html`）。
  * 曲线复用 GLIDE_MOTION.easeOut、时间轴复用 glideMotion（同为封顶 60fps），

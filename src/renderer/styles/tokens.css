@@ -310,6 +310,20 @@
    */
   --session-stream-font-md: 16px;
   --session-stream-font-sm: 14px;
+  /* 左侧完整对话目录：紧凑宽度与长列表上限，字号复用正文小一档。 */
+  --question-directory-width: 380px;
+  --question-directory-list-height: 440px;
+  --question-directory-mark-width: 12px;
+  /* 输入栏特效的资源色：集中在主题令牌，Canvas 与预览共用。 */
+  --input-aura-gold: #f3c969;
+  --input-aura-nebula: #a855f7;
+  --input-aura-star-1: #ffffff;
+  --input-aura-star-2: #e0e7ff;
+  --input-aura-star-3: #c7d2fe;
+  --input-aura-star-4: #f5d0fe;
+  --input-aura-star-5: #bae6fd;
+  --input-aura-star-6: #fef3c7;
+  --input-effect-preview-height: 160px;
   /**
    * 工具调用展开区字号：恒定比正文流（--session-stream-font-md）小一号（-2px）。
    * 从 md 推导而不是复用 sm——sm 是独立档位，改 md 时不会跟，展开区会和正文同号。
@@ -434,6 +448,14 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
+  --input-aura-gold: #b8842a;
+  --input-aura-nebula: #8351b5;
+  --input-aura-star-1: #52607c;
+  --input-aura-star-2: #5c6b95;
+  --input-aura-star-3: #6c6aa1;
+  --input-aura-star-4: #9b638c;
+  --input-aura-star-5: #527d91;
+  --input-aura-star-6: #9b834f;
 
   /* 背景层（亮色 P2 校色，先保持同名变量可用） */
   --color-bg: #f5f5f7;

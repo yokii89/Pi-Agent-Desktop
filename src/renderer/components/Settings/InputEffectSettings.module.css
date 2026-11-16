@@ -1,0 +1,46 @@
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  width: 100%;
+  min-width: 0;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  min-height: var(--input-effect-preview-height);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+
+.editor {
+  flex: 1;
+  min-height: var(--input-effect-preview-height);
+  max-height: var(--input-effect-preview-height);
+  padding: var(--spacing-md);
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--session-stream-font-md);
+  color: var(--color-text);
+  outline: none;
+}
+
+.editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.editor:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--color-accent-border);
+}
+
+.caption {
+  padding: var(--spacing-xs) var(--spacing-md);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}

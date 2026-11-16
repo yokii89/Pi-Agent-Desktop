@@ -31,11 +31,12 @@ import glideStyles from "../ui/GlideList.module.css";
 import { Composer, type ComposerHandle } from "./Composer";
 import { FileAttachStrip } from "./FileAttachStrip";
 import { ImageAttachStrip } from "./ImageAttachStrip";
+import { InputAura } from "./InputAura";
+import auraStyles from "./InputAura.module.css";
 import { InputBuddy, type InputBuddyHandle } from "./InputBuddy/InputBuddy";
 import styles from "./TaskInput.module.css";
 import { TaskInputContextBar } from "./TaskInputContextBar";
 import { TaskInputToolbar } from "./TaskInputToolbar";
-import { ThinkingMaxAura } from "./ThinkingMaxAura";
 
 type SuggestKind = "file" | "slash" | null;
 
@@ -67,7 +68,7 @@ export function TaskInput({ variant }: TaskInputProps) {
     modelLabel,
     readUserHistory,
   } = useSessionMeta();
-  const { showToast, inputBuddy } = useUiStore();
+  const { showToast, inputBuddy, inputEffect } = useUiStore();
   const browser = useBrowserStore();
   const { currentProject } = useProjectStore();
   const {
@@ -130,6 +131,7 @@ export function TaskInput({ variant }: TaskInputProps) {
   /** 顶档 = 当前模型可用档位的最高档；单档（模型不支持思考）不算顶档。 */
   const thinkingAtTop =
     thinkingLevels.length > 1 && thinkingLevel === thinkingLevels[thinkingLevels.length - 1];
+  const auraActive = thinkingAtTop && inputEffect !== "none";
   // P0：modal / floating widget 打开期间禁用任务输入发送，避免与工具 Promise 双写
   // （docs/design/08 §12.1；floating widget 与 modal 同属阻断交互）
   const { hasBlockingViewFor, modeTransitioning, sendBlockedReason } = useExtensionViewStore();
@@ -841,8 +843,12 @@ export function TaskInput({ variant }: TaskInputProps) {
       )}
 
       <div
-        className={[styles.inputBox, variant === "session" ? styles.inputSession : ""].join(" ")}
-        data-max={thinkingAtTop ? "" : undefined}
+        className={[
+          styles.inputBox,
+          variant === "session" ? styles.inputSession : "",
+          auraActive ? auraStyles.surface : "",
+        ].join(" ")}
+        data-effect={auraActive ? inputEffect : undefined}
       >
         {/* 伙伴形象：骑在输入卡右上沿，纯装饰；姿态只跟随会话状态（设置 → 个性化）。
             排队托盘展开时收起，避免压住托盘右侧动作。 */}
@@ -857,8 +863,8 @@ export function TaskInput({ variant }: TaskInputProps) {
           />
         )}
 
-        {/* 思考等级顶档特效：顶档 = 当前模型可用档位的最高档（左下起辉走 .inputBox[data-max]::before） */}
-        {thinkingAtTop && <ThinkingMaxAura />}
+        {/* 与设置预览共用渲染器，保留最高思考档的激活条件。 */}
+        {thinkingAtTop && inputEffect !== "none" && <InputAura effect={inputEffect} />}
 
         {variant === "empty" && <TaskInputContextBar />}
 

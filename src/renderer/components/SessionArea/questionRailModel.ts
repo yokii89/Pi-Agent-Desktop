@@ -1,14 +1,12 @@
-import type { SessionEntry } from "../../stores/sessionTranscript";
+import type { SessionEntry, UserEntry } from "../../stores/sessionTranscript";
 import {
   parseUserMessageSegments,
   readableUserMessageWithImages,
 } from "../../utils/userMessageSegments";
 
 /**
- * 对话问题导航分段栏（QuestionRail）的纯逻辑，借鉴 ZCode `ConversationTurnNavigator`
- * （docs/design/34、docs/design/30 借鉴清单）。全部为无副作用纯函数，便于 vitest
- * 直接覆盖（遵循 renderer「只测纯逻辑不挂 DOM」惯例）；DOM 测量、滚动跟随、气泡
- * 定时与跳转校正见 QuestionRail.tsx。
+ * 左侧导航的问题分段与定位纯逻辑。DOM 测量及跳转校正见 QuestionRail.tsx，
+ * 完整目录的开合与键盘交互见 QuestionRailMenu.tsx。
  */
 
 /** 预览默认参数：与 ZCode turn navigator 对齐（220 字、前 2 段）。 */
@@ -21,7 +19,7 @@ export interface QuestionSegment {
   id: string;
   /** 在分段序列中的下标（0 起），激活/缩放/焦点导航都按它索引。 */
   index: number;
-  /** 悬停气泡展示的可读预览（已切段/压缩/截断；纯图消息为图片计数文案）。 */
+  /** 目录展示的可读预览；纯图片消息回退为图片计数文案。 */
   preview: string;
 }
 
@@ -69,6 +67,33 @@ export function buildQuestionSegments(entries: readonly SessionEntry[]): Questio
   return segments;
 }
 
+/** 按用户内容缓存目录；助手增量只扫描条目引用，不拼接整段历史正文。 */
+export function createQuestionSegmentsSelector() {
+  let users: readonly UserEntry[] = [];
+  let segments: QuestionSegment[] = [];
+  let previousLocale: string | undefined;
+  return (entries: readonly SessionEntry[], locale: string): QuestionSegment[] => {
+    let index = 0;
+    let changed = locale !== previousLocale;
+    for (const entry of entries) {
+      if (entry.kind !== "user") continue;
+      const previous = users[index++];
+      if (
+        !previous ||
+        previous.id !== entry.id ||
+        previous.text !== entry.text ||
+        (previous.images?.length ?? 0) !== (entry.images?.length ?? 0)
+      )
+        changed = true;
+    }
+    if (!changed && index === users.length) return segments;
+    users = entries.filter((entry): entry is UserEntry => entry.kind === "user");
+    previousLocale = locale;
+    segments = buildQuestionSegments(users);
+    return segments;
+  };
+}
+
 /** 单个问题行在滚动内容中的实测位置（相对内容顶部，px）。 */
 export interface QuestionRow {
   /** 对应 QuestionSegment.index。 */
@@ -95,36 +120,40 @@ export function pickActiveSegment(
 
   const viewportStart = finiteNonNegative(scrollTop);
   const viewportEnd = viewportStart + Math.max(1, finiteNonNegative(viewportHeight));
-  const normalized = rows
-    .map((row) => {
-      const start = finiteNonNegative(row.start);
-      return {
-        index: row.index,
-        start,
-        end: Math.max(start, finiteNonNegative(row.end)),
-      };
-    })
-    .sort((left, right) => left.start - right.start || left.index - right.index);
-
-  let nearest: (typeof normalized)[number] | undefined;
-  for (const row of normalized) {
-    if (row.end < viewportStart || row.start > viewportEnd) continue;
-    if (
-      nearest === undefined ||
-      Math.abs(row.start - viewportStart) < Math.abs(nearest.start - viewportStart)
-    ) {
-      nearest = row;
+  // 单次扫描保留原排序后的裁决顺序，避免每个滚动帧分配数组、对象并排序。
+  let nearest: number | undefined;
+  let nearestStart = Infinity;
+  let nearestDistance = Infinity;
+  let above: number | undefined;
+  let aboveStart = -Infinity;
+  let below: number | undefined;
+  let belowStart = Infinity;
+  for (const row of rows) {
+    const start = finiteNonNegative(row.start);
+    const end = Math.max(start, finiteNonNegative(row.end));
+    if (end >= viewportStart && start <= viewportEnd) {
+      const distance = Math.abs(start - viewportStart);
+      if (
+        distance < nearestDistance ||
+        (distance === nearestDistance &&
+          (start < nearestStart || (start === nearestStart && row.index < (nearest ?? Infinity))))
+      ) {
+        nearest = row.index;
+        nearestStart = start;
+        nearestDistance = distance;
+      }
+    }
+    if (start <= viewportStart) {
+      if (start > aboveStart || (start === aboveStart && row.index > (above ?? -Infinity))) {
+        above = row.index;
+        aboveStart = start;
+      }
+    } else if (start < belowStart || (start === belowStart && row.index < (below ?? Infinity))) {
+      below = row.index;
+      belowStart = start;
     }
   }
-  if (nearest !== undefined) return nearest.index;
-
-  // 无相交行：优先上方最后一行，其次下方第一行
-  let above: number | undefined;
-  for (const row of normalized) {
-    if (row.start <= viewportStart) above = row.index;
-  }
-  if (above !== undefined) return above;
-  return normalized.find((row) => row.start > viewportStart)?.index;
+  return nearest ?? above ?? below;
 }
 
 /**

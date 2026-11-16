@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SessionEntry } from "../../stores/sessionTranscript";
 import {
   buildQuestionSegments,
+  createQuestionSegmentsSelector,
   pickActiveSegment,
   previewFromText,
   type QuestionRow,
@@ -81,12 +82,78 @@ describe("buildQuestionSegments", () => {
   });
 });
 
+describe("createQuestionSegmentsSelector", () => {
+  it("助手流式更新和乐观状态确认复用目录引用", () => {
+    const select = createQuestionSegmentsSelector();
+    const first = user("u1", "正文");
+    const initial = select([first], "zh-CN");
+    expect(select([{ ...first }, { kind: "assistant", id: "a", blocks: [] }], "zh-CN")).toBe(
+      initial,
+    );
+  });
+
+  it("同长度改文、图片数量、顺序、删除与语言变化均失效", () => {
+    const select = createQuestionSegmentsSelector();
+    let entries = [user("u1", "甲"), user("u2", "乙")];
+    let previous = select(entries, "zh-CN");
+    for (const next of [
+      [user("u1", "丙"), entries[1]],
+      [user("u1", "丙", [{ src: "data:", mimeType: "image/png" }]), entries[1]],
+      [entries[1], entries[0]],
+      [entries[0]],
+      [],
+    ]) {
+      entries = next;
+      const result = select(entries, "zh-CN");
+      expect(result).not.toBe(previous);
+      expect(result).toEqual(buildQuestionSegments(entries));
+      previous = result;
+    }
+    expect(select(entries, "en-US")).not.toBe(previous);
+  });
+});
+
 describe("pickActiveSegment", () => {
   const rows: QuestionRow[] = [
     { index: 0, start: 0, end: 100 },
     { index: 1, start: 100, end: 300 },
     { index: 2, start: 300, end: 500 },
   ];
+
+  it("无序、相同起点与等距离候选保留原排序裁决", () => {
+    expect(
+      pickActiveSegment(
+        [
+          { index: 7, start: 120, end: 150 },
+          { index: 4, start: 80, end: 110 },
+          { index: 2, start: 80, end: 110 },
+        ],
+        100,
+        200,
+      ),
+    ).toBe(2);
+    expect(
+      pickActiveSegment(
+        [
+          { index: 2, start: 80, end: 90 },
+          { index: 4, start: 80, end: 90 },
+        ],
+        200,
+        50,
+      ),
+    ).toBe(4);
+    expect(
+      pickActiveSegment(
+        [
+          { index: 4, start: 80, end: 90 },
+          { index: 2, start: 80, end: 90 },
+        ],
+        0,
+        20,
+      ),
+    ).toBe(2);
+    expect(pickActiveSegment([{ index: 3, start: NaN, end: -1 }], NaN, Infinity)).toBe(3);
+  });
 
   it("空行返回 undefined", () => {
     expect(pickActiveSegment([], 0, 200)).toBeUndefined();

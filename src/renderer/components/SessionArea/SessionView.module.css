@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   /* 供问题导航分段栏（QuestionRail）的容器查询：宽度由 flex 布局决定、不依赖内容，
-     不影响现有布局；不加 paint containment，故 rail 右侧的预览气泡不会被裁剪。 */
+     不影响现有布局；不加 paint containment，故左侧问题目录不会被裁剪。 */
   container-type: inline-size;
 }
 

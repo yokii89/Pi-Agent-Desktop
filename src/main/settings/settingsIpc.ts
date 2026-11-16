@@ -3,6 +3,7 @@ import { normalizeAccentColor } from "../../shared/accentColor";
 import { isFontMonoPreset, isFontUiPreset } from "../../shared/fontPresets";
 import { isLocalePreference } from "../../shared/i18n";
 import { isInputBuddyKind } from "../../shared/inputBuddy";
+import { isInputEffect } from "../../shared/inputEffect";
 import type {
   BrowserRecentUrl,
   IpcResult,
@@ -251,6 +252,9 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
       case "inputBuddy":
         // 白名单外的值整项丢弃，不把脏 id 写进设置
         if (isInputBuddyKind(value)) clean.inputBuddy = value;
+        break;
+      case "inputEffect":
+        if (isInputEffect(value)) clean.inputEffect = value;
         break;
       case "thinkingAnimation":
         if (isThinkingAnimation(value)) clean.thinkingAnimation = value;

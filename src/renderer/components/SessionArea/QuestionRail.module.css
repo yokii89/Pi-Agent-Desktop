@@ -1,10 +1,4 @@
-/**
- * 对话问题导航分段栏样式（docs/design/34）。颜色/阴影/层级全走 tokens，不写死色值。
- * rail 挂在 SessionView .view（position:relative + container-type:inline-size）下，
- * absolute 左缘垂直居中；容器宽 < 960px 时通过 container query 隐藏（gutter 不够时
- * 避免压住文档流文字）。气泡在 rail 右侧、pointer-events:none，不被 track 的
- * overflow 裁剪（气泡是 nav 的子元素，nav 不裁剪）。
- */
+/** 左侧问题刻度与完整目录；挂在 .view 下以避开正文滚动盒的裁剪。 */
 
 .rail {
   position: absolute;
@@ -158,25 +152,82 @@
   border-color: var(--color-text);
 }
 
-/* 悬停预览气泡：320px 宽，弹在分段右侧，pointer-events:none */
-.bubble {
+/* 定位与缩放分层，避免进出场补间覆盖垂直居中的 transform。 */
+.directoryAnchor {
   position: absolute;
-  left: calc(100% + 8px);
-  width: 320px;
-  max-width: calc(100vw - 2rem);
-  /* 垂直居中对齐触发它的分段（top 由组件按实测位置写入） */
+  left: 0;
+  top: 50%;
   transform: translateY(-50%);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-  color: var(--color-text);
-  box-shadow: var(--shadow-overlay);
-  font-size: var(--font-size-md);
+}
+
+.directory {
+  composes: shell from "../ui/overlayShell.module.css";
+  width: min(var(--question-directory-width), calc(100cqw - var(--spacing-xl)));
+  padding: var(--spacing-sm);
+  transform-origin: left center;
+  color: var(--color-text-muted);
+  font-size: var(--session-stream-font-sm);
+}
+
+/* shell 默认为 fixed；定位由锚点承担，明确覆盖避免 CSS 打包顺序改变包含块。 */
+.directoryAnchor > .directory {
+  position: relative;
+  top: auto;
+  left: auto;
+  padding: var(--spacing-sm);
+  border-color: var(--color-border-strong);
+}
+
+.directoryList {
+  max-height: min(
+    var(--question-directory-list-height),
+    calc(var(--question-directory-max-height, 80vh) - var(--spacing-md) - 2px)
+  );
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.directoryRow {
+  --row-padding: var(--spacing-xs) var(--spacing-sm);
+  --row-gap: var(--spacing-md);
+  --row-font-size: var(--session-stream-font-sm);
+  min-height: var(--spacing-xl);
   line-height: 1.5;
-  white-space: pre-line;
-  overflow-wrap: anywhere;
-  pointer-events: none;
+}
+
+.directoryCurrent,
+.directoryRow:hover,
+.directoryRow:focus-visible {
+  color: var(--color-text-strong);
+}
+
+.directoryCurrent {
+  font-weight: 600;
+}
+
+.directoryRow:focus-visible {
+  outline: 2px solid var(--color-accent-border);
+  outline-offset: -2px;
+}
+
+.directoryLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directoryMark {
+  flex: 0 0 var(--question-directory-mark-width);
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.directoryCurrent .directoryMark {
+  opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
