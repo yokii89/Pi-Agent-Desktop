@@ -1,0 +1,526 @@
+diff --git a/dist/docx-preview.d.ts b/dist/docx-preview.d.ts
+index 0ab83eb46ec690b093e59a31bf879f43501ff26d..0c606c93ab7c74cfc0604b9d8d56d2d251c42c1b 100644
+--- a/dist/docx-preview.d.ts
++++ b/dist/docx-preview.d.ts
+@@ -38,6 +38,15 @@ export interface Options {
+ 
+ //stub
+ export type WordDocument = any;
++export interface PageRenderer {
++    styles: Node[];
++    length: number;
++    get(index: number): Promise<HTMLElement>;
++    getText(index: number): { text: string; headingPath: string[]; headings: { offset: number; path: string[] }[] };
++}
++/** PiDesk patch: opt-in lazy pages; existing renderAsync semantics remain unchanged. */
++export declare function createPageRenderer(data: Uint8Array, options?: Partial<Options> & { signal?: AbortSignal; pageElementLimit?: number }): Promise<PageRenderer>;
++
+ export declare const defaultOptions: Options;
+ export declare function parseAsync(data: Blob | any, userOptions?: Partial<Options>): Promise<WordDocument>;
+ export declare function renderDocument(document: WordDocument, userOptions?: Partial<Options>): Promise<Node[]>;
+diff --git a/dist/docx-preview.js b/dist/docx-preview.js
+index 99b83667b7cdd7b7e75e634b293b10e08302d550..3a30f33801f5e2fddad41583c0e79d244e78266f 100644
+--- a/dist/docx-preview.js
++++ b/dist/docx-preview.js
+@@ -238,7 +238,11 @@
+             if (this._package.options.keepOrigin) {
+                 this._xmlDocument = xmlDoc;
+             }
+-            this.parseXml(xmlDoc.firstElementChild);
++            if (this._package.options.pageView) {
++                this._package.options.signal?.throwIfAborted();
++                await new Promise(resolve => setTimeout(resolve, 0));
++            }
++            await this.parseXml(xmlDoc.firstElementChild);
+         }
+         save() {
+             this._package.update(this.path, serializeXmlString(this._xmlDocument));
+@@ -350,8 +354,10 @@
+             super(pkg, path);
+             this._documentParser = parser;
+         }
+-        parseXml(root) {
+-            this.body = this._documentParser.parseDocumentFile(root);
++        async parseXml(root) {
++            this.body = this._package.options.pageView
++                ? await this._documentParser.parseDocumentFileAsync(root, this._package.options.signal)
++                : this._documentParser.parseDocumentFile(root);
+         }
+     }
+ 
+@@ -1471,9 +1477,30 @@
+             }
+             return result;
+         }
+-        parseBodyElements(element) {
++        async parseDocumentFileAsync(xmlDoc, signal) {
++            const body = globalXmlParser.element(xmlDoc, "body");
++            const background = globalXmlParser.element(xmlDoc, "background");
++            const section = globalXmlParser.element(body, "sectPr");
++            const children = [];
++            const elements = globalXmlParser.elements(body);
++            let deadline = performance.now() + 8;
++            for (const element of elements) {
++                signal?.throwIfAborted();
++                children.push(...this.parseBodyElements(body, [element]));
++                if (performance.now() >= deadline) {
++                    await new Promise(resolve => setTimeout(resolve, 0));
++                    deadline = performance.now() + 8;
++                }
++            }
++            return {
++                type: DomType.Document, children,
++                props: section ? parseSectionProperties(section, globalXmlParser) : {},
++                cssStyle: background ? this.parseBackground(background) : {},
++            };
++        }
++        parseBodyElements(element, elements = globalXmlParser.elements(element)) {
+             var children = [];
+-            for (const elem of globalXmlParser.elements(element)) {
++            for (const elem of elements) {
+                 switch (elem.localName) {
+                     case "p":
+                         children.push(this.parseParagraph(elem));
+@@ -2962,6 +2989,9 @@
+             }
+             if (!options.ignoreFonts && document.fontTablePart)
+                 result.push(...await this.renderFontTable(document.fontTablePart));
++            if (options.pageView) {
++                return this.createPageView(document.documentPart.body, result);
++            }
+             var sectionElements = this.renderSections(document.documentPart.body);
+             if (this.options.inWrapper) {
+                 result.push(this.renderWrapper(sectionElements));
+@@ -3129,6 +3159,148 @@
+             }
+             return this.h({ tagName: "article", style });
+         }
++        createPageView(document, styles) {
++            this.processElement(document);
++            const sections = this.splitBySection(document.children, document.props);
++            const sourcePages = this.groupByPageBreaks(sections);
++            const pages = [];
++            const paragraphLimit = this.options.pageElementLimit || 250;
++            for (const sourcePage of sourcePages) {
++                let page = [];
++                let size = 0;
++                for (const section of sourcePage) {
++                    for (let at = 0; at < section.elements.length;) {
++                        const count = Math.min(paragraphLimit - size, section.elements.length - at);
++                        page.push({ ...section, elements: section.elements.slice(at, at + count) });
++                        at += count;
++                        size += count;
++                        if (size >= paragraphLimit) { pages.push(page); page = []; size = 0; }
++                    }
++                }
++                if (page.length) pages.push(page);
++            }
++            const plainText = element => {
++                if (element.fieldRun || element.type === DomType.Deleted || element.type === DomType.DeletedText) return "";
++                if (element.type === DomType.Text) return element.text ?? "";
++                if (element.type === DomType.Tab) return "\t";
++                if (element.type === DomType.Break) return "\n";
++                const text = (element.children ?? []).map(plainText).join("");
++                return text + (element.type === DomType.Paragraph ? "\n" : element.type === DomType.Cell ? "\t" : "");
++            };
++            const outline = element => element.outlineLevel ?? this.findStyle(element.styleName)?.paragraphProps?.outlineLevel;
++            const activeHeadings = [];
++            const pageHeadings = [];
++            const endnoteIds = [];
++            const numberings = this.document.numberingPart?.domNumberings ?? [];
++            const counters = new Map(numberings.filter(num => num.levelText).map(num => [this.numberingCounter(num.id, num.level), num.start - 1]));
++            const visit = element => {
++                if (element.type === DomType.EndnoteReference && !endnoteIds.includes(element.id)) endnoteIds.push(element.id);
++                if (element.type === DomType.Paragraph) {
++                    const level = outline(element);
++                    if (Number.isInteger(level) && level >= 0 && level < 9) { activeHeadings.length = level; activeHeadings[level] = plainText(element).trim(); }
++                    const numbering = element.numbering ?? this.findStyle(element.styleName)?.paragraphProps?.numbering;
++                    if (numbering) {
++                        const counter = this.numberingCounter(numbering.id, numbering.level);
++                        if (counters.has(counter)) counters.set(counter, counters.get(counter) + 1);
++                        for (const next of numberings) {
++                            if (next.id == numbering.id && next.level === numbering.level + 1 && next.levelText) counters.set(this.numberingCounter(next.id, next.level), next.start - 1);
++                        }
++                    }
++                }
++                element.children?.forEach(visit);
++            };
++            const pageCounters = pages.map(page => {
++                pageHeadings.push([...activeHeadings]);
++                const reset = [...counters].map(([name, value]) => `${name} ${value}`).join(" ");
++                for (const section of page) section.elements.forEach(visit);
++                return reset;
++            });
++            this.pageEndnoteIds = endnoteIds;
++            return {
++                styles,
++                length: pages.length,
++                getText: index => {
++                    const page = pages[index];
++                    if (!page) throw new RangeError("Page index out of range");
++                    this.options.signal?.throwIfAborted();
++                    let text = "";
++                    const headings = [];
++                    const trail = [...pageHeadings[index]];
++                    const notes = [];
++                    const collectNotes = element => {
++                        if (element.type === DomType.FootnoteReference) notes.push(element.id);
++                        element.children?.forEach(collectNotes);
++                    };
++                    const headerFooter = (props, refs, first) => {
++                        const ref = (props.titlePage && first ? refs?.find(ref => ref.type === "first") : null)
++                            ?? (index % 2 === 1 && this.document.settingsPart?.settings?.evenAndOddHeaders ? refs?.find(ref => ref.type === "even") : null)
++                            ?? refs?.find(ref => ref.type === "default");
++                        const part = ref && this.document.findPartByRelId(ref.id, this.document.documentPart);
++                        if (part?.rootElement) text += plainText(part.rootElement);
++                    };
++                    const firstProps = page[0].sectProps;
++                    const prevProps = pages[index - 1]?.at(-1)?.sectProps;
++                    this.options.renderHeaders && headerFooter(firstProps, firstProps.headerRefs, firstProps !== prevProps);
++                    for (const section of page) for (const element of section.elements) {
++                        const level = element.type === DomType.Paragraph ? outline(element) : undefined;
++                        if (Number.isInteger(level) && level >= 0 && level < 9) {
++                            trail.length = level; trail[level] = plainText(element).trim();
++                            headings.push({ offset: text.length, path: trail.filter(Boolean) });
++                        }
++                        text += plainText(element);
++                        collectNotes(element);
++                    }
++                    if (this.options.renderFootnotes) for (const id of notes) if (this.footnoteMap[id]) text += plainText(this.footnoteMap[id]);
++                    if (this.options.renderEndnotes && index === pages.length - 1) for (const id of endnoteIds) if (this.endnoteMap[id]) text += plainText(this.endnoteMap[id]);
++                    const lastProps = page.at(-1).sectProps;
++                    this.options.renderFooters && headerFooter(lastProps, lastProps.footerRefs, lastProps !== prevProps);
++                    return { text, headingPath: [...pageHeadings[index]], headings };
++                },
++                get: async index => {
++                    const page = pages[index];
++                    if (!page) throw new RangeError("Page index out of range");
++                    this.options.signal?.throwIfAborted();
++                    this.tasks = [];
++                    this.postRenderTasks = [];
++                    this.currentFootnoteIds = [];
++                    this.currentEndnoteIds = [];
++                    let props = page[0].sectProps;
++                    const prevProps = pages[index - 1]?.at(-1)?.sectProps;
++                    const pageElement = this.createPageElement(this.className, props, document.cssStyle);
++                    if (pageCounters[index]) pageElement.style.counterReset = pageCounters[index];
++                    this.options.renderHeaders && this.renderHeaderFooter(props.headerRefs, props, index, prevProps != props, pageElement);
++                    let deadline = performance.now() + 8;
++                    for (const section of page) {
++                        const contentElement = this.createSectionContent(section.sectProps);
++                        for (const element of section.elements) {
++                            this.options.signal?.throwIfAborted();
++                            this.renderElements([element], contentElement);
++                            if (performance.now() >= deadline) {
++                                await new Promise(resolve => setTimeout(resolve, 0));
++                                deadline = performance.now() + 8;
++                            }
++                        }
++                        pageElement.appendChild(contentElement);
++                        props = section.sectProps;
++                    }
++                    if (this.options.renderFootnotes) {
++                        const notes = this.renderNotes(this.currentFootnoteIds, this.footnoteMap);
++                        notes && pageElement.appendChild(notes);
++                    }
++                    if (this.options.renderEndnotes && index === pages.length - 1) {
++                        const notes = this.renderNotes(endnoteIds, this.endnoteMap);
++                        notes && pageElement.appendChild(notes);
++                    }
++                    this.options.renderFooters && this.renderHeaderFooter(props.footerRefs, props, index, prevProps != props, pageElement);
++                    this.postRenderTasks.forEach(task => task());
++                    await Promise.allSettled(this.tasks);
++                    this.options.signal?.throwIfAborted();
++                    this.tasks = [];
++                    this.postRenderTasks = [];
++                    return pageElement;
++                }
++            };
++        }
+         renderSections(document) {
+             const result = [];
+             this.processElement(document);
+@@ -3535,6 +3707,8 @@ section.${c}>footer { z-index: 1; }
+         renderParagraph(elem) {
+             var result = this.toHTML(elem, ns.html, "p");
+             const style = this.findStyle(elem.styleName);
++            const outlineLevel = elem.outlineLevel ?? style?.paragraphProps?.outlineLevel;
++            if (this.options.pageView && Number.isInteger(outlineLevel) && outlineLevel >= 0 && outlineLevel < 9) result.setAttribute("data-office-heading-level", String(outlineLevel));
+             elem.tabs ?? (elem.tabs = style?.paragraphProps?.tabs);
+             const numbering = elem.numbering ?? style?.paragraphProps?.numbering;
+             if (numbering) {
+@@ -3661,6 +3835,7 @@ section.${c}>footer { z-index: 1; }
+             return this.h({ tagName: "sup", children: [`${this.currentFootnoteIds.length}`] });
+         }
+         renderEndnoteReference(elem) {
++            if (this.pageEndnoteIds) return this.h({ tagName: "sup", children: [`${this.pageEndnoteIds.indexOf(elem.id) + 1}`] });
+             this.currentEndnoteIds.push(elem.id);
+             return this.h({ tagName: "sup", children: [`${this.currentEndnoteIds.length}`] });
+         }
+@@ -4008,6 +4183,13 @@ section.${c}>footer { z-index: 1; }
+         return doc;
+     }
+ 
++    async function createPageRenderer(data, userOptions) {
++        const options = { ...defaultOptions, ...userOptions, inWrapper: false, pageView: true };
++        const document = await parseAsync(data, options);
++        options.signal?.throwIfAborted();
++        return new HtmlRenderer().render(document, options);
++    }
++    exports.createPageRenderer = createPageRenderer;
+     exports.defaultOptions = defaultOptions;
+     exports.parseAsync = parseAsync;
+     exports.renderAsync = renderAsync;
+diff --git a/dist/docx-preview.mjs b/dist/docx-preview.mjs
+index febba6e335804b25c90670989d493061c6255aa5..0255501f552645980c18b8737b5f8aae6339ad5a 100644
+--- a/dist/docx-preview.mjs
++++ b/dist/docx-preview.mjs
+@@ -234,7 +234,11 @@ class Part {
+         if (this._package.options.keepOrigin) {
+             this._xmlDocument = xmlDoc;
+         }
+-        this.parseXml(xmlDoc.firstElementChild);
++        if (this._package.options.pageView) {
++            this._package.options.signal?.throwIfAborted();
++            await new Promise(resolve => setTimeout(resolve, 0));
++        }
++        await this.parseXml(xmlDoc.firstElementChild);
+     }
+     save() {
+         this._package.update(this.path, serializeXmlString(this._xmlDocument));
+@@ -346,8 +350,10 @@ class DocumentPart extends Part {
+         super(pkg, path);
+         this._documentParser = parser;
+     }
+-    parseXml(root) {
+-        this.body = this._documentParser.parseDocumentFile(root);
++    async parseXml(root) {
++        this.body = this._package.options.pageView
++            ? await this._documentParser.parseDocumentFileAsync(root, this._package.options.signal)
++            : this._documentParser.parseDocumentFile(root);
+     }
+ }
+ 
+@@ -1467,9 +1473,30 @@ class DocumentParser {
+         }
+         return result;
+     }
+-    parseBodyElements(element) {
++    async parseDocumentFileAsync(xmlDoc, signal) {
++        const body = globalXmlParser.element(xmlDoc, "body");
++        const background = globalXmlParser.element(xmlDoc, "background");
++        const section = globalXmlParser.element(body, "sectPr");
++        const children = [];
++        const elements = globalXmlParser.elements(body);
++        let deadline = performance.now() + 8;
++        for (const element of elements) {
++            signal?.throwIfAborted();
++            children.push(...this.parseBodyElements(body, [element]));
++            if (performance.now() >= deadline) {
++                await new Promise(resolve => setTimeout(resolve, 0));
++                deadline = performance.now() + 8;
++            }
++        }
++        return {
++            type: DomType.Document, children,
++            props: section ? parseSectionProperties(section, globalXmlParser) : {},
++            cssStyle: background ? this.parseBackground(background) : {},
++        };
++    }
++    parseBodyElements(element, elements = globalXmlParser.elements(element)) {
+         var children = [];
+-        for (const elem of globalXmlParser.elements(element)) {
++        for (const elem of elements) {
+             switch (elem.localName) {
+                 case "p":
+                     children.push(this.parseParagraph(elem));
+@@ -2958,6 +2985,9 @@ class HtmlRenderer {
+         }
+         if (!options.ignoreFonts && document.fontTablePart)
+             result.push(...await this.renderFontTable(document.fontTablePart));
++        if (options.pageView) {
++            return this.createPageView(document.documentPart.body, result);
++        }
+         var sectionElements = this.renderSections(document.documentPart.body);
+         if (this.options.inWrapper) {
+             result.push(this.renderWrapper(sectionElements));
+@@ -3125,6 +3155,148 @@ class HtmlRenderer {
+         }
+         return this.h({ tagName: "article", style });
+     }
++    createPageView(document, styles) {
++        this.processElement(document);
++        const sections = this.splitBySection(document.children, document.props);
++        const sourcePages = this.groupByPageBreaks(sections);
++        const pages = [];
++        const paragraphLimit = this.options.pageElementLimit || 250;
++        for (const sourcePage of sourcePages) {
++            let page = [];
++            let size = 0;
++            for (const section of sourcePage) {
++                for (let at = 0; at < section.elements.length;) {
++                    const count = Math.min(paragraphLimit - size, section.elements.length - at);
++                    page.push({ ...section, elements: section.elements.slice(at, at + count) });
++                    at += count;
++                    size += count;
++                    if (size >= paragraphLimit) { pages.push(page); page = []; size = 0; }
++                }
++            }
++            if (page.length) pages.push(page);
++        }
++        const plainText = element => {
++            if (element.fieldRun || element.type === DomType.Deleted || element.type === DomType.DeletedText) return "";
++            if (element.type === DomType.Text) return element.text ?? "";
++            if (element.type === DomType.Tab) return "\t";
++            if (element.type === DomType.Break) return "\n";
++            const text = (element.children ?? []).map(plainText).join("");
++            return text + (element.type === DomType.Paragraph ? "\n" : element.type === DomType.Cell ? "\t" : "");
++        };
++        const outline = element => element.outlineLevel ?? this.findStyle(element.styleName)?.paragraphProps?.outlineLevel;
++        const activeHeadings = [];
++        const pageHeadings = [];
++        const endnoteIds = [];
++        const numberings = this.document.numberingPart?.domNumberings ?? [];
++        const counters = new Map(numberings.filter(num => num.levelText).map(num => [this.numberingCounter(num.id, num.level), num.start - 1]));
++        const visit = element => {
++            if (element.type === DomType.EndnoteReference && !endnoteIds.includes(element.id)) endnoteIds.push(element.id);
++            if (element.type === DomType.Paragraph) {
++                const level = outline(element);
++                if (Number.isInteger(level) && level >= 0 && level < 9) { activeHeadings.length = level; activeHeadings[level] = plainText(element).trim(); }
++                const numbering = element.numbering ?? this.findStyle(element.styleName)?.paragraphProps?.numbering;
++                if (numbering) {
++                    const counter = this.numberingCounter(numbering.id, numbering.level);
++                    if (counters.has(counter)) counters.set(counter, counters.get(counter) + 1);
++                    for (const next of numberings) {
++                        if (next.id == numbering.id && next.level === numbering.level + 1 && next.levelText) counters.set(this.numberingCounter(next.id, next.level), next.start - 1);
++                    }
++                }
++            }
++            element.children?.forEach(visit);
++        };
++        const pageCounters = pages.map(page => {
++            pageHeadings.push([...activeHeadings]);
++            const reset = [...counters].map(([name, value]) => `${name} ${value}`).join(" ");
++            for (const section of page) section.elements.forEach(visit);
++            return reset;
++        });
++        this.pageEndnoteIds = endnoteIds;
++        return {
++            styles,
++            length: pages.length,
++            getText: index => {
++                const page = pages[index];
++                if (!page) throw new RangeError("Page index out of range");
++                this.options.signal?.throwIfAborted();
++                let text = "";
++                const headings = [];
++                const trail = [...pageHeadings[index]];
++                const notes = [];
++                const collectNotes = element => {
++                    if (element.type === DomType.FootnoteReference) notes.push(element.id);
++                    element.children?.forEach(collectNotes);
++                };
++                const headerFooter = (props, refs, first) => {
++                    const ref = (props.titlePage && first ? refs?.find(ref => ref.type === "first") : null)
++                        ?? (index % 2 === 1 && this.document.settingsPart?.settings?.evenAndOddHeaders ? refs?.find(ref => ref.type === "even") : null)
++                        ?? refs?.find(ref => ref.type === "default");
++                    const part = ref && this.document.findPartByRelId(ref.id, this.document.documentPart);
++                    if (part?.rootElement) text += plainText(part.rootElement);
++                };
++                const firstProps = page[0].sectProps;
++                const prevProps = pages[index - 1]?.at(-1)?.sectProps;
++                this.options.renderHeaders && headerFooter(firstProps, firstProps.headerRefs, firstProps !== prevProps);
++                for (const section of page) for (const element of section.elements) {
++                    const level = element.type === DomType.Paragraph ? outline(element) : undefined;
++                    if (Number.isInteger(level) && level >= 0 && level < 9) {
++                        trail.length = level; trail[level] = plainText(element).trim();
++                        headings.push({ offset: text.length, path: trail.filter(Boolean) });
++                    }
++                    text += plainText(element);
++                    collectNotes(element);
++                }
++                if (this.options.renderFootnotes) for (const id of notes) if (this.footnoteMap[id]) text += plainText(this.footnoteMap[id]);
++                if (this.options.renderEndnotes && index === pages.length - 1) for (const id of endnoteIds) if (this.endnoteMap[id]) text += plainText(this.endnoteMap[id]);
++                const lastProps = page.at(-1).sectProps;
++                this.options.renderFooters && headerFooter(lastProps, lastProps.footerRefs, lastProps !== prevProps);
++                return { text, headingPath: [...pageHeadings[index]], headings };
++            },
++            get: async index => {
++                const page = pages[index];
++                if (!page) throw new RangeError("Page index out of range");
++                this.options.signal?.throwIfAborted();
++                this.tasks = [];
++                this.postRenderTasks = [];
++                this.currentFootnoteIds = [];
++                this.currentEndnoteIds = [];
++                let props = page[0].sectProps;
++                const prevProps = pages[index - 1]?.at(-1)?.sectProps;
++                const pageElement = this.createPageElement(this.className, props, document.cssStyle);
++                if (pageCounters[index]) pageElement.style.counterReset = pageCounters[index];
++                this.options.renderHeaders && this.renderHeaderFooter(props.headerRefs, props, index, prevProps != props, pageElement);
++                let deadline = performance.now() + 8;
++                for (const section of page) {
++                    const contentElement = this.createSectionContent(section.sectProps);
++                    for (const element of section.elements) {
++                        this.options.signal?.throwIfAborted();
++                        this.renderElements([element], contentElement);
++                        if (performance.now() >= deadline) {
++                            await new Promise(resolve => setTimeout(resolve, 0));
++                            deadline = performance.now() + 8;
++                        }
++                    }
++                    pageElement.appendChild(contentElement);
++                    props = section.sectProps;
++                }
++                if (this.options.renderFootnotes) {
++                    const notes = this.renderNotes(this.currentFootnoteIds, this.footnoteMap);
++                    notes && pageElement.appendChild(notes);
++                }
++                if (this.options.renderEndnotes && index === pages.length - 1) {
++                    const notes = this.renderNotes(endnoteIds, this.endnoteMap);
++                    notes && pageElement.appendChild(notes);
++                }
++                this.options.renderFooters && this.renderHeaderFooter(props.footerRefs, props, index, prevProps != props, pageElement);
++                this.postRenderTasks.forEach(task => task());
++                await Promise.allSettled(this.tasks);
++                this.options.signal?.throwIfAborted();
++                this.tasks = [];
++                this.postRenderTasks = [];
++                return pageElement;
++            }
++        };
++    }
+     renderSections(document) {
+         const result = [];
+         this.processElement(document);
+@@ -3531,6 +3703,8 @@ section.${c}>footer { z-index: 1; }
+     renderParagraph(elem) {
+         var result = this.toHTML(elem, ns.html, "p");
+         const style = this.findStyle(elem.styleName);
++        const outlineLevel = elem.outlineLevel ?? style?.paragraphProps?.outlineLevel;
++        if (this.options.pageView && Number.isInteger(outlineLevel) && outlineLevel >= 0 && outlineLevel < 9) result.setAttribute("data-office-heading-level", String(outlineLevel));
+         elem.tabs ?? (elem.tabs = style?.paragraphProps?.tabs);
+         const numbering = elem.numbering ?? style?.paragraphProps?.numbering;
+         if (numbering) {
+@@ -3657,6 +3831,7 @@ section.${c}>footer { z-index: 1; }
+         return this.h({ tagName: "sup", children: [`${this.currentFootnoteIds.length}`] });
+     }
+     renderEndnoteReference(elem) {
++        if (this.pageEndnoteIds) return this.h({ tagName: "sup", children: [`${this.pageEndnoteIds.indexOf(elem.id) + 1}`] });
+         this.currentEndnoteIds.push(elem.id);
+         return this.h({ tagName: "sup", children: [`${this.currentEndnoteIds.length}`] });
+     }
+@@ -4004,5 +4179,12 @@ async function renderAsync(data, bodyContainer, styleContainer, userOptions) {
+     return doc;
+ }
+ 
+-export { defaultOptions, parseAsync, renderAsync, renderDocument };
++async function createPageRenderer(data, userOptions) {
++    const options = { ...defaultOptions, ...userOptions, inWrapper: false, pageView: true };
++    const document = await parseAsync(data, options);
++    options.signal?.throwIfAborted();
++    return new HtmlRenderer().render(document, options);
++}
++
++export { defaultOptions, parseAsync, renderAsync, renderDocument, createPageRenderer };
+ //# sourceMappingURL=docx-preview.mjs.map

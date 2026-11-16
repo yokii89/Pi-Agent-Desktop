@@ -79,6 +79,139 @@ export const panelMessages = defineMessages({
   "panels.files.notebookCode": { "zh-CN": "代码", "en-US": "Code" },
   "panels.files.notebookMarkdown": { "zh-CN": "Markdown", "en-US": "Markdown" },
   "panels.files.notebookOutput": { "zh-CN": "输出", "en-US": "Output" },
+  "panels.files.office.searchTitle": {
+    "zh-CN": "搜索文档（Ctrl+F）",
+    "en-US": "Search document (Ctrl+F)",
+  },
+  "panels.files.office.searchPlaceholder": {
+    "zh-CN": "搜索文字，Enter 跳到下一个结果",
+    "en-US": "Search text; Enter for next result",
+  },
+  "panels.files.office.searchProgress": {
+    "zh-CN": "正在搜索 · {processed} / {total}",
+    "en-US": "Searching · {processed} / {total}",
+  },
+  "panels.files.office.searchCount": { "zh-CN": "找到 {count} 个结果", "en-US": "{count} results" },
+  "panels.files.office.searchCancelled": {
+    "zh-CN": "搜索已停止，保留已找到的结果",
+    "en-US": "Search stopped; results found so far are retained",
+  },
+  "panels.files.office.cancelSearch": { "zh-CN": "停止搜索", "en-US": "Stop search" },
+  "panels.files.office.searchFailed": {
+    "zh-CN": "搜索未完成，请重试",
+    "en-US": "Search could not complete. Try again.",
+  },
+  "panels.files.office.searchLimited": {
+    "zh-CN": "已达到搜索上限，当前显示部分结果。可缩小关键词后重试。",
+    "en-US": "Search limit reached; only partial results are shown. Try a more specific query.",
+  },
+  "panels.files.office.searchDocumentScope": {
+    "zh-CN": "搜索文档文字和表格，不含图片内文字",
+    "en-US": "Search document text and tables; text inside images is excluded",
+  },
+  "panels.files.office.searchPreviewScope": {
+    "zh-CN": "当前工作表的预览范围",
+    "en-US": "Current worksheet's preview range",
+  },
+  "panels.files.office.searchWorkbookScope": { "zh-CN": "整个工作簿", "en-US": "Entire workbook" },
+  "panels.files.office.searchWorkbook": {
+    "zh-CN": "搜索整个工作簿",
+    "en-US": "Search entire workbook",
+  },
+  "panels.files.office.slideNumber": { "zh-CN": "幻灯片 {page}", "en-US": "Slide {page}" },
+  "panels.files.office.readingPageNumber": {
+    "zh-CN": "阅读页 {page}",
+    "en-US": "Reading page {page}",
+  },
+  "panels.files.office.slideLabel": { "zh-CN": "幻灯片", "en-US": "Slide" },
+  "panels.files.office.readingPage": { "zh-CN": "阅读页", "en-US": "Reading page" },
+  "panels.files.office.rowBatch": { "zh-CN": "表格页", "en-US": "Table page" },
+  "panels.files.office.jumpPage": { "zh-CN": "跳转到页码", "en-US": "Page to jump to" },
+  "panels.files.office.goPage": { "zh-CN": "跳转", "en-US": "Go to page" },
+  "panels.files.office.invalidPage": {
+    "zh-CN": "请输入 1–{total} 之间的页码",
+    "en-US": "Enter a page between 1 and {total}",
+  },
+  "panels.files.office.quoteCells": {
+    "zh-CN": "工作表：{sheet} · 单元格：{range}",
+    "en-US": "Worksheet: {sheet} · Cells: {range}",
+  },
+  "panels.files.office.quoteHeading": {
+    "zh-CN": "标题路径：{heading}",
+    "en-US": "Heading path: {heading}",
+  },
+  "panels.files.office.quoteReadingPage": {
+    "zh-CN": "阅读页 {page}（非原文档打印页码）",
+    "en-US": "Reading page {page} (not the original printed page number)",
+  },
+  "panels.files.office.quoteOriginal": { "zh-CN": "原文片段：", "en-US": "Original excerpt:" },
+  "panels.files.office.document": { "zh-CN": "办公文档预览", "en-US": "Office document preview" },
+  "panels.files.office.loading": { "zh-CN": "正在解析文档…", "en-US": "Loading document…" },
+  "panels.files.office.slide": {
+    "zh-CN": "第 {page} / {total} 张",
+    "en-US": "Slide {page} of {total}",
+  },
+  "panels.files.office.sheet": { "zh-CN": "工作表", "en-US": "Worksheet" },
+  "panels.files.office.row": { "zh-CN": "行号", "en-US": "Row number" },
+  "panels.files.office.copyCells": {
+    "zh-CN": "复制预览范围内的单元格",
+    "en-US": "Copy cells in preview range",
+  },
+  "panels.files.office.previousRows": { "zh-CN": "上一批行", "en-US": "Previous rows" },
+  "panels.files.office.nextRows": { "zh-CN": "下一批行", "en-US": "Next rows" },
+  "panels.files.office.rowPage": {
+    "zh-CN": "第 {start}–{end} 行 · 可预览 {total} 行",
+    "en-US": "Rows {start}–{end} · {total} rows available",
+  },
+  "panels.files.office.range": { "zh-CN": "预览范围：{range}", "en-US": "Preview range: {range}" },
+  "panels.files.office.sheetSize": {
+    "zh-CN": "{rows} 行 × {columns} 列",
+    "en-US": "{rows} rows × {columns} columns",
+  },
+  "panels.files.office.sheetTruncated": {
+    "zh-CN": "预览 {rows} 行、{columns} 列（工作表共 {totalRows} 行、{totalColumns} 列）",
+    "en-US":
+      "Previewing {rows} rows and {columns} columns ({totalRows} rows, {totalColumns} columns in the worksheet)",
+  },
+  "panels.files.office.valuesOnly": {
+    "zh-CN": "仅预览单元格数据；公式使用已保存的结果，不显示图表和图片。",
+    "en-US": "Cell values only. Formulas use saved results; charts and images are not shown.",
+  },
+  "panels.files.office.layoutNote": {
+    "zh-CN": "只读预览，复杂排版可能与原文档不同。长文档会分成阅读页。",
+    "en-US":
+      "Read-only preview. Complex layouts may differ; long documents are split into reading pages.",
+  },
+  "panels.files.office.legacy": {
+    "zh-CN": "此格式暂不支持内置预览。可用 Office/WPS 另存为 DOCX、PPTX 或 XLSX 后查看。",
+    "en-US":
+      "Built-in preview is not available for this format. Save a copy as DOCX, PPTX or XLSX in Office/WPS to preview it here.",
+  },
+  "panels.files.office.tooLarge": {
+    "zh-CN": "文档过大或内容过于复杂，无法预览（文件上限 {limit} MB）。请使用系统应用打开。",
+    "en-US":
+      "The document is too large or complex to preview (file limit: {limit} MB). Open it in your system application.",
+  },
+  "panels.files.office.encrypted": {
+    "zh-CN": "此文档可能受密码保护，暂不支持预览。",
+    "en-US": "This document may be password-protected and cannot be previewed.",
+  },
+  "panels.files.office.invalid": {
+    "zh-CN": "文件内容与格式不符，或文档已损坏。",
+    "en-US": "The file does not match its format or the document is damaged.",
+  },
+  "panels.files.office.changed": {
+    "zh-CN": "文件在读取期间发生了变化，请重新打开预览。",
+    "en-US": "The file changed while it was being read. Reopen the preview.",
+  },
+  "panels.files.office.notRegular": {
+    "zh-CN": "此路径不是可预览的常规文件。",
+    "en-US": "This path is not a regular file that can be previewed.",
+  },
+  "panels.files.office.failed": {
+    "zh-CN": "文档解析失败，文件可能已损坏或包含尚不支持的内容。",
+    "en-US": "The document could not be read. It may be damaged or contain unsupported content.",
+  },
   "panels.files.pdfPage": { "zh-CN": "第 {page} / {total} 页", "en-US": "Page {page} of {total}" },
   "panels.files.pdfLoadFailed": {
     "zh-CN": "PDF 无法读取或文件已损坏",

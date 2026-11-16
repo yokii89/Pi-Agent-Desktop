@@ -14,6 +14,8 @@ import type {
   FsSaveTextResult,
   FsSearchHit,
 } from "../../shared/ipc";
+import { officeFormatForPath } from "../../shared/officePreview";
+import { readOfficeFile } from "./readOffice";
 import { parseImageDataUrl, pickAvailablePath, toSaveFileName } from "./saveImageName";
 import { planTextSave } from "./saveText";
 import { matchesFileQuery, rankFileSearchHits } from "./searchMatch";
@@ -59,10 +61,13 @@ function looksBinary(buffer: Buffer): boolean {
 /**
  * 只读读取文件并按类型分流：
  * - 图片（扩展名命中）→ base64 data URL，供侧栏 <img> 直接展示
+ * - Office → 有界字节载荷或可解释的不可预览结果，交给渲染层按需解析
  * - 文本（无 NUL）→ UTF-8，超限截断
  * - 其余 → binary 占位（只回元信息，避免把乱码灌进 UI）
  */
-export function readFile(file: string): FsReadResult {
+export async function readFile(file: string): Promise<FsReadResult> {
+  const officeFormat = officeFormatForPath(file);
+  if (officeFormat !== undefined) return readOfficeFile(file, officeFormat);
   const stat = fs.statSync(file);
   if (!stat.isFile()) {
     throw new Error("不是常规文件");

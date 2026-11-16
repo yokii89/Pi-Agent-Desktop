@@ -52,6 +52,14 @@
   --buddy-snack-honey: #edb74d;
   --buddy-snack-eucalyptus: #a0c8aa;
 
+  /* Office 页面保持纸张底色，文档中的颜色属于内容而非应用主题。 */
+  --color-document-paper: #ffffff;
+  --color-document-ink: #111111;
+  --office-table-column-width: 112px;
+  --office-table-cell-max-height: 160px;
+  --office-search-results-height: 240px;
+  --office-page-input-width: 48px;
+
   /* 文件预览与就地编辑器共用的代码表面规格。 */
   --code-font-family: var(--font-family-mono);
   --code-font-size: var(--font-size-sm);

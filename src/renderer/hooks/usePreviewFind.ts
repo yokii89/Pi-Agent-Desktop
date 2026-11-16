@@ -1,13 +1,16 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import {
+  PREVIEW_CONTENT_EVENT,
+  previewDocumentRoot,
+  previewHighlights,
+  revealFrameRange,
+} from "../utils/previewDocument";
 import { collectMatchRanges } from "../utils/previewFind";
 import { revealInNearestScroller } from "../utils/revealInScroller";
 
 /** CSS Custom Highlight 的登记名：全部命中一档，当前命中一档（见 FilePanel.module.css）。 */
 const HIGHLIGHT_ALL = "pidesk-find";
 const HIGHLIGHT_ACTIVE = "pidesk-find-active";
-
-/** 引擎是否支持 CSS Custom Highlight API（不支持时查找仍可计数跳转，只是不上色）。 */
-const canHighlight = (): boolean => typeof CSS !== "undefined" && "highlights" in CSS;
 
 interface PreviewFindState {
   open: boolean;
@@ -43,15 +46,19 @@ export function usePreviewFind(
   const indexRef = useRef(0);
   indexRef.current = index;
 
+  const highlightsRef = useRef<ReturnType<typeof previewHighlights>>(undefined);
   const clearHighlights = useCallback((): void => {
-    if (!canHighlight()) return;
-    CSS.highlights.delete(HIGHLIGHT_ALL);
-    CSS.highlights.delete(HIGHLIGHT_ACTIVE);
+    highlightsRef.current?.delete(HIGHLIGHT_ALL);
+    highlightsRef.current?.delete(HIGHLIGHT_ACTIVE);
+    // HighlightRegistry keeps its owning iframe document alive even after all ranges are removed.
+    highlightsRef.current = undefined;
   }, []);
 
   /** 按容器当前 DOM 重算命中，并把当前命中滚进视野。 */
   const rescan = useCallback((): void => {
-    const container = containerRef.current;
+    const container = previewDocumentRoot(containerRef.current);
+    clearHighlights();
+    highlightsRef.current = previewHighlights(container);
     const ranges = container && query ? collectMatchRanges(container, query) : [];
     rangesRef.current = ranges;
     if (ranges.length === 0) {
@@ -62,9 +69,9 @@ export function usePreviewFind(
     }
     const next = Math.min(indexRef.current, ranges.length - 1);
     indexRef.current = next;
-    if (canHighlight()) {
-      CSS.highlights.set(HIGHLIGHT_ALL, new Highlight(...ranges));
-      CSS.highlights.set(HIGHLIGHT_ACTIVE, new Highlight(ranges[next]));
+    if (highlightsRef.current) {
+      highlightsRef.current.set(HIGHLIGHT_ALL, new Highlight(...ranges));
+      highlightsRef.current.set(HIGHLIGHT_ACTIVE, new Highlight(ranges[next]));
     }
     setCount(ranges.length);
     setIndex(next);
@@ -97,8 +104,21 @@ export function usePreviewFind(
         rescan();
       });
     });
-    observer.observe(container, { childList: true, characterData: true, subtree: true });
+    const observe = (): void => {
+      observer.disconnect();
+      observer.observe(container, { childList: true, characterData: true, subtree: true });
+      const root = previewDocumentRoot(container);
+      if (root && root !== container)
+        observer.observe(root, { childList: true, characterData: true, subtree: true });
+    };
+    const contentChanged = (): void => {
+      observe();
+      rescan();
+    };
+    observe();
+    container.addEventListener(PREVIEW_CONTENT_EVENT, contentChanged);
     return () => {
+      container.removeEventListener(PREVIEW_CONTENT_EVENT, contentChanged);
       observer.disconnect();
       if (frame !== 0) cancelAnimationFrame(frame);
     };
@@ -125,7 +145,7 @@ export function usePreviewFind(
     if (ranges.length === 0) return;
     const next = ((nextIndex % ranges.length) + ranges.length) % ranges.length;
     indexRef.current = next;
-    if (canHighlight()) CSS.highlights.set(HIGHLIGHT_ACTIVE, new Highlight(ranges[next]));
+    highlightsRef.current?.set(HIGHLIGHT_ACTIVE, new Highlight(ranges[next]));
     setIndex(next);
     revealActive(ranges[next]);
   }, []);
@@ -157,6 +177,7 @@ export function usePreviewFind(
 
 /** 把命中的起点滚进最近的可滚动容器（Markdown 正文 / PDF 画布是嵌套滚动盒）。 */
 function revealActive(range: Range): void {
+  if (revealFrameRange(range)) return;
   const anchor = range.endContainer.parentElement ?? range.startContainer.parentElement;
   if (anchor) revealInNearestScroller(anchor);
 }

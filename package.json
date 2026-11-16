@@ -19,6 +19,8 @@
     "sync:view-types": "node scripts/sync-view-sdk-types.mjs",
     "check:view-types": "node scripts/sync-view-sdk-types.mjs --check",
     "gen:file-icons": "node scripts/generate-file-icons.mjs",
+    "fixtures:office": "node scripts/officePreview/generateFixtures.ts",
+    "bench:office": "node scripts/officePreview/benchmark.ts",
     "gen:app-icon": "node scripts/generate-app-icon.mjs",
     "gen:installer-art": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-installer-art.ps1",
     "rebuild:native": "electron-rebuild -f -w node-pty",
@@ -57,6 +59,7 @@
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.15",
     "@electron/rebuild": "^4.2.0",
+    "@jvmr/pptx-to-html": "1.1.2",
     "@lezer/highlight": "^1.2.5",
     "@lobehub/icons": "^6.13.0",
     "@phosphor-icons/react": "^2.1.7",
@@ -68,6 +71,7 @@
     "@vitest/coverage-v8": "3.2.7",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "docx-preview": "0.4.1",
     "electron": "41.0.3",
     "electron-builder": "^26.0.12",
     "gsap": "^3.15.0",
@@ -83,6 +87,7 @@
     "shiki": "^4.4.3",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

@@ -84,6 +84,9 @@ node_modules 解析**的包（当前仅 `electron-updater` / `node-pty`——主
 - `gsap`（devDep，渲染层构建期打包）：左侧边栏的展开/折叠、悬浮揭示等交互动效；**必须动态 `import()` 使用**（见下文"动效规范"），不得静态引入。
 - `@electron/rebuild`（dev）：`node-pty` 原生模块针对 Electron ABI 的重编译（`pnpm run rebuild:native`）。
 - `shiki`（devDep，渲染层构建期打包）：Markdown 围栏代码与 Notebook 单元格等文档内代码块的高亮；工作区文件的源码视图统一由 CodeMirror 承接。经 `shiki/core` 细粒度动态加载，禁止整包 `import "shiki"` 静态引入。
+- `docx-preview`（devDep，渲染层构建期打包）：工作区 DOCX 只读排版预览，打开文档时动态加载，输出放入禁脚本的隔离文档。
+- `@jvmr/pptx-to-html`（devDep，渲染层构建期打包，MIT）：工作区 PPTX 幻灯片预览，动态加载；仅静态页面，不执行动画或嵌入对象。
+- `xlsx`（devDep，SheetJS 官方 CDN 0.20.3，渲染层构建期打包）：XLS/XLSX/XLSM/XLSB 的只读数据表预览，在按需创建的 Worker 中解析；不计算公式、不执行宏，不采用 npm registry 的旧版。
 - `pdfjs-dist`（devDep，渲染层构建期打包）：右侧「文件」面板的 PDF 按页只读预览；PDF.js 与 worker 均通过动态 import / Vite 资源 URL 按需加载，不作为主进程运行时依赖。
 - `@vitest/coverage-v8`（dev）：`packages/view-sdk` 的行/分支覆盖率口径（`pnpm test:sdk:coverage`）。版本必须与 `vitest` 主版本配对；**仅 SDK 测试用**，不扩展到主进程 / 渲染层（后者仍按本文件"测试"条款只跑断言）。`NODE_V8_COVERAGE` 对 vitest worker 无效，不要再试。
 - `electron-updater`（runtime，主进程运行时依赖）：设置 →「应用更新」的检查/下载/安装。GitHub Releases + NSIS `latest.yml`/blockmap（差分更新：本地缓存有旧安装包时自动差分下载）；发布流程见 `scripts/release.mjs` 与 `.github/workflows/release.yml`。
@@ -192,6 +195,17 @@ import { Play } from "@phosphor-icons/react";
 - **外部改动靠目录 watch**（复用 `fsService.watch` 引用计数）：无脏内容静默换版本，有脏内容只标「磁盘已更新」不打断输入；
   自家保存的目录回推用 `SELF_WRITE_GRACE_MS` 跳过，否则每次保存都自弹冲突。
 - **编辑态的交互差异**：右键回 Chromium 原生菜单（剪切/粘贴刚需），划选工具条与自绘右键菜单撤掉；源码两种模式的 Ctrl+F 共用 CodeMirror 查找，替换入口仅在编辑态出现。
+
+## Office 文档只读预览（docs/design/145）
+
+- 首批 DOCX / PPTX / XLSX / XLS / XLSM / XLSB 使用应用内置解析；Office/WPS 保存的兼容格式同路处理。DOC / PPT 与 WPS / DPS / ET 等专有格式明确提示另存为兼容格式，保留系统打开。
+- 格式、大小与解析预算只认 `shared/officePreview.ts`。主进程通过 `fs:read` 返回 `kind: "office"`，不得误判为可编辑文本；不增加原文件写入口。
+- DOCX/PPTX 只在 `components/ContextSidebar/panels/office/` 的禁脚本 iframe 内呈现，禁止把文档 HTML / CSS 注入应用正文或放宽主页面 CSP。文档原有配色/字号属于内容，宿主控件仍用主题令牌；选区、查找与右键经 `utils/previewDocument.ts` 衔接。
+- Excel 解析在按需创建的 Worker 中；先读目录、按需解析选中工作表，最多缓存 3 个预览结果；每页展示 50 行，保留原始行列坐标。切文件/卸载必须终止 Worker；每次工作表请求都需超时保护。公式仅显示已保存的结果，不执行宏；行列截断必须显式提示。
+- DOCX/PPTX 通过固定版本的 `pnpm patch` 提供按页解析接口（`patches/`）；适配层最多缓存 3 页，切页请求串行并支持取消，禁止回到全量页面 DOM。升级解析库必须复跑 `pnpm fixtures:office` / `pnpm bench:office`（工具说明见 `scripts/officePreview/README.md`）；Word 的阅读页可能与原文档物理分页不同。
+- Office 搜索由预览组件负责：DOCX/PPTX 读取文本索引，禁止为搜索全量生成页面或解码图片；Excel 默认搜索当前预览窗口，全工作簿必须由用户显式启动独立 Worker，取消/换文件必须终止。预算只认 `shared/officePreview.ts`，超过预算明确显示部分结果。
+- 选择文本的复制保持原文；引用通过 `TextSelectionSnapshot.getQuoteText` 携带来源，Word 必须标明阅读页不等于打印页，Excel 保留真实行列坐标和实际选中的区间。引用前不清理选区，切文件重置工具条快照。
+- 预览关闭时必须释放查找高亮的注册表引用；仅删除 Highlight 条目仍可能让旧 iframe 文档存活。
 
 ## 数据持久化
 

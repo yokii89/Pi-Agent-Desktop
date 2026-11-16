@@ -35,7 +35,8 @@ export function registerFsIpc(): void {
 
   ipcMain.handle(
     FS_IPC.read,
-    (_event, req: { path: string }): IpcResult<FsReadResult> => envelope(() => readFile(req.path)),
+    (_event, req: { path: string }): Promise<IpcResult<FsReadResult>> =>
+      envelopeAsync(() => readFile(req.path)),
   );
 
   ipcMain.handle(

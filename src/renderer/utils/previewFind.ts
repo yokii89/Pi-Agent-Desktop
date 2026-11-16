@@ -43,7 +43,8 @@ const MAX_MATCHES = 2000;
  */
 export function collectMatchRanges(root: Node, query: string, limit = MAX_MATCHES): Range[] {
   if (!query) return [];
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const doc = root.ownerDocument ?? document;
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const segments: TextSegment[] = [];
   let haystack = "";
   for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
@@ -65,7 +66,7 @@ export function collectMatchRanges(root: Node, query: string, limit = MAX_MATCHE
     while (endIndex < segments.length && segments[endIndex].end < end) endIndex += 1;
     const to = segments[endIndex];
     if (!to) break;
-    const range = document.createRange();
+    const range = doc.createRange();
     range.setStart(from.node, start - from.start);
     range.setEnd(to.node, Math.min(end - to.start, to.end - to.start));
     ranges.push(range);

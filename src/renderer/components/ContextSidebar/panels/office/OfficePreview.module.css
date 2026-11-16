@@ -1,0 +1,71 @@
+.wrap {
+  min-width: 0;
+  padding: 0 var(--spacing-sm) var(--spacing-sm);
+}
+
+.searchAction {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--spacing-xs);
+}
+
+:global(::highlight(pidesk-office-find)) {
+  background: var(--color-accent-soft);
+}
+
+:global(::highlight(pidesk-office-find-active)) {
+  background: var(--color-selection);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.documentFrame {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: var(--color-document-paper);
+  border-radius: var(--radius-sm);
+}
+
+.documentFrame[data-loading] {
+  visibility: hidden;
+  height: 0;
+}
+
+.sheetSelect {
+  flex: 1;
+  min-width: 0;
+}
+
+.sheetTable {
+  table-layout: fixed;
+  width: calc(var(--office-table-column-width) * var(--office-table-columns));
+  overflow-wrap: anywhere;
+}
+
+.longCell {
+  max-height: var(--office-table-cell-max-height);
+  overflow: auto;
+}
+
+.rowNumber.rowNumber {
+  position: static;
+  min-width: 0;
+  user-select: none;
+}

@@ -13,4 +13,6 @@ packageExtensions:
       lucide-react:
         optional: true
 patchedDependencies:
+  '@jvmr/pptx-to-html@1.1.2': patches/@jvmr__pptx-to-html@1.1.2.patch
+  docx-preview@0.4.1: patches/docx-preview@0.4.1.patch
   node-pty@1.1.0: patches/node-pty@1.1.0.patch

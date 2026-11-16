@@ -11,7 +11,7 @@ import {
   PencilSimple,
   X,
 } from "@phosphor-icons/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type Ref, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   isHtmlPath,
   isMarkdownPath,
@@ -24,6 +24,7 @@ import { applyLineEnding, toSavedContent } from "../../../../shared/lineEndings"
 import type { CodeEditorHandle, CodeScrollAnchor } from "../../../editor/codeEditorTypes";
 import { usePreviewFind } from "../../../hooks/usePreviewFind";
 import { useT } from "../../../hooks/useT";
+import type { OfficePreviewHandle } from "../../../office/officeSearchTypes";
 import { fsService } from "../../../services/fsService";
 import { useBrowserStore } from "../../../stores/browserStore";
 import { useComposerStore } from "../../../stores/composerStore";
@@ -42,7 +43,9 @@ import {
   resolvePath,
   toNativePath,
 } from "../../../utils/fileOpen";
+import { officeSelectionSource } from "../../../utils/officeSelection";
 import { normalizeDirPath, parentDirPath } from "../../../utils/paths";
+import { previewDocumentRoot } from "../../../utils/previewDocument";
 import {
   canGoBack,
   canGoForward,
@@ -65,6 +68,7 @@ import panelStyles from "./FilePanel.module.css";
 import { FileTree } from "./FileTree";
 import { MarkdownPreview, type MarkdownViewMode } from "./MarkdownPreview";
 import { NotebookPreview } from "./NotebookPreview";
+import { OfficePreview } from "./office/OfficePreview";
 import { PdfPreview } from "./PdfPreview";
 import { PreviewFindBar } from "./PreviewFindBar";
 
@@ -181,6 +185,14 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   const editingRef = useRef(editing);
   editingRef.current = editing;
   const sourcePreview = activePreview !== null && isSourcePreview(activePreview, mdViewMode);
+  const officeFramePreview =
+    activePreview?.result.kind === "office" &&
+    activePreview.result.status === "ready" &&
+    activePreview.result.format !== "spreadsheet";
+  const officeReady =
+    activePreview?.result.kind === "office" && activePreview.result.status === "ready";
+  const officeRef = useRef<OfficePreviewHandle>(null);
+  const officeSelection = useMemo(() => officeSelectionSource(panelBodyRef), []);
   const sourceSelection = useMemo<TextSelectionSource>(
     () => ({
       read: () => editorRef.current?.getSelection() ?? null,
@@ -191,7 +203,9 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   );
   /** 内容身份：换文件 / md 预览与源码切换时查找条自行收起并重算。 */
   const findContentKey =
-    !sourcePreview && preview && preview.root === rootKey ? `${preview.path}:${mdViewMode}` : null;
+    !sourcePreview && !officeReady && preview && preview.root === rootKey
+      ? `${preview.path}:${mdViewMode}`
+      : null;
   const find = usePreviewFind(panelBodyRef, findContentKey);
 
   // Ctrl+F 在预览内容里查找（渲染层没有浏览器级查找条，不抢就没人接这个键）
@@ -205,11 +219,12 @@ export function FilePanel({ active = true }: { active?: boolean }) {
       if (event.key.toLowerCase() !== "f") return;
       event.preventDefault();
       if (sourcePreview) editorRef.current?.openFind();
+      else if (officeReady) officeRef.current?.openSearch();
       else openFind();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [active, hasActivePreview, openFind, sourcePreview]);
+  }, [active, hasActivePreview, openFind, sourcePreview, officeReady]);
 
   // Ctrl+P 打开/重复触发时聚焦搜索框（fileSearchTick 每次触发都递增）
   useEffect(() => {
@@ -455,12 +470,12 @@ export function FilePanel({ active = true }: { active?: boolean }) {
 
     setPreview({ ...latest, result });
     setExternalChanged(false);
+    setEditorReloadTick((n) => n + 1);
     if (result.kind === "text") {
       setEditorBaseline(toEditorText(result.content));
       if (editorRef.current) {
         previewScrollAnchorRef.current = editorRef.current.getScrollAnchor();
       }
-      setEditorReloadTick((n) => n + 1);
       setDirty(false);
       if (result.truncated) setEditing(false);
       return;
@@ -724,10 +739,10 @@ export function FilePanel({ active = true }: { active?: boolean }) {
       editorRef.current?.selectAll();
       return;
     }
-    const body = panelBodyRef.current;
-    const selection = window.getSelection();
+    const body = previewDocumentRoot(panelBodyRef.current);
+    const selection = body?.ownerDocument.defaultView?.getSelection();
     if (!body || !selection) return;
-    const range = document.createRange();
+    const range = body.ownerDocument.createRange();
     range.selectNodeContents(body);
     selection.removeAllRanges();
     selection.addRange(range);
@@ -754,11 +769,13 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     setPreviewMenu({
       x: event.clientX,
       y: event.clientY,
-      selected: sourcePreview
-        ? (editorRef.current?.getSelectedText() ?? "")
-        : insideSelection
-          ? selection.toString()
-          : "",
+      selected: officeFramePreview
+        ? (officeSelection.read()?.getText() ?? "")
+        : sourcePreview
+          ? (editorRef.current?.getSelectedText() ?? "")
+          : insideSelection
+            ? selection.toString()
+            : "",
     });
   };
 
@@ -793,8 +810,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     : [];
 
   /**
-   * 引用到输入栏：引用块首行标出来源文件，后面跟选中文本。
-   * 不标行号 —— 划选是字符偏移，换算回行号要重新数行，得不偿失；文件路径已足够定位。
+   * 引用到输入栏：来源文件加选区快照。Office 快照还包含阅读页/标题或单元格范围。
    */
   const quoteFromPreview = useCallback(
     (text: string): void => {
@@ -978,7 +994,9 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           <p className={panelStyles.noMatch}>{t("panels.files.selectProject")}</p>
         ) : activePreview ? (
           <FilePreviewBody
+            key={`${activePreview.root}:${activePreview.path}#${editorReloadTick}`}
             preview={activePreview}
+            officeRef={officeRef}
             onImageSize={setImageSize}
             onOpenInSystem={() => openInSystem(activePreview.path)}
           />
@@ -1035,9 +1053,17 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           编辑态撤掉：工具条会压在正当输入的文本上 */}
       {!editing && (
         <SelectionToolbar
-          key={sourcePreview ? `${activePreview?.path}#${editorReloadTick}` : "document"}
+          key={
+            sourcePreview
+              ? `${activePreview?.path}#${editorReloadTick}`
+              : officeReady
+                ? `office:${activePreview?.path}#${editorReloadTick}`
+                : "document"
+          }
           containerRef={panelBodyRef}
-          selectionSource={sourcePreview ? sourceSelection : undefined}
+          selectionSource={
+            sourcePreview ? sourceSelection : officeReady ? officeSelection : undefined
+          }
           quoteDisabled={quoteDisabled}
           quoteDisabledHint={quoteDisabledHint}
           onCopy={copyToClipboard}
@@ -1097,8 +1123,10 @@ function FilePreviewBody({
   preview,
   onImageSize,
   onOpenInSystem,
+  officeRef,
 }: {
   preview: PreviewState;
+  officeRef: Ref<OfficePreviewHandle>;
   onImageSize: (size: string | null) => void;
   onOpenInSystem: () => void;
 }) {
@@ -1125,6 +1153,10 @@ function FilePreviewBody({
 
   if (result.kind === "pdf") {
     return <PdfPreview result={result} />;
+  }
+
+  if (result.kind === "office") {
+    return <OfficePreview ref={officeRef} result={result} onOpenInSystem={onOpenInSystem} />;
   }
 
   if (result.kind === "binary") {

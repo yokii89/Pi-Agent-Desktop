@@ -1,0 +1,113 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 6509ac61e237ffc475d6bc3a990456f17e2ca063..c5590db463c5e2d3ce18ad28c5506e3c08296771 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -19,5 +19,11 @@ declare function pptxToHtml(buffer: ArrayBuffer, config?: {
+   };
+ }): Promise<string[]>;
+ //#endregion
+-export { pptxToHtml };
++/** PiDesk patch: reuse one ZIP index and parse only the requested slide. */
++declare function openPresentation(buffer: ArrayBuffer, signal?: AbortSignal): Promise<{
++  length: number;
++  get(index: number): Promise<string>;
++  getText(index: number): Promise<string>;
++}>;
++export { pptxToHtml, openPresentation };
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file
+diff --git a/dist/index.js b/dist/index.js
+index 69db9542af4c4e95f51fb992196d7e224967d7fe..6b230b1f41653085dc48054304b55a786924be14 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1259,7 +1259,7 @@ var SlideExtractor = class {
+ 	* Extracts all slides in order and parses their visual elements.
+ 	* @returns An array of SlideElement lists (one per slide).
+ 	*/
+-	async extractSlides() {
++	async extractSlides(selectedPaths, textOnly = false) {
+ 		const themeXmlStr = await this.zip.file("ppt/theme/theme1.xml")?.async("string");
+ 		const themeXml = themeXmlStr ? XmlHelper.parseXml(themeXmlStr) : null;
+ 		const themeColors = XmlHelper.extractThemeColors(themeXml);
+@@ -1267,7 +1267,7 @@ var SlideExtractor = class {
+ 		const fallbackSlidePaths = Object.keys(this.zip.files).filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f)).sort((a, b) => {
+ 			return parseInt(a.match(/slide(\d+)\.xml$/)?.[1] || "0", 10) - parseInt(b.match(/slide(\d+)\.xml$/)?.[1] || "0", 10);
+ 		});
+-		const slidePaths = await this.getSlidePathsInPresentationOrder(fallbackSlidePaths);
++		const slidePaths = selectedPaths ?? await this.getSlidePathsInPresentationOrder(fallbackSlidePaths);
+ 		const slides = [];
+ 		for (const slidePath of slidePaths) {
+ 			const slideXmlStr = await this.zip.file(slidePath).async("string");
+@@ -1308,17 +1308,17 @@ var SlideExtractor = class {
+ 					}
+ 				}
+ 			}
+-			const slideBg = await this.extractBackground(slideXml, relsXml, "ppt/slides", this.zip, themeColors);
+-			const layoutBg = layoutRelsXml ? await this.extractBackground(layoutSpTree?.ownerDocument || null, layoutRelsXml, "ppt/slideLayouts", this.zip, themeColors) : null;
+-			const masterBg = masterRelsXml ? await this.extractBackground(masterSpTree?.ownerDocument || null, masterRelsXml, "ppt/slideMasters", this.zip, themeColors) : null;
++			const slideBg = textOnly ? null : await this.extractBackground(slideXml, relsXml, "ppt/slides", this.zip, themeColors);
++			const layoutBg = !textOnly && layoutRelsXml ? await this.extractBackground(layoutSpTree?.ownerDocument || null, layoutRelsXml, "ppt/slideLayouts", this.zip, themeColors) : null;
++			const masterBg = !textOnly && masterRelsXml ? await this.extractBackground(masterSpTree?.ownerDocument || null, masterRelsXml, "ppt/slideMasters", this.zip, themeColors) : null;
+ 			const bgElement = slideBg || layoutBg || masterBg;
+ 			if (bgElement) bgElement.zIndex = -1;
+ 			const masterText = masterSpTree ? TextExtractor.extract(masterSpTree, themeColors, { context: "master" }) : [];
+-			const masterImages = masterSpTree && masterRelsXml ? await ImageExtractor.extract(masterSpTree, masterRelsXml, this.zip, "ppt/slideMasters") : [];
+-			const masterShapes = masterSpTree ? ShapeExtractor.extract(masterSpTree, themeColors) : [];
++			const masterImages = !textOnly && masterSpTree && masterRelsXml ? await ImageExtractor.extract(masterSpTree, masterRelsXml, this.zip, "ppt/slideMasters") : [];
++			const masterShapes = !textOnly && masterSpTree ? ShapeExtractor.extract(masterSpTree, themeColors) : [];
+ 			const layoutText = layoutSpTree ? TextExtractor.extract(layoutSpTree, themeColors, { context: "layout" }) : [];
+-			const layoutImages = layoutSpTree && layoutRelsXml ? await ImageExtractor.extract(layoutSpTree, layoutRelsXml, this.zip, "ppt/slideLayouts") : [];
+-			const layoutShapes = layoutSpTree ? ShapeExtractor.extract(layoutSpTree, themeColors) : [];
++			const layoutImages = !textOnly && layoutSpTree && layoutRelsXml ? await ImageExtractor.extract(layoutSpTree, layoutRelsXml, this.zip, "ppt/slideLayouts") : [];
++			const layoutShapes = !textOnly && layoutSpTree ? ShapeExtractor.extract(layoutSpTree, themeColors) : [];
+ 			const masterGeom = this.extractPlaceholderGeom(masterSpTree);
+ 			const layoutGeom = this.extractPlaceholderGeom(layoutSpTree);
+ 			const mergedGeom = {
+@@ -1336,10 +1336,10 @@ var SlideExtractor = class {
+ 				placeholderGeom: mergedGeom,
+ 				placeholderTypes: mergedTypes
+ 			});
+-			const slideImages = await ImageExtractor.extract(spTree, relsXml, this.zip, "ppt/slides");
++			const slideImages = textOnly ? [] : await ImageExtractor.extract(spTree, relsXml, this.zip, "ppt/slides");
+ 			const slideTables = TableExtractor.extract(spTree, themeColors, themeTableStyles);
+-			const slideCharts = await ChartExtractor.extract(spTree, relsXml, this.zip, themeColors);
+-			const slideShapes = ShapeExtractor.extract(spTree, themeColors);
++			const slideCharts = textOnly ? [] : await ChartExtractor.extract(spTree, relsXml, this.zip, themeColors);
++			const slideShapes = textOnly ? [] : ShapeExtractor.extract(spTree, themeColors);
+ 			const withLayer = (items, layer) => items.map((item) => ({
+ 				...item,
+ 				zIndex: layer + (item.zIndex ?? 0)
+@@ -2479,6 +2479,32 @@ async function pptxToHtml(buffer, config) {
+ 	return slides.map((slideElements) => HtmlRenderer.render(slideElements, opts));
+ }
+ //#endregion
+-export { pptxToHtml };
++async function openPresentation(buffer, signal) {
++	const reader = new PptxReader();
++	reader.zip = await JSZip.loadAsync(buffer);
++	signal?.throwIfAborted();
++	const base = await reader.getBaseSizePx();
++	const extractor = new SlideExtractor(reader.zip);
++	const fallback = Object.keys(reader.zip.files).filter(path => /^ppt\/slides\/slide\d+\.xml$/.test(path)).sort((a, b) => Number(a.match(/slide(\d+)/)[1]) - Number(b.match(/slide(\d+)/)[1]));
++	const paths = await extractor.getSlidePathsInPresentationOrder(fallback);
++	return {
++		length: paths.length,
++		getText: async index => {
++			signal?.throwIfAborted();
++			if (!paths[index]) throw new RangeError("Slide index out of range");
++			const [elements] = await extractor.extractSlides([paths[index]], true);
++			signal?.throwIfAborted();
++			return elements.map(element => element.type === "text" ? element.content : element.type === "table" ? element.rows.map(row => row.cells.map(cell => cell.text).join("\t")).join("\n") : "").filter(Boolean).join("\n");
++		},
++		get: async index => {
++			signal?.throwIfAborted();
++			if (!paths[index]) throw new RangeError("Slide index out of range");
++			const [slide] = await extractor.extractSlides([paths[index]]);
++			signal?.throwIfAborted();
++			return HtmlRenderer.render(slide, { baseWidth: base.width, baseHeight: base.height });
++		}
++	};
++}
++export { pptxToHtml, openPresentation };
+ 
+ //# sourceMappingURL=index.js.map

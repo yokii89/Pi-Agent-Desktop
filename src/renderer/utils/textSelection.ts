@@ -2,6 +2,8 @@
 export interface TextSelectionSnapshot {
   rect: Pick<DOMRect, "left" | "top" | "bottom" | "width">;
   getText(): string;
+  /** Optional source metadata captured with this selection; clipboard copies still use getText(). */
+  getQuoteText?(): string;
 }
 
 /** Text and geometry come from the owning surface rather than its rendered DOM. */

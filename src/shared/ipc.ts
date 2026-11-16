@@ -9,6 +9,7 @@ import type { FontMonoPreset, FontUiPreset } from "./fontPresets";
 import type { LocalePreference } from "./i18n";
 import type { InputBuddyKind } from "./inputBuddy";
 import type { NotificationSettings } from "./notification";
+import type { OfficePreviewFormat, OfficePreviewIssue } from "./officePreview";
 import type { RailStyle } from "./railStyles";
 import type { ShortcutsMap } from "./shortcuts";
 import type { SplashFontPreset } from "./splash";
@@ -1724,10 +1725,17 @@ export interface FsReadBinaryResult {
   mime?: string;
 }
 
+/** Office payloads stay read-only; unavailable files still retain the system-open action. */
+export type FsReadOfficeResult = { kind: "office"; byteLength: number } & (
+  | { status: "ready"; format: OfficePreviewFormat; data: Uint8Array }
+  | { status: "unavailable"; reason: OfficePreviewIssue }
+);
+
 export type FsReadResult =
   | FsReadTextResult
   | FsReadImageResult
   | FsReadPdfResult
+  | FsReadOfficeResult
   | FsReadBinaryResult;
 
 /** 文本文件写盘请求（右侧文件面板就地编辑，docs/design/141）。 */
@@ -1763,7 +1771,7 @@ export interface FsSearchHit {
 export const FS_IPC = {
   /** 列出目录（文件夹在前、字母序）。 */
   list: "pidesk:fs:list",
-  /** 只读读取文本文件（有大小上限）。 */
+  /** 只读读取文件，按文本、图片、PDF、Office 或二进制分流（有大小上限）。 */
   read: "pidesk:fs:read",
   /** 覆盖写入文本文件（就地编辑保存；带 mtime 冲突判定）。 */
   save: "pidesk:fs:save",

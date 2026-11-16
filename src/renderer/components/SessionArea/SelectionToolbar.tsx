@@ -46,6 +46,7 @@ export function SelectionToolbar({
   const visible = useRef(false);
   /** 「由藏转显」那一帧的文本快照，仅作实时选区取不到时的兜底（见 run）。 */
   const textRef = useRef("");
+  const quoteTextRef = useRef("");
   const frameRef = useRef(0);
 
   const hide = useCallback((): void => {
@@ -95,6 +96,7 @@ export function SelectionToolbar({
       const text = sourceSelection?.getText() ?? selection?.toString() ?? "";
       if (!text.trim()) return;
       textRef.current = text;
+      quoteTextRef.current = sourceSelection?.getQuoteText?.() ?? text;
       visible.current = true;
       // 尺寸要在 un-hide 之后量（hidden 时 offsetWidth 为 0）；prime 只写 opacity/scale，
       // 不影响布局盒，所以仍赶在本帧绘制前把 left/top 落好
@@ -161,13 +163,16 @@ export function SelectionToolbar({
   }, [hide]);
 
   const run = useCallback(
-    (action: (text: string) => void): void => {
+    (action: (text: string) => void, quote = false): void => {
       // 动作时才取实时选区（根节点 mousedown 已 preventDefault，此刻选区仍在），
       // 被别处清掉时退回「由藏转显」那一帧的快照
       const live = selectionSource ? null : window.getSelection();
+      const snapshot = selectionSource?.read();
       const text =
-        selectionSource?.read()?.getText() ??
-        (live && !live.isCollapsed ? live.toString() : textRef.current);
+        quote && selectionSource
+          ? (snapshot?.getQuoteText?.() ?? snapshot?.getText() ?? quoteTextRef.current)
+          : (snapshot?.getText() ??
+            (live && !live.isCollapsed ? live.toString() : textRef.current));
       if (!text.trim()) return;
       action(text);
       hide();
@@ -202,7 +207,7 @@ export function SelectionToolbar({
           className={styles.action}
           disabled={quoteDisabled}
           title={quoteDisabledHint || undefined}
-          onClick={() => run(onQuote)}
+          onClick={() => run(onQuote, true)}
         >
           <ChatCircleDots size={16} weight="regular" />
           <span>{t("ui.selectBar.quote")}</span>
