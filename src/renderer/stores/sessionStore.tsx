@@ -36,6 +36,7 @@ import { buildUserHistory } from "../utils/composerHistory";
 import { piImageFromDisplay, type UserMessageImage } from "../utils/imageAttach";
 import { buildPageContext } from "../utils/pageContext";
 import { getComposerThinkingLevel, useComposerStore } from "./composerStore";
+import { createContextUsageRefresh } from "./contextUsageRefresh";
 import { isModeTransitioning } from "./modeTransitionBarrier";
 import { useProjectStore } from "./projectStore";
 import {
@@ -205,7 +206,7 @@ interface SessionMetaValue {
   /** JSONL 路径 → 运行时 SessionId（后台进程归属查询用）。 */
   getSessionIdForFile: (file: string) => SessionId | null;
   refreshModelState: () => Promise<void>;
-  /** 拉取上下文用量（get_session_stats）；agent_settled / compaction_end / 手动点击触发，不轮询。 */
+  /** 立即拉取上下文用量；消息完成另走合并调度，不轮询流式增量。 */
   refreshContextUsage: (sessionId?: SessionId) => Promise<void>;
 }
 
@@ -739,23 +740,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [setState, syncThinkingState]);
 
-  /** 上下文用量：只在 agent_settled / compaction_end / set_model / 手动点击时拉取，不挂 message_update。 */
+  const contextUsageRefresh = useMemo(
+    () =>
+      createContextUsageRefresh(sessionService.getStats, (id, stats) => {
+        setState((prev) => {
+          const bucket = prev.buckets.get(id);
+          if (!bucket) return prev;
+          return patchBucket(prev, id, {
+            contextUsage: stats.contextUsage ?? null,
+            contextBreakdown: stats.breakdown ?? null,
+            contextOtherPercent: stats.otherPercent ?? null,
+            contextWindow: stats.contextUsage?.contextWindow ?? bucket.contextWindow,
+          });
+        });
+      }),
+    [setState],
+  );
+
+  useEffect(() => () => contextUsageRefresh.clear(), [contextUsageRefresh]);
+
+  /** 手动操作、切会话与收口立即刷新；同会话在途请求完成后补读。 */
   const refreshContextUsage = useCallback(
     async (sessionId?: SessionId): Promise<void> => {
       const id = sessionId ?? activeKeyRef.current;
-      if (!id) return;
-      const stats = await sessionService.getStats(id);
-      setState((prev) =>
-        patchBucket(prev, id, {
-          contextUsage: stats?.contextUsage ?? null,
-          contextBreakdown: stats?.breakdown ?? null,
-          contextOtherPercent: stats?.otherPercent ?? null,
-          contextWindow:
-            stats?.contextUsage?.contextWindow ?? prev.buckets.get(id)?.contextWindow ?? null,
-        }),
-      );
+      if (id) await contextUsageRefresh.refresh(id);
     },
-    [setState],
+    [contextUsageRefresh],
   );
 
   /**
@@ -918,6 +928,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (bucket) return prev;
         return next;
       });
+      if (
+        type === "message_end" &&
+        (event.message.role === "user" ||
+          event.message.role === "assistant" ||
+          event.message.role === "toolResult")
+      ) {
+        // pi 在 message_end 后持久化消息；合并等待也让统计读取落在持久化之后。
+        contextUsageRefresh.schedule(sessionId);
+      }
       if (type === "agent_start") {
         // 新一轮开始：上一轮的待读标记作废（侧栏改回运行点阵）
         lastStopReasonsRef.current.delete(sessionId);
@@ -941,7 +960,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
         void refreshContextUsage(sessionId);
       } else if (type === "compaction_end") {
-        // 压缩后 percent 可能为 null（pi 契约），chip 显示 `?`；下一次 settled 恢复数字
+        // 压缩后 percent 可能为 null；新的有效 assistant 消息完成后恢复数字。
         void refreshContextUsage(sessionId);
       }
     };
@@ -1012,6 +1031,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (message.type === "exit") {
+        contextUsageRefresh.cancel(sessionId);
         // 运行中进程消失 = 崩溃：侧栏按「未正常结束」标记（idle 后手动结束不打扰）
         const crashed = bucketsStateRef.current.buckets.get(sessionId)?.phase === "running";
         lastStopReasonsRef.current.delete(sessionId);
@@ -1063,6 +1083,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     rematerializeSidebar,
     setState,
     refreshContextUsage,
+    contextUsageRefresh,
     syncThinkingState,
   ]);
 
