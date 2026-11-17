@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useReviewAutoRefresh } from "../../hooks/useReviewAutoRefresh";
 import { useReviewStore } from "../../stores/reviewStore";
 import { GitGraphPanel } from "../ContextSidebar/panels/GitGraphPanel";
 import { ChangesPane } from "./ChangesPane";
@@ -11,11 +11,15 @@ import styles from "./ReviewPanel.module.css";
  * 数据保鲜逻辑（过期才刷新）与旧侧栏审查面板一致。
  */
 export function ReviewPanel() {
-  const { cwd, reviewView, graphRefreshSeq, refreshIfStale } = useReviewStore();
+  const { cwd, repoRoot, reviewView, graphRefreshSeq, refresh, refreshIfStale } = useReviewStore();
 
-  useEffect(() => {
-    if (reviewView === "changes") refreshIfStale();
-  }, [refreshIfStale, reviewView]);
+  useReviewAutoRefresh({
+    cwd,
+    repoRoot,
+    enabled: reviewView === "changes",
+    refresh,
+    refreshIfStale,
+  });
 
   return (
     <>

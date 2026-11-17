@@ -18,6 +18,7 @@ import type {
 import { gitService } from "../services/gitService";
 import { sessionService } from "../services/sessionService";
 import type { ChangeFocusHit } from "../utils/reviewFocus";
+import { createReviewRefreshScheduler } from "../utils/reviewRefreshScheduler";
 import {
   emptyRollbackInspect,
   type RollbackBlockReason,
@@ -47,8 +48,8 @@ export type ReviewFilterMode = "unstaged" | "staged" | "all" | "lastRound";
 /** 审查面板二级视图：变更列表 / 提交图谱。 */
 export type ReviewView = "changes" | "graph";
 
-/** agent 一轮结束后延迟刷新，合并 pi 连续写盘产生的多次触发。 */
-const AGENT_REFRESH_DELAY_MS = 800;
+/** Agent 收口后补刷，覆盖最后一次文件写入与状态刷新之间的竞态。 */
+const AGENT_REFRESH_DELAY_MS = 250;
 /** Review tab 重新可见时的数据保鲜期，过期才后台重读（避免切 Tab 反复执行 git）。 */
 const STALE_MS = 15000;
 
@@ -204,7 +205,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
   const snapshotSeqRef = useRef(0);
   const lastUpdatedRef = useRef<number | null>(null);
   const seqRef = useRef(0);
-  const timerRef = useRef<number | null>(null);
+  const refreshSchedulerRef = useRef<ReturnType<typeof createReviewRefreshScheduler> | null>(null);
 
   /** 作废「上一轮」回滚能力：丢掉快照、HEAD 锚点与本轮差异。 */
   const clearRollbackState = useCallback((reason: RollbackBlockReason = "empty"): void => {
@@ -220,8 +221,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   const applyResult = useCallback(
     (result: Awaited<ReturnType<typeof gitService.status>>) => {
-      setLastUpdated(Date.now());
-      lastUpdatedRef.current = Date.now();
+      const updatedAt = Date.now();
+      setLastUpdated(updatedAt);
+      lastUpdatedRef.current = updatedAt;
       setRefreshing(false);
       setError(null);
       if (result.repoRoot === null) {
@@ -259,7 +261,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     [clearRollbackState],
   );
 
-  const refresh = useCallback(async (): Promise<void> => {
+  const performRefresh = useCallback(async (): Promise<void> => {
     const cwd = cwdRef.current;
     if (!cwd) return;
     const seq = ++seqRef.current;
@@ -285,24 +287,25 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     }
   }, [applyResult]);
 
-  const scheduleRefresh = useCallback(
-    (delayMs: number): void => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-      timerRef.current = window.setTimeout(() => {
-        timerRef.current = null;
-        void refresh();
-      }, delayMs);
-    },
-    [refresh],
+  if (refreshSchedulerRef.current === null) {
+    refreshSchedulerRef.current = createReviewRefreshScheduler(performRefresh);
+  }
+
+  const refresh = useCallback(
+    (): Promise<void> => refreshSchedulerRef.current?.refresh() ?? Promise.resolve(),
+    [],
   );
+
+  const scheduleRefresh = useCallback((delayMs: number): void => {
+    refreshSchedulerRef.current?.schedule(delayMs);
+  }, []);
 
   // 目录或会话变化都切换回滚域；同一仓库的其他会话不能继承本轮快照。
   useEffect(() => {
     seqRef.current += 1;
     snapshotSeqRef.current += 1;
     roundEndSeqRef.current += 1;
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-    timerRef.current = null;
+    refreshSchedulerRef.current?.reset();
     lastUpdatedRef.current = null;
     setLastUpdated(null);
     setRepoRoot(null);
@@ -321,52 +324,60 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [sessionWorkingDir, activeSessionId, refresh, clearRollbackState]);
 
-  // agent 一轮：开始时拍快照（供回滚），结束时防抖刷新 + 锁定轮末快照（冲突检测）
+  // agent 一轮：开始时拍快照（供回滚），工具完成时刷新，收口时锁定轮末快照
   // 仅 active 会话的事件驱动回滚域（多会话：后台 agent 不改变 A 的 canRollback）
   const activeSessionIdRef = useRef(activeSessionId);
   activeSessionIdRef.current = activeSessionId;
   useEffect(() => {
     return sessionService.subscribe((message) => {
-      if (message.type !== "event") return;
       if (message.sessionId !== activeSessionIdRef.current) return;
-      const event = message.payload;
-      const { type } = event;
-      if (type === "agent_start") {
-        const cwd = cwdRef.current;
-        if (!cwd) return;
-        const seq = ++snapshotSeqRef.current;
-        roundEndSeqRef.current += 1;
-        seqRef.current += 1;
-        if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-        timerRef.current = null;
-        setRefreshing(false);
-        setRollbackPromptOpen(false);
-        roundActiveRef.current = true;
-        roundSettledRef.current = false;
-        roundHeadRef.current = null;
-        roundEndTreeOidRef.current = null;
-        preRoundTreeOidRef.current = null;
-        setPreRoundTreeOid(null);
-        setLastRound([]);
-        setStoredBlockReason("noSnapshot");
-        void gitService
-          .snapshot(cwd)
-          .then((result) => {
-            if (snapshotSeqRef.current !== seq || !roundActiveRef.current) return;
-            preRoundTreeOidRef.current = result.treeOid;
-            setPreRoundTreeOid(result.treeOid);
-            roundHeadRef.current = result.headOid;
-            // 极短轮次可能先收口、后拍完轮前快照，补刷才能得到本轮内容差异。
-            if (roundSettledRef.current) scheduleRefresh(0);
-          })
-          .catch((err: unknown) => {
-            if (snapshotSeqRef.current !== seq) return;
-            clearRollbackState("noSnapshot");
-            console.warn("[review] Failed to capture turn snapshot", err);
-          });
-        return;
-      }
-      if (type === "agent_settled") {
+      const events =
+        message.type === "event"
+          ? [message.payload]
+          : message.type === "eventBatch"
+            ? message.payload
+            : [];
+      for (const event of events) {
+        const { type } = event;
+        if (type === "agent_start") {
+          const cwd = cwdRef.current;
+          if (!cwd) continue;
+          const seq = ++snapshotSeqRef.current;
+          roundEndSeqRef.current += 1;
+          seqRef.current += 1;
+          refreshSchedulerRef.current?.reset();
+          setRefreshing(false);
+          setRollbackPromptOpen(false);
+          roundActiveRef.current = true;
+          roundSettledRef.current = false;
+          roundHeadRef.current = null;
+          roundEndTreeOidRef.current = null;
+          preRoundTreeOidRef.current = null;
+          setPreRoundTreeOid(null);
+          setLastRound([]);
+          setStoredBlockReason("noSnapshot");
+          void gitService
+            .snapshot(cwd)
+            .then((result) => {
+              if (snapshotSeqRef.current !== seq || !roundActiveRef.current) return;
+              preRoundTreeOidRef.current = result.treeOid;
+              setPreRoundTreeOid(result.treeOid);
+              roundHeadRef.current = result.headOid;
+              // 极短轮次可能先收口、后拍完轮前快照，补刷才能得到本轮内容差异。
+              if (roundSettledRef.current) scheduleRefresh(0);
+            })
+            .catch((err: unknown) => {
+              if (snapshotSeqRef.current !== seq) return;
+              clearRollbackState("noSnapshot");
+              console.warn("[review] Failed to capture turn snapshot", err);
+            });
+          continue;
+        }
+        if (type === "tool_execution_end") {
+          scheduleRefresh(150);
+          continue;
+        }
+        if (type !== "agent_settled") continue;
         // 轮末只在会话级收口点拍：agent_end 之后还可能自动重试／压缩恢复／before_settle 续跑，
         // 在它上面切轮会把同一轮的文件编辑截成两段（docs/design/76 §6.3）。
         // 中断轮仍出卡与撤销资格（docs/design/11），不因 aborted 跳过。
@@ -395,7 +406,8 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 
   useEffect(
     () => () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      seqRef.current += 1;
+      refreshSchedulerRef.current?.reset();
     },
     [],
   );
