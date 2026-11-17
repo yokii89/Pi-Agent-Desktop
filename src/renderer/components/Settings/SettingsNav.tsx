@@ -7,6 +7,7 @@ import {
   Keyboard,
   MagnifyingGlass,
   Palette,
+  Pulse,
   PuzzlePiece,
   Rocket,
   Sparkle,
@@ -37,6 +38,7 @@ export type SettingsSectionId =
   | "environment"
   | "projects"
   | "scheduled"
+  | "liveSessions"
   | "extensions"
   | "archived"
   | "about";
@@ -150,6 +152,12 @@ const NAV_GROUPS: NavGroup[] = [
         id: "projects",
         labelKey: "settings.section.projects",
         icon: <Folder size={18} weight="regular" />,
+      },
+      {
+        id: "liveSessions",
+        labelKey: "settings.section.liveSessions",
+        icon: <Pulse size={18} weight="regular" />,
+        keywords: ["存活", "活动会话", "会话进程", "live", "running session"],
       },
       {
         id: "scheduled",

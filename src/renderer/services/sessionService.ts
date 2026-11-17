@@ -8,6 +8,7 @@ import type {
   PiSlashCommand,
   PromptDisposition,
   QueueIntent,
+  SessionDisposeIdleResult,
   SessionId,
   SessionPushMessage,
   SessionRenameRequest,
@@ -120,6 +121,13 @@ export const sessionService = {
     if (!api || !id) return;
     if (id === currentSessionId) currentSessionId = null;
     api.session.dispose(id).catch(() => {});
+  },
+
+  /** 仅结束主进程确认空闲的 pi 实例；结果由 runtime/exit 推送对账。 */
+  async disposeIdle(sessionId: SessionId): Promise<SessionDisposeIdleResult> {
+    const api = pideskApi();
+    if (!api) throw new Error("preload 未就绪");
+    return unwrap(api.session.disposeIdle(sessionId));
   },
 
   list(cwd: string): Promise<SessionSummary[]> {

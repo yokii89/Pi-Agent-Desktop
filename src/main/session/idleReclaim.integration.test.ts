@@ -64,6 +64,7 @@ vi.mock("./piLauncher", () => ({
 }));
 
 import { setBackgroundJobProbe } from "./backgroundJobs";
+import { disposeIdleSession } from "./disposeIdleSession";
 import { __resetIdleReclaimForTests, noteViewingSession, scanIdleSessions } from "./idleReclaim";
 import {
   disposeSession,
@@ -121,6 +122,19 @@ function age() {
 }
 
 describe("空闲回收的实际 RPC 与子进程生命周期", () => {
+  it("设置页手动关闭无需等待回收阈值，核对后结束实际 pi 进程", async () => {
+    const id = await launch();
+    expect(await disposeIdleSession(id)).toBe("ended");
+    expect(hasSession(id)).toBe(false);
+    expect(getRuntimeState(id)).toBe("cold");
+    await waitForSessionDisposal(id);
+  });
+  it("设置页关闭核对 RPC 后发现排队消息，实际进程继续存活", async () => {
+    fixture.state = { isStreaming: false, isCompacting: false, pendingMessageCount: 1 };
+    const id = await launch();
+    expect(await disposeIdleSession(id)).toBe("busy");
+    expect(hasSession(id)).toBe(true);
+  });
   it("空闲进程干净退出，可用同 id 再启动", async () => {
     const id = await launch();
     age();

@@ -110,6 +110,7 @@ import type {
   ProcStopAllResult,
   ProcStopResult,
   PromptDisposition,
+  SessionDisposeIdleResult,
   SessionExportRequest,
   SessionGetModelsRequest,
   SessionId,
@@ -397,6 +398,9 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 结束指定会话的 pi 进程（历史 JSONL 保留）。 */
     dispose: (sessionId: SessionId): Promise<IpcResult<null>> =>
       ipcRenderer.invoke(SESSION_IPC.dispose, { sessionId }),
+    /** 主进程确认空闲后结束 pi；保留历史与后台项目进程。 */
+    disposeIdle: (sessionId: SessionId): Promise<IpcResult<SessionDisposeIdleResult>> =>
+      ipcRenderer.invoke(SESSION_IPC.disposeIdle, { sessionId }),
     /** 读取项目目录的 pi 会话历史。 */
     list: (cwd: string): Promise<IpcResult<SessionSummary[]>> =>
       ipcRenderer.invoke(SESSION_IPC.list, { cwd }),

@@ -11,6 +11,7 @@ import type {
   PiShellProbe,
   PiSlashCommand,
   PromptDisposition,
+  SessionDisposeIdleResult,
   SessionExportRequest,
   SessionGetModelsRequest,
   SessionId,
@@ -34,6 +35,7 @@ import {
 import { envelope, envelopeAsync } from "../ipc/envelope";
 import { getSettings } from "../settings/settings";
 import { buildContextBreakdown } from "./contextBreakdown";
+import { disposeIdleSession } from "./disposeIdleSession";
 import { exportSessionHtml, exportSessionMarkdown } from "./exportSession";
 import { invalidateGatewayModelCache, listApiKeyProviders } from "./piAuth";
 import {
@@ -385,6 +387,12 @@ export function registerSessionIpc(): void {
         disposeSession(requireSessionId(req?.sessionId));
         return null;
       }),
+  );
+
+  ipcMain.handle(
+    SESSION_IPC.disposeIdle,
+    (_event, req: { sessionId?: unknown }): Promise<IpcResult<SessionDisposeIdleResult>> =>
+      envelopeAsync(() => disposeIdleSession(requireSessionId(req?.sessionId))),
   );
 
   ipcMain.handle(
