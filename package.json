@@ -21,6 +21,7 @@
     "gen:file-icons": "node scripts/generate-file-icons.mjs",
     "fixtures:office": "node scripts/officePreview/generateFixtures.ts",
     "bench:office": "node scripts/officePreview/benchmark.ts",
+    "check:pdf-preview": "node scripts/pdfPreview/regression.ts",
     "gen:app-icon": "node scripts/generate-app-icon.mjs",
     "gen:installer-art": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-installer-art.ps1",
     "rebuild:native": "electron-rebuild -f -w node-pty",

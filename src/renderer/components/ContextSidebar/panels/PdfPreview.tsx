@@ -1,16 +1,15 @@
 import { CaretLeft, CaretRight, Copy } from "@phosphor-icons/react";
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask, TextLayer } from "pdfjs-dist";
-import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useEffect, useRef, useState } from "react";
 import type { FsReadPdfResult } from "../../../../shared/ipc";
 import { useT } from "../../../hooks/useT";
 import { useUiStore } from "../../../stores/uiStore";
 import { copyTextToClipboard } from "../../../utils/clipboard";
+import { loadPdfJs, type PdfJsModule } from "../../../utils/pdfLoader";
+import { getPdfResourceOptions } from "../../../utils/pdfResources";
+import { previewPageStep } from "../../../utils/previewPageKeys";
 import panelStyles from "./FilePanel.module.css";
 import styles from "./PdfPreview.module.css";
-
-/** 动态加载的 pdfjs 主模块（同时提供 TextLayer：文本层必须与渲染同一个实例）。 */
-type PdfJsModule = typeof import("pdfjs-dist/build/pdf.mjs");
 
 interface PdfPreviewProps {
   result: FsReadPdfResult;
@@ -77,6 +76,18 @@ export function PdfPreview({ result }: PdfPreviewProps) {
   }, []);
 
   useEffect(() => {
+    if (!documentState) return;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const step = previewPageStep(event);
+      if (step === null) return;
+      event.preventDefault();
+      setPage((value) => Math.min(documentState.numPages, Math.max(1, value + step)));
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [documentState]);
+
+  useEffect(() => {
     let cancelled = false;
     let loadingTask: { promise: Promise<PDFDocumentProxy>; destroy: () => Promise<void> } | null =
       null;
@@ -84,11 +95,13 @@ export function PdfPreview({ result }: PdfPreviewProps) {
     setDocumentState(null);
     setPdfjs(null);
     setPage(1);
-    void import("pdfjs-dist/build/pdf.mjs")
+    void loadPdfJs()
       .then(async (module) => {
-        module.GlobalWorkerOptions.workerSrc = workerUrl;
         // PDF.js transfers typed-array buffers to its worker; keep IPC preview state reusable.
-        loadingTask = module.getDocument({ data: result.data.slice() });
+        loadingTask = module.getDocument({
+          data: result.data.slice(),
+          ...getPdfResourceOptions(),
+        });
         if (cancelled) {
           void loadingTask.destroy();
           return;
