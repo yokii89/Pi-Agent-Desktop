@@ -9,6 +9,7 @@ const fake = vi.hoisted(() => ({
 }));
 vi.mock("./piSession", () => ({
   hasSession: (id: string) => fake.alive.has(id),
+  getSessionPid: (id: string) => (fake.alive.has(id) ? 1234 : null),
   startSession: fake.start,
   fetchSessionState: fake.probe,
   disposeSession: fake.dispose,
@@ -26,6 +27,7 @@ import {
   assertNoModeTransition,
   ensureSessionReady,
   getRuntimeState,
+  listLiveSessionSnapshots,
   listRuntimeSnapshots,
   markRuntimeActivity,
   noteSessionSpawned,
@@ -63,6 +65,28 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("runtime lifecycle", () => {
+  it("完整存活清单包含隐藏预热，但不将其泄漏到常规会话对账", () => {
+    for (const [sessionId, reason] of [
+      ["normal", "manual"],
+      ["prewarm", "new-chat-prefetch"],
+      ["ended", "manual"],
+    ] as const) {
+      noteSessionSpawned({ sessionId, reason, cwd: "project", sessionFile: null });
+    }
+    fake.alive.add("normal");
+    fake.alive.add("prewarm");
+    const initial = listLiveSessionSnapshots();
+    expect(initial.map((row) => row.sessionId)).toEqual(["normal", "prewarm"]);
+    expect(initial.every((row) => row.pid === 1234)).toBe(true);
+    expect(listRuntimeSnapshots().some((row) => row.sessionId === "prewarm")).toBe(false);
+
+    vi.advanceTimersByTime(60_000);
+    expect(listLiveSessionSnapshots()).toEqual(initial);
+    expect(fake.probe).not.toHaveBeenCalled();
+    expect(fake.start).not.toHaveBeenCalled();
+    fake.alive.delete("normal");
+    expect(listLiveSessionSnapshots().map((row) => row.sessionId)).toEqual(["prewarm"]);
+  });
   it("reuses the same id without restarting, preserves actual cwd and ownership", async () => {
     await ensureSessionReady({ sessionId: "a", cwd: "project", reason: "speculative-prefetch" });
     await ensureSessionReady({ sessionId: "a", reason: "view-action" });

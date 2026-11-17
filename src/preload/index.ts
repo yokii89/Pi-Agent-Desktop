@@ -4,6 +4,7 @@ import type {
   ActivateContributionResult,
   ContributionCatalogSnapshot,
   ExtensionWorkerStatus,
+  LiveSessionSnapshot,
   PrefetchMetrics,
   PrefetchNotifyRequest,
   RuntimeViewingRequest,
@@ -711,6 +712,9 @@ contextBridge.exposeInMainWorld("pidesk", {
   },
 
   runtime: {
+    /** 设置页完整存活清单，包含未晋升的预热实例。 */
+    liveSessions: (): Promise<IpcResult<LiveSessionSnapshot[]>> =>
+      ipcRenderer.invoke(RUNTIME_IPC.liveSessions),
     /** 读取主进程权威 runtime 快照（Renderer reload 对账）。 */
     snapshot: (): Promise<IpcResult<SessionRuntimeSnapshot[]>> =>
       ipcRenderer.invoke(RUNTIME_IPC.snapshot),

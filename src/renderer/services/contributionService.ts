@@ -2,6 +2,7 @@ import type {
   ActivateContributionRequest,
   ActivateContributionResult,
   ContributionCatalogSnapshot,
+  LiveSessionSnapshot,
   RuntimeViewingRequest,
   SessionRuntimeSnapshot,
 } from "../../shared/contribution";
@@ -36,6 +37,10 @@ export const catalogService = {
 
 /** Session Runtime 快照服务（docs/design/16 Phase C）。 */
 export const runtimeService = {
+  /** 设置页专用完整清单，不合入普通会话对账。 */
+  async liveSessions(): Promise<LiveSessionSnapshot[]> {
+    return unwrap(runtimeApi().liveSessions());
+  },
   async snapshot(): Promise<SessionRuntimeSnapshot[]> {
     return unwrap(runtimeApi().snapshot());
   },

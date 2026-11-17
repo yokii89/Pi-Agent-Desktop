@@ -3,6 +3,7 @@ import {
   ArrowsClockwise,
   Bell,
   ChartBar,
+  Cpu,
   Folder,
   Keyboard,
   MagnifyingGlass,
@@ -37,6 +38,7 @@ export type SettingsSectionId =
   | "environment"
   | "projects"
   | "scheduled"
+  | "liveSessions"
   | "extensions"
   | "archived"
   | "about";
@@ -150,6 +152,12 @@ const NAV_GROUPS: NavGroup[] = [
         id: "projects",
         labelKey: "settings.section.projects",
         icon: <Folder size={18} weight="regular" />,
+      },
+      {
+        id: "liveSessions",
+        labelKey: "settings.section.liveSessions",
+        icon: <Cpu size={20} weight="regular" />,
+        keywords: ["存活", "会话", "进程", "空闲", "预热", "session", "process", "idle", "live"],
       },
       {
         id: "scheduled",

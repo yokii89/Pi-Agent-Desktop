@@ -8,6 +8,7 @@ import { Modal } from "../ui/Modal";
 import { ArchivedSessionsPanel } from "./ArchivedSessionsPanel";
 import { ExtensionsSettingsPanel } from "./ExtensionsSettingsPanel";
 import { GeneralPanel } from "./GeneralPanel";
+import { LiveSessionsPanel } from "./LiveSessionsPanel";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { PersonalizationPanel } from "./PersonalizationPanel";
 import { ProfilePanel } from "./ProfilePanel";
@@ -40,6 +41,7 @@ const SECTION_TITLE_KEYS: Record<SettingsSectionId, string> = {
   environment: "settings.section.environment",
   projects: "settings.section.projects",
   scheduled: "settings.section.scheduled",
+  liveSessions: "settings.section.liveSessions",
   extensions: "settings.section.extensions",
   archived: "settings.section.archived",
   about: "settings.section.about",
@@ -90,6 +92,8 @@ export function SettingsDialog() {
         return <EnvironmentPanel />;
       case "projects":
         return <ProjectsPanel />;
+      case "liveSessions":
+        return <LiveSessionsPanel />;
       case "scheduled":
         return <ScheduledSettingsPanel />;
       case "notifications":

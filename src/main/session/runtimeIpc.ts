@@ -5,10 +5,11 @@ import type { IpcResult } from "../../shared/ipc";
 import { envelope } from "../ipc/envelope";
 import { getMainWindow } from "../window/createMainWindow";
 import { noteViewingSession } from "./idleReclaim";
-import { listRuntimeSnapshots } from "./runtimeCoordinator";
+import { listLiveSessionSnapshots, listRuntimeSnapshots } from "./runtimeCoordinator";
 
 /** Session Runtime 快照 IPC（docs/design/16 Phase C）。 */
 export function registerRuntimeIpc(): void {
+  ipcMain.handle(RUNTIME_IPC.liveSessions, () => envelope(listLiveSessionSnapshots));
   ipcMain.handle(
     RUNTIME_IPC.snapshot,
     (): IpcResult<SessionRuntimeSnapshot[]> => envelope(() => listRuntimeSnapshots()),
