@@ -177,6 +177,10 @@ export const contextMessages = defineMessages({
     "zh-CN": "选择左侧文件查看差异",
     "en-US": "Select a file to see its diff",
   },
+  "panels.review.detailEmptyStacked": {
+    "zh-CN": "选择上方文件查看差异",
+    "en-US": "Select a file above to see its diff",
+  },
   "panels.review.viewLabel": { "zh-CN": "审查视图", "en-US": "Review views" },
   "panels.review.viewChanges": { "zh-CN": "变更", "en-US": "Changes" },
   "panels.review.viewGraph": { "zh-CN": "图谱", "en-US": "Graph" },

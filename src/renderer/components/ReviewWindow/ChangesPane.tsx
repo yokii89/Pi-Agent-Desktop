@@ -61,16 +61,31 @@ function StateView({
   text,
   hint,
   tone,
+  className,
+  stackedText,
 }: {
   icon: ReactNode;
   text: string;
   hint?: string;
   tone?: "error";
+  className?: string;
+  stackedText?: string;
 }) {
   return (
-    <div className={[styles.state, tone === "error" ? styles.stateError : ""].join(" ")}>
+    <div
+      className={[styles.state, tone === "error" ? styles.stateError : "", className ?? ""]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {icon}
-      <p className={styles.stateText}>{text}</p>
+      {stackedText ? (
+        <p className={styles.stateText}>
+          <span className={styles.detailEmptyDefault}>{text}</span>
+          <span className={styles.detailEmptyStacked}>{stackedText}</span>
+        </p>
+      ) : (
+        <p className={styles.stateText}>{text}</p>
+      )}
       {hint && <p className={styles.stateHint}>{hint}</p>}
     </div>
   );
@@ -386,6 +401,8 @@ function ChangesPaneImpl() {
             <StateView
               icon={<GitDiff size={24} weight="regular" className={styles.stateIcon} />}
               text={t("panels.review.detailEmpty")}
+              stackedText={t("panels.review.detailEmptyStacked")}
+              className={styles.detailEmptyState}
             />
           )}
         </div>

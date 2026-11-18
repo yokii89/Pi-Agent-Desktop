@@ -190,6 +190,20 @@
 
 /* —— 空态 / 加载 / 错误 —— */
 
+.detailEmptyStacked {
+  display: none;
+}
+
+@container review-pane (max-width: 559px) {
+  .detailEmptyDefault {
+    display: none;
+  }
+
+  .detailEmptyStacked {
+    display: inline;
+  }
+}
+
 .state {
   flex: 1;
   display: flex;
