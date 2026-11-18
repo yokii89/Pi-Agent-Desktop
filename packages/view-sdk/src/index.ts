@@ -105,6 +105,7 @@ export {
 export {
   type CoalescedFrameMeta,
   type CoalescedViewWriter,
+  type CoalescedViewWriterOptions,
   createViewFrameScheduler,
   DEFAULT_VIEW_FRAME_INTERVAL_MS,
   type ViewFrameScheduler,

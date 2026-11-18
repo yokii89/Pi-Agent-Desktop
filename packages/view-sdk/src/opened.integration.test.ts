@@ -17,7 +17,13 @@ import {
   VIEW_HOST_CAPABILITIES,
   VIEW_LIMITS,
 } from "../../../src/shared/view";
-import { DesktopViewClient, VIEW_PROTOCOL_VERSION } from "./index.js";
+import {
+  DesktopViewClient,
+  openPanelResult,
+  openSettingsViewResult,
+  openSidebarResult,
+  VIEW_PROTOCOL_VERSION,
+} from "./index.js";
 import { createTestViewHost, type TestViewHost } from "./testing.js";
 
 let current: TestViewHost;
@@ -73,6 +79,48 @@ function openedCollector(): {
 }
 
 describe("opened ack over real socket", () => {
+  it.each([
+    ["panel", openPanelResult],
+    ["sidebar", openSidebarResult],
+    ["settings", openSettingsViewResult],
+  ] as const)("%s Result resolves only with Host-confirmed placement", async (placement, open) => {
+    const client = makeClient();
+    const { onEvent, seen } = openedCollector();
+    try {
+      const result = await open(client, {
+        panelId: "confirmed-slot",
+        root: { type: "text", content: "resident view" },
+        onEvent,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.message);
+      expect(seen).toEqual([{ placement, panelId: "confirmed-slot" }]);
+      expect(result.session.placement).toBe(placement);
+      expect(result.session.panelId).toBe("confirmed-slot");
+      result.session.close();
+      await result.session.closed;
+    } finally {
+      client.dispose();
+    }
+  });
+
+  it("accepts panel confirmation from a legacy Host without capabilities", async () => {
+    const client = makeClient("legacy");
+    try {
+      const result = await openPanelResult(client, {
+        panelId: "legacy-panel",
+        root: { type: "text", content: "legacy" },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.message);
+      expect(result.session.placement).toBe("panel");
+      expect(result.session.panelId).toBe("legacy-panel");
+      result.session.close();
+    } finally {
+      client.dispose();
+    }
+  });
+
   it("receives hello and opened with requested modal placement", async () => {
     const client = makeClient();
     const { onEvent, seen } = openedCollector();

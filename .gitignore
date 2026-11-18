@@ -12,6 +12,9 @@ release/
 packages/view-sdk/dist/
 .zcode/
 
+# Mobile local environment
+/mobile/.env
+
 # local docs (not for repo)
 docs/
 # 官网素材与采集工具链（CDP 截图 / 分镜编码 / 演示项目脚手架），同 docs/ 只本地用

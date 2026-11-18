@@ -2,7 +2,7 @@
 
 Client SDK for the **PiDesk extension View protocol** (`view/v1`).
 
-Maintainers: changes to public APIs, protocols, placements, and extension
+**Maintainers:** changes to public APIs, protocols, placements, and extension
 lifecycle must follow the SDK development standards (Chinese), including the
 design template and delivery checklist.
 
@@ -829,28 +829,53 @@ if (supportsPatch(desktop)) session.patch({ ops });   // else: full update
 ## Throttling a live panel
 
 ```ts
-const writer = session.coalesced({ intervalMs: 250 }); // ≤4 frames/second
+const writer = session.coalesced({
+  intervalMs: 250, // ≤4 frames/second
+  onError: (error) => console.error("Local view send failed", error),
+});
 for (const tick of ticks) {
   writer.set(project(tick), patchOpsFor(tick), {
     actions: actionBarFor(tick),   // rides the same frame as the tree
   });
 }
-await writer.flush();               // action boundary: converge before sending
+await writer.flush();               // attempt delivery at the action boundary
+if (writer.lastError !== null) return; // handle the failure before acting
 await writer.flushNow();            // right after open(), when nothing is dirty
 writer.stop();                      // also stopped automatically when closed
 ```
 
-`set()` takes the whole tree **and** the patch expressing the same change; the
-writer picks `patch` or `update` from the advertised capability. The optional
-third argument carries the non-tree fields of an `update` / `patch` frame
-(`actions` / `title` / `placementHint`) so action-bar state such as `disabled`
-coalesces with content instead of needing a side-channel timer. Omitted fields
-are left off the frame (the Host keeps its current value); pass `actions: []`
-to clear the bar. A change that arrives while a frame is on the wire is never
-dropped — one more frame is owed.
-For a bare scheduler (not bound to a session) use `createViewFrameScheduler()`.
-Reconnection stays with `superviseSlot`: the scheduler owns *when*, the session
-owns *whether the wire exists*.
+`set()` takes the whole tree and an optional patch expressing the same change.
+A single pending `set()` may send a patch if the Host supports it. Two or more
+unsent sets send the last **complete tree**, because successive patches may
+depend on earlier local changes. After delivery, a single set may use patches
+again. Provide the full latest tree even when passing patch operations.
+
+The optional third argument carries `actions` / `title` / `placementHint`. Each
+field keeps its last non-`undefined` value across pending sets: setting actions
+and then changing only the body preserves those unsent actions. Arrays and
+`placementHint` replace the entire field; they are not deep merged. Pass
+`actions: []` to clear the bar. Fields omitted throughout the pending frame
+keep the Host's current value. Meta is cleared after delivery.
+
+`onError` and `lastError` expose **local send failures**. `flush()` resolves
+after an attempt; inspect `lastError` before relying on the new state. A
+successful send clears the error. Rejectable local budgets and serialization
+errors pause automatic retries until new state is supplied with `set()`. Other
+send failures retry on the next window using the whole latest tree and pending
+meta. `flushNow()` explicitly attempts delivery even when paused or clean.
+A clean `flushNow()` sends an update without a root, preserving the Host's
+current tree, including any direct `session.update()` or `session.patch()`.
+Closing the session or stopping the writer cancels future sends. Host rejection
+after a queued write still arrives via `session.onError()` and is not tracked
+by the writer. The first `coalesced()` call captures the options for the session.
+
+For a bare scheduler use `createViewFrameScheduler({ send, onError, shouldRetry })`.
+It exposes the same `lastError`; its default retry policy remains `true` for
+compatibility. Set `shouldRetry` to return `false` for deterministic failures;
+the scheduler waits for a new `markDirty()` (or explicit `flushNow()`). Observer
+exceptions are isolated, and a throwing retry policy pauses the frame. New
+state marked during a failed attempt remains pending. Reconnection stays with
+`superviseSlot`.
 
 ## Host discovery (env + rendezvous)
 
@@ -885,8 +910,23 @@ if (!result.ok) {
 }
 ```
 
+`openPanelResult()` / `openSidebarResult()` / `openSettingsViewResult()` return
+success only after the Host confirms registration with `opened`, within three
+seconds after dispatch. A Host error preserves its code and payload; a missing
+confirmation yields retryable `handshake-timeout`; cancellation yields
+`aborted`; a dropped connection yields retryable `transport`. Failed attempts
+close their session and release acknowledgement listeners, timers and abort
+listeners. Success confirms registration in the Host, not completion of UI mounting.
+
+Compatibility: a Host with no `hello` yields `handshake-timeout`; one whose
+`hello.placements` lacks the requested slot yields `placement`. Older Hosts
+that advertise the slot and send `opened` work without capability flags. Those
+that advertise the slot but never send `opened` time out; an unconfirmed open
+is never reported as success. The lower-level `client.openLive()` still returns
+immediately after dispatch, so callers needing that timing can use it directly.
+
 `openPanel()` / `openSidebar()` / `openSettingsView()` stay soft (`null`, never
-throw) — they are projections of the same implementation. `session.onError()` and
+throw) and share the same confirmation timing. `session.onError()` and
 `viewOnDesktop(..., { onError })` reach the Host's `error` frames on paths that
 used to swallow them, and `update()` / `patch()` returning normally means
 **sent**, not accepted.
@@ -902,6 +942,16 @@ used to swallow them, and `update()` / `patch()` returning normally means
 
 ViewNode is **data**. Host never `eval`s or injects HTML. Endpoint is
 localhost-only; token is per-session and not logged.
+
+Both ends decode UTF-8 across socket chunks and enforce per-line byte limits,
+including incomplete lines after authentication. LF and CRLF delimiters are
+excluded from the payload budget, even when CR and LF arrive in separate chunks. Client receive limits use the
+Host's advertised `maxMessageBytes` when available. Socket write queues are
+bounded at four default maximum message sizes (currently 4 MiB, including line
+delimiters); a write that would exceed this cap closes the connection and
+settles its views. `socket.write(false)` still means the frame was queued. An
+unqueueable client `update()` throws `ViewHostError` with `code: "closed"`,
+while `patch()` returns `false`. Local invalid-frame budgets use `code: "limit"`.
 
 ## Gaps found while integrating yoki-ask-user-question
 

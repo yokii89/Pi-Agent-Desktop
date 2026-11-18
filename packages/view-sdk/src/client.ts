@@ -1,11 +1,16 @@
 import fs from "node:fs";
 import net from "node:net";
+import { StringDecoder } from "node:string_decoder";
 import {
   describeBudgetViolations,
   frameBudgetViolations,
   hasRejectableViolation,
 } from "./limits.js";
-import type { CoalescedFrameMeta, CoalescedViewWriter } from "./scheduler.js";
+import type {
+  CoalescedFrameMeta,
+  CoalescedViewWriter,
+  CoalescedViewWriterOptions,
+} from "./scheduler.js";
 import { createViewFrameScheduler } from "./scheduler.js";
 import type {
   ViewClosedPayload,
@@ -64,6 +69,9 @@ export interface ConnectDesktopViewOptions {
   /** Connect timeout. Default 5000ms. */
   connectTimeoutMs?: number;
 }
+
+// Four maximum-sized frames allow brief bursts while bounding memory if the Host stops reading.
+const SOCKET_WRITE_HIGH_WATER_BYTES = 4 * VIEW_LIMITS.maxMessageBytes;
 
 interface RendezvousPayload {
   endpoint: string;
@@ -211,10 +219,9 @@ export interface LiveViewSession {
    * **Fire-and-forget: returning normally means the frame was written, not that
    * the Host accepted it.** Host-side rejection arrives asynchronously as an
    * `error` event — subscribe with {@link onError} (or `onEvent`) if you need to
-   * know. Throws `ViewHostError(code:"limit")` only when the frame is locally
-   * guaranteed to fail: over `maxMessageBytes`, where the alternative is the
-   * Host dropping the socket and taking every other view on the connection down
-   * with it (docs/design/20 O3/O4).
+   * know. Throws `ViewHostError(code:"limit")` for locally rejectable tree or
+   * byte budgets, or `ViewHostError(code:"closed")` if the transport cannot
+   * queue the frame (including write-buffer exhaustion). Closed views ignore updates.
    */
   update(update: ViewUpdatePayload | ViewNode): void;
   /**
@@ -223,9 +230,9 @@ export interface LiveViewSession {
    * old, the view is already closed, or the pipe is down — callers should
    * fall back to `update()` with the full tree.
    *
-   * `true` means **sent**, not accepted: a `patch.ops` count above
-   * `limits.maxPatchOps` is still rejected by the Host, asynchronously, as an
-   * `error` frame. Use {@link onError} to catch that.
+   * `true` means **queued**, not accepted. Local op/byte budget failures return
+   * `false`; other Host-side rejections arrive as asynchronous `error` frames.
+   * Use {@link onError} to catch those.
    */
   patch(payload: ViewPatchPayload): boolean;
   close(result?: ViewResult): void;
@@ -239,15 +246,17 @@ export interface LiveViewSession {
   /**
    * Coalesced writer for live, frequently-changing views (docs/design/20 O4).
    * Prefer this over calling `update()` from a timer: deliveries merge to ≤4/s,
-   * an in-flight frame never loses the newest state, and `patch` vs. whole-tree
-   * is decided from the Host's advertised capability. Lazily creates one
+   * an in-flight frame never loses the newest state. Single pending sets may
+   * use `patch`; multiple unsent sets send the last full tree. Lazily creates one
    * scheduler; its timer is cancelled when the view settles.
    *
    * `set()` also accepts frame meta (`actions` / `title` / `placementHint`) so
    * action-bar state rides the same coalesced frame as the tree — see
    * {@link CoalescedViewWriter.set}.
+   * Local failures are observable through the writer's `lastError` / `onError`.
+   * Invalid frames wait for new state; closing the session stops the writer.
    */
-  coalesced(options?: { intervalMs?: number }): CoalescedViewWriter;
+  coalesced(options?: CoalescedViewWriterOptions): CoalescedViewWriter;
   /** Resolves when the view is closed (either side). */
   closed: Promise<ViewClosedPayload | null>;
 }
@@ -554,8 +563,10 @@ export class DesktopViewClient {
       socket.once("error", onError);
     });
 
+    const decoder = new StringDecoder("utf8");
     socket.on("data", (chunk: Buffer | string) => {
-      this.#onData(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+      if (socket.destroyed || this.#socket !== socket) return;
+      this.#onData(typeof chunk === "string" ? chunk : decoder.write(chunk));
     });
     socket.on("close", () => {
       // 只让当前 socket 的关闭触发清理；teardown 已置空 #socket，避免重复结算
@@ -596,13 +607,20 @@ export class DesktopViewClient {
     this.#ready = true;
   }
 
-  #rawWrite(line: string): void {
+  #rawWrite(line: string): boolean {
     const socket = this.#socket;
-    if (!socket || socket.destroyed) return;
+    if (!socket || socket.destroyed) return false;
+    const frame = `${line}\n`;
+    if (socket.writableLength + Buffer.byteLength(frame, "utf8") > SOCKET_WRITE_HIGH_WATER_BYTES) {
+      socket.destroy();
+      return false;
+    }
     try {
-      socket.write(`${line}\n`);
+      socket.write(frame);
+      return true;
     } catch {
-      // peer gone; close path cleans up
+      socket.destroy();
+      return false;
     }
   }
 
@@ -635,7 +653,12 @@ export class DesktopViewClient {
       const message = `View frame over budget before send: ${describeBudgetViolations(violations)}`;
       throw new ViewHostError(message, { code: "limit", payload: { message, code: "limit" } });
     }
-    this.#rawWrite(line);
+    if (!this.#rawWrite(line)) {
+      throw new ViewHostError("View transport unavailable or write buffer exhausted", {
+        code: "closed",
+        closedReason: "dispose",
+      });
+    }
   }
 
   #onData(chunk: string): void {
@@ -644,8 +667,19 @@ export class DesktopViewClient {
     while (nl !== -1) {
       const line = this.#lineBuffer.slice(0, nl).replace(/\r$/, "");
       this.#lineBuffer = this.#lineBuffer.slice(nl + 1);
+      if (Buffer.byteLength(line, "utf8") > this.limits.maxMessageBytes) {
+        this.#socket?.destroy();
+        return;
+      }
       this.#handleLine(line);
+      if (!this.#socket || this.#socket.destroyed) return;
       nl = this.#lineBuffer.indexOf("\n");
+    }
+    // A trailing CR may be the first half of a split CRLF delimiter.
+    const pendingBytes =
+      Buffer.byteLength(this.#lineBuffer, "utf8") - (this.#lineBuffer.endsWith("\r") ? 1 : 0);
+    if (pendingBytes > this.limits.maxMessageBytes) {
+      this.#socket?.destroy();
     }
   }
 
@@ -882,10 +916,11 @@ export class DesktopViewClient {
     let lastValues: Record<string, unknown> = {};
     let settledResult: ViewResult | null = null;
     let lastErrorPayload: ViewErrorPayload | null = null;
-    /** Latest state handed to `coalesced()` — the scheduler never buffers a tree itself. */
-    let pendingRoot: ViewNode | null = null;
+    /** Unsent coalesced state; clean flushes must preserve direct updates and patches. */
+    let pendingRoot: ViewNode | undefined;
     let pendingOps: ViewPatchOp[] | null = null;
     let pendingMeta: CoalescedFrameMeta = {};
+    let pendingSets = 0;
     let coalescer: CoalescedViewWriter | null = null;
     const client = this;
 
@@ -950,28 +985,64 @@ export class DesktopViewClient {
         }),
       coalesced: (coalesceOptions) => {
         if (coalescer) return coalescer;
+        let stopped = pending.settled;
         const scheduler = createViewFrameScheduler({
           intervalMs: coalesceOptions?.intervalMs,
+          onError: (error) => {
+            if (error instanceof ViewHostError && error.code === "closed") stop();
+            coalesceOptions?.onError?.(error);
+          },
+          shouldRetry: (error) =>
+            !stopped &&
+            !(error instanceof ViewHostError && error.code === "limit") &&
+            !(error instanceof TypeError) &&
+            !(error instanceof RangeError),
           send: () => {
             // meta rides the same frame as the tree/patch so action-bar state
             // (e.g. `disabled`) coalesces with content instead of needing a
             // second write path (docs/design/20 §9).
             const meta = pendingMeta;
-            if (pendingOps && session.patch({ ops: pendingOps, ...meta })) return;
-            if (pendingRoot) session.update({ root: pendingRoot, ...meta });
+            try {
+              if (!pendingOps || !session.patch({ ops: pendingOps, ...meta })) {
+                session.update({ root: pendingRoot, ...meta });
+              }
+            } catch (error) {
+              // The next attempt must recover the complete state, including
+              // changes whose patch may not have reached the Host.
+              pendingOps = null;
+              throw error;
+            }
+            pendingRoot = undefined;
+            pendingOps = null;
+            pendingMeta = {};
+            pendingSets = 0;
           },
         });
-        pending.cleanups.push(() => scheduler.stop());
+        const stop = (): void => {
+          stopped = true;
+          scheduler.stop();
+        };
+        if (stopped) scheduler.stop();
+        else pending.cleanups.push(stop);
         coalescer = {
           set(root, ops, meta) {
+            if (stopped) return;
             pendingRoot = root;
-            pendingOps = ops && ops.length > 0 ? ops : null;
-            pendingMeta = meta ? { ...meta } : {};
+            // Patches describe successive local states, not a cumulative diff
+            // against the Host. Multiple unsent sets require the full tree.
+            pendingOps = pendingSets === 0 && ops && ops.length > 0 ? ops : null;
+            pendingSets += 1;
+            if (meta?.actions !== undefined) pendingMeta.actions = meta.actions;
+            if (meta?.title !== undefined) pendingMeta.title = meta.title;
+            if (meta?.placementHint !== undefined) pendingMeta.placementHint = meta.placementHint;
             scheduler.markDirty();
           },
           flush: () => scheduler.flush(),
           flushNow: () => scheduler.flushNow(),
-          stop: () => scheduler.stop(),
+          stop,
+          get lastError() {
+            return scheduler.lastError;
+          },
         };
         return coalescer;
       },

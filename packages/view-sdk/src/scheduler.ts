@@ -10,10 +10,9 @@
  * Contract, in one breath: mark state dirty, get at most one frame per window,
  * never lose the last change, never deadlock a caller that is about to act.
  *
- * Failure handling is deliberately *not* a retry policy: a failed `send` marks
- * state dirty again and the next window retries. Reconnecting is
- * `superviseSlot`'s job, and the two must not race to re-send the same frame —
- * the scheduler owns "when", the session owns "whether the wire is there".
+ * Failed sends are retried by default on the next window. Callers can observe
+ * failures and opt out of retrying deterministic errors; reconnecting remains
+ * `superviseSlot`'s job.
  */
 
 import type { ViewNode, ViewPatchOp, ViewUpdatePayload } from "./types.js";
@@ -35,26 +34,36 @@ export type CoalescedFrameMeta = Pick<ViewUpdatePayload, "actions" | "title" | "
  * State-latest-wins writer bound to one live session.
  *
  * `set()` takes the full tree *and* the patch that would have expressed the
- * same change; the scheduler picks `patch` when the Host advertises
- * `view-patch` and falls back to the whole tree when it does not, so the
- * extension never forks that decision itself (docs/design/20 O4).
+ * same change. A single pending set may use `patch` on capable Hosts; two or
+ * more unsent sets always send the newest whole tree, since each patch may
+ * depend on the previous local state.
  */
 export interface CoalescedViewWriter {
   /**
    * Record the newest state; the frame goes out at the end of the window.
    *
    * `meta` fields are copied onto the same frame (`actions` / `title` /
-   * `placementHint`). Omitted fields are left off the frame and the Host keeps
-   * its current value — same as `session.update({ root })`. Pass `actions: []`
-   * to clear the action bar.
+   * `placementHint`). Within a pending frame, each field keeps its last
+   * non-undefined value. `placementHint` is replaced as a whole, not deep merged.
+   * Fields omitted throughout the frame keep the Host's current value. Pass
+   * `actions: []` to clear the action bar.
    */
   set(root: ViewNode, ops?: ViewPatchOp[], meta?: CoalescedFrameMeta): void;
-  /** Deliver now (action boundary). No-op when nothing changed. */
+  /** Attempt delivery now; inspect `lastError` before acting on the new state. */
   flush(): Promise<void>;
-  /** Deliver now even when nothing changed — the first frame after `open()`. */
+  /** Attempt delivery now even when clean; a clean frame leaves the Host tree unchanged. */
   flushNow(): Promise<void>;
   /** Stop the timer. Called automatically when the view settles. */
   stop(): void;
+  /** Local send failure, cleared after a successful send; Host errors use session.onError(). */
+  readonly lastError: unknown | null;
+}
+
+/** Options are captured by the first `session.coalesced()` call for that session. */
+export interface CoalescedViewWriterOptions {
+  intervalMs?: number;
+  /** Local send failures only. Budget/serialization failures wait for a new set(). */
+  onError?: (error: unknown) => void;
 }
 
 export interface ViewFrameSchedulerOptions {
@@ -66,6 +75,10 @@ export interface ViewFrameSchedulerOptions {
   send: () => Promise<void> | void;
   /** Minimum gap between two deliveries. Default 250ms (≤4/s). */
   intervalMs?: number;
+  /** Called after a failed attempt. Exceptions thrown by this callback are ignored. */
+  onError?: (error: unknown) => void;
+  /** Whether to retry a failed attempt. Defaults to true; exceptions mean no retry. */
+  shouldRetry?: (error: unknown) => boolean;
   /** Timer injection for tests. */
   setTimer?: (handler: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
@@ -75,8 +88,10 @@ export interface ViewFrameScheduler {
   /** Mark live state dirty; absorbed into the pending frame if one is already owed. */
   markDirty(): void;
   /**
-   * Deliver any pending frame now and await it. Call before an action so the
-   * Host never acts on stale state (§4.3 「动作边界不得丢」). No-op when clean.
+   * Attempt to deliver any pending frame now and await the attempt. Resolution
+   * does not mean the Host accepted it; inspect `lastError` or observe `onError`
+   * for failures before acting on the new state (§4.3 「动作边界不得丢」).
+   * No-op when clean.
    */
   flush(): Promise<void>;
   /**
@@ -89,6 +104,8 @@ export interface ViewFrameScheduler {
   stop(): void;
   /** Diagnostics: marks requested vs. frames delivered vs. absorbed. */
   readonly stats: { requested: number; delivered: number; coalesced: number };
+  /** Most recent send failure, cleared by a successful send. */
+  readonly lastError: unknown | null;
 }
 
 export function createViewFrameScheduler(options: ViewFrameSchedulerOptions): ViewFrameScheduler {
@@ -117,6 +134,7 @@ export function createViewFrameScheduler(options: ViewFrameSchedulerOptions): Vi
   });
 
   const stats = { requested: 0, delivered: 0, coalesced: 0 };
+  let lastError: unknown | null = null;
 
   const settleWaiters = (): void => {
     const pending = waiters;
@@ -125,33 +143,50 @@ export function createViewFrameScheduler(options: ViewFrameSchedulerOptions): Vi
   };
 
   async function deliver(): Promise<void> {
-    if (stopped) return;
+    if (stopped || inFlight || !dirty) return;
     inFlight = true;
     dirty = false;
     // `send` may throw synchronously (a render-phase blowup). Wrapping it before
     // attaching handlers keeps that from escaping as an unhandled rejection.
-    const raced = new Promise<"sent" | "failed">((resolve) => {
-      try {
-        resolve(
-          Promise.resolve(options.send()).then(
-            () => "sent" as const,
-            () => "failed" as const,
-          ),
-        );
-      } catch {
-        resolve("failed");
-      }
-    });
-    const outcome = await Promise.race([raced, stopSignal.then(() => "stopped" as const)]);
-    inFlight = false;
-
-    if (outcome === "sent") {
+    const raced = new Promise<{ outcome: "sent" } | { outcome: "failed"; error: unknown }>(
+      (resolve) => {
+        try {
+          resolve(
+            Promise.resolve(options.send()).then(
+              () => ({ outcome: "sent" as const }),
+              (error: unknown) => ({ outcome: "failed" as const, error }),
+            ),
+          );
+        } catch (error) {
+          resolve({ outcome: "failed", error });
+        }
+      },
+    );
+    const outcome = await Promise.race([
+      raced,
+      stopSignal.then(() => ({ outcome: "stopped" as const })),
+    ]);
+    if (!stopped && outcome.outcome === "sent") {
       stats.delivered += 1;
-    } else if (outcome === "failed") {
-      // A failed frame must not break the loop: the next window retries with
-      // current state. Reconnection itself belongs to superviseSlot.
-      dirty = true;
+      lastError = null;
+    } else if (outcome.outcome === "failed") {
+      lastError = outcome.error;
+      try {
+        options.onError?.(outcome.error);
+      } catch {
+        // Diagnostics must not interfere with scheduling.
+      }
+      let retry = true;
+      try {
+        retry = options.shouldRetry?.(outcome.error) ?? true;
+      } catch {
+        retry = false;
+      }
+      // Preserve a newer mark made during the failed send, even when this
+      // particular error is not retryable.
+      if (retry) dirty = true;
     }
+    inFlight = false;
 
     if (stopped) {
       settleWaiters();
@@ -205,21 +240,23 @@ export function createViewFrameScheduler(options: ViewFrameSchedulerOptions): Vi
     async flush() {
       if (stopped) return;
       clearPending();
-      if (inFlight) {
+      while (inFlight) {
         await new Promise<void>((resolve) => waiters.push(resolve));
-        if (!dirty || stopped) return;
+        if (stopped) return;
       }
       if (!dirty) return;
+      clearPending();
       await deliver();
     },
 
     async flushNow() {
       if (stopped) return;
       clearPending();
-      if (inFlight) {
+      while (inFlight) {
         await new Promise<void>((resolve) => waiters.push(resolve));
         if (stopped) return;
       }
+      clearPending();
       dirty = true;
       await deliver();
     },
@@ -238,5 +275,8 @@ export function createViewFrameScheduler(options: ViewFrameSchedulerOptions): Vi
     },
 
     stats,
+    get lastError() {
+      return lastError;
+    },
   };
 }

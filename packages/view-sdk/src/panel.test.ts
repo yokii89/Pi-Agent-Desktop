@@ -1,27 +1,33 @@
 import { describe, expect, it, vi } from "vitest";
-import type { DesktopViewClient, LiveViewSession } from "./client.js";
+import type { DesktopViewClient, LiveViewSession, ViewSessionEvent } from "./client.js";
 import { openPanel, openSettingsView, openSidebar } from "./index.js";
-import type { ViewHelloPayload, ViewSpec } from "./types.js";
+import type { ViewHelloPayload, ViewPlacement, ViewSpec } from "./types.js";
 
-function fakeSession(): LiveViewSession {
+function fakeSession(placement: ViewPlacement): LiveViewSession {
+  const handlers = new Set<(event: ViewSessionEvent) => void>();
   return {
     id: "view-test-1",
-    placement: "panel",
+    placement: null,
     panelId: "telegram-bridge",
     headerSide: null,
     update: vi.fn(),
     patch: vi.fn(() => false),
     close: vi.fn(),
-    onEvent: () => () => undefined,
+    onEvent: (handler: (event: ViewSessionEvent) => void) => {
+      handlers.add(handler);
+      queueMicrotask(() => {
+        if (handlers.has(handler)) handler({ type: "opened", placement });
+      });
+      return () => handlers.delete(handler);
+    },
     closed: new Promise(() => undefined),
   } as unknown as LiveViewSession;
 }
 
 function fakeClient(hello: ViewHelloPayload | null) {
-  const session = fakeSession();
-  const openLive = vi.fn(async (_spec: ViewSpec) => session);
+  const openLive = vi.fn(async (spec: ViewSpec) => fakeSession(spec.placement ?? "modal"));
   const client = { ensureConnected: async () => hello, hello, openLive };
-  return { client: client as unknown as DesktopViewClient, openLive, session };
+  return { client: client as unknown as DesktopViewClient, openLive };
 }
 
 const ALL_SLOTS: ViewHelloPayload = {
@@ -70,7 +76,7 @@ describe("openPanel", () => {
     expect(openLive).not.toHaveBeenCalled();
   });
 
-  it("resolves null when hello is absent (old host) and never opens", async () => {
+  it("resolves null when hello times out and never opens", async () => {
     const { client, openLive } = fakeClient(null);
     expect(
       await openPanel(client, { panelId: "p", root: { type: "text", content: "x" } }),

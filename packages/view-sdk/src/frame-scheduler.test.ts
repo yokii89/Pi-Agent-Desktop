@@ -11,7 +11,7 @@
  * send. Only the *scheduling* invariants are SDK concerns.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createViewFrameScheduler, DEFAULT_VIEW_FRAME_INTERVAL_MS } from "./index.js";
 
 function delay(ms: number): Promise<void> {
@@ -77,6 +77,46 @@ describe("merge window", () => {
 });
 
 describe("backpressure", () => {
+  it("serializes concurrent flushes without leaving a duplicate timer", async () => {
+    vi.useFakeTimers();
+    const releases: Array<() => void> = [];
+    let active = 0;
+    let maximumActive = 0;
+    const send = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          active += 1;
+          maximumActive = Math.max(maximumActive, active);
+          releases.push(() => {
+            active -= 1;
+            resolve();
+          });
+        }),
+    );
+    const scheduler = createViewFrameScheduler({ send, intervalMs: 10 });
+    try {
+      scheduler.markDirty();
+      const first = scheduler.flush();
+      scheduler.markDirty();
+      const second = scheduler.flush();
+      const thirdDone = vi.fn();
+      const third = scheduler.flush().then(thirdDone);
+      releases[0]();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(thirdDone).not.toHaveBeenCalled();
+      releases[1]();
+      await Promise.all([first, second, third]);
+      await vi.advanceTimersByTimeAsync(50);
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(maximumActive).toBe(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      scheduler.stop();
+      vi.useRealTimers();
+    }
+  });
+
   it("never drops a change that arrives while a frame is in flight", async () => {
     let sends = 0;
     let release!: () => void;
@@ -208,6 +248,88 @@ describe("failure isolation", () => {
     scheduler.markDirty();
     await until(() => scheduler.stats.delivered === 1);
     expect(attempts).toBeGreaterThanOrEqual(2);
+    expect(scheduler.lastError).toBeNull();
+    scheduler.stop();
+  });
+
+  it("stops retrying permanent failures and recovers on a new dirty mark", async () => {
+    let attempts = 0;
+    const failure = new Error("invalid frame");
+    const reported: unknown[] = [];
+    const scheduler = createViewFrameScheduler({
+      send: () => {
+        attempts += 1;
+        if (attempts === 1) throw failure;
+      },
+      shouldRetry: () => false,
+      onError: (error) => reported.push(error),
+      intervalMs: 10,
+    });
+
+    scheduler.markDirty();
+    await until(() => reported.length === 1);
+    await delay(40);
+    expect(attempts).toBe(1);
+    expect(scheduler.lastError).toBe(failure);
+
+    scheduler.markDirty();
+    await until(() => scheduler.stats.delivered === 1);
+    expect(attempts).toBe(2);
+    expect(scheduler.lastError).toBeNull();
+    scheduler.stop();
+  });
+
+  it("isolates exceptions from error and retry callbacks", async () => {
+    let attempts = 0;
+    const scheduler = createViewFrameScheduler({
+      send: () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error("temporary");
+      },
+      onError: () => {
+        throw new Error("observer failed");
+      },
+      shouldRetry: () => {
+        if (attempts === 1) throw new Error("policy failed");
+        return true;
+      },
+      intervalMs: 10,
+    });
+
+    scheduler.markDirty();
+    await until(() => attempts === 1);
+    expect(scheduler.lastError).toBeInstanceOf(Error);
+    await delay(30);
+    expect(attempts).toBe(1);
+
+    scheduler.markDirty();
+    await until(() => scheduler.stats.delivered === 1);
+    expect(attempts).toBe(2);
+    expect(scheduler.lastError).toBeNull();
+    scheduler.stop();
+  });
+
+  it("keeps a dirty mark made during a non-retryable failed send", async () => {
+    let attempts = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((_resolve, reject) => {
+      release = () => reject(new Error("permanent"));
+    });
+    const scheduler = createViewFrameScheduler({
+      send: async () => {
+        attempts += 1;
+        if (attempts === 1) await gate;
+      },
+      shouldRetry: () => false,
+      intervalMs: 10,
+    });
+
+    scheduler.markDirty();
+    await until(() => attempts === 1);
+    scheduler.markDirty();
+    release();
+    await until(() => scheduler.stats.delivered === 1);
+    expect(attempts).toBe(2);
     scheduler.stop();
   });
 });

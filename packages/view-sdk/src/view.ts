@@ -307,11 +307,11 @@ export type ViewOpenFailureCode =
   | ViewHostError["code"]
   /** No host env: plain terminal pi. Not retryable — fall back to TUI. */
   | "no-host"
-  /** Connected, but `hello` never arrived: a slow Host, not an old one. Retryable. */
+  /** Host did not send `hello` or confirm `opened` within the budget. Retryable. */
   | "handshake-timeout"
   /** Socket / disposed client. Retryable. */
   | "transport"
-  /** The caller's own `signal` was already aborted. Not a failure of anyone else. */
+  /** The caller cancelled before Host confirmation. Not retryable. */
   | "aborted"
   /** Options the SDK refuses to send (blank `panelId` → Host-side identity drift). */
   | "invalid";
@@ -357,7 +357,9 @@ function openFailure(
 /**
  * Discriminated open for the three resident slots. This is the real
  * implementation; `openPanel` / `openSidebar` / `openSettingsView` are the
- * documented soft (`null`) projections of it.
+ * documented soft (`null`) projections of it. Success requires the Host's
+ * `opened` confirmation within 3 seconds after dispatch. Hosts that advertise
+ * the slot but never acknowledge it produce retryable `handshake-timeout`.
  */
 export async function openPanelResult(
   client: DesktopViewClient | null,
@@ -402,6 +404,9 @@ async function openSlotResult(
   let session: LiveViewSession | null = null;
   try {
     const hello = await client.ensureConnected();
+    if (options.signal?.aborted) {
+      return openFailure("aborted", "Open aborted before dispatch.", false);
+    }
     if (!hello) {
       // hello 缺失 = 慢宿主 / 握手未结算：与“老宿主没有这个槽”不是一回事
       return openFailure(
@@ -421,11 +426,66 @@ async function openSlotResult(
       signal: options.signal,
       onEvent: options.onEvent,
     });
-    return { ok: true, session };
+    const opened = await awaitOpened(session, { signal: options.signal });
+    if (opened.ok) return { ok: true, session };
+
+    session.close();
+    if (opened.kind === "aborted") {
+      return openFailure("aborted", "Open aborted before Host confirmation.", false);
+    }
+    if (opened.kind === "timeout") {
+      return openFailure(
+        "handshake-timeout",
+        `Host did not confirm placement "${placement}" before the open timeout.`,
+        true,
+      );
+    }
+    if (opened.kind === "transport") {
+      return openFailure(
+        "transport",
+        `View closed before Host confirmation (${opened.closedReason}).`,
+        true,
+      );
+    }
+    if (opened.error) {
+      return openFailure(
+        opened.error.code,
+        opened.error.message,
+        opened.error.code === "limit" || opened.error.code === "internal",
+        opened.error,
+      );
+    }
+    const code =
+      opened.closedReason === "placement"
+        ? "placement"
+        : opened.closedReason === "limit"
+          ? "limit"
+          : opened.closedReason === "protocol"
+            ? "protocol"
+            : opened.closedReason === "internal"
+              ? "internal"
+              : "closed";
+    return openFailure(
+      code,
+      `Host closed the view before confirmation${opened.closedReason ? ` (${opened.closedReason})` : ""}.`,
+      code === "limit" || code === "internal",
+    );
   } catch (err) {
     // 连接失败 / client 已 dispose：可重试，绝不向扩展抛错
     session?.close();
+    if (options.signal?.aborted) {
+      return openFailure("aborted", "Open aborted before Host confirmation.", false);
+    }
     if (err instanceof ViewHostError) {
+      if (err.closedReason === "abort") {
+        return openFailure("aborted", err.message, false);
+      }
+      if (
+        err.closedReason &&
+        TRANSPORT_CLOSE_REASONS.includes(err.closedReason as ViewClosedReason)
+      ) {
+        return openFailure("transport", err.message, true);
+      }
       return openFailure(
         err.code,
         err.message,
@@ -542,6 +602,7 @@ type OpenedOutcome =
   | { ok: true }
   | { ok: false; kind: "refused"; error?: ViewErrorPayload; closedReason?: string }
   | { ok: false; kind: "timeout" }
+  | { ok: false; kind: "aborted" }
   | { ok: false; kind: "transport"; closedReason?: string };
 
 /** Closed reasons that mean "the pipe/session went away", never "the Host said no". */
@@ -553,32 +614,61 @@ const TRANSPORT_CLOSE_REASONS: readonly ViewClosedReason[] = [
 ] as const;
 
 /**
- * Wait for the Host `opened` ack (or the reason there isn't one). Access-mode
- * registration must land in its slot — modal fallback is meaningless here.
+ * Wait for the Host `opened` ack (or the reason there isn't one). Resident
+ * slots need confirmation before callers can consider them registered.
  */
-function awaitOpened(session: LiveViewSession, timeoutMs = 3000): Promise<OpenedOutcome> {
+function awaitOpened(
+  session: LiveViewSession,
+  options: { signal?: AbortSignal; timeoutMs?: number } = {},
+): Promise<OpenedOutcome> {
+  if (options.signal?.aborted) return Promise.resolve({ ok: false, kind: "aborted" });
   return new Promise((resolve) => {
     let done = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let off = (): void => undefined;
     const finish = (outcome: OpenedOutcome): void => {
       if (done) return;
       done = true;
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       off();
+      options.signal?.removeEventListener("abort", onAbort);
       resolve(outcome);
     };
-    const off = session.onEvent((event) => {
+    const onAbort = (): void => finish({ ok: false, kind: "aborted" });
+
+    off = session.onEvent((event) => {
       if (event.type === "opened") finish({ ok: true });
       else if (event.type === "error") finish({ ok: false, kind: "refused", error: event.error });
     });
+    if (done) {
+      off();
+      return;
+    }
+    // The Host may deliver `opened` before openLive() returns. In that case
+    // the session has already recorded the authoritative placement, so do not
+    // wait for an event that has already been consumed by the client.
+    if (session.placement !== null) {
+      finish({ ok: true });
+      return;
+    }
     void session.closed.then((payload) => {
       const reason = payload?.reason;
       if (reason && TRANSPORT_CLOSE_REASONS.includes(reason as ViewClosedReason)) {
-        finish({ ok: false, kind: "transport", closedReason: reason });
+        finish(
+          reason === "abort"
+            ? { ok: false, kind: "aborted" }
+            : { ok: false, kind: "transport", closedReason: reason },
+        );
         return;
       }
       finish({ ok: false, kind: "refused", closedReason: reason });
     });
-    const timer = setTimeout(() => finish({ ok: false, kind: "timeout" }), timeoutMs);
+    if (options.signal?.aborted) {
+      onAbort();
+      return;
+    }
+    options.signal?.addEventListener("abort", onAbort, { once: true });
+    timer = setTimeout(() => finish({ ok: false, kind: "timeout" }), options.timeoutMs ?? 3000);
     timer.unref?.();
   });
 }
@@ -695,7 +785,9 @@ export async function tryRegisterAccessMode(
 
     session.close();
     if (opened.kind === "timeout") return { ok: false, reason: "timeout" };
-    if (opened.kind === "transport") return { ok: false, reason: "transport" };
+    if (opened.kind === "transport" || opened.kind === "aborted") {
+      return { ok: false, reason: "transport" };
+    }
     return { ok: false, reason: "refused", error: opened.error };
   } catch (err) {
     // 连接失败 / client 已 dispose：可重试（管道闪断），绝不向扩展抛错

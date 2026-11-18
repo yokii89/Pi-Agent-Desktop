@@ -11,6 +11,7 @@
  * `os.tmpdir`（rendezvous 改写进私有目录，避免测试覆盖开发机上正在运行的 PiDesk 的 rendezvous）。
  */
 import fs from "node:fs";
+import net from "node:net";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const bag = vi.hoisted(() => {
@@ -45,6 +46,16 @@ vi.mock("../settings/settings", () => ({
   }),
 }));
 
+// Catalog discovery and session processes are outside this transport test and
+// import Electron. Keep binding validation real against an empty catalog.
+vi.mock("../extension/contributionCatalog", () => ({
+  getCatalogSnapshot: () => ({ entries: [] }),
+}));
+
+vi.mock("../session/runtimeCoordinator", () => ({
+  listRuntimeSnapshots: () => [],
+}));
+
 vi.mock("../notification/toastService", () => ({
   showSystemToast: (req: Record<string, unknown>) => {
     bag.toasts.push(req);
@@ -66,6 +77,8 @@ import type { LiveViewSession, OpenPanelOptions } from "../../../packages/view-s
 import {
   DesktopViewClient,
   openPanel,
+  openPanelResult,
+  parseEndpoint,
   playNotification,
 } from "../../../packages/view-sdk/src/index";
 import type { ViewNode } from "../../../packages/view-sdk/src/types";
@@ -199,6 +212,220 @@ describe("viewHost ↔ view-sdk over the real transport", () => {
     expect(hasSessionModal("idle-guard")).toBe(false);
     modalClient.dispose();
   });
+  it.each(["x", "中"])(
+    "closes an authenticated peer with an oversized incomplete %s line",
+    async (character) => {
+      const env = await ensureViewHost();
+      const target = parseEndpoint(env.endpoint);
+      const socket =
+        "port" in target ? net.connect(target.port, target.host) : net.connect(target.path);
+      const disconnected = new Promise<boolean>((resolve, reject) => {
+        socket.once("close", resolve);
+        socket.once("error", reject);
+      });
+      await new Promise<void>((resolve, reject) => {
+        socket.once("connect", resolve);
+        socket.once("error", reject);
+      });
+
+      socket.write(`${JSON.stringify({ token: env.token })}\n`);
+      await new Promise<void>((resolve, reject) => {
+        socket.once("data", () => resolve());
+        socket.once("error", reject);
+      });
+      socket.write(
+        character.repeat(
+          Math.floor(VIEW_LIMITS.maxMessageBytes / Buffer.byteLength(character)) + 1,
+        ),
+      );
+      await expect(disconnected).resolves.toBe(false);
+    },
+  );
+
+  it.each([0, 1])(
+    "checks fragmented CRLF against the Host payload byte limit (overflow=%i)",
+    async (overflow) => {
+      const env = await ensureViewHost();
+      let accepted: net.Socket | undefined;
+      const originalOn = net.Socket.prototype.on;
+      const observe = vi.spyOn(net.Socket.prototype, "on").mockImplementation(function (
+        this: net.Socket,
+        event: string,
+        listener: (...args: unknown[]) => void,
+      ) {
+        if (event === "data") accepted = this;
+        Reflect.apply(originalOn, this, [event, listener]);
+        return this;
+      });
+      const socket = net.connect(parseEndpoint(env.endpoint));
+      socket.on("error", () => undefined);
+      try {
+        await waitFor(() => accepted !== undefined, "Host socket data handler");
+        observe.mockRestore();
+        const peer = accepted;
+        if (!peer) throw new Error("Host socket missing");
+        const hello = new Promise<Buffer>((resolve) => socket.once("data", resolve));
+        peer.emit("data", Buffer.from(`${JSON.stringify({ token: env.token })}\n`));
+        expect(JSON.parse((await hello).toString()).type).toBe("hello");
+        const payload = {
+          v: "view/v1",
+          id: "crlf-boundary",
+          type: "update",
+          payload: {},
+          padding: "",
+        };
+        payload.padding = "x".repeat(
+          VIEW_LIMITS.maxMessageBytes - Buffer.byteLength(JSON.stringify(payload)) + overflow,
+        );
+        // Inject chunks into the accepted socket: real TCP may merge adjacent writes.
+        peer.emit("data", Buffer.from(`${JSON.stringify(payload)}\r`));
+        expect(peer.destroyed).toBe(overflow > 0);
+        if (overflow === 0) {
+          const reply = new Promise<Buffer>((resolve) => socket.once("data", resolve));
+          peer.emit("data", Buffer.from("\n"));
+          expect(JSON.parse((await reply).toString())).toMatchObject({
+            id: "crlf-boundary",
+            type: "error",
+            payload: { code: "protocol" },
+          });
+          expect(peer.destroyed).toBe(false);
+        }
+      } finally {
+        observe.mockRestore();
+        socket.destroy();
+      }
+    },
+  );
+
+  it.each(["update", "patch"] as const)(
+    "keeps the Host tree after a direct %s followed by a clean flushNow",
+    async (method) => {
+      const initial: ViewNode = { type: "text", content: "initial" };
+      const current: ViewNode = {
+        type: "column",
+        children: [{ type: "text", content: "current" }],
+      };
+      const session = await openTab({ panelId: `flush-direct-${method}`, root: initial });
+      try {
+        if (method === "update") session.update(current);
+        else expect(session.patch({ ops: [{ path: [], node: current }] })).toBe(true);
+        await session.coalesced().flushNow();
+        // A subsequent Host patch reads its retained tree, proving the clean
+        // flush did not restore the initial root.
+        const probe: ViewNode = { type: "text", content: "probe" };
+        expect(session.patch({ ops: [{ path: [0], node: probe }], title: "probe" })).toBe(true);
+        await waitFor(
+          () =>
+            pushesOfType("update").some((push) => push.id === session.id && push.title === "probe"),
+          "Host tree after flush",
+        );
+        const updates = pushesOfType("update").filter((push) => push.id === session.id);
+        expect(updates).toHaveLength(3);
+        expect(updates[0]).toMatchObject({ root: current });
+        expect(updates[1]).not.toHaveProperty("root");
+        expect(updates[2]).toMatchObject({
+          root: { type: "column", children: [probe] },
+          title: "probe",
+        });
+      } finally {
+        session.close();
+        await waitFor(
+          () => pushesOfType("closed").some((push) => push.id === session.id),
+          "direct-write panel cleanup",
+        );
+      }
+    },
+  );
+
+  it("Result returns the real Host's asynchronous open-view limit refusal", async () => {
+    const limitedClient = new DesktopViewClient(await ensureViewHost());
+    const sessions: LiveViewSession[] = [];
+    try {
+      for (let index = 0; index < VIEW_LIMITS.maxOpenViewsPerConnection; index += 1) {
+        const result = await openPanelResult(limitedClient, {
+          panelId: `cap-${index}`,
+          root: { type: "text", content: "registered" },
+        });
+        if (!result.ok) throw new Error(result.message);
+        sessions.push(result.session);
+      }
+      const result = await openPanelResult(limitedClient, {
+        panelId: "over-cap",
+        root: { type: "text", content: "refused" },
+      });
+      expect(result).toMatchObject({
+        ok: false,
+        code: "limit",
+        retryable: true,
+        error: { code: "limit" },
+      });
+      expect(pushesOfType("open").some((push) => push.panelId === "over-cap")).toBe(false);
+    } finally {
+      limitedClient.dispose();
+      await waitFor(
+        () =>
+          sessions.every((session) =>
+            pushesOfType("closed").some((push) => push.id === session.id),
+          ),
+        "limited connection cleanup",
+      );
+    }
+  });
+
+  it("bounds Host writes for a stalled peer and settles its live session", async () => {
+    const session = await openTab({
+      panelId: "stalled-peer",
+      root: { type: "text", content: "test" },
+    });
+    const queuedBytes = vi
+      .spyOn(net.Socket.prototype, "writableLength", "get")
+      .mockReturnValue(4 * VIEW_LIMITS.maxMessageBytes);
+    try {
+      sendViewEvent(session.id, { type: "change", nodeId: "answer", value: "blocked" });
+    } finally {
+      queuedBytes.mockRestore();
+    }
+    await expect(session.closed).resolves.toMatchObject({ reason: "dispose" });
+  });
+
+  it("Result reports contribution binding refusal before registering the panel", async () => {
+    const result = await openPanelResult(client, {
+      panelId: "unbound-panel",
+      contributionKey: "missing-contribution",
+      root: { type: "text", content: "refused" },
+    });
+    expect(result).toMatchObject({ ok: false, code: "protocol", retryable: false });
+    expect(pushesOfType("open")).toHaveLength(0);
+  });
+
+  it("coalesced disjoint patches converge both fields and retain pending actions", async () => {
+    const pair = (a: string, b: string): ViewNode => ({
+      type: "column",
+      children: [
+        { type: "text", content: a },
+        { type: "text", content: b },
+      ],
+    });
+    const session = await openTab({ panelId: "coalesced-pair", root: pair("A=0", "B=0") });
+    const writer = session.coalesced();
+    const actions = [{ id: "refresh", label: "Refresh", kind: "event" as const }];
+    writer.set(pair("A=1", "B=0"), [{ path: [0], node: { type: "text", content: "A=1" } }], {
+      actions,
+    });
+    writer.set(pair("A=1", "B=1"), [{ path: [1], node: { type: "text", content: "B=1" } }]);
+    await writer.flush();
+    await waitFor(
+      () => pushesOfType("update").some((push) => push.id === session.id),
+      "coalesced update",
+    );
+    expect(lastPush("update")).toMatchObject({ root: pair("A=1", "B=1"), actions });
+    session.close();
+    await waitFor(
+      () => pushesOfType("closed").some((push) => push.id === session.id),
+      "coalesced panel cleanup",
+    );
+  });
+
   it("advertises the panel slot and view-table in hello", async () => {
     const hello = await client.ensureConnected();
     expect(hello?.placements).toContain("panel");

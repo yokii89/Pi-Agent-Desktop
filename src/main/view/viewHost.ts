@@ -131,6 +131,9 @@ let hostEnv: ViewHostEnv | null = null;
 let starting: Promise<ViewHostEnv> | null = null;
 let nextConnectionId = 0;
 
+// Four maximum-sized frames allow brief bursts while bounding memory for a stalled client.
+const SOCKET_WRITE_HIGH_WATER_BYTES = 4 * VIEW_LIMITS.maxMessageBytes;
+
 /** tmpdir 里 rendezvous 文件的命名前缀/后缀（`pidesk-view-host-<pid>.json`，含旧版固定名）。 */
 const RENDEZVOUS_PREFIX = "pidesk-view-host";
 const RENDEZVOUS_SUFFIX = ".json";
@@ -242,10 +245,18 @@ function push(message: ExtensionViewPush): void {
 
 function sendEnvelope(conn: ViewConnection, envelope: Omit<ViewEnvelope, "v">): void {
   if (conn.socket.destroyed) return;
+  const frame = `${JSON.stringify({ v: VIEW_PROTOCOL_VERSION, ...envelope })}\n`;
+  if (
+    conn.socket.writableLength + Buffer.byteLength(frame, "utf8") >
+    SOCKET_WRITE_HIGH_WATER_BYTES
+  ) {
+    conn.socket.destroy();
+    return;
+  }
   try {
-    conn.socket.write(`${JSON.stringify({ v: VIEW_PROTOCOL_VERSION, ...envelope })}\n`);
+    conn.socket.write(frame);
   } catch {
-    // 对端已断开；close 会走清理
+    conn.socket.destroy();
   }
 }
 
@@ -853,15 +864,20 @@ function onConnection(socket: net.Socket): void {
   const decoder = new StringDecoder("utf8");
   let lineBuffer = "";
   socket.on("data", (chunk: Buffer) => {
+    if (socket.destroyed) return;
     lineBuffer += decoder.write(chunk);
     let newlineAt = lineBuffer.indexOf("\n");
     while (newlineAt !== -1) {
       const line = lineBuffer.slice(0, newlineAt).replace(/\r$/, "");
       lineBuffer = lineBuffer.slice(newlineAt + 1);
       handleEnvelope(conn, line);
+      if (socket.destroyed) return;
       newlineAt = lineBuffer.indexOf("\n");
     }
-    if (!conn.authenticated && lineBuffer.length > VIEW_LIMITS.maxMessageBytes) {
+    // A trailing CR may be the first half of a split CRLF delimiter.
+    const pendingBytes =
+      Buffer.byteLength(lineBuffer, "utf8") - (lineBuffer.endsWith("\r") ? 1 : 0);
+    if (pendingBytes > VIEW_LIMITS.maxMessageBytes) {
       socket.destroy();
     }
   });

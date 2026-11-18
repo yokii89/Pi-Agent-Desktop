@@ -159,7 +159,9 @@ describe("#5 pre-aborted signal semantics", () => {
 
 describe("#9 abort listener cleanup", () => {
   it("openLive removes its abort listener once the session closes", async () => {
-    const client = makeOfflineClient();
+    // Use the stable connection: opening requires a frame to be queued.
+    connections = 1;
+    const client = makeClient();
     const controller = new AbortController();
     const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
 

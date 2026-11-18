@@ -1,5 +1,27 @@
 # @pidesk/view-sdk
 
+## Unreleased
+
+- Preserve Chinese and emoji when UTF-8 bytes arrive in separate socket chunks.
+- Clean coalesced `flushNow()` calls preserve the Host tree instead of replaying
+  an initial or previously delivered tree over direct updates or patches.
+- Accept CRLF frames at the payload byte limit when CR and LF arrive separately,
+  while still rejecting oversized payloads.
+- Coalescing multiple unsent `set()` calls now sends the final complete tree,
+  preserving earlier disjoint patches. Pending meta keeps each field's last
+  explicit value and is cleared only after successful delivery.
+- Resident-slot Result helpers and their soft wrappers wait up to three seconds
+  for Host `opened` confirmation. Rejections, timeout, cancellation and transport
+  loss remain distinguishable. Older Hosts without `opened` time out;
+  `openLive()` retains its immediate return timing.
+- Add coalesced-writer `onError` and `lastError`, and scheduler `onError`,
+  `lastError` and `shouldRetry`. Local invalid frames stop automatic retries
+  until new state; closed sessions stop sending. Temporary failures retry the
+  complete latest state. `flush()` remains resolving; inspect `lastError`.
+- Enforce receive byte limits for complete and incomplete lines and cap socket
+  write queues on both ends. Transport write failures become observable local
+  failures for updates rather than silently appearing sent.
+
 ## 0.5.2 — 2026-11-01
 **Rendezvous hijack resilience** (PiDesk `docs/design/122`). No wire, capability
 or public API change; additive behaviour only, safe for `^0.5.1` consumers.
