@@ -62,13 +62,58 @@ describe("Markdown 图片来源", () => {
     }
   });
 
-  it("只为图片放行本地和 data URL，链接过滤规则保持生效", () => {
-    for (const url of ["D:/out/a.png", "file:///D:/a.png", "data:image/png;base64,AAAA"]) {
+  it("本地路径可用于链接，data URL 只允许图片，危险协议仍被过滤", () => {
+    for (const url of ["D:/out/a.png", "file:///D:/a.png"]) {
       expect(markdownUrlTransform(url, "src")).toBe(url);
+      expect(markdownUrlTransform(url, "href")).toBe(url);
+    }
+    expect(markdownUrlTransform("data:image/png;base64,AAAA", "src")).toBe(
+      "data:image/png;base64,AAAA",
+    );
+    for (const url of [
+      "data:image/png;base64,AAAA",
+      "javascript:alert(1)",
+      "vbscript:test",
+      "data:text/html,test",
+    ]) {
       expect(markdownUrlTransform(url, "href")).toBe("");
     }
     expect(markdownUrlTransform("javascript:alert(1)", "src")).toBe("");
     expect(markdownUrlTransform("data:text/html,hello", "src")).toBe("");
+  });
+
+  it("实际 Markdown 链接保留目录、图片、空格、反斜杠和行号", () => {
+    const links: string[] = [];
+    renderToStaticMarkup(
+      createElement(
+        Markdown,
+        {
+          urlTransform: markdownUrlTransform,
+          components: {
+            a: ({ href }) => {
+              links.push(href ?? "");
+              return null;
+            },
+          },
+        },
+        [
+          "[截图目录](D:/Code/PI/pidesk/temp/composer-drop-ui/screenshots)",
+          "[PNG](D:/out/a.png)",
+          "[空格](<D:/my files/a.png>)",
+          "[反斜杠](D:\\out\\a.png)",
+          "[行号](D:/out/a.ts:12:3)",
+          "[网页](https://example.com)",
+        ].join("\n\n"),
+      ),
+    );
+    expect(links).toEqual([
+      "D:/Code/PI/pidesk/temp/composer-drop-ui/screenshots",
+      "D:/out/a.png",
+      "D:/my%20files/a.png",
+      "D:%5Cout%5Ca.png",
+      "D:/out/a.ts:12:3",
+      "https://example.com",
+    ]);
   });
 
   it("实际 Markdown 解析不会在进入图片组件前清掉盘符和 data 来源", () => {

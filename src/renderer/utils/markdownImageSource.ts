@@ -25,8 +25,9 @@ export function resolveMarkdownImageSource(
   return path ? { kind: "local", path } : null;
 }
 
-/** 仅 img 的 src 放行本地路径和图片 data URL；链接仍沿用 Markdown 的协议过滤。 */
+/** 本地链接交受控点击处理器；data URL 仅允许作为图片来源。 */
 export function markdownUrlTransform(url: string, key: string): string {
   if (key === "src" && resolveMarkdownImageSource(url, null, "/")) return url;
+  if (key === "href" && resolveMarkdownRef(url)) return url;
   return defaultUrlTransform(url);
 }
