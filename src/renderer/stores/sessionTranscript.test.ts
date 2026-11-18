@@ -32,6 +32,63 @@ function run(entries: SessionEntry[]): Extract<SessionEntry, { kind: "run" }> {
   return runEntry;
 }
 
+describe("thinking tags embedded in streamed text", () => {
+  it("turns a chunked <thinking>...</thinking> text response into a reasoning block", () => {
+    let entries: SessionEntry[] = [];
+    const events: PiAgentEvent[] = [
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      { type: "message_update", assistantMessageEvent: { type: "text_start", contentIndex: 0 } },
+      {
+        type: "message_update",
+        assistantMessageEvent: { type: "text_delta", delta: "<thi", contentIndex: 0 },
+      },
+      {
+        type: "message_update",
+        assistantMessageEvent: {
+          type: "text_delta",
+          delta: "nking>Outlining implementation steps</thinking>\r",
+          contentIndex: 0,
+        },
+      },
+    ];
+    for (const event of events) {
+      entries = sessionEntriesReducer(entries, { type: "event", event });
+    }
+
+    const assistant = entries.find((entry) => entry.kind === "assistant");
+    expect(assistant).toMatchObject({
+      blocks: [
+        { kind: "thinking", text: "Outlining implementation steps", streaming: true },
+        { kind: "text", text: "\r", streaming: true },
+      ],
+    });
+  });
+
+  it("also recognizes the tag when rebuilding the final message or history", () => {
+    const entries = sessionEntriesReducer([], {
+      type: "loadMessages",
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "<thinking>Outlining implementation steps</thinking>\r",
+            },
+          ],
+        },
+      ],
+    });
+    const assistant = entries.find((entry) => entry.kind === "assistant");
+    expect(assistant).toMatchObject({
+      blocks: [
+        { kind: "thinking", text: "Outlining implementation steps" },
+        { kind: "text", text: "\r" },
+      ],
+    });
+  });
+});
+
 function expectNoStreamingBlocks(entries: SessionEntry[]): void {
   const streaming = entries
     .flatMap((entry) => (entry.kind === "assistant" ? entry.blocks : []))

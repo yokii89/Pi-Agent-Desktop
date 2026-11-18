@@ -137,8 +137,22 @@ export interface ToolAssistantBlock {
 }
 
 export type AssistantBlock =
-  | { kind: "text"; text: string; streaming?: boolean; contentIndex: number }
-  | { kind: "thinking"; text: string; streaming?: boolean; contentIndex: number }
+  | {
+      kind: "text";
+      text: string;
+      streaming?: boolean;
+      contentIndex: number;
+      /** 原始流文本；仅在流式标签解析期间保留，message_end 会以权威内容重建。 */
+      streamSource?: string;
+    }
+  | {
+      kind: "thinking";
+      text: string;
+      streaming?: boolean;
+      contentIndex: number;
+      /** 原始流文本；仅在流式标签解析期间保留，message_end 会以权威内容重建。 */
+      streamSource?: string;
+    }
   | ToolAssistantBlock;
 
 /** 一次模型响应的渲染条目；`at` 为结束时刻，供回复页脚的时间展示。 */
@@ -1188,7 +1202,7 @@ function applyDelta(entries: SessionEntry[], delta: PiStreamDelta): SessionEntry
       });
     case "text_delta":
       return mutateLastAssistant(entries, (blocks) =>
-        appendToKindedBlock(blocks, "text", delta.delta, contentIndex),
+        appendTextDelta(blocks, delta.delta, contentIndex),
       );
     case "thinking_start":
       return mutateLastAssistant(entries, (blocks) => {
@@ -1312,6 +1326,126 @@ function createToolBlock(
     durationMs: null,
     contentIndex,
   };
+}
+
+function appendTextDelta(
+  blocks: AssistantBlock[],
+  delta: string,
+  contentIndex?: number,
+): AssistantBlock[] {
+  let targetIndex = -1;
+  if (contentIndex !== undefined) {
+    targetIndex = blocks.findIndex(
+      (block) =>
+        (block.kind === "text" ||
+          (block.kind === "thinking" && block.streamSource !== undefined)) &&
+        block.contentIndex === contentIndex,
+    );
+  } else {
+    for (let i = blocks.length - 1; i >= 0; i -= 1) {
+      const block = blocks[i];
+      if (
+        (block.kind === "text" ||
+          (block.kind === "thinking" && block.streamSource !== undefined)) &&
+        block.streaming === true
+      ) {
+        targetIndex = i;
+        break;
+      }
+    }
+  }
+
+  const target = targetIndex === -1 ? undefined : blocks[targetIndex];
+  const resolvedIndex = contentIndex ?? target?.contentIndex ?? nextContentIndex(blocks);
+  const source =
+    target && (target.kind === "text" || target.kind === "thinking")
+      ? (target.streamSource ?? target.text) + delta
+      : delta;
+  const replacements = splitThinkingMarkup(source, true).map(({ kind, text }) => ({
+    kind,
+    text,
+    streaming: true,
+    contentIndex: resolvedIndex,
+    streamSource: source,
+  }));
+
+  if (targetIndex === -1) return [...blocks, ...replacements];
+
+  const firstIndex = blocks.findIndex(
+    (block) =>
+      (block.kind === "text" ||
+        (block.kind === "thinking" && block.streamSource !== undefined)) &&
+      block.contentIndex === resolvedIndex,
+  );
+  const next = blocks.filter(
+    (block) =>
+      !(
+        (block.kind === "text" ||
+          (block.kind === "thinking" && block.streamSource !== undefined)) &&
+        block.contentIndex === resolvedIndex
+      ),
+  );
+  next.splice(firstIndex, 0, ...replacements);
+  return next;
+}
+
+function splitThinkingMarkup(
+  source: string,
+  streaming = false,
+): Array<{ kind: "text" | "thinking"; text: string }> {
+  const segments: Array<{ kind: "text" | "thinking"; text: string }> = [];
+  const opening = "<thinking>";
+  const closing = "</thinking>";
+  const findTag = (tag: string, from: number) =>
+    source.toLowerCase().indexOf(tag, from);
+  let cursor = 0;
+
+  while (cursor < source.length) {
+    const start = findTag(opening, cursor);
+    if (start === -1) {
+      const remaining = source.slice(cursor);
+      const pendingLength = streaming ? partialTagSuffixLength(remaining, opening) : 0;
+      const visible = remaining.slice(0, remaining.length - pendingLength);
+      if (visible) segments.push({ kind: "text", text: visible });
+      break;
+    }
+
+    const before = source.slice(cursor, start);
+    if (before) segments.push({ kind: "text", text: before });
+    const contentStart = start + opening.length;
+    const end = findTag(closing, contentStart);
+    if (end === -1) {
+      if (!streaming) {
+        // 未闭合标签不是有效标记，原样留在正文中。
+        segments.push({ kind: "text", text: source.slice(start) });
+        break;
+      }
+      const remaining = source.slice(contentStart);
+      const pendingLength = partialTagSuffixLength(remaining, closing);
+      segments.push({
+        kind: "thinking",
+        text: remaining.slice(0, remaining.length - pendingLength),
+      });
+      break;
+    }
+
+    segments.push({ kind: "thinking", text: source.slice(contentStart, end) });
+    cursor = end + closing.length;
+  }
+
+  if (segments.length === 0) {
+    // 保留原始流缓冲区，以便下一段 delta 补齐被暂存的标签前缀。
+    segments.push({ kind: "text", text: "" });
+  }
+  return segments;
+}
+
+function partialTagSuffixLength(value: string, tag: string): number {
+  const max = Math.min(value.length, tag.length - 1);
+  for (let length = max; length > 0; length -= 1) {
+    if (value.slice(-length).toLowerCase() === tag.slice(0, length)) return length;
+  }
+  return 0;
 }
 
 function appendToKindedBlock(
@@ -1769,7 +1903,13 @@ function blocksFromContent(
   content.forEach((raw, contentIndex) => {
     const text = asRecord(raw);
     if (text && text.type === "text" && typeof text.text === "string") {
-      blocks.push({ kind: "text", text: text.text, contentIndex });
+      blocks.push(
+        ...splitThinkingMarkup(text.text).map(({ kind, text: segmentText }) => ({
+          kind,
+          text: segmentText,
+          contentIndex,
+        })),
+      );
       return;
     }
     if (text && text.type === "thinking" && typeof text.thinking === "string") {
