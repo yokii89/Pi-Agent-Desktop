@@ -11,7 +11,15 @@ import {
   PencilSimple,
   X,
 } from "@phosphor-icons/react";
-import { type Ref, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type Ref,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   isHtmlPath,
   isMarkdownPath,
@@ -182,6 +190,8 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   const selfWriteAtRef = useRef(0);
   /** 预览内容落在 panelBody 里：划选工具条容器、全选与右键菜单都按它取范围。 */
   const panelBodyRef = useRef<HTMLDivElement>(null);
+  /** 文件树与预览共用滚动容器；打开文件会暂时替换内容，因此要保留树的位置。 */
+  const fileTreeScrollRef = useRef({ root: rootDir, top: 0 });
   /** 预览区右键菜单（光标坐标 + 右键时已有的选区文本）。 */
   const [previewMenu, setPreviewMenu] = useState<{
     x: number;
@@ -625,6 +635,20 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [active, editing]);
 
+  const activeMatches = matches && matches.root === (rootDir ?? "") ? matches.hits : null;
+  const fileTreeVisible =
+    !!rootDir && activePreview === null && !previewLoading && activeMatches === null;
+
+  // 树始终挂载，展开状态仍在；重新显示时在绘制前恢复滚动，且不沿用其他项目的位置。
+  useLayoutEffect(() => {
+    if (fileTreeScrollRef.current.root !== rootDir) {
+      fileTreeScrollRef.current = { root: rootDir, top: 0 };
+    }
+    if (fileTreeVisible && panelBodyRef.current) {
+      panelBodyRef.current.scrollTop = fileTreeScrollRef.current.top;
+    }
+  }, [fileTreeVisible, rootDir]);
+
   /** 历史导航（后退/前进）：重读目标文件并恢复 :line 定位。 */
   const navigateHistory = useCallback(
     (delta: number): void => {
@@ -756,7 +780,6 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     void browserStore.openLocalFile(filePath);
   };
 
-  const activeMatches = matches && matches.root === (rootDir ?? "") ? matches.hits : null;
   /** 可复制的全文：仅文本类预览有（图片/PDF/二进制不提供「复制全文」）。 */
   const previewText = activePreview?.result.kind === "text" ? activePreview.result.content : null;
   /** 当前预览能不能就地编辑（纯文本 + 未截断 + 非表格/Notebook；md 需源码态）。 */
@@ -1038,6 +1061,12 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           .filter(Boolean)
           .join(" ")}
         ref={panelBodyRef}
+        onScroll={(event) => {
+          // 只记录目录滚动，避免预览与搜索结果覆盖返回位置。
+          if (fileTreeVisible) {
+            fileTreeScrollRef.current = { root: rootDir, top: event.currentTarget.scrollTop };
+          }
+        }}
         onContextMenu={openPreviewMenu}
       >
         {sourcePreview && activePreview?.result.kind === "text" ? (
@@ -1107,12 +1136,12 @@ export function FilePanel({ active = true }: { active?: boolean }) {
           )
         ) : null}
         {rootDir && (
-          <div hidden={activePreview !== null || previewLoading || activeMatches !== null}>
+          <div hidden={!fileTreeVisible}>
             <FileTree
               rootDir={rootDir}
               selectedPath={selectedPath}
               onSelectFile={(path) => guardLeave(() => openPreview(path))}
-              active={active && activePreview === null && !previewLoading && activeMatches === null}
+              active={active && fileTreeVisible}
               revealRequest={fileRevealRequest}
             />
           </div>

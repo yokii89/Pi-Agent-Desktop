@@ -107,6 +107,7 @@ import type {
   ProcStopAllResult,
   ProcStopResult,
   PromptDisposition,
+  SessionDisposeIdleResult,
   SessionExportRequest,
   SessionGetModelsRequest,
   SessionId,
@@ -265,6 +266,8 @@ export interface PideskGlobalApi {
     clearQueue(sessionId: SessionId): Promise<IpcResult<PiQueuedMessages>>;
     stop(sessionId: SessionId): Promise<IpcResult<null>>;
     dispose(sessionId: SessionId): Promise<IpcResult<null>>;
+    /** 主进程确认空闲后结束 pi；保留历史与后台项目进程。 */
+    disposeIdle(sessionId: SessionId): Promise<IpcResult<SessionDisposeIdleResult>>;
     list(cwd: string): Promise<IpcResult<SessionSummary[]>>;
     listAll(): Promise<IpcResult<SessionSummary[]>>;
     messages(sessionId: SessionId): Promise<IpcResult<PiChatMessage[]>>;

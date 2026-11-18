@@ -87,7 +87,7 @@ node_modules 解析**的包（当前仅 `electron-updater` / `node-pty`——主
 - `docx-preview`（devDep，渲染层构建期打包）：工作区 DOCX 只读排版预览，打开文档时动态加载，输出放入禁脚本的隔离文档。
 - `@jvmr/pptx-to-html`（devDep，渲染层构建期打包，MIT）：工作区 PPTX 幻灯片预览，动态加载；仅静态页面，不执行动画或嵌入对象。
 - `xlsx`（devDep，SheetJS 官方 CDN 0.20.3，渲染层构建期打包）：XLS/XLSX/XLSM/XLSB 的只读数据表预览，在按需创建的 Worker 中解析；不计算公式、不执行宏，不采用 npm registry 的旧版。
-- `pdfjs-dist`（devDep，渲染层构建期打包）：右侧「文件」面板的 PDF 按页只读预览；PDF.js 与 worker 均通过动态 import / Vite 资源 URL 按需加载，不作为主进程运行时依赖。
+- `pdfjs-dist`（devDep，渲染层构建期打包）：右侧「文件」面板的 PDF 按页只读预览；主模块和 worker 统一经 `utils/pdfLoader.ts` 使用官方 `legacy` 兼容构建（Electron 41 尚无 `Math.sumPrecise`），动态 import / Vite 资源 URL 按需加载，不作为主进程运行时依赖。CMap、标准字体、WASM 解码器与 ICC 资源由 `scripts/vite/pdfAssets.ts` 保留原文件名及许可，开发态本地提供、构建时输出到带版本的 `dist/renderer/pdfjs/`；统一通过 `utils/pdfResources.ts` 配置，`file://` 下须经 DOM 资源工厂读取，禁止改为 worker fetch 或外部 CDN。PDF 字体与 WASM 所需 CSP 在开发、生产两处同步维护；修改加载链路或升级库须跑 `pnpm check:pdf-preview`（见 `scripts/pdfPreview/README.md`）。
 - `@vitest/coverage-v8`（dev）：`packages/view-sdk` 的行/分支覆盖率口径（`pnpm test:sdk:coverage`）。版本必须与 `vitest` 主版本配对；**仅 SDK 测试用**，不扩展到主进程 / 渲染层（后者仍按本文件"测试"条款只跑断言）。`NODE_V8_COVERAGE` 对 vitest worker 无效，不要再试。
 - `electron-updater`（runtime，主进程运行时依赖）：设置 →「应用更新」的检查/下载/安装。GitHub Releases + NSIS `latest.yml`/blockmap（差分更新：本地缓存有旧安装包时自动差分下载）；发布流程见 `scripts/release.mjs` 与 `.github/workflows/release.yml`。
 - `mermaid`（devDep，渲染层构建期打包）：会话区 / 文件面板 / ExtensionView 的 ` ```mermaid ` 围栏出图。**只能经 `src/renderer/utils/mermaidLoader.ts` 动态 `import()`**（同 GSAP 条款）——它自带 60+ 个按图表类型切分的惰性 chunk（含 elk 布局引擎），静态引入会把它们全部塞进主 bundle。**不写 `manualChunks` 规则**：mermaid 内部已是动态 import，强行归组反而废掉惰性分块。CSP 无需放宽（`securityLevel: "strict"` 下生产策略实测可跑）。
@@ -135,7 +135,7 @@ import { Play } from "@phosphor-icons/react";
 - IPC channel 命名：`"pidesk:<域>:<动作>"`，如 `"pidesk:session:start"`、`"pidesk:session:output"`。
 - **返回值统一信封**：请求-响应类 handler 一律返回 `{ ok: true, data }` 或 `{ ok: false, error: string }`，渲染层通过统一工具函数（如 `unwrap()`）解包，禁止 handler 直接 throw 或返回裸值。
 - **终端流式输出消息格式固定（仅中央工作区底部的终端面板）**：主进程推送的消息为 `{ type: "data" | "exit" | "error", payload: string | number }`；多实例域（终端 Tab）在此基础上附加 `id` 字段以区分实例，渲染层按 `type` 分发，不得发明其他结构。面板可见性与终端进程生命周期是两个独立概念：隐藏面板不得 kill pty。
-- **会话推送消息格式固定（中央会话区）**：主进程推送的消息为 `{ sessionId, type: "event" | "eventBatch" | "exit" | "error", payload }`（多实例并行：对齐终端条款，**必带** `sessionId`）；`event` 时 `payload` 为单条 pi RPC 事件对象，`eventBatch` 时为约 32ms 合批后的事件数组（边界事件仍走单条 `event` 并立即 flush）；事件经白名单转发，类型见 `src/shared/ipc.ts`，渲染层按 `sessionId` 路由到对应会话桶，不得发明其他结构。同 `sessionFile` 至多一个存活进程；切换 active / 隐藏不 kill，手动结束只走侧栏行菜单「结束进程」。
+- **会话推送消息格式固定（中央会话区）**：主进程推送的消息为 `{ sessionId, type: "event" | "eventBatch" | "exit" | "error", payload }`（多实例并行：对齐终端条款，**必带** `sessionId`）；`event` 时 `payload` 为单条 pi RPC 事件对象，`eventBatch` 时为约 32ms 合批后的事件数组（边界事件仍走单条 `event` 并立即 flush）；事件经白名单转发，类型见 `src/shared/ipc.ts`，渲染层按 `sessionId` 路由到对应会话桶，不得发明其他结构。同 `sessionFile` 至多一个存活进程；切换 active / 隐藏不 kill，手动结束入口为侧栏行菜单「结束进程」与设置 →「存活会话」；设置入口仅允许结束空闲实例，必须二次确认，并经 `SESSION_IPC.disposeIdle` 在主进程复核 RPC 状态与进程身份，保留会话历史及后台项目进程。
 - **扩展 UI 子协议是独立域（`pidesk:sessionUi:*`）**：pi RPC 的第四个记录族 `extension_ui_request`
   **不进会话事件白名单**，必须在 `handleProtocolLine` 里先于白名单分流给
   `src/main/session/extensionUi.ts` 的登记表（协议解析与传输分育：该模块不 import electron，

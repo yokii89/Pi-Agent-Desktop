@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { useReviewAutoRefresh } from "../../hooks/useReviewAutoRefresh";
 import { useT } from "../../hooks/useT";
 import { gitService } from "../../services/gitService";
 import { useReviewStore } from "../../stores/reviewStore";
@@ -81,8 +82,15 @@ function initialRect(): WindowRect {
  */
 export function ReviewWindow() {
   const t = useT();
-  const { cwd, reviewView, graphRefreshSeq, refreshIfStale } = useReviewStore();
+  const { cwd, repoRoot, reviewView, graphRefreshSeq, refresh, refreshIfStale } = useReviewStore();
   const { closeReviewWindow } = useUiStore();
+  useReviewAutoRefresh({
+    cwd,
+    repoRoot,
+    enabled: reviewView === "changes",
+    refresh,
+    refreshIfStale,
+  });
   const [rect, setRect] = useState<WindowRect>(initialRect);
   const [branch, setBranch] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -93,11 +101,6 @@ export function ReviewWindow() {
   useEffect(() => {
     panelRef.current?.focus();
   }, []);
-
-  // 打开/切视图时数据过期才后台刷新；不重复执行 git（docs/design/04 §19/§28）
-  useEffect(() => {
-    if (reviewView === "changes") refreshIfStale();
-  }, [refreshIfStale, reviewView]);
 
   // 分支 chip：随会话目录与手动刷新更新；非 git 仓库时静默隐藏
   // biome-ignore lint/correctness/useExhaustiveDependencies: graphRefreshSeq 是「手动刷新」的触发信号，effect 内不读它

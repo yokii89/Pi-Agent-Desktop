@@ -21,7 +21,7 @@ function fileName(repoPath: string): string {
 
 /**
  * 按需拉取并渲染单文件 Diff（docs/审查页面ui 图 3）。
- * 缓存由调用方（审查浮窗 ChangesPane）持有并按文件复用，同一变更列表内切换选中不重复执行 git。
+ * 缓存由调用方（审查浮窗 ChangesPane）持有；刷新时保留已读 Diff 并在后台对账文件内容。
  */
 export function FileDiffInline({
   change,
@@ -31,14 +31,15 @@ export function FileDiffInline({
   cache: RefObject<Map<string, CacheEntry>>;
 }) {
   const t = useT();
-  const { cwd, changesVersion, repoRoot } = useReviewStore();
+  const { cwd, repoRoot } = useReviewStore();
   const [state, setState] = useState<DiffState>({ loading: false, diff: null, error: null });
   const seqRef = useRef(0);
 
   useEffect(() => {
     if (!cwd) return;
-    // 缓存键含仓库与变更列表版本：刷新后旧条目自然失效，避免读到过期 diff
-    const key = `${repoRoot ?? ""}:${changesVersion}:${change.snapshot?.before ?? ""}:${change.snapshot?.after ?? ""}:${change.layer}|${change.path}`;
+    // 按仓库、快照、层与路径复用缓存；轮询时先显示旧 diff，再后台对账文件内容。
+    const key = `${repoRoot ?? ""}:${change.snapshot?.before ?? ""}:${change.snapshot?.after ?? ""}:${change.layer}|${change.oldPath ?? ""}|${change.path}`;
+    const seq = ++seqRef.current;
     const cached = cache.current?.get(key);
     if (cached) {
       setState(
@@ -46,10 +47,9 @@ export function FileDiffInline({
           ? { loading: false, diff: cached.diff, error: null }
           : { loading: false, diff: null, error: cached.error },
       );
-      return;
+    } else {
+      setState({ loading: true, diff: null, error: null });
     }
-    const seq = ++seqRef.current;
-    setState({ loading: true, diff: null, error: null });
     gitService
       .diff({
         cwd,
@@ -67,7 +67,10 @@ export function FileDiffInline({
         cache.current?.set(key, { ok: false, error: message });
         if (seqRef.current === seq) setState({ loading: false, diff: null, error: message });
       });
-  }, [change, cwd, cache, changesVersion, repoRoot]);
+    return () => {
+      if (seqRef.current === seq) seqRef.current += 1;
+    };
+  }, [change, cwd, cache, repoRoot]);
 
   if (state.loading) {
     return (

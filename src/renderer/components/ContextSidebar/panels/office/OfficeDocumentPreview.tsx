@@ -16,6 +16,7 @@ import { searchOfficeDocument } from "../../../../office/searchOfficeDocument";
 import { useUiStore } from "../../../../stores/uiStore";
 import { copyTextToClipboard } from "../../../../utils/clipboard";
 import { PREVIEW_CONTENT_EVENT, PREVIEW_SELECTION_EVENT } from "../../../../utils/previewDocument";
+import { previewPageStep } from "../../../../utils/previewPageKeys";
 import { IconButton } from "../../../ui/IconButton";
 import { OfficePageJump } from "./OfficePageJump";
 import styles from "./OfficePreview.module.css";
@@ -135,7 +136,7 @@ export function OfficeDocumentPreview({
 
   useEffect(() => {
     const frame = frameRef.current;
-    if (!doc || !frame) return;
+    if (!doc || !frame || !source) return;
     const notify = (): void => {
       frame.dispatchEvent(new Event(PREVIEW_SELECTION_EVENT, { bubbles: true }));
     };
@@ -152,6 +153,14 @@ export function OfficeDocumentPreview({
       );
     };
     const onKeyDown = (event: KeyboardEvent): void => {
+      if (!searchOpen) {
+        const step = previewPageStep(event);
+        if (step !== null) {
+          event.preventDefault();
+          setPage((value) => Math.min(source.length - 1, Math.max(0, value + step)));
+          return;
+        }
+      }
       if (event.key === "Escape" && searchOpen) {
         event.preventDefault();
         onCloseSearch();
@@ -204,7 +213,7 @@ export function OfficeDocumentPreview({
       doc.removeEventListener("keydown", onKeyDown);
       doc.removeEventListener("click", onClick);
     };
-  }, [doc, searchOpen, onCloseSearch]);
+  }, [doc, searchOpen, onCloseSearch, source]);
 
   useEffect(() => {
     const frame = frameRef.current;

@@ -6,10 +6,8 @@ import Markdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
-import { isHtmlPath } from "../../../shared/fileKinds";
 import { useT } from "../../hooks/useT";
 import { clipboardService } from "../../services/clipboardService";
-import { useBrowserStore } from "../../stores/browserStore";
 import { useUiStore } from "../../stores/uiStore";
 import { countCodeLines } from "../../utils/codeLines";
 import { elementToPng } from "../../utils/elementToPng";
@@ -21,6 +19,7 @@ import { canRenderMermaid } from "../../utils/mermaidPreview";
 import { FileLink, looksLikeFilePath } from "../SessionArea/FileLink";
 import { CodeHighlight } from "../ui/CodeHighlight";
 import { UrlLink } from "../ui/UrlLink";
+import { LocalMarkdownLink } from "./LocalMarkdownLink";
 import { MarkdownImage, MarkdownImageLinkContext } from "./MarkdownImage";
 import { MarkdownTable } from "./MarkdownTable";
 import { MathFormula } from "./MathFormula";
@@ -186,59 +185,27 @@ function FenceShell({
   );
 }
 
-/** Markdown 内链接：有源文件语境时本地路径在面板内跳转；http(s) 一律交系统浏览器；
+/** Markdown 内链接：本地路径在面板内跳转，目录交资源管理器；http(s) 交系统浏览器；
  * 其余协议降级死链。会话区（无 sourcePath）同样必须接管——默认 <a> 会把整个应用导航走
  * （docs/design/13 P0-1）。外链形态与输入栏、用户气泡同源（docs/design/131）。 */
 function MarkdownLink({
   sourcePath,
+  baseDir,
   href,
   imageContent,
   children,
 }: {
   sourcePath: string | null;
+  baseDir?: string | null;
   href?: string;
   imageContent: boolean;
   children?: ReactNode;
 }) {
-  const t = useT();
-  const { dispatch } = useUiStore();
-  const browser = useBrowserStore();
-
   if (typeof href !== "string" || href === "") {
     return <span className={styles.mdLinkDead}>{children}</span>;
   }
-  if (sourcePath != null) {
-    const resolved = resolveMarkdownRef(href, sourcePath);
-    if (resolved) {
-      // HTML 链接的「预览」就是浏览器渲染：直达 file:// 通道而非源码视图
-      if (isHtmlPath(resolved)) {
-        return (
-          <a
-            href={href}
-            title={t("common.openInBrowserPath", { path: resolved })}
-            onClick={(event) => {
-              event.preventDefault();
-              void browser.openLocalFile(resolved);
-            }}
-          >
-            {children}
-          </a>
-        );
-      }
-      return (
-        <a
-          href={href}
-          title={t("common.openInFilesPath", { path: resolved })}
-          onClick={(event) => {
-            event.preventDefault();
-            dispatch({ type: "openFileInPanel", path: resolved });
-          }}
-        >
-          {children}
-        </a>
-      );
-    }
-  }
+  const resolved = resolveMarkdownRef(href, sourcePath, baseDir);
+  if (resolved) return <LocalMarkdownLink path={resolved}>{children}</LocalMarkdownLink>;
   if (isExternalHttpUrl(href)) {
     // 徽标型链接 `[![CI](shield.png)](https://…)` 不加图标：图本身已是标识，
     // 再补一枚站点图标会让 README 里成排的徽章左边多出一列小图（docs/design/131）。
@@ -309,18 +276,17 @@ function buildComponents(opts: {
         </code>
       );
     },
-    // a 无条件接管（docs/design/13 P0-1）：有源文件语境解析本地路径，
-    // 会话区至少拦下 http(s) 外链，其余协议降级死链，禁止应用内导航
+    // 链接无条件接管，避免本地路径或外链把整个应用导航走。
     a: (props) => (
       <MarkdownImageLinkContext
         value={
           isExternalHttpUrl(props.href) ||
-          (opts.sourcePath != null &&
-            resolveMarkdownRef(props.href ?? "", opts.sourcePath) !== null)
+          resolveMarkdownRef(props.href ?? "", opts.sourcePath, opts.imageBaseDir) !== null
         }
       >
         <MarkdownLink
           sourcePath={opts.sourcePath ?? null}
+          baseDir={opts.imageBaseDir}
           href={props.href}
           imageContent={hastHasImage(props.node)}
         >

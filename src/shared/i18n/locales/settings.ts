@@ -13,29 +13,18 @@ export const settingsMessages = defineMessages({
     "en-US": "No matching settings",
   },
 
-  "settings.section.liveSessions": { "zh-CN": "存活会话", "en-US": "Live sessions" },
-  "settings.liveSessions.count": {
-    "zh-CN": "当前存活 {count} 个会话",
-    "en-US": "{count} live sessions",
-  },
   "settings.liveSessions.description": {
     "zh-CN": "显示本应用当前存活的全部会话进程，包括后台会话和预热会话。每 5 秒自动刷新。",
     "en-US":
       "All live session processes in this app, including background and prewarmed sessions. Refreshes every 5 seconds.",
-  },
-  "settings.liveSessions.empty": {
-    "zh-CN": "当前没有存活的会话进程。",
-    "en-US": "No session processes are currently alive.",
   },
   "settings.liveSessions.error": {
     "zh-CN": "刷新失败，列表可能已过期：{error}",
     "en-US": "Refresh failed; the list may be out of date: {error}",
   },
   "settings.liveSessions.prefetch": { "zh-CN": "预热会话", "en-US": "Prewarmed session" },
-  "settings.liveSessions.current": { "zh-CN": "当前会话", "en-US": "Current session" },
   "settings.liveSessions.pid": { "zh-CN": "进程 PID", "en-US": "Process PID" },
   "settings.liveSessions.source": { "zh-CN": "启动来源", "en-US": "Started by" },
-  "settings.liveSessions.startedAt": { "zh-CN": "启动时间", "en-US": "Started at" },
   "settings.liveSessions.lastActivity": { "zh-CN": "最近活动", "en-US": "Last activity" },
   "settings.liveSessions.ago": { "zh-CN": "{time} 前", "en-US": "{time} ago" },
   "settings.liveSessions.cwd": { "zh-CN": "工作目录", "en-US": "Working directory" },
@@ -98,6 +87,10 @@ export const settingsMessages = defineMessages({
   "settings.section.scheduled": {
     "zh-CN": "定时任务",
     "en-US": "Scheduled tasks",
+  },
+  "settings.section.liveSessions": {
+    "zh-CN": "存活会话",
+    "en-US": "Live sessions",
   },
   "settings.section.extensions": {
     "zh-CN": "来自扩展",
@@ -303,6 +296,50 @@ export const settingsMessages = defineMessages({
   "settings.archived.deleteConfirm.confirm": {
     "zh-CN": "删除",
     "en-US": "Delete",
+  },
+
+  "settings.liveSessions.listTitle": { "zh-CN": "会话进程", "en-US": "Session processes" },
+  "settings.liveSessions.count": { "zh-CN": "{count} 个", "en-US": "{count}" },
+  "settings.liveSessions.empty": {
+    "zh-CN": "当前没有存活会话",
+    "en-US": "No live sessions",
+  },
+  "settings.liveSessions.details": { "zh-CN": "会话详情", "en-US": "Session details" },
+  "settings.liveSessions.back": { "zh-CN": "返回会话列表", "en-US": "Back to sessions" },
+  "settings.liveSessions.current": { "zh-CN": "当前会话", "en-US": "Current session" },
+  "settings.liveSessions.status.running": { "zh-CN": "运行中", "en-US": "Running" },
+  "settings.liveSessions.status.idle": { "zh-CN": "空闲", "en-US": "Idle" },
+  "settings.liveSessions.status.starting": { "zh-CN": "启动中", "en-US": "Starting" },
+  "settings.liveSessions.workingDirectory": { "zh-CN": "工作目录", "en-US": "Working directory" },
+  "settings.liveSessions.startedAt": { "zh-CN": "进程启动时间", "en-US": "Process started" },
+  "settings.liveSessions.createdAt": { "zh-CN": "会话创建时间", "en-US": "Conversation created" },
+  "settings.liveSessions.updatedAt": { "zh-CN": "最近消息", "en-US": "Last message" },
+  "settings.liveSessions.firstMessage": { "zh-CN": "首条消息", "en-US": "First message" },
+  "settings.liveSessions.closeIdle": { "zh-CN": "结束空闲会话", "en-US": "End idle session" },
+  "settings.liveSessions.closeConfirm.title": {
+    "zh-CN": "结束这个会话进程？",
+    "en-US": "End this session process?",
+  },
+  "settings.liveSessions.closeConfirm.message": {
+    "zh-CN":
+      "确定结束“{title}”的空闲会话进程？会话历史会保留，下次使用时可重新启动。已启动的后台项目进程会继续运行，可在「后台进程」中单独停止。",
+    "en-US":
+      "End the idle process for “{title}”? Conversation history is kept and the session can restart when you use it again. Background project processes keep running and can be stopped separately in Background processes.",
+  },
+  "settings.liveSessions.closeConfirm.confirm": { "zh-CN": "结束进程", "en-US": "End process" },
+  "settings.liveSessions.close.busy": {
+    "zh-CN": "会话正在处理任务或等待交互，暂时无法结束。请稍后重试。",
+    "en-US":
+      "The session is processing work or waiting for input and cannot be ended yet. Try again later.",
+  },
+  "settings.liveSessions.close.pending": { "zh-CN": "正在结束…", "en-US": "Ending…" },
+  "settings.liveSessions.close.ended": {
+    "zh-CN": "会话进程已结束",
+    "en-US": "Session process ended",
+  },
+  "settings.liveSessions.close.failed": {
+    "zh-CN": "无法确认会话为空闲状态，未结束进程。请重试。",
+    "en-US": "Could not confirm that the session is idle. Its process was kept; please try again.",
   },
 
   "settings.usage.rangeLabel": { "zh-CN": "统计区间", "en-US": "Stats range" },

@@ -286,7 +286,7 @@ interface BrowserStoreValue extends BrowserState {
   closePage: (id: string) => Promise<void>;
   /** 切换活跃浏览器页面。 */
   setActivePage: (id: string) => Promise<void>;
-  navigate: (input: string) => Promise<void>;
+  navigate: (input: string) => Promise<boolean>;
   /** 在侧栏浏览器中打开本地 HTML 文件；返回是否成功（调用方据此决定是否切 Tab）。 */
   openLocalFile: (filePath: string) => Promise<boolean>;
   reload: () => Promise<void>;
@@ -551,12 +551,14 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
   );
 
   const navigate = useCallback(
-    async (input: string): Promise<void> => {
+    async (input: string): Promise<boolean> => {
       try {
         await browserService.navigate(input);
         dispatch({ type: "started" });
+        return true;
       } catch (err) {
         showToast(err instanceof Error ? err.message : t("browser.toast.navigateFailed"));
+        return false;
       }
     },
     [showToast],

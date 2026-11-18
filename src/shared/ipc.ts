@@ -391,6 +391,8 @@ export const SESSION_IPC = {
   stop: "pidesk:session:stop",
   /** 结束指定会话的 pi 进程（历史 JSONL 保留）。 */
   dispose: "pidesk:session:dispose",
+  /** 仅在主进程确认空闲后结束 pi；历史与后台项目进程保留。 */
+  disposeIdle: "pidesk:session:disposeIdle",
   /** 读取指定目录的 pi 会话历史（JSONL）。 */
   list: "pidesk:session:list",
   /** 读取全部 pi 会话历史（含各会话的工作目录，供侧边栏按项目分组）。 */
@@ -1307,6 +1309,9 @@ export type SessionPushMessage =
   | { sessionId: SessionId; type: "eventBatch"; payload: PiAgentEvent[] }
   | { sessionId: SessionId; type: "exit"; payload: number }
   | { sessionId: SessionId; type: "error"; payload: string };
+
+/** 空闲关闭的正常分支；无法确认空闲时保留实例，RPC 失败仍走错误信封。 */
+export type SessionDisposeIdleResult = "ended" | "busy" | "not-running";
 
 /** 会话历史条目（pi JSONL 会话文件的摘要）。 */
 export interface SessionSummary {
