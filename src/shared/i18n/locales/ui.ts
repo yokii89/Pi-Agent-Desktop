@@ -189,4 +189,7 @@ export const uiMessages = defineMessages({
   "ui.selectBar.aria": { "zh-CN": "选区操作", "en-US": "Selection actions" },
   "ui.selectBar.copy": { "zh-CN": "复制文本", "en-US": "Copy text" },
   "ui.selectBar.quote": { "zh-CN": "添加到输入栏", "en-US": "Add to composer" },
+  "ui.linkBar.aria": { "zh-CN": "链接打开方式", "en-US": "Link open actions" },
+  "ui.linkBar.sidebar": { "zh-CN": "在右侧边栏浏览器打开", "en-US": "Open in sidebar browser" },
+  "ui.linkBar.system": { "zh-CN": "使用系统默认浏览器打开", "en-US": "Open in default browser" },
 });

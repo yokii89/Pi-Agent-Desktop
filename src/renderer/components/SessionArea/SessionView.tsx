@@ -25,6 +25,7 @@ import { hasAssistantReplyText } from "./assistantReplyText";
 import { CustomNotice } from "./CustomNotice";
 import { FileEditsSummary } from "./FileEditsSummary";
 import { findFirstTokenWaitingRunId } from "./firstTokenWaiting";
+import { LinkToolbar } from "./LinkToolbar";
 import { QuestionRail } from "./QuestionRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { SelectionToolbar } from "./SelectionToolbar";
@@ -387,6 +388,7 @@ export function SessionView() {
         onCopy={handleCopySelection}
         onQuote={handleQuoteSelection}
       />
+      <LinkToolbar containerRef={scrollRef} />
     </div>
   );
 }
