@@ -13,6 +13,54 @@ export const settingsMessages = defineMessages({
     "en-US": "No matching settings",
   },
 
+  "settings.liveSessions.description": {
+    "zh-CN": "显示本应用当前存活的全部会话进程，包括后台会话和预热会话。每 5 秒自动刷新。",
+    "en-US":
+      "All live session processes in this app, including background and prewarmed sessions. Refreshes every 5 seconds.",
+  },
+  "settings.liveSessions.error": {
+    "zh-CN": "刷新失败，列表可能已过期：{error}",
+    "en-US": "Refresh failed; the list may be out of date: {error}",
+  },
+  "settings.liveSessions.prefetch": { "zh-CN": "预热会话", "en-US": "Prewarmed session" },
+  "settings.liveSessions.pid": { "zh-CN": "进程 PID", "en-US": "Process PID" },
+  "settings.liveSessions.source": { "zh-CN": "启动来源", "en-US": "Started by" },
+  "settings.liveSessions.lastActivity": { "zh-CN": "最近活动", "en-US": "Last activity" },
+  "settings.liveSessions.ago": { "zh-CN": "{time} 前", "en-US": "{time} ago" },
+  "settings.liveSessions.cwd": { "zh-CN": "工作目录", "en-US": "Working directory" },
+  "settings.liveSessions.id": { "zh-CN": "会话 ID", "en-US": "Session ID" },
+  "settings.liveSessions.file": { "zh-CN": "会话文件", "en-US": "Session file" },
+  "settings.liveSessions.noFile": {
+    "zh-CN": "尚未关联会话文件",
+    "en-US": "No session file associated yet",
+  },
+  "settings.liveSessions.activityHint": {
+    "zh-CN":
+      "最近活动包含会话执行和用户查看；它不是自动关闭倒计时，后台作业等保护条件仍可能阻止回收。查看此列表不会延长其他会话的闲置期限。结束进程请使用侧栏会话菜单。",
+    "en-US":
+      "Activity includes session work and viewing. This is not a shutdown countdown: background jobs and other protections may prevent reclamation. Viewing this list does not extend other sessions' idle time. Use the sidebar session menu to end a process.",
+  },
+  "settings.liveSessions.state.cold": { "zh-CN": "未就绪", "en-US": "Not ready" },
+  "settings.liveSessions.state.starting": { "zh-CN": "启动中", "en-US": "Starting" },
+  "settings.liveSessions.state.ready": { "zh-CN": "已就绪", "en-US": "Ready" },
+  "settings.liveSessions.state.idle": { "zh-CN": "空闲", "en-US": "Idle" },
+  "settings.liveSessions.state.busy": { "zh-CN": "运行中", "en-US": "Running" },
+  "settings.liveSessions.state.stopping": { "zh-CN": "结束中", "en-US": "Stopping" },
+  "settings.liveSessions.state.failed": { "zh-CN": "异常", "en-US": "Failed" },
+  "settings.liveSessions.source.send": { "zh-CN": "发送消息", "en-US": "Message" },
+  "settings.liveSessions.source.view-action": { "zh-CN": "扩展界面", "en-US": "Extension view" },
+  "settings.liveSessions.source.slash-command": { "zh-CN": "斜杠命令", "en-US": "Slash command" },
+  "settings.liveSessions.source.manual": { "zh-CN": "手动启动", "en-US": "Manual" },
+  "settings.liveSessions.source.speculative-prefetch": {
+    "zh-CN": "历史会话预热",
+    "en-US": "History prewarm",
+  },
+  "settings.liveSessions.source.new-chat-prefetch": {
+    "zh-CN": "新会话预热",
+    "en-US": "New session prewarm",
+  },
+  "settings.liveSessions.source.scheduled": { "zh-CN": "定时任务", "en-US": "Scheduled task" },
+
   "settings.section.general": { "zh-CN": "常规", "en-US": "General" },
   "settings.section.profile": { "zh-CN": "个人资料", "en-US": "Profile" },
   "settings.section.usage": {

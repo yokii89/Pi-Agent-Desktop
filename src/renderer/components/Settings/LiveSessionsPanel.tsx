@@ -1,9 +1,9 @@
-import { ArrowLeft, CaretRight, Pulse, Stop } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowsClockwise, CaretRight, Pulse, Stop } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { getI18nLocale } from "../../../shared/i18n";
+import { useLiveSessions } from "../../hooks/useLiveSessions";
 import { useT } from "../../hooks/useT";
 import { sessionService } from "../../services/sessionService";
-import { useExtensionViewStore } from "../../stores/extensionViewStore";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
 import { sessionTitle } from "../../utils/sessionTitle";
@@ -21,10 +21,10 @@ function formatDate(timestamp: number | null, unavailable: string): string {
   }).format(timestamp);
 }
 
-/** 设置 → 存活会话：复用权威 runtime 推送，先显示列表，点击后进入详情。 */
+/** 设置 → 存活会话：展示完整进程清单，点击进入详情并确认结束空闲实例。 */
 export function LiveSessionsPanel() {
   const t = useT();
-  const { runtimeSnapshots } = useExtensionViewStore();
+  const { sessions: runtimeSnapshots, loading, loaded, error, refresh } = useLiveSessions();
   const { allSessions, activeSessionId } = useSessionMeta();
   const { showToast } = useUiStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -47,7 +47,10 @@ export function LiveSessionsPanel() {
           status,
           title: summary
             ? sessionTitle(summary, t("sidenav.session.untitled"))
-            : t("sidenav.session.untitled"),
+            : runtime.createdBy === "new-chat-prefetch" ||
+                runtime.createdBy === "speculative-prefetch"
+              ? t("settings.liveSessions.prefetch")
+              : t("sidenav.session.untitled"),
           cwd: runtime.cwd ?? summary?.cwd ?? null,
           updatedAt: summary?.updatedAt ?? null,
           createdAt: summary?.startedAt ?? null,
@@ -74,6 +77,7 @@ export function LiveSessionsPanel() {
       }
       setPendingClose(null);
       setSelectedId(null);
+      void refresh();
       showToast(t("settings.liveSessions.close.ended"));
     } catch {
       setCloseError(t("settings.liveSessions.close.failed"));
@@ -83,7 +87,18 @@ export function LiveSessionsPanel() {
   };
 
   return (
-    <div className={settingsStyles.panel}>
+    <div className={settingsStyles.panel} data-selectable-text>
+      <p>{t("settings.liveSessions.description")}</p>
+      <Button onClick={() => void refresh()} disabled={loading}>
+        <ArrowsClockwise size={16} weight="regular" />
+        {t("common.refresh")}
+      </Button>
+      {error && (
+        <p className={styles.error} role="alert">
+          {t("settings.liveSessions.error", { error })}
+        </p>
+      )}
+      {!loaded && loading && <p role="status">{t("common.loading")}</p>}
       {selected ? (
         <section aria-label={t("settings.liveSessions.details")}>
           <Button onClick={() => setSelectedId(null)}>
@@ -113,6 +128,30 @@ export function LiveSessionsPanel() {
             )}
           </header>
           <dl className={styles.details} data-selectable-text>
+            <div className={styles.detailRow}>
+              <dt>{t("settings.liveSessions.pid")}</dt>
+              <dd>{selected.pid}</dd>
+            </div>
+            <div className={styles.detailRow}>
+              <dt>{t("settings.liveSessions.source")}</dt>
+              <dd>
+                {selected.createdBy
+                  ? t(`settings.liveSessions.source.${selected.createdBy}`)
+                  : t("common.unknown")}
+              </dd>
+            </div>
+            <div className={styles.detailRow}>
+              <dt>{t("settings.liveSessions.lastActivity")}</dt>
+              <dd>{formatDate(selected.lastActivityAt, t("common.unknown"))}</dd>
+            </div>
+            <div className={styles.detailRow}>
+              <dt>{t("settings.liveSessions.id")}</dt>
+              <dd>{selected.sessionId}</dd>
+            </div>
+            <div className={styles.detailRow}>
+              <dt>{t("settings.liveSessions.file")}</dt>
+              <dd>{selected.sessionFile ?? t("settings.liveSessions.noFile")}</dd>
+            </div>
             <div className={styles.detailRow}>
               <dt>{t("settings.liveSessions.workingDirectory")}</dt>
               <dd>{selected.cwd ?? t("common.unknown")}</dd>
@@ -145,7 +184,7 @@ export function LiveSessionsPanel() {
               {t("settings.liveSessions.count", { count: rows.length })}
             </span>
           </header>
-          {rows.length === 0 ? (
+          {loaded && rows.length === 0 ? (
             <div className={styles.empty}>
               <Pulse size={24} weight="regular" />
               <p>{t("settings.liveSessions.empty")}</p>

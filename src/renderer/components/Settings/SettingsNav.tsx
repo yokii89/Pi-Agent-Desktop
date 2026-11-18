@@ -3,11 +3,11 @@ import {
   ArrowsClockwise,
   Bell,
   ChartBar,
+  Cpu,
   Folder,
   Keyboard,
   MagnifyingGlass,
   Palette,
-  Pulse,
   PuzzlePiece,
   Rocket,
   Sparkle,
@@ -156,8 +156,8 @@ const NAV_GROUPS: NavGroup[] = [
       {
         id: "liveSessions",
         labelKey: "settings.section.liveSessions",
-        icon: <Pulse size={18} weight="regular" />,
-        keywords: ["存活", "活动会话", "会话进程", "live", "running session"],
+        icon: <Cpu size={20} weight="regular" />,
+        keywords: ["存活", "会话", "进程", "空闲", "预热", "session", "process", "idle", "live"],
       },
       {
         id: "scheduled",

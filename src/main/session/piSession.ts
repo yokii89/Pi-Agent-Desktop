@@ -191,6 +191,11 @@ export function hasSession(id: SessionId): boolean {
   return getLiveInstance(id) !== null;
 }
 
+/** 读取存活会话的 PID；不启动进程，已进入关闭流程时返回 null。 */
+export function getSessionPid(sessionId: SessionId): number | null {
+  return getLiveInstance(sessionId)?.child?.pid ?? null;
+}
+
 /** 当前存活实例 id 列表（调试 / 对账 / 默认模型广播）。 */
 export function listLiveSessions(): SessionId[] {
   return [...instances.values()]

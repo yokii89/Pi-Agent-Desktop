@@ -92,10 +92,10 @@ export function SettingsDialog() {
         return <EnvironmentPanel />;
       case "projects":
         return <ProjectsPanel />;
-      case "scheduled":
-        return <ScheduledSettingsPanel />;
       case "liveSessions":
         return <LiveSessionsPanel />;
+      case "scheduled":
+        return <ScheduledSettingsPanel />;
       case "notifications":
         return <NotificationsPanel />;
       case "shortcuts":

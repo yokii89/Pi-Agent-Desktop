@@ -182,6 +182,11 @@ export interface SessionRuntimeSnapshot {
   errorMessage?: string;
 }
 
+/** 设置页只读进程清单；包含隐藏预热实例，不参与会话桶对账。 */
+export interface LiveSessionSnapshot extends SessionRuntimeSnapshot {
+  pid: number;
+}
+
 export type SessionRuntimeErrorCode =
   | "spawn-failed"
   | "runtime-ready-timeout"
@@ -269,6 +274,8 @@ export const CATALOG_IPC = {
 } as const;
 
 export const RUNTIME_IPC = {
+  /** 所有存活会话进程（含隐藏预热），仅设置页按需读取。 */
+  liveSessions: "pidesk:runtime:liveSessions",
   /** 读取主进程权威 runtime 快照（Renderer reload 对账）。 */
   snapshot: "pidesk:runtime:snapshot",
   /** 主进程推送：runtime 条目变化。 */

@@ -5,6 +5,7 @@
  */
 
 import type {
+  LiveSessionSnapshot,
   SessionId,
   SessionLimitReachedError,
   SessionRuntimeErrorCode,
@@ -19,6 +20,7 @@ import { getMainWindow } from "../window/createMainWindow";
 import {
   disposeSession,
   fetchSessionState,
+  getSessionPid,
   hasSession,
   startSession,
   waitForSessionDisposal,
@@ -752,6 +754,14 @@ export function listRuntimeSnapshots(includeHidden = false): SessionRuntimeSnaps
     (rec) => includeHidden || !isHiddenFromRenderer(rec),
   );
   return visible.map(toSnapshot);
+}
+
+/** 设置页的完整存活清单：只读内存，包含预热实例，不发 RPC、不刷新活动时间。 */
+export function listLiveSessionSnapshots(): LiveSessionSnapshot[] {
+  return listRuntimeSnapshots(true).flatMap((snapshot) => {
+    const pid = getSessionPid(snapshot.sessionId);
+    return pid === null ? [] : [{ ...snapshot, pid }];
+  });
 }
 
 /** 激活事务互斥：同 sessionId+contributionKey 合并重复点击。 */

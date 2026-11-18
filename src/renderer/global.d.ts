@@ -3,6 +3,7 @@ import type {
   ActivateContributionResult,
   ContributionCatalogSnapshot,
   ExtensionWorkerStatus,
+  LiveSessionSnapshot,
   PrefetchMetrics,
   PrefetchNotifyRequest,
   RuntimeViewingRequest,
@@ -403,6 +404,8 @@ export interface PideskGlobalApi {
     onChanged(callback: (snapshot: ContributionCatalogSnapshot) => void): () => void;
   };
   runtime: {
+    /** 只读全部存活会话，包含隐藏预热实例。 */
+    liveSessions(): Promise<IpcResult<LiveSessionSnapshot[]>>;
     snapshot(): Promise<IpcResult<SessionRuntimeSnapshot[]>>;
     /** 上报用户正在查看的会话（docs/design/138）：该会话豁免空闲回收。 */
     noteViewing(req: RuntimeViewingRequest): Promise<IpcResult<null>>;
