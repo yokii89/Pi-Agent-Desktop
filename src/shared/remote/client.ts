@@ -80,6 +80,7 @@ export class ControlClient {
       if (token) headers["X-PiDesk-Room-Authorization"] = `Bearer ${token}`;
     } else if (token) headers.Authorization = `Bearer ${token}`;
     let response: ControlResponse;
+    let r: Record<string, unknown>;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
     try {
@@ -91,16 +92,12 @@ export class ControlClient {
         ...(payload ? { body: payload } : {}),
         signal: controller.signal,
       });
+      // Receiving headers does not mean the response body has finished downloading.
+      r = record(parseJson(await response.text(), this.v2 ? 32_768 : LIMITS.controlBytes));
     } catch {
       throw new ControlError("NETWORK_UNCERTAIN", true);
     } finally {
       clearTimeout(timeout);
-    }
-    let r: Record<string, unknown>;
-    try {
-      r = record(parseJson(await response.text(), this.v2 ? 32_768 : LIMITS.controlBytes));
-    } catch {
-      throw new ControlError("NETWORK_UNCERTAIN", true);
     }
     if (
       r.controlVersion !== this.version ||

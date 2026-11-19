@@ -317,7 +317,7 @@ export class RemoteService {
       };
       ws.onmessage = (event) => {
         const raw = String(event.data);
-        const size = new TextEncoder().encode(raw).byteLength;
+        const size = Buffer.byteLength(raw);
         queued++;
         queuedBytes += size;
         if (queued > 8 || queuedBytes > 262_144) {
@@ -414,7 +414,8 @@ export class RemoteService {
             this.deliver(context, frame, ws);
           })
           .catch((cause) => {
-            this.error = cause instanceof ControlError ? cause.code : "CONTROL_FAILED";
+            if (this.socket === ws)
+              this.error = cause instanceof ControlError ? cause.code : "CONTROL_FAILED";
             ws.close();
           })
           .finally(() => {

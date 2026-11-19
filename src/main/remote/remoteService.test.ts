@@ -4,6 +4,7 @@ import type { Grant } from "../../shared/remote";
 const f = vi.hoisted(() => ({
   request: vi.fn(),
   poll: vi.fn(async () => {}),
+  reconcile: vi.fn(async () => {}),
   grant: null as Grant | null,
   saveGrant: vi.fn(),
   credential: {
@@ -51,7 +52,7 @@ vi.mock("./desktopPairing", () => ({
     claim = { claimId: "claim-1" };
     grant = null;
     poll = f.poll;
-    reconcile = async () => {};
+    reconcile = f.reconcile;
   },
 }));
 
@@ -144,6 +145,31 @@ describe("remote service pause and shutdown", () => {
     expect(FakeSocket.instances).toHaveLength(1);
     expect(FakeSocket.instances[0].url).toBe("wss://relay.example/v1/connect/desktop-1");
   });
+  it.each([false, true])(
+    "ignores an old socket's reconciliation failure after pause (reconnect: %s)",
+    async (reconnect) => {
+      let reject!: (cause: Error) => void;
+      f.reconcile.mockReturnValueOnce(
+        new Promise<void>((_resolve, fail) => {
+          reject = fail;
+        }),
+      );
+      await service.start();
+      const oldSocket = FakeSocket.instances[0];
+      await authenticate(oldSocket);
+      expect(f.reconcile).toHaveBeenCalledOnce();
+      service.stop();
+      if (reconnect) {
+        await service.start();
+        await authenticate(FakeSocket.instances[1]);
+        expect(service.snapshot().connected).toBe(true);
+      }
+      reject(new Error("stale connection failed"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(service.snapshot()).toMatchObject({ connected: reconnect, error: null });
+      if (reconnect) expect(FakeSocket.instances[1].close).not.toHaveBeenCalled();
+    },
+  );
   it("clears pairing secrets and timers on pause, retaining only enrollment", async () => {
     await service.start();
     expect(service.snapshot().qr).not.toBeNull();

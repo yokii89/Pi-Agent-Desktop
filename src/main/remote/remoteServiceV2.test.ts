@@ -195,6 +195,15 @@ describe("desktop v2 service", () => {
     await vi.waitFor(() => expect(socket.close).toHaveBeenCalled());
     expect(socket.send).toHaveBeenCalledTimes(1);
   });
+  it("bounds queued UTF-8 bytes independently of the pending frame count", async () => {
+    const socket = await connected();
+    const request = route();
+    request.frame.payload = { text: "文".repeat(20_000) };
+    for (let i = 0; i < 4; i++) socket.receive({ ...request, deliverySequence: i + 1 });
+    expect(socket.close).not.toHaveBeenCalled();
+    socket.receive({ ...request, deliverySequence: 5 });
+    expect(socket.close).toHaveBeenCalledOnce();
+  });
   it("bounds pending input even if a peer sends without receiving credit", async () => {
     const socket = await connected();
     for (let i = 0; i < 9; i++) socket.receive({ ...route(), deliverySequence: i + 1 });
