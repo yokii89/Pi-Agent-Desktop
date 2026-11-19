@@ -179,7 +179,82 @@ function route(accountId = fixture.owner) {
     frame: { version: 1, type: "request", id: randomUUID(), command: "projects.list", payload: {} },
   };
 }
+function pendingAccountLookup() {
+  let resolve!: (response: Response) => void;
+  let reject!: (cause: Error) => void;
+  let requestId: string | null = null;
+  const response = new Promise<Response>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  vi.mocked(fetch).mockImplementationOnce(async (_url, init) => {
+    requestId = new Headers(init?.headers).get("X-Request-Id");
+    return response;
+  });
+  return {
+    wait: () => vi.waitFor(() => expect(requestId).not.toBeNull()),
+    complete: () =>
+      resolve(
+        Response.json({
+          controlVersion: 2,
+          requestId,
+          serverTime: new Date().toISOString(),
+          data: { accountId: fixture.owner, accountStatus: "active" },
+        }),
+      ),
+    fail: () => reject(new Error("Delayed network failure")),
+  };
+}
+
 describe("desktop v2 service", () => {
+  it.each([false, true])(
+    "ignores account restoration completing after pause (reconnect: %s)",
+    async (reconnect) => {
+      const pending = pendingAccountLookup();
+      const stale = service.start();
+      await pending.wait();
+      service.stop();
+      if (reconnect) await service.start();
+      pending.complete();
+      await stale;
+      expect(FakeSocket.instances).toHaveLength(reconnect ? 1 : 0);
+      expect(service.snapshot().error).toBeNull();
+    },
+  );
+  it.each([false, true])(
+    "ignores account restoration failing after pause (reconnect: %s)",
+    async (reconnect) => {
+      const pending = pendingAccountLookup();
+      const stale = service.start();
+      await pending.wait();
+      service.stop();
+      if (reconnect) await service.start();
+      pending.fail();
+      await stale;
+      expect(FakeSocket.instances).toHaveLength(reconnect ? 1 : 0);
+      expect(service.snapshot().error).toBeNull();
+    },
+  );
+  it("ignores duplicate starts while account restoration is in progress", async () => {
+    const pending = pendingAccountLookup();
+    const first = service.start();
+    await pending.wait();
+    await service.start();
+    expect(fetch).toHaveBeenCalledOnce();
+    pending.complete();
+    await first;
+    expect(FakeSocket.instances).toHaveLength(1);
+  });
+  it("does not reconnect after an explicit account login is paused", async () => {
+    const pending = pendingAccountLookup();
+    const login = service.setAccount({ relayOrigin: "https://relay.example" });
+    await pending.wait();
+    service.stop();
+    pending.complete();
+    await expect(login).rejects.toMatchObject({ code: "ACCOUNT_CHANGED" });
+    expect(FakeSocket.instances).toHaveLength(0);
+    expect(service.snapshot().error).toBeNull();
+  });
   it("authenticates the upgrade with the account and ACKs routed business frames", async () => {
     const socket = await connected();
     expect(socket.url).toBe(`wss://relay.example/v2/connect/${fixture.desktop}`);

@@ -1,4 +1,4 @@
-// Business protocol v1; pairing control messages use their own parser and version.
+// Business frame schema version 1, carried by the v2 relay control protocol.
 export const PROTOCOL_VERSION = 1;
 export const MAX_FRAME_BYTES = 64 * 1024;
 export const MAX_PROMPT_LENGTH = 16_000;

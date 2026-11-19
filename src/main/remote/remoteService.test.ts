@@ -9,6 +9,8 @@ const f = vi.hoisted(() => ({
   saveGrant: vi.fn(),
   credential: {
     version: 1,
+    controlVersion: 2,
+    accountId: `account-v1-${"a".repeat(64)}`,
     relayOrigin: "https://relay.example",
     desktopId: "desktop-1",
     relayInstanceId: "relay-1",
@@ -20,9 +22,13 @@ vi.mock("../../shared/remote", async (original) => {
   const actual = await original<typeof import("../../shared/remote")>();
   return {
     ...actual,
-    ControlClient: class {
-      request = f.request;
-      now = Date.now;
+    RelayAccountSession: class {
+      getSnapshot = () => ({ accountId: f.credential.accountId });
+      client = () => ({
+        request: f.request,
+        now: Date.now,
+        socketHeaders: async () => ({ Authorization: "Bearer account-token" }),
+      });
     },
   };
 });
@@ -55,6 +61,9 @@ vi.mock("./desktopPairing", () => ({
     reconcile = f.reconcile;
   },
 }));
+
+vi.mock("./desktopAuth", () => ({ hasDesktopAuth: () => true }));
+vi.mock("./relaySocket", () => ({ relaySocket: (url: string) => new FakeSocket(url) }));
 
 import { RemoteService, remoteService } from "./remoteService";
 
@@ -95,10 +104,11 @@ remoteService.dispose();
 const authenticate = async (socket: FakeSocket) => {
   socket.onmessage?.({
     data: JSON.stringify({
-      controlVersion: 1,
+      controlVersion: 2,
       type: "authenticated",
       securityProfile: "trusted-relay-tls-v1",
       principal: {
+        accountId: f.credential.accountId,
         role: "desktop",
         desktopId: "desktop-1",
         relayInstanceId: "relay-1",
@@ -143,7 +153,7 @@ describe("remote service pause and shutdown", () => {
     resolve({ token: "stale", expires: Date.now() + 300_000 });
     await stale;
     expect(FakeSocket.instances).toHaveLength(1);
-    expect(FakeSocket.instances[0].url).toBe("wss://relay.example/v1/connect/desktop-1");
+    expect(FakeSocket.instances[0].url).toBe("wss://relay.example/v2/connect/desktop-1");
   });
   it.each([false, true])(
     "ignores an old socket's reconciliation failure after pause (reconnect: %s)",

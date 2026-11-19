@@ -305,14 +305,6 @@
   font-weight: 500;
 }
 
-.enrollment {
-  padding: var(--spacing-lg);
-}
-
-.enrollment h3 {
-  font-size: var(--font-size-lg);
-}
-
 .form {
   display: flex;
   flex-direction: column;
@@ -342,20 +334,6 @@
 .field input::placeholder,
 .search input::placeholder {
   color: var(--color-text-muted);
-}
-
-.inputWrap {
-  position: relative;
-}
-
-.inputWrap input {
-  padding-right: calc(var(--spacing-xl) + var(--spacing-sm));
-}
-
-.inputWrap .revealTicket {
-  position: absolute;
-  top: var(--spacing-xs);
-  right: var(--spacing-xs);
 }
 
 .choice {
@@ -516,8 +494,7 @@
   color: var(--color-text-muted);
 }
 
-.projectOption input[type="checkbox"],
-.permissionOption input[type="checkbox"] {
+.projectOption input[type="checkbox"] {
   margin-top: 0;
 }
 
@@ -529,30 +506,6 @@
 
 .panel .projectLimit {
   margin-top: var(--spacing-sm);
-}
-
-.permissions {
-  padding: 0 var(--spacing-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.permissionOption {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  min-height: 38px;
-  padding: var(--spacing-sm) 0;
-  cursor: pointer;
-}
-
-.permissionOption + .permissionOption {
-  border-top: 1px solid var(--color-border);
-}
-
-.permissionOption > svg {
-  margin-left: auto;
-  color: var(--color-text-muted);
 }
 
 .panel .baseline {

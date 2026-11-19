@@ -4,15 +4,15 @@ import { ControlError } from "./contract";
 
 const owner = `account-v1-${"a".repeat(64)}`;
 const desktop = "00000000-0000-4000-8000-000000000001";
-const options = (version: 1 | 2) =>
-  version === 2
-    ? { account: { accountId: owner, token: async () => "account-token" }, desktopId: desktop }
-    : undefined;
+const options = {
+  account: { accountId: owner, token: async () => "account-token" },
+  desktopId: desktop,
+};
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
-describe.each([1, 2] as const)("v%s control request lifecycle", (version) => {
+describe("v2 control request lifecycle", () => {
   it("keeps the request deadline active while reading a stalled response body", async () => {
     let signal: AbortSignal | undefined;
     let reading = false;
@@ -36,10 +36,10 @@ describe.each([1, 2] as const)("v%s control request lifecycle", (version) => {
       () => "request",
       fetcher,
       Date.now,
-      options(version),
+      options,
     );
     const result = client
-      .request("GET", "/v1/desktops/self/state", null, null, (v) => v)
+      .request("GET", "/state", null, null, (v) => v)
       .then(
         () => {
           settled = true;
@@ -71,7 +71,7 @@ describe.each([1, 2] as const)("v%s control request lifecycle", (version) => {
         headers: new Headers(),
         text: async () =>
           JSON.stringify({
-            controlVersion: version,
+            controlVersion: 2,
             requestId: init.headers["X-Request-Id"],
             serverTime: new Date().toISOString(),
             data: { state: "ready" },
@@ -83,11 +83,11 @@ describe.each([1, 2] as const)("v%s control request lifecycle", (version) => {
       () => "request",
       fetcher,
       Date.now,
-      options(version),
+      options,
     );
-    await expect(
-      client.request("GET", "/v1/desktops/self/state", null, null, (v) => v),
-    ).resolves.toEqual({ state: "ready" });
+    await expect(client.request("GET", "/state", null, null, (v) => v)).resolves.toEqual({
+      state: "ready",
+    });
     expect(vi.getTimerCount()).toBe(0);
     await vi.advanceTimersByTimeAsync(15_000);
     expect(signal?.aborted).toBe(false);
@@ -102,10 +102,10 @@ describe.each([1, 2] as const)("v%s control request lifecycle", (version) => {
       () => "request",
       fetcher,
       Date.now,
-      options(version),
+      options,
     );
     await expect(
-      client.request("POST", "/v1/pairings", "room-token", {}, (v) => v, "stable-request"),
+      client.request("POST", "/pairings", "room-token", {}, (v) => v, "stable-request"),
     ).rejects.toMatchObject({ code: "NETWORK_UNCERTAIN", retryable: true });
     expect(fetcher).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
@@ -122,11 +122,12 @@ describe.each([1, 2] as const)("v%s control request lifecycle", (version) => {
       () => "request",
       fetcher,
       Date.now,
-      options(version),
+      options,
     );
-    await expect(
-      client.request("GET", "/v1/desktops/self/state", null, null, (v) => v),
-    ).rejects.toMatchObject({ code: "NETWORK_UNCERTAIN", retryable: true });
+    await expect(client.request("GET", "/state", null, null, (v) => v)).rejects.toMatchObject({
+      code: "NETWORK_UNCERTAIN",
+      retryable: true,
+    });
     expect(vi.getTimerCount()).toBe(0);
   });
 });

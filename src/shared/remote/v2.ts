@@ -19,9 +19,9 @@ export function desktopId(value: unknown): string {
     fail("INVALID_FRAME");
   return result;
 }
-/** Maps only existing public room operations; never forwards arbitrary v1 routes. */
-export function v2Path(path: string, desktop?: string): string {
-  if (path === "/v1/meta") return "/v2/meta";
+/** Accepts public v2 account paths or explicit operations scoped to one desktop. */
+export function controlPath(path: string, desktop?: string): string {
+  if (path === "/v2/meta") return path;
   if (path.startsWith("/v2/account/me")) {
     if (
       !/^\/v2\/account\/me(?:\/desktops(?:\/[a-f0-9-]{36})?)?(?:\?cursor=[A-Za-z0-9_-]{1,2048})?$/.test(
@@ -31,26 +31,16 @@ export function v2Path(path: string, desktop?: string): string {
       fail("INVALID_PATH");
     return path;
   }
-  const fixed: Record<string, string> = {
-    "/v1/desktops/access-token": "/auth/desktop-access",
-    "/v1/desktops/self/state": "/state",
-    "/v1/desktops/self/reconcile": "/reconcile",
-    "/v1/desktops/self/activation-ack": "/activation-ack",
-    "/v1/pairings": "/pairings",
-    "/v1/auth/refresh": "/auth/refresh",
-  };
-  const suffix =
-    fixed[path] ??
-    (/^\/v1\/(?:pairings\/[A-Za-z0-9_-]{1,128}\/claim|claims\/[A-Za-z0-9_-]{1,128}(?:\/(?:approve|reject|cancel|redeem))?|devices\/[A-Za-z0-9_-]{1,128}\/(?:activate|revoke))$/.test(
+  if (
+    !desktop ||
+    !/^(?:\/(?:state|reconcile|activation-ack|pairings)|\/auth\/(?:desktop-access|refresh)|\/pairings\/[A-Za-z0-9_-]{1,128}\/claim|\/claims\/[A-Za-z0-9_-]{1,128}(?:\/(?:approve|reject|cancel|redeem))?|\/devices\/[A-Za-z0-9_-]{1,128}\/(?:activate|revoke))$/.test(
       path,
     )
-      ? path.slice(3)
-      : null);
-  if (!suffix || !desktop) return fail("INVALID_PATH");
-  return `/v2/desktops/${desktopId(desktop)}${suffix}`;
+  )
+    return fail("INVALID_PATH");
+  return `/v2/desktops/${desktopId(desktop)}${path}`;
 }
-export function relayPrincipal(value: unknown, version: 1 | 2, expectedAccount?: string) {
-  if (version === 1) return parsePrincipal(value);
+export function relayPrincipal(value: unknown, expectedAccount: string) {
   const { accountId: owner, ...base } = record(value);
   if (accountId(owner) !== expectedAccount) fail("AUTH_REQUIRED");
   return { ...parsePrincipal(base), accountId: owner as string };

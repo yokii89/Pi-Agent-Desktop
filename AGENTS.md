@@ -10,7 +10,7 @@
 
 ## 桌面远程伴侣实现范围（2026-11）
 
-桌面端远程能力统一使用 `src/shared/remote/` 的配对与业务协议，不并存旧的房间轮询协议或同名 `src/shared/remote.ts`。电脑凭证经 safeStorage 加密保存，邀请秘密只驻内存；用户可在设置中连接或暂停，重启后按现有授权协调恢复。默认仅授权项目与会话读取，发送、停止、新建会话和回答交互需用户逐项显式授权。仅分享用户选定且仍在设置中存在的项目，通过私有不透明 ID 访问会话；磁盘历史校验真实路径并限制为 2 MiB，隐藏消息、思考、工具参数及本地绝对路径不外传，保留新版协议支持的可见工具结果文本。IPC 仅信任主窗口顶层 frame。暂停清理邀请与本地连接，撤销先取消本地授权再通知中转；退出只清理远程服务，不改变窗口关闭/最小化和桌面运行生命周期。设置明确中转可读取正文，不承诺端到端加密；本任务不部署中转、不生成 Android 工程。
+桌面端远程控制面只支持 v2；v1 无使用者，直接删除实现、版本选择、旧凭证解析与迁移路径。远程能力统一使用 `src/shared/remote/` 的配对与业务协议，不并存旧的房间轮询协议或同名 `src/shared/remote.ts`。电脑凭证经 safeStorage 加密保存，邀请秘密只驻内存；用户可在设置中连接或暂停，重启后按现有授权协调恢复。当前 v2 仅授权项目与会话读取，写入与交互操作尚未开放。仅分享用户选定且仍在设置中存在的项目，通过私有不透明 ID 访问会话；磁盘历史校验真实路径并限制为 2 MiB，隐藏消息、思考、工具参数及本地绝对路径不外传，保留新版协议支持的可见工具结果文本。IPC 仅信任主窗口顶层 frame。暂停清理邀请与本地连接，撤销先取消本地授权再通知中转；退出只清理远程服务，不改变窗口关闭/最小化和桌面运行生命周期。设置明确中转可读取正文，不承诺端到端加密；本任务不部署中转、不生成 Android 工程。
 
 ## 项目概述
 
@@ -69,7 +69,7 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 
 - `qrcode`、`@types/qrcode`（devDep，渲染层构建期）：手机配对邀请二维码本地生成；二维码秘密只在内存，不进入 URL、日志、剪贴板或持久设置。
 - `src/shared/remote/` 作为 `@pidesk/remote-protocol` 零依赖源码包供相邻 Pi-Mobile 工程链接；桌面继续相对导入并由现有 tsc 编译，无新增主进程外部依赖。
-- `ws`（runtime，主进程）与 `@types/ws`（dev）：v2 WSS 握手携带账号认证头，禁止重定向与压缩，限制帧大小；v1 保留原生 WebSocket。Auth0 PKCE 会话由主进程管理；access/refresh token 经 Electron `safeStorage` 加密保存，渲染进程只看到账号就绪状态。
+- `ws`（runtime，主进程）与 `@types/ws`（dev）：v2 WSS 握手携带账号认证头，禁止重定向与压缩，限制帧大小。Auth0 PKCE 会话由主进程管理；access/refresh token 经 Electron `safeStorage` 加密保存，渲染进程只看到账号就绪状态。
 - 远程控制面使用 Node 内置 fetch / WebSocket / crypto；Windows 电脑凭证经 Electron 41 safeStorage 加密后由 settings 模块原子保存到 userData。手机原生存储与扫码依赖、中转构建边界登记在 Pi-Mobile/AGENTS.md。
 - 现有 vitest 纯逻辑测试扩展到 remote 配对授权、持久化失败与两端协调；不新增渲染测试框架。
 

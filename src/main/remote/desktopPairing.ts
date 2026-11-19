@@ -1,5 +1,4 @@
 import {
-  ALL_SCOPES,
   type ClaimStatus,
   type ControlClient,
   exact,
@@ -11,6 +10,7 @@ import {
   parseGrant,
   parseQr,
   projectIds,
+  READ_SCOPES,
   revoked,
   type Scope,
   sameBinding,
@@ -60,11 +60,11 @@ export class DesktopPairing {
   async invite(): Promise<PairingQr> {
     this.qr = null;
     this.claim = null;
-    this.qr = await this.call("/v1/pairings", {}, (v) => parseQr(JSON.stringify(v)));
+    this.qr = await this.call("/pairings", {}, (v) => parseQr(JSON.stringify(v)));
     return this.qr;
   }
   async poll(): Promise<void> {
-    const state = await this.call("/v1/desktops/self/state", null, (v) => {
+    const state = await this.call("/state", null, (v) => {
       const r = exact(v, ["grant", "claim"]);
       return {
         grant: r.grant === null ? null : parseGrant(r.grant),
@@ -112,13 +112,8 @@ export class DesktopPairing {
     const ids = projectIds(selected).sort();
     const selectedScopes = [...new Set(scopes)].sort();
     if (
-      (this.client.version === 2 &&
-        selectedScopes.some((scope) => scope !== "projects.read" && scope !== "sessions.read")) ||
-      selectedScopes.some((scope) => !(ALL_SCOPES as readonly string[]).includes(scope)) ||
-      !selectedScopes.includes("projects.read") ||
-      !selectedScopes.includes("sessions.read") ||
-      (selectedScopes.includes("interactions.answer") &&
-        !selectedScopes.includes("interactions.read"))
+      selectedScopes.length !== READ_SCOPES.length ||
+      selectedScopes.some((scope) => !(READ_SCOPES as readonly string[]).includes(scope))
     )
       fail("FORBIDDEN");
     if (ids.some((p) => !this.projects().includes(p))) fail("INVALID_PROJECTS");
@@ -153,7 +148,7 @@ export class DesktopPairing {
       this.store.save(grant);
     }
     this.claim = await this.call(
-      `/v1/claims/${claim.claimId}/approve`,
+      `/claims/${claim.claimId}/approve`,
       { approvalId: grant.approvalId, grant },
       parseClaim,
     );
@@ -162,7 +157,7 @@ export class DesktopPairing {
     if (!this.claim) fail("PAIRING_UNAVAILABLE");
     const local = this.grant;
     if (local?.state === "prepared") this.store.save(revoked(local, this.client.now(), "rejected"));
-    this.claim = await this.call(`/v1/claims/${this.claim.claimId}/reject`, {}, parseClaim);
+    this.claim = await this.call(`/claims/${this.claim.claimId}/reject`, {}, parseClaim);
     this.qr = null;
   }
   private async activate(claim: ClaimStatus): Promise<void> {
@@ -187,7 +182,7 @@ export class DesktopPairing {
       this.store.save(local);
     }
     const confirmed = await this.call(
-      "/v1/desktops/self/activation-ack",
+      "/activation-ack",
       {
         grantId: local.grantId,
         grantVersion: local.grantVersion,
@@ -210,14 +205,10 @@ export class DesktopPairing {
     // An interrupted prepared grant never survives a desktop process restart.
     if (startup && local?.state === "prepared")
       this.store.save(revoked(local, this.client.now(), "desktop_restart"));
-    const remote = await this.call(
-      "/v1/desktops/self/reconcile",
-      { grant: this.grant, startup },
-      (v) => {
-        const r = exact(v, ["grant"]);
-        return r.grant === null ? null : parseGrant(r.grant);
-      },
-    );
+    const remote = await this.call("/reconcile", { grant: this.grant, startup }, (v) => {
+      const r = exact(v, ["grant"]);
+      return r.grant === null ? null : parseGrant(r.grant);
+    });
     const current = this.grant;
     if (
       current &&
@@ -235,7 +226,7 @@ export class DesktopPairing {
     this.revocationPending = true;
     this.qr = null;
     await this.call(
-      `/v1/devices/${next.deviceId}/revoke`,
+      `/devices/${next.deviceId}/revoke`,
       { grantId: next.grantId, grantVersion: next.grantVersion },
       (v) => exact(v, ["grant"]),
     );

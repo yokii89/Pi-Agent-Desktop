@@ -10,7 +10,7 @@ import {
   record,
   timestamp,
 } from "./contract";
-import { type V2ClientOptions, v2Path } from "./v2";
+import { controlPath, type V2ClientOptions } from "./v2";
 
 export interface ControlResponse {
   status: number;
@@ -36,15 +36,12 @@ export class ControlClient {
     private readonly newId: () => string,
     private readonly fetcher: ControlFetch = fetch,
     private readonly clock = Date.now,
-    readonly v2?: V2ClientOptions,
+    readonly v2: V2ClientOptions,
   ) {
     origin(relayOrigin);
   }
-  get version(): 1 | 2 {
-    return this.v2 ? 2 : 1;
-  }
+  readonly version = 2;
   async socketHeaders(): Promise<Record<string, string>> {
-    if (!this.v2) return {};
     return {
       Authorization: `Bearer ${await this.v2.account.token()}`,
       "X-PiDesk-Control-Version": "2",
@@ -62,8 +59,7 @@ export class ControlClient {
     decode: (v: unknown) => T,
     stableRequestId?: string,
   ): Promise<T> {
-    if (this.v2) path = v2Path(path, this.v2.desktopId);
-    else if (!/^\/v1\/[a-zA-Z0-9_/-]+$/.test(path)) fail("INVALID_PATH");
+    path = controlPath(path, this.v2.desktopId);
     const requestId = id(stableRequestId ?? this.newId());
     const payload =
       body === null
@@ -75,10 +71,8 @@ export class ControlClient {
       "X-PiDesk-Control-Version": String(this.version),
       "X-Request-Id": requestId,
     };
-    if (this.v2) {
-      if (path !== "/v2/meta") headers.Authorization = `Bearer ${await this.v2.account.token()}`;
-      if (token) headers["X-PiDesk-Room-Authorization"] = `Bearer ${token}`;
-    } else if (token) headers.Authorization = `Bearer ${token}`;
+    if (path !== "/v2/meta") headers.Authorization = `Bearer ${await this.v2.account.token()}`;
+    if (token) headers["X-PiDesk-Room-Authorization"] = `Bearer ${token}`;
     let response: ControlResponse;
     let r: Record<string, unknown>;
     const controller = new AbortController();
@@ -93,7 +87,7 @@ export class ControlClient {
         signal: controller.signal,
       });
       // Receiving headers does not mean the response body has finished downloading.
-      r = record(parseJson(await response.text(), this.v2 ? 32_768 : LIMITS.controlBytes));
+      r = record(parseJson(await response.text(), 32_768));
     } catch {
       throw new ControlError("NETWORK_UNCERTAIN", true);
     } finally {
@@ -101,7 +95,7 @@ export class ControlClient {
     }
     if (
       r.controlVersion !== this.version ||
-      (r.requestId !== requestId && !(this.v2 && path === "/v2/meta" && r.requestId === null))
+      (r.requestId !== requestId && !(path === "/v2/meta" && r.requestId === null))
     )
       fail("VERSION_MISMATCH");
     timestamp(r.serverTime);

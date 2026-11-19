@@ -1,9 +1,10 @@
 import { defineMessages } from "../types";
 
 export const remoteSettingsMessages = defineMessages({
-  "settings.remote.v2": { "zh-CN": "共享中转 v2", "en-US": "Shared relay v2" },
-  "settings.remote.v1": { "zh-CN": "单电脑中转 v1", "en-US": "Single-computer relay v1" },
-  "settings.remote.protocol": { "zh-CN": "中转协议", "en-US": "Relay protocol" },
+  "settings.remote.accountTitle": {
+    "zh-CN": "账号与电脑连接",
+    "en-US": "Account and computer connection",
+  },
   "settings.remote.accountHint": {
     "zh-CN": "使用 Auth0 登录账号。电脑账号凭证保存在系统安全存储中；登录本身不会批准手机访问。",
     "en-US":
@@ -23,24 +24,14 @@ export const remoteSettingsMessages = defineMessages({
     "en-US": "Sign out of Auth0",
   },
   "settings.remote.readonly": {
-    "zh-CN": "此 v2 中转目前仅开放项目、会话与历史读取。",
-    "en-US": "This v2 relay currently allows reading projects, sessions and history only.",
+    "zh-CN": "中转目前仅开放项目、会话与历史读取。",
+    "en-US": "The relay currently allows reading projects, sessions and history only.",
   },
-  "settings.remote.setup": { "zh-CN": "首次设置", "en-US": "First-time setup" },
-  "settings.remote.connectTitle": { "zh-CN": "连接中转服务", "en-US": "Connect your relay" },
   "settings.remote.origin": { "zh-CN": "中转地址（HTTPS）", "en-US": "Relay address (HTTPS)" },
-  "settings.remote.ticket": { "zh-CN": "一次性登记票据", "en-US": "One-time enrollment ticket" },
-  "settings.remote.ticketHint": {
-    "zh-CN": "由中转管理员提供",
-    "en-US": "Provided by your relay administrator",
-  },
-  "settings.remote.showTicket": { "zh-CN": "显示票据", "en-US": "Show ticket" },
-  "settings.remote.hideTicket": { "zh-CN": "隐藏票据", "en-US": "Hide ticket" },
   "settings.remote.trust": {
     "zh-CN": "已核对域名，并信任此中转",
     "en-US": "I checked the domain and trust this relay",
   },
-  "settings.remote.enroll": { "zh-CN": "登记并连接", "en-US": "Enroll and connect" },
   "settings.remote.connecting": { "zh-CN": "正在连接…", "en-US": "Connecting…" },
   "settings.remote.securityTitle": {
     "zh-CN": "仅使用可信的自部署中转。",
@@ -120,10 +111,6 @@ export const remoteSettingsMessages = defineMessages({
   "settings.remote.readOnlySummary": {
     "zh-CN": "{count} 个项目 · 仅查看",
     "en-US": "{count} projects · Read only",
-  },
-  "settings.remote.actionSummary": {
-    "zh-CN": "{count} 个项目 · {actions} 项操作权限",
-    "en-US": "{count} projects · {actions} action permissions",
   },
   "settings.remote.approve": { "zh-CN": "确认配对", "en-US": "Confirm pairing" },
   "settings.remote.activation": { "zh-CN": "等待双端激活", "en-US": "Waiting for activation" },

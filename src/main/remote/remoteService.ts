@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
-  record as asRecord,
-  ControlClient,
+  type ControlClient,
   ControlError,
   DeliveryReceiver,
   type DesktopCredential,
@@ -70,6 +69,7 @@ async function ensureDesktopLogin(): Promise<number> {
 export class RemoteService {
   private readonly account = new RelayAccountSession(randomUUID);
   private enrolling = false;
+  private starting = false;
   private credential: DesktopCredential | null = null;
   private pairing: DesktopPairing | null = null;
   private client: ControlClient | null = null;
@@ -116,7 +116,7 @@ export class RemoteService {
   snapshot(): RemoteSnapshot {
     return {
       configured: !!this.credential,
-      controlVersion: this.credential?.controlVersion ?? 1,
+      controlVersion: 2,
       accountReady: hasDesktopAuth(),
       relayOrigin: this.credential?.relayOrigin ?? null,
       connected: this.ready,
@@ -137,32 +137,6 @@ export class RemoteService {
       this.enrolling = false;
     }
   }
-  private async enrollRequest(raw: RemoteEnrollment): Promise<RemoteSnapshot> {
-    if (asRecord(raw).controlVersion === 2) return this.enrollV2(raw);
-    const r = exact(raw, ["relayOrigin", "enrollmentTicket", "trustRelay"]);
-    if (r.trustRelay !== true) fail("SECURITY_PROFILE_MISMATCH");
-    if (!remoteStorageAvailable()) fail("SECURE_STORAGE_UNAVAILABLE");
-    if (this.credential || loadRemoteCredential()) fail("DEVICE_LIMIT_REACHED");
-    const relayOrigin = origin(r.relayOrigin);
-    const ticket = secret(r.enrollmentTicket);
-    const client = new ControlClient(relayOrigin, randomUUID);
-    const meta = await client.request("GET", "/v1/meta", null, null, parseMeta);
-    const credential = await client.request("POST", "/v1/desktops/enroll", ticket, {}, (v) => {
-      const data = exact(v, ["desktopId", "relayInstanceId", "desktopCredential", "expiresAt"]);
-      if (data.relayInstanceId !== meta.relayInstanceId) fail("RELAY_INSTANCE_MISMATCH");
-      return {
-        version: 1 as const,
-        relayOrigin,
-        desktopId: id(data.desktopId),
-        relayInstanceId: id(data.relayInstanceId),
-        desktopCredential: secret(data.desktopCredential),
-        expiresAt: timestamp(data.expiresAt),
-      };
-    });
-    saveRemoteCredential(credential);
-    await this.start();
-    return this.snapshot();
-  }
   async logout(): Promise<RemoteSnapshot> {
     this.stop();
     this.account.disconnect();
@@ -172,13 +146,15 @@ export class RemoteService {
   async setAccount(raw: RemoteAccountInput): Promise<RemoteSnapshot> {
     const r = exact(raw, ["relayOrigin"]);
     const credential = this.credential ?? loadRemoteCredential();
-    if (credential && (credential.controlVersion !== 2 || credential.relayOrigin !== r.relayOrigin))
-      fail("AUTH_REQUIRED");
+    if (credential && credential.relayOrigin !== r.relayOrigin) fail("AUTH_REQUIRED");
     this.stop();
+    const generation = this.generation;
     const authGeneration = await ensureDesktopLogin();
+    if (generation !== this.generation) fail("ACCOUNT_CHANGED");
     await this.account.connectWithTokenProvider(origin(r.relayOrigin), () =>
       desktopAccessToken(authGeneration),
     );
+    if (generation !== this.generation) fail("ACCOUNT_CHANGED");
     if (credential && this.account.getSnapshot()?.accountId !== credential.accountId) {
       this.account.disconnect();
       fail("AUTH_REQUIRED");
@@ -186,7 +162,7 @@ export class RemoteService {
     await this.start();
     return this.snapshot();
   }
-  private async enrollV2(raw: RemoteEnrollment): Promise<RemoteSnapshot> {
+  private async enrollRequest(raw: RemoteEnrollment): Promise<RemoteSnapshot> {
     const r = exact(raw, [
       "controlVersion",
       "relayOrigin",
@@ -194,6 +170,7 @@ export class RemoteService {
       "registrationRequestId",
       "trustRelay",
     ]);
+    if (r.controlVersion !== 2) fail("VERSION_MISMATCH");
     if (r.trustRelay !== true) fail("SECURITY_PROFILE_MISMATCH");
     if (!remoteStorageAvailable()) fail("SECURE_STORAGE_UNAVAILABLE");
     if (this.credential || loadRemoteCredential()) fail("DEVICE_LIMIT_REACHED");
@@ -203,7 +180,7 @@ export class RemoteService {
       desktopAccessToken(authGeneration),
     );
     const client = this.account.client();
-    const meta = await client.request("GET", "/v1/meta", null, null, parseMeta);
+    const meta = await client.request("GET", "/v2/meta", null, null, parseMeta);
     const credential = await client.request(
       "POST",
       "/v2/account/me/desktops",
@@ -221,7 +198,7 @@ export class RemoteService {
       (value) => {
         const result = record(value);
         exact(value, Object.hasOwn(result, "credential") ? ["item", "credential"] : ["item"]);
-        const item = asRecord(result.item);
+        const item = record(result.item);
         if (!result.credential)
           fail(
             item.state === "registered" ? "REGISTRATION_CREDENTIAL_LOST" : "REGISTRATION_PENDING",
@@ -263,26 +240,24 @@ export class RemoteService {
     return this.snapshot();
   }
   async start(): Promise<void> {
-    if (!this.stopped) return;
+    if (!this.stopped || this.starting) return;
+    this.starting = true;
+    const generation = this.generation;
     try {
       this.credential = loadRemoteCredential();
       if (!this.credential) return;
       if (Date.now() >= Date.parse(this.credential.expiresAt)) fail("AUTH_EXPIRED");
-      if (this.credential.controlVersion === 2) {
-        if (!this.account.getSnapshot()) {
-          if (!hasDesktopAuth()) fail("AUTH_REQUIRED");
-          const authGeneration = desktopAuthGeneration();
-          await this.account.connectWithTokenProvider(this.credential.relayOrigin, () =>
-            desktopAccessToken(authGeneration),
-          );
-        }
-        if (this.account.getSnapshot()?.accountId !== this.credential.accountId)
-          fail("AUTH_REQUIRED");
+      if (!this.account.getSnapshot()) {
+        if (!hasDesktopAuth()) fail("AUTH_REQUIRED");
+        const authGeneration = desktopAuthGeneration();
+        await this.account.connectWithTokenProvider(this.credential.relayOrigin, () =>
+          desktopAccessToken(authGeneration),
+        );
       }
-      this.client =
-        this.credential.controlVersion === 2
-          ? this.account.client(this.credential.desktopId, this.credential.accountId)
-          : new ControlClient(this.credential.relayOrigin, randomUUID);
+      if (generation !== this.generation) return;
+      if (this.account.getSnapshot()?.accountId !== this.credential.accountId)
+        fail("AUTH_REQUIRED");
+      this.client = this.account.client(this.credential.desktopId, this.credential.accountId);
       this.pairing = new DesktopPairing(
         this.client,
         { read: loadRemoteGrant, save: saveRemoteGrant },
@@ -297,7 +272,10 @@ export class RemoteService {
       this.stopped = false;
       await this.connect();
     } catch (cause) {
-      this.error = cause instanceof ControlError ? cause.code : "SECURE_STORAGE_UNAVAILABLE";
+      if (generation === this.generation)
+        this.error = cause instanceof ControlError ? cause.code : "SECURE_STORAGE_UNAVAILABLE";
+    } finally {
+      if (generation === this.generation) this.starting = false;
     }
   }
   private schedule(): void {
@@ -327,7 +305,7 @@ export class RemoteService {
     try {
       const access = await client.request(
         "POST",
-        "/v1/desktops/access-token",
+        "/auth/desktop-access",
         credential.desktopCredential,
         {},
         (v) => {
@@ -341,11 +319,10 @@ export class RemoteService {
       if (this.stopped || generation !== this.generation) return;
       this.access = access;
       const token = access.token;
-      const version = credential.controlVersion ?? 1;
-      const url = `${credential.relayOrigin.replace(/^https:/, "wss:")}/v${version}/connect/${credential.desktopId}`;
-      const headers = version === 2 ? await client.socketHeaders() : null;
+      const url = `${credential.relayOrigin.replace(/^https:/, "wss:")}/v2/connect/${credential.desktopId}`;
+      const headers = await client.socketHeaders();
       if (this.stopped || generation !== this.generation) return;
-      const ws = headers ? relaySocket(url, headers) : new WebSocket(url);
+      const ws = relaySocket(url, headers);
       const delivery = new DeliveryReceiver();
       let received = Promise.resolve();
       let queued = 0;
@@ -355,9 +332,7 @@ export class RemoteService {
       let authenticated = false;
       ws.onopen = () => {
         if (this.socket === ws)
-          ws.send(
-            JSON.stringify({ controlVersion: version, type: "authenticate", accessToken: token }),
-          );
+          ws.send(JSON.stringify({ controlVersion: 2, type: "authenticate", accessToken: token }));
       };
       ws.onmessage = (event) => {
         const raw = String(event.data);
@@ -371,20 +346,15 @@ export class RemoteService {
         received = received
           .then(async () => {
             if (this.socket !== ws) return;
-            const r = record(
-              parseJson(
-                raw,
-                version === 2 ? LIMITS.businessBytes : LIMITS.businessBytes + LIMITS.controlBytes,
-              ),
-            );
+            const r = record(parseJson(raw, LIMITS.businessBytes));
             if (!authenticated) {
               if (
-                r.controlVersion !== version ||
+                r.controlVersion !== 2 ||
                 r.type !== "authenticated" ||
                 r.securityProfile !== SECURITY_PROFILE
               )
                 fail("AUTH_REQUIRED");
-              const p = relayPrincipal(r.principal, version, credential.accountId);
+              const p = relayPrincipal(r.principal, credential.accountId);
               if (
                 p.role !== "desktop" ||
                 p.desktopId !== this.credential?.desktopId ||
@@ -403,13 +373,14 @@ export class RemoteService {
               return;
             }
             if (!this.ready) return;
-            const routed = exact(
-              r,
-              version === 2
-                ? ["controlVersion", "type", "context", "frame", "deliverySequence"]
-                : ["controlVersion", "type", "context", "frame"],
-            );
-            if (routed.controlVersion !== version || routed.type !== "route") fail("FORBIDDEN");
+            const routed = exact(r, [
+              "controlVersion",
+              "type",
+              "context",
+              "frame",
+              "deliverySequence",
+            ]);
+            if (routed.controlVersion !== 2 || routed.type !== "route") fail("FORBIDDEN");
             const contextValue = exact(routed.context, [
               "relayInstanceId",
               "desktopId",
@@ -418,27 +389,22 @@ export class RemoteService {
               "grantVersion",
               "connectionGeneration",
               "accessExpiresAt",
-              ...(version === 2 ? ["accountId"] : []),
+              "accountId",
             ]);
-            const p = relayPrincipal(
-              { ...contextValue, role: "mobile" },
-              version,
-              credential.accountId,
-            );
+            const p = relayPrincipal({ ...contextValue, role: "mobile" }, credential.accountId);
             const { role: _role, ...context } = p;
             if (
               context.desktopId !== this.credential?.desktopId ||
               context.relayInstanceId !== this.credential?.relayInstanceId
             )
               fail("AUTH_REQUIRED");
-            if (version === 2)
-              ws.send(
-                JSON.stringify({
-                  controlVersion: 2,
-                  type: "ack",
-                  deliverySequence: delivery.accept(r),
-                }),
-              );
+            ws.send(
+              JSON.stringify({
+                controlVersion: 2,
+                type: "ack",
+                deliverySequence: delivery.accept(r),
+              }),
+            );
             let frame: unknown;
             try {
               frame = await this.bridge.request(context, routed.frame);
@@ -503,7 +469,7 @@ export class RemoteService {
       return;
     ws.send(
       JSON.stringify({
-        controlVersion: this.credential?.controlVersion ?? 1,
+        controlVersion: 2,
         type: "deliver",
         context,
         frame,
@@ -571,6 +537,7 @@ export class RemoteService {
     this.stopped = true;
     this.generation++;
     this.ready = false;
+    this.starting = false;
     this.connecting = false;
     this.ticking = false;
     this.bridge.clear();

@@ -1,5 +1,5 @@
-/** Pairing control plane; deliberately independent of business protocol v1. */
-export const CONTROL_VERSION = 1;
+/** Account-scoped v2 pairing control plane; business frames have an independent version. */
+export const CONTROL_VERSION = 2;
 export const SECURITY_PROFILE = "trusted-relay-tls-v1";
 export const LIMITS = {
   invitationMs: 120_000,
@@ -8,7 +8,6 @@ export const LIMITS = {
   grantMs: 30 * 86_400_000,
   refreshIdleMs: 7 * 86_400_000,
   accessMs: 300_000,
-  enrollmentMs: 600_000,
   desktopMs: 90 * 86_400_000,
   authMs: 5_000,
   pollMs: 2_000,
@@ -69,7 +68,7 @@ export interface Grant extends Binding {
 }
 export interface PairingQr {
   kind: "pidesk.pairing";
-  pairingVersion: 1 | 2;
+  pairingVersion: 2;
   relayOrigin: string;
   relayInstanceId: string;
   desktopId: string;
@@ -79,7 +78,7 @@ export interface PairingQr {
 }
 export interface Meta {
   relayInstanceId: string;
-  controlVersion: 1 | 2;
+  controlVersion: 2;
   securityProfile: typeof SECURITY_PROFILE;
 }
 export interface ClaimStatus {
@@ -104,8 +103,8 @@ export interface PendingOperationRef {
 }
 export interface MobileCredential extends Binding {
   version: 1;
-  controlVersion?: 2;
-  accountId?: string;
+  controlVersion: 2;
+  accountId: string;
   projectIds: string[];
   scopes: Scope[];
   relayOrigin: string;
@@ -128,8 +127,8 @@ export interface IssuedTokens {
 }
 export interface DesktopCredential {
   version: 1;
-  controlVersion?: 2;
-  accountId?: string;
+  controlVersion: 2;
+  accountId: string;
   relayOrigin: string;
   relayInstanceId: string;
   desktopId: string;
@@ -274,11 +273,11 @@ export function parseQr(raw: string): PairingQr {
     "invitationSecret",
     "expiresAt",
   ]);
-  if (r.kind !== "pidesk.pairing" || (r.pairingVersion !== 1 && r.pairingVersion !== 2))
+  if (r.kind !== "pidesk.pairing" || r.pairingVersion !== CONTROL_VERSION)
     return fail("VERSION_MISMATCH");
   return {
     kind: "pidesk.pairing",
-    pairingVersion: r.pairingVersion as 1 | 2,
+    pairingVersion: CONTROL_VERSION,
     relayOrigin: origin(r.relayOrigin),
     relayInstanceId: id(r.relayInstanceId),
     desktopId: id(r.desktopId),
@@ -288,34 +287,27 @@ export function parseQr(raw: string): PairingQr {
   };
 }
 export function parseMeta(v: unknown): Meta {
-  const raw = record(v);
-  const r = exact(
-    v,
-    raw.controlVersion === 2
-      ? [
-          "relayInstanceId",
-          "controlVersion",
-          "businessVersion",
-          "securityProfile",
-          "maxDesktops",
-          "membershipLeaseMs",
-          "deliveryAck",
-        ]
-      : ["relayInstanceId", "controlVersion", "securityProfile"],
-  );
-  if (r.controlVersion !== 1 && r.controlVersion !== 2) fail("VERSION_MISMATCH");
+  const r = exact(v, [
+    "relayInstanceId",
+    "controlVersion",
+    "businessVersion",
+    "securityProfile",
+    "maxDesktops",
+    "membershipLeaseMs",
+    "deliveryAck",
+  ]);
   if (
-    r.controlVersion === 2 &&
-    (r.businessVersion !== 1 ||
-      r.maxDesktops !== 5 ||
-      r.deliveryAck !== "cumulative-v1" ||
-      r.membershipLeaseMs !== 30_000)
+    r.controlVersion !== CONTROL_VERSION ||
+    r.businessVersion !== 1 ||
+    r.maxDesktops !== 5 ||
+    r.deliveryAck !== "cumulative-v1" ||
+    r.membershipLeaseMs !== 30_000
   )
     fail("VERSION_MISMATCH");
   if (r.securityProfile !== SECURITY_PROFILE) fail("SECURITY_PROFILE_MISMATCH");
   return {
     relayInstanceId: id(r.relayInstanceId),
-    controlVersion: r.controlVersion as 1 | 2,
+    controlVersion: CONTROL_VERSION,
     securityProfile: SECURITY_PROFILE,
   };
 }
@@ -443,9 +435,10 @@ export function parseTokens(v: unknown): IssuedTokens {
   };
 }
 export function parseMobileCredential(v: unknown): MobileCredential {
-  const raw = record(v);
-  const legacyKeys = [
+  const r = exact(v, [
     "version",
+    "controlVersion",
+    "accountId",
     "relayOrigin",
     "securityProfile",
     "relayInstanceId",
@@ -460,56 +453,45 @@ export function parseMobileCredential(v: unknown): MobileCredential {
     "activationExpiresAt",
     "state",
     "refreshPending",
-  ];
-  const withScopes = [...legacyKeys, "scopes"];
-  const withProjects = [...withScopes, "projectIds"];
-  const currentKeys = [...withProjects, "pendingOperations"];
-  const allowedKeys = Object.hasOwn(raw, "pendingOperations")
-    ? currentKeys
-    : Object.hasOwn(raw, "projectIds")
-      ? withProjects
-      : Object.hasOwn(raw, "scopes")
-        ? withScopes
-        : legacyKeys;
-  const v2 = raw.controlVersion === 2;
-  const r = exact(v, v2 ? [...currentKeys, "controlVersion", "accountId"] : allowedKeys);
-  if (v2 && (typeof r.accountId !== "string" || !/^account-v1-[0-9a-f]{64}$/.test(r.accountId)))
+    "scopes",
+    "projectIds",
+    "pendingOperations",
+  ]);
+  if (r.controlVersion !== CONTROL_VERSION) fail("VERSION_MISMATCH");
+  if (typeof r.accountId !== "string" || !/^account-v1-[0-9a-f]{64}$/.test(r.accountId))
     fail("AUTH_REQUIRED");
   if (r.version !== 1 || r.securityProfile !== SECURITY_PROFILE) fail("SECURITY_PROFILE_MISMATCH");
   if ((r.state !== "activating" && r.state !== "active") || typeof r.refreshPending !== "boolean")
     fail("INVALID_FRAME");
-  const projectIdsValue = Object.hasOwn(r, "projectIds") ? projectIds(r.projectIds) : [];
-  const scopes = Object.hasOwn(r, "scopes") ? parseScopes(r.scopes) : [...READ_SCOPES];
-  const pendingOperations = Object.hasOwn(r, "pendingOperations")
-    ? (() => {
-        if (!Array.isArray(r.pendingOperations) || r.pendingOperations.length > 64)
-          return fail("INVALID_FRAME");
-        const refs = r.pendingOperations.map((item) => {
-          const pending = exact(item, ["requestId", "command", "createdAt"]);
-          if (
-            !["sessions.send", "sessions.stop", "sessions.create", "interactions.answer"].includes(
-              String(pending.command),
-            ) ||
-            typeof pending.createdAt !== "number" ||
-            !Number.isSafeInteger(pending.createdAt) ||
-            pending.createdAt < 0
-          )
-            fail("INVALID_FRAME");
-          return {
-            requestId: id(pending.requestId),
-            command: pending.command as PendingWriteCommand,
-            createdAt: pending.createdAt,
-          };
-        });
-        if (new Set(refs.map((item) => item.requestId)).size !== refs.length) fail("INVALID_FRAME");
-        return refs;
-      })()
-    : [];
+  const pendingOperations = (() => {
+    if (!Array.isArray(r.pendingOperations) || r.pendingOperations.length > 64)
+      return fail("INVALID_FRAME");
+    const refs = r.pendingOperations.map((item) => {
+      const pending = exact(item, ["requestId", "command", "createdAt"]);
+      if (
+        !["sessions.send", "sessions.stop", "sessions.create", "interactions.answer"].includes(
+          String(pending.command),
+        ) ||
+        typeof pending.createdAt !== "number" ||
+        !Number.isSafeInteger(pending.createdAt) ||
+        pending.createdAt < 0
+      )
+        fail("INVALID_FRAME");
+      return {
+        requestId: id(pending.requestId),
+        command: pending.command as PendingWriteCommand,
+        createdAt: pending.createdAt,
+      };
+    });
+    if (new Set(refs.map((item) => item.requestId)).size !== refs.length) fail("INVALID_FRAME");
+    return refs;
+  })();
   return {
     ...parseBinding(r),
-    ...(v2 ? { controlVersion: 2 as const, accountId: r.accountId as string } : {}),
-    projectIds: projectIdsValue,
-    scopes,
+    controlVersion: CONTROL_VERSION,
+    accountId: r.accountId,
+    projectIds: projectIds(r.projectIds),
+    scopes: parseScopes(r.scopes),
     pendingOperations,
     state: r.state as "activating" | "active",
     refreshPending: r.refreshPending as boolean,

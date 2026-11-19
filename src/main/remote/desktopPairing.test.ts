@@ -11,7 +11,7 @@ import {
 import { DesktopPairing } from "./desktopPairing";
 
 const now = Date.parse("2026-11-19T10:00:00Z");
-const binding = { relayInstanceId: "relay-1", desktopId: "desktop-1" };
+const binding = { relayInstanceId: "relay-1", desktopId: "00000000-0000-4000-8000-000000000001" };
 const baseGrant = (): Grant => ({
   ...binding,
   deviceId: "phone-1",
@@ -49,14 +49,14 @@ function fixture(initial: Grant | null = baseGrant()) {
     saved = structuredClone(grant);
   });
   const fetcher = vi.fn<ControlFetch>(async (url, init) => {
-    const route = new URL(url).pathname;
+    const route = new URL(url).pathname.slice(`/v2/desktops/${binding.desktopId}`.length);
     let data: unknown;
-    if (route === "/v1/desktops/self/state") data = { grant: relay, claim };
-    else if (route === "/v1/desktops/self/reconcile") data = { grant: relay };
-    else if (route === "/v1/desktops/self/activation-ack") {
+    if (route === "/state") data = { grant: relay, claim };
+    else if (route === "/reconcile") data = { grant: relay };
+    else if (route === "/activation-ack") {
       expect(saved?.state).toBe("active");
       data = { state: "active", grant: acknowledged ?? saved };
-    } else if (route === `/v1/claims/${claim.claimId}/approve`) {
+    } else if (route === `/claims/${claim.claimId}/approve`) {
       expect(saved?.state).toBe("prepared");
       data = { ...claim, state: "approved", grant: saved };
     } else throw new Error(`Unexpected route: ${route}`);
@@ -65,7 +65,7 @@ function fixture(initial: Grant | null = baseGrant()) {
       headers: { get: () => null },
       text: async () =>
         JSON.stringify({
-          controlVersion: 1,
+          controlVersion: 2,
           requestId: init.headers["X-Request-Id"],
           serverTime: new Date(now).toISOString(),
           data,
@@ -77,6 +77,10 @@ function fixture(initial: Grant | null = baseGrant()) {
     () => `request-${++nextId}`,
     fetcher,
     () => now,
+    {
+      account: { accountId: `account-v1-${"a".repeat(64)}`, token: async () => "account-token" },
+      desktopId: binding.desktopId,
+    },
   );
   const pairing = new DesktopPairing(
     client,
@@ -124,21 +128,17 @@ describe("desktop pairing authorization", () => {
 
   it("durably prepares the selected projects and deduplicated scopes before approval", async () => {
     const f = fixture(null);
-    await f.pairing.approve(
-      "claim-1",
-      ["other", "allowed"],
-      [...READ_SCOPES, "interactions.read", "interactions.answer", "interactions.read"],
-    );
+    await f.pairing.approve("claim-1", ["other", "allowed"], [...READ_SCOPES, "projects.read"]);
     expect(f.saved()).toMatchObject({
       state: "prepared",
       projectIds: ["allowed", "other"],
-      scopes: ["interactions.answer", "interactions.read", "projects.read", "sessions.read"],
+      scopes: ["projects.read", "sessions.read"],
     });
     expect(f.pairing.claim?.state).toBe("approved");
     expect(f.fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects answering without reading permission and projects absent from configuration", async () => {
+  it("rejects unsupported scopes and projects absent from configuration", async () => {
     const f = fixture(null);
     await expect(
       f.pairing.approve("claim-1", ["allowed"], [...READ_SCOPES, "interactions.answer"]),

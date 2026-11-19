@@ -30,18 +30,6 @@ function read(): RemoteFile | null {
   try {
     const raw: unknown = JSON.parse(fs.readFileSync(filePath(), "utf8"));
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) fail("STATE_UNAVAILABLE");
-    const version = (raw as { version?: unknown }).version;
-    if (version === 1) {
-      const base = exact(raw, ["version", "credential", "grant"]);
-      if (typeof base.credential !== "string") fail("STATE_UNAVAILABLE");
-      cache = {
-        version: 2,
-        credential: base.credential,
-        grant: base.grant === null ? null : parseGrant(base.grant),
-        operations: [],
-      };
-      return cache;
-    }
     const current = exact(raw, ["version", "credential", "grant", "operations"]);
     if (
       current.version !== 2 ||
@@ -87,8 +75,6 @@ export function loadRemoteCredential(): DesktopCredential | null {
     const raw: unknown = JSON.parse(
       safeStorage.decryptString(Buffer.from(data.credential, "base64")),
     );
-    const v2 =
-      !!raw && typeof raw === "object" && "controlVersion" in raw && raw.controlVersion === 2;
     const r = exact(raw, [
       "version",
       "relayOrigin",
@@ -96,12 +82,14 @@ export function loadRemoteCredential(): DesktopCredential | null {
       "desktopId",
       "desktopCredential",
       "expiresAt",
-      ...(v2 ? ["controlVersion", "accountId"] : []),
+      "controlVersion",
+      "accountId",
     ]);
-    if (r.version !== 1) fail("STATE_UNAVAILABLE");
+    if (r.version !== 1 || r.controlVersion !== 2) fail("STATE_UNAVAILABLE");
     return {
       version: 1,
-      ...(v2 ? { controlVersion: 2 as const, accountId: accountId(r.accountId) } : {}),
+      controlVersion: 2,
+      accountId: accountId(r.accountId),
       relayOrigin: origin(r.relayOrigin),
       relayInstanceId: id(r.relayInstanceId),
       desktopId: id(r.desktopId),

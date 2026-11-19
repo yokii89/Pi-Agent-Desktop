@@ -1,11 +1,4 @@
-import {
-  Check,
-  DeviceMobile,
-  Eye,
-  Folder,
-  MagnifyingGlass,
-  StopCircle,
-} from "@phosphor-icons/react";
+import { Check, DeviceMobile, Eye, Folder, MagnifyingGlass } from "@phosphor-icons/react";
 import { type ReactNode, useId, useState } from "react";
 import { type ClaimStatus, LIMITS, READ_SCOPES, type Scope } from "../../../../shared/remote";
 import type { RemoteSnapshot } from "../../../../shared/remoteDesktop";
@@ -14,17 +7,8 @@ import { Button } from "../../ui/Button";
 import styles from "../MobilePairingPanel.module.css";
 import { usePairingCountdown } from "./usePairingCountdown";
 
-const OPTIONAL_ACTIONS = [
-  "sessions.send",
-  "sessions.create",
-  "sessions.stop",
-  "interactions.read",
-  "interactions.answer",
-] as const satisfies readonly Scope[];
-
 interface RemotePairingApprovalProps {
   claim: ClaimStatus;
-  readOnly?: boolean;
   relayOrigin: string;
   projects: RemoteSnapshot["projects"];
   busy: boolean;
@@ -37,7 +21,6 @@ interface RemotePairingApprovalProps {
 /** Mounted per claim so no confirmation or permission choice carries over to another phone. */
 export function RemotePairingApproval({
   claim,
-  readOnly = false,
   relayOrigin,
   projects,
   busy,
@@ -50,7 +33,6 @@ export function RemotePairingApproval({
   const id = useId();
   const [matched, setMatched] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
-  const [scopes, setScopes] = useState<Scope[]>([...READ_SCOPES]);
   const [query, setQuery] = useState("");
   const remaining = usePairingCountdown(claim.expiresAt);
   const selectedIds = selected.filter((projectId) =>
@@ -60,9 +42,6 @@ export function RemotePairingApproval({
   const visibleProjects = projects.filter((project) =>
     project.name.toLocaleLowerCase().includes(needle),
   );
-  const actions = scopes.filter(
-    (scope) => !(READ_SCOPES as readonly Scope[]).includes(scope),
-  ).length;
   const expired = remaining === 0;
   const code = claim.confirmationCode;
   const validCode = !!code && /^\d{8}$/.test(code);
@@ -76,10 +55,7 @@ export function RemotePairingApproval({
         ? t("settings.remote.matchFirst")
         : selectedIds.length === 0
           ? t("settings.remote.selectFirst")
-          : t(actions ? "settings.remote.actionSummary" : "settings.remote.readOnlySummary", {
-              count: selectedIds.length,
-              actions,
-            });
+          : t("settings.remote.readOnlySummary", { count: selectedIds.length });
   return (
     <div className={styles.approval}>
       <div className={styles.scroll}>
@@ -177,33 +153,6 @@ export function RemotePairingApproval({
               <div className={styles.sectionHeading}>
                 <h3 id={`${id}-permissions`}>{t("settings.remote.permissions")}</h3>
               </div>
-              <div className={styles.permissions}>
-                {(readOnly ? [] : OPTIONAL_ACTIONS).map((scope) => (
-                  <label className={styles.permissionOption} key={scope}>
-                    <input
-                      type="checkbox"
-                      checked={scopes.includes(scope)}
-                      disabled={disabled}
-                      onChange={(event) => {
-                        const checked = event.target.checked;
-                        setScopes((current) => {
-                          const next = new Set(current);
-                          if (checked) {
-                            next.add(scope);
-                            if (scope === "interactions.answer") next.add("interactions.read");
-                          } else {
-                            next.delete(scope);
-                            if (scope === "interactions.read") next.delete("interactions.answer");
-                          }
-                          return [...next];
-                        });
-                      }}
-                    />
-                    <span>{t(`remote.scope.${scope}`)}</span>
-                    {scope === "sessions.stop" && <StopCircle size={16} weight="regular" />}
-                  </label>
-                ))}
-              </div>
               <p className={styles.baseline}>
                 <Eye size={16} weight="regular" />
                 <span>{t("settings.remote.baseline")}</span>
@@ -226,7 +175,7 @@ export function RemotePairingApproval({
             disabled={!canApprove}
             onClick={() => {
               if (canApprove && Date.now() < Date.parse(claim.expiresAt)) {
-                onApprove(claim.claimId, selectedIds, scopes);
+                onApprove(claim.claimId, selectedIds, [...READ_SCOPES]);
               }
             }}
           >

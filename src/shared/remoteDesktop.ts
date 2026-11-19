@@ -14,7 +14,7 @@ export const REMOTE_IPC = {
 } as const;
 export interface RemoteSnapshot {
   configured: boolean;
-  controlVersion?: 1 | 2;
+  controlVersion: 2;
   accountReady?: boolean;
   relayOrigin: string | null;
   connected: boolean;
@@ -41,16 +41,10 @@ export interface RemoteApi {
 export interface RemoteAccountInput {
   relayOrigin: string;
 }
-export type RemoteEnrollment =
-  | {
-      relayOrigin: string;
-      enrollmentTicket: string;
-      trustRelay: boolean;
-    }
-  | {
-      controlVersion: 2;
-      relayOrigin: string;
-      displayName: string;
-      registrationRequestId: string;
-      trustRelay: boolean;
-    };
+export interface RemoteEnrollment {
+  controlVersion: 2;
+  relayOrigin: string;
+  displayName: string;
+  registrationRequestId: string;
+  trustRelay: boolean;
+}

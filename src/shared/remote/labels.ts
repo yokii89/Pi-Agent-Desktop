@@ -1,7 +1,7 @@
 export const pairingMessages = {
   "remote.error.ACCOUNT_AUTH_REQUIRED": {
-    "zh-CN": "请先验证此中转的账号访问令牌。",
-    "en-US": "Verify your account access token for this relay first.",
+    "zh-CN": "请先登录此中转的账号。",
+    "en-US": "Sign in to your account for this relay first.",
   },
   "remote.error.ACCOUNT_CHANGED": {
     "zh-CN": "账号会话已更改，请重新连接。",
@@ -23,11 +23,11 @@ export const pairingMessages = {
   },
   "remote.title": { "zh-CN": "手机配对", "en-US": "Mobile pairing" },
   "remote.description": {
-    "zh-CN": "电脑始终保留项目与会话控制权；配对时逐项选择手机可用的能力。",
-    "en-US": "Your computer remains authoritative. Choose the phone's capabilities when pairing.",
+    "zh-CN": "电脑始终保留项目与会话控制权；配对时选择允许手机读取的项目。",
+    "en-US":
+      "Your computer remains authoritative. Choose which projects the phone may read when pairing.",
   },
   "remote.origin": { "zh-CN": "中转 HTTPS origin", "en-US": "Relay HTTPS origin" },
-  "remote.ticket": { "zh-CN": "一次性电脑登记票据", "en-US": "One-time desktop enrollment ticket" },
   "remote.trust": {
     "zh-CN": "我信任此中转并确认完整域名",
     "en-US": "I trust this relay and have checked its full domain",
@@ -38,7 +38,6 @@ export const pairingMessages = {
     "en-US":
       "This profile uses HTTPS/WSS without end-to-end encryption. The relay can read content and impersonate devices. Use only a self-hosted relay you trust.",
   },
-  "remote.enroll": { "zh-CN": "登记电脑并连接", "en-US": "Enroll and connect" },
   "remote.connect": { "zh-CN": "连接中转", "en-US": "Connect relay" },
   "remote.disconnect": { "zh-CN": "暂停远程连接", "en-US": "Pause remote connection" },
   "remote.createInvitation": { "zh-CN": "生成配对二维码", "en-US": "Create pairing QR code" },

@@ -27,7 +27,7 @@ export function RemoteAccountForm({
   const registration = useRef<string | null>(null);
   return (
     <section className={styles.card}>
-      <h3>{t("settings.remote.v2")}</h3>
+      <h3>{t("settings.remote.accountTitle")}</h3>
       <p className={styles.hint}>{t("settings.remote.accountHint")}</p>
       <form
         className={styles.form}
