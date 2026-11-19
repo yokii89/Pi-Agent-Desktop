@@ -1,331 +1,287 @@
-import { DeviceMobile, ShieldCheck } from "@phosphor-icons/react";
-import { useCallback, useEffect, useState } from "react";
-import { getI18nLocale } from "../../../shared/i18n";
-import { pairingText, type Scope } from "../../../shared/remote";
+import { Broadcast, CheckCircle, Devices, ShieldWarning, WifiSlash } from "@phosphor-icons/react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { LIMITS } from "../../../shared/remote";
 import type { RemoteApi, RemoteSnapshot } from "../../../shared/remoteDesktop";
 import { useT } from "../../hooks/useT";
 import { unwrap } from "../../services/ipc";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import styles from "./RemoteDevicesPanel.module.css";
-import { SettingRow, SettingsSection } from "./SettingRow";
+import { RemoteEnrollmentForm } from "./remote/RemoteEnrollmentForm";
+import { RemoteGrantedDevice } from "./remote/RemoteGrantedDevice";
+import { RemotePairingApproval } from "./remote/RemotePairingApproval";
+import { RemotePairingInvitation } from "./remote/RemotePairingInvitation";
 
 function remoteApi(): RemoteApi {
   const api = window.pidesk?.remote;
   if (!api) throw new Error("AUTH_REQUIRED");
   return api;
 }
-/** Local-only pairing management. Approval requires a deliberate project selection. */
+
+type RemoteOperation = (api: RemoteApi) => ReturnType<RemoteApi["snapshot"]>;
+
+/** Local-only pairing management. The relay connection and the phone's grant remain separate. */
 export function RemoteDevicesPanel() {
   const t = useT();
-  const text = (key: string) => pairingText(getI18nLocale(), key);
+  const id = useId();
   const [snapshot, setSnapshot] = useState<RemoteSnapshot | null>(null);
-  const [relayOrigin, setOrigin] = useState("");
-  const [ticket, setTicket] = useState("");
-  const [trust, setTrust] = useState(false);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [scopes, setScopes] = useState<Scope[]>(["projects.read", "sessions.read"]);
-  const [matchedClaimId, setMatchedClaimId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [image, setImage] = useState("");
+  const [readFailed, setReadFailed] = useState(false);
+  const [connectionExpanded, setConnectionExpanded] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const mounted = useRef(false);
+  const operationPending = useRef(false);
+  const reading = useRef(false);
+  const revision = useRef(0);
   const refresh = useCallback(async () => {
-    const result = await unwrap(remoteApi().snapshot());
-    setSnapshot(result);
+    if (reading.current || operationPending.current) return;
+    reading.current = true;
+    const version = revision.current;
+    try {
+      const value = await unwrap(remoteApi().snapshot());
+      if (mounted.current && version === revision.current) {
+        setSnapshot(value);
+        setReadFailed(false);
+      }
+    } catch {
+      if (mounted.current && version === revision.current) setReadFailed(true);
+    } finally {
+      reading.current = false;
+    }
   }, []);
   useEffect(() => {
-    let active = true;
-    let reading = false;
-    const poll = async () => {
-      if (reading) return;
-      reading = true;
-      try {
-        const value = await unwrap(remoteApi().snapshot());
-        if (active) setSnapshot(value);
-      } catch {
-        if (active) setError("STATE_UNAVAILABLE");
-      } finally {
-        reading = false;
-      }
-    };
-    void poll();
-    const timer = setInterval(() => void poll(), 2_000);
+    mounted.current = true;
+    void refresh();
+    const timer = setInterval(() => void refresh(), LIMITS.pollMs);
     return () => {
-      active = false;
+      mounted.current = false;
+      revision.current += 1;
       clearInterval(timer);
     };
-  }, []);
-  const claimId = snapshot?.claim?.claimId;
-  const matched = !!claimId && matchedClaimId === claimId;
-  useEffect(() => {
-    if (!claimId) return;
-    setSelected([]);
-    setScopes(["projects.read", "sessions.read"]);
-    setMatchedClaimId(null);
-  }, [claimId]);
-  const qr = snapshot?.qr ? JSON.stringify(snapshot.qr) : null;
-  useEffect(() => {
-    let active = true;
-    setImage("");
-    if (qr)
-      void import("qrcode")
-        .then((q) => q.toDataURL(qr, { width: 280, margin: 4, errorCorrectionLevel: "M" }))
-        .then((value) => {
-          if (active) setImage(value);
-        })
-        .catch(() => {
-          if (active) setError("INVALID_FRAME");
-        });
-    return () => {
-      active = false;
-    };
-  }, [qr]);
-  const run = async (operation: (api: RemoteApi) => ReturnType<RemoteApi["snapshot"]>) => {
-    if (busy) return;
+  }, [refresh]);
+  const run = async (operation: RemoteOperation): Promise<void> => {
+    if (operationPending.current) return;
+    operationPending.current = true;
+    revision.current += 1;
     setBusy(true);
     setError(null);
     try {
-      setSnapshot(await unwrap(operation(remoteApi())));
+      const value = await unwrap(operation(remoteApi()));
+      if (mounted.current) {
+        setSnapshot(value);
+        setReadFailed(false);
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "CONTROL_FAILED");
-      await refresh().catch(() => {});
+      if (mounted.current) setError(cause instanceof Error ? cause.message : "CONTROL_FAILED");
+      // A failed response may still have persisted a grant or a local revocation.
+      try {
+        const value = await unwrap(remoteApi().snapshot());
+        if (mounted.current) {
+          setSnapshot(value);
+          setReadFailed(false);
+        }
+      } catch {
+        if (mounted.current) setReadFailed(true);
+      }
     } finally {
-      setBusy(false);
+      operationPending.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
-  const status = snapshot?.grant?.state;
+  const grant = snapshot?.grant && snapshot.grant.state !== "revoked" ? snapshot.grant : null;
+  const claim = !grant && snapshot?.claim?.state === "claimed" ? snapshot.claim : null;
+  const errorCode = error ?? snapshot?.error ?? (readFailed ? "STATE_UNAVAILABLE" : null);
+  const errorKey = `remote.error.${errorCode}`;
+  const errorText = errorCode ? t(errorKey) : "";
+  const errorNotice = errorCode ? (
+    <p className={styles.error} role="alert">
+      {errorText === errorKey ? t("remote.error_generic") : errorText}
+    </p>
+  ) : null;
+  const securityNotice = (
+    <aside className={styles.securityNote}>
+      <ShieldWarning size={16} weight="regular" />
+      <p>
+        <strong>{t("settings.remote.securityTitle")}</strong> {t("settings.remote.securityBody")}
+      </p>
+    </aside>
+  );
   return (
-    <div className={styles.panel}>
-      <p data-selectable-text>{text("description")}</p>
-      <div className={styles.notice} data-selectable-text>
-        <ShieldCheck size={20} weight="regular" />
-        <p>{text("trustBody")}</p>
-      </div>
-      {!snapshot?.configured ? (
-        <SettingsSection title={text("enroll")}>
-          <label className={styles.field}>
-            {text("origin")}
-            <input
-              type="url"
-              value={relayOrigin}
-              onChange={(e) => {
-                setOrigin(e.target.value);
-                setTrust(false);
-              }}
-              placeholder="https://relay.example.invalid"
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </label>
-          <label className={styles.field}>
-            {text("ticket")}
-            <input
-              type="password"
-              value={ticket}
-              onChange={(e) => setTicket(e.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </label>
-          <label className={styles.choice}>
-            <input type="checkbox" checked={trust} onChange={(e) => setTrust(e.target.checked)} />
-            {text("trust")}
-          </label>
-          <Button
-            variant="primary"
-            disabled={busy || !trust || !relayOrigin || !ticket}
-            onClick={() => {
-              const enrollmentTicket = ticket;
-              setTicket("");
-              void run((api) => api.enroll({ relayOrigin, enrollmentTicket, trustRelay: trust }));
-            }}
-          >
-            {text("enroll")}
-          </Button>
-        </SettingsSection>
+    <div className={styles.panel} data-selectable-text>
+      {claim && snapshot ? (
+        <RemotePairingApproval
+          key={`${claim.claimId}:${claim.confirmationCode}`}
+          claim={claim}
+          relayOrigin={snapshot.relayOrigin ?? ""}
+          projects={snapshot.projects}
+          busy={busy}
+          connected={snapshot.connected}
+          onApprove={(claimId, projects, scopes) =>
+            void run((api) => api.approve(claimId, projects, scopes))
+          }
+          onReject={() => void run((api) => api.reject())}
+        >
+          {securityNotice}
+          {errorNotice}
+        </RemotePairingApproval>
       ) : (
-        <>
-          <SettingRow
-            label={snapshot.relayOrigin ?? ""}
-            description={snapshot.connected ? text("online") : text("offline")}
-            control={
-              <Button
-                disabled={busy}
-                onClick={() =>
-                  void run((api) => (snapshot.connected ? api.disconnect() : api.connect()))
-                }
-              >
-                {text(snapshot.connected ? "disconnect" : "connect")}
-              </Button>
-            }
-          />
-          {status === "active" || status === "prepared" || status === "revoked" ? (
-            <SettingsSection
-              title={text(
-                status === "active"
-                  ? "active"
-                  : status === "prepared"
-                    ? "prepared"
-                    : snapshot.revocationPending
-                      ? "revocationPending"
-                      : "revoked",
-              )}
-            >
-              <p data-selectable-text>
-                {snapshot.grant?.projectIds
-                  .map((id) => snapshot.projects.find((p) => p.id === id)?.name ?? id)
-                  .join(" · ")}
-              </p>
-              <p data-selectable-text>
-                {snapshot.grant?.scopes.map((scope) => text(`scope.${scope}`)).join(" · ")}
-              </p>
-              <Button variant="danger" disabled={busy} onClick={() => setConfirmRevoke(true)}>
-                {text("revoke")}
-              </Button>
-            </SettingsSection>
-          ) : null}
-          {(!status || status === "revoked") && (
-            <Button
-              variant="primary"
-              disabled={busy || !snapshot.connected}
-              onClick={() => void run((api) => api.invite())}
-            >
-              <DeviceMobile size={20} weight="regular" />
-              {text("createInvitation")}
-            </Button>
-          )}
-          {image && snapshot.qr ? (
-            <div className={styles.invitation}>
-              <img src={image} alt={text("scan")} className={styles.qr} draggable={false} />
-              <p>
-                {text("expires")} {new Date(snapshot.qr.expiresAt).toLocaleTimeString()}
-              </p>
-            </div>
-          ) : null}
-          {snapshot.claim &&
-          ["claimed", "approved", "credential_issued", "activating"].includes(
-            snapshot.claim.state,
-          ) ? (
-            <SettingsSection title={text("confirmation")}>
-              <p className={styles.code} data-selectable-text>
-                {snapshot.claim.confirmationCode}
-              </p>
-              <p data-selectable-text>{snapshot.claim.deviceName}</p>
-              <p className={styles.muted}>{text("selfReported")}</p>
-              <p data-selectable-text>{text("confirmationHint")}</p>
-              {snapshot.claim.state === "claimed" ? (
-                <>
-                  <label className={styles.choice}>
-                    <input
-                      type="checkbox"
-                      checked={matched}
-                      disabled={busy}
-                      onChange={(e) =>
-                        setMatchedClaimId(e.target.checked ? (claimId ?? null) : null)
-                      }
-                    />
-                    {text("confirmationHint")}
-                  </label>
-                  <fieldset className={styles.projects}>
-                    <legend>{text("capabilities")}</legend>
-                    {(
-                      [
-                        ["sessions.send", "scope.sessions.send"],
-                        ["sessions.stop", "scope.sessions.stop"],
-                        ["sessions.create", "scope.sessions.create"],
-                        ["interactions.read", "scope.interactions.read"],
-                        ["interactions.answer", "scope.interactions.answer"],
-                      ] as const
-                    ).map(([scope, label]) => (
-                      <label className={styles.choice} key={scope}>
-                        <input
-                          type="checkbox"
-                          checked={scopes.includes(scope)}
-                          disabled={busy}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setScopes((current) => {
-                              const next = new Set(current);
-                              if (checked) {
-                                next.add(scope);
-                                if (scope === "interactions.answer") next.add("interactions.read");
-                              } else {
-                                next.delete(scope);
-                                if (scope === "interactions.read")
-                                  next.delete("interactions.answer");
-                              }
-                              return [...next];
-                            });
-                          }}
-                        />
-                        {text(label)}
-                      </label>
-                    ))}
-                  </fieldset>
-                  <fieldset className={styles.projects}>
-                    <legend>{text("projects")}</legend>
-                    {snapshot.projects.map((p) => (
-                      <label className={styles.choice} key={p.id}>
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(p.id)}
-                          disabled={busy || (!selected.includes(p.id) && selected.length >= 20)}
-                          onChange={(e) =>
-                            setSelected((current) =>
-                              e.target.checked
-                                ? [...current, p.id]
-                                : current.filter((id) => id !== p.id),
-                            )
-                          }
-                        />
-                        {p.name}
-                      </label>
-                    ))}
-                  </fieldset>
-                  <div className={styles.actions}>
-                    <Button
-                      variant="primary"
-                      disabled={busy || !matched || selected.length === 0}
-                      onClick={() => {
-                        if (claimId) void run((api) => api.approve(claimId, selected, scopes));
-                      }}
-                    >
-                      {text("approve")}
-                    </Button>
-                    <Button
-                      variant="danger"
-                      disabled={busy}
-                      onClick={() => void run((api) => api.reject())}
-                    >
-                      {text("reject")}
-                    </Button>
+        <div className={styles.scroll}>
+          <div className={styles.stack}>
+            {!snapshot ? (
+              <>
+                {!readFailed && (
+                  <p className={styles.hint} role="status">
+                    {t("common.loading")}
+                  </p>
+                )}
+                {errorNotice}
+                {readFailed && (
+                  <div>
+                    <Button onClick={() => void refresh()}>{t("settings.remote.retry")}</Button>
                   </div>
-                </>
-              ) : (
-                <p>{text("prepared")}</p>
-              )}
-            </SettingsSection>
-          ) : null}
-        </>
+                )}
+              </>
+            ) : !snapshot.configured ? (
+              <>
+                <RemoteEnrollmentForm
+                  busy={busy}
+                  onEnroll={(request) => void run((api) => api.enroll(request))}
+                />
+                {securityNotice}
+                {errorNotice}
+              </>
+            ) : (
+              <>
+                {!snapshot.connected && (
+                  <aside className={styles.offlineBanner}>
+                    <WifiSlash size={20} weight="regular" />
+                    <div>
+                      <strong>{t("settings.remote.offlineTitle")}</strong>
+                      <p className={styles.hint}>
+                        {t(
+                          grant
+                            ? "settings.remote.offlinePaired"
+                            : "settings.remote.offlineUnpaired",
+                        )}
+                      </p>
+                    </div>
+                    <Button disabled={busy} onClick={() => void run((api) => api.connect())}>
+                      {t(busy ? "settings.remote.connecting" : "settings.remote.reconnect")}
+                    </Button>
+                  </aside>
+                )}
+                {grant ? (
+                  <RemoteGrantedDevice
+                    grant={grant}
+                    deviceName={
+                      snapshot.claim?.deviceId === grant.deviceId ? snapshot.claim.deviceName : null
+                    }
+                    projects={snapshot.projects}
+                    busy={busy}
+                    onRevoke={() => setConfirmRevoke(true)}
+                  />
+                ) : (
+                  <>
+                    <RemotePairingInvitation
+                      qr={snapshot.qr}
+                      connected={snapshot.connected}
+                      busy={busy}
+                      onInvite={() => void run((api) => api.invite())}
+                    />
+                    <section>
+                      <div className={styles.sectionHeading}>
+                        <h3>
+                          {t("settings.remote.devices")}
+                          <span className={styles.count}>0</span>
+                        </h3>
+                      </div>
+                      <div className={styles.emptyDevices}>
+                        <Devices size={24} weight="regular" />
+                        <span>{t("settings.remote.empty")}</span>
+                      </div>
+                    </section>
+                  </>
+                )}
+                {snapshot.grant?.state === "revoked" && (
+                  <p className={`${styles.revokedNotice} ${styles.hint}`} role="status">
+                    {snapshot.revocationPending ? (
+                      <ShieldWarning size={16} weight="regular" />
+                    ) : (
+                      <CheckCircle size={16} weight="regular" />
+                    )}
+                    {t(snapshot.revocationPending ? "remote.revocationPending" : "remote.revoked")}
+                  </p>
+                )}
+                <section className={styles.relay} aria-label={t("settings.remote.relay")}>
+                  <div className={styles.relayMain}>
+                    <Broadcast size={20} weight="regular" />
+                    <div className={styles.relayText}>
+                      <div className={styles.relayTitle}>
+                        {t("settings.remote.relay")}
+                        <span
+                          className={`${styles.status} ${snapshot.connected ? styles.online : styles.pending}`}
+                        >
+                          <span className={styles.dot} />
+                          {t(
+                            snapshot.connected
+                              ? "settings.remote.connected"
+                              : "settings.remote.disconnected",
+                          )}
+                        </span>
+                      </div>
+                      <p className={styles.domain}>{snapshot.relayOrigin}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.textButton}
+                      aria-expanded={connectionExpanded}
+                      aria-controls={`${id}-connection`}
+                      onClick={() => setConnectionExpanded((expanded) => !expanded)}
+                    >
+                      {t(
+                        connectionExpanded ? "settings.remote.collapse" : "settings.remote.manage",
+                      )}
+                    </button>
+                  </div>
+                  {connectionExpanded && (
+                    <div className={styles.relayDetails} id={`${id}-connection`}>
+                      <Button
+                        disabled={busy}
+                        onClick={() =>
+                          void run((api) => (snapshot.connected ? api.disconnect() : api.connect()))
+                        }
+                      >
+                        {t(
+                          snapshot.connected
+                            ? "settings.remote.pause"
+                            : "settings.remote.reconnect",
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </section>
+                {securityNotice}
+                {errorNotice}
+              </>
+            )}
+          </div>
+        </div>
       )}
-      {error || snapshot?.error ? (
-        <p role="alert" className={styles.error}>
-          {text(`error.${error ?? snapshot?.error}`)}
-        </p>
-      ) : null}
       <ConfirmDialog
         nested
         open={confirmRevoke}
-        title={text("revoke")}
-        message={text("revokeConfirm")}
-        confirmLabel={text("revoke")}
+        title={t("settings.remote.revokeTitle")}
+        message={t("settings.remote.revokeBody")}
+        confirmLabel={t("settings.remote.revoke")}
         cancelLabel={t("common.cancel")}
         tone="danger"
         busy={busy}
         onCancel={() => setConfirmRevoke(false)}
         onConfirm={() => {
-          void run((api) => api.revoke()).finally(() => setConfirmRevoke(false));
+          void run((api) => api.revoke()).finally(() => {
+            if (mounted.current) setConfirmRevoke(false);
+          });
         }}
       />
     </div>
