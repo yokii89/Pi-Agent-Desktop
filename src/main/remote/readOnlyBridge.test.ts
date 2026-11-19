@@ -121,6 +121,43 @@ function fixture(
 }
 
 describe("desktop read-only authority and project isolation", () => {
+  it("authorizes incremental pages and never uses the legacy full transcript path", async () => {
+    const history = vi.fn(async () => ({
+      view: { identity: "file", messages: [], prefixes: [] },
+      tail: { revision: "empty", messages: [] },
+    }));
+    const f = fixture(READ_SCOPES, { history });
+    const payload = {
+      sessionId: "allowed-session",
+      direction: "latest",
+      cursor: null,
+      limit: 50,
+      tailRevision: null,
+    };
+    expect(
+      await f.bridge.request(f.context(), frame("sessions.history.sync", payload)),
+    ).toMatchObject({
+      data: { status: "page", messages: [], checkpoint: expect.any(String), beforeCursor: null },
+    });
+    expect(f.historyReads()).toBe(0);
+    await expect(
+      f.bridge.request(
+        f.context(),
+        frame("sessions.history.sync", { ...payload, sessionId: "private-session" }),
+      ),
+    ).rejects.toThrow("RESOURCE_UNAVAILABLE");
+    expect(history).toHaveBeenCalledOnce();
+    history.mockImplementationOnce(async () => {
+      f.revoke();
+      return {
+        view: { identity: "file", messages: [], prefixes: [] },
+        tail: { revision: "empty", messages: [] },
+      };
+    });
+    await expect(
+      f.bridge.request(f.context(), frame("sessions.history.sync", payload)),
+    ).rejects.toThrow("DEVICE_REVOKED");
+  });
   it("filters unauthorized project metadata, sessions, pages and history", async () => {
     const f = fixture();
     const projectResult = await f.bridge.request(f.context(), frame("projects.list"));

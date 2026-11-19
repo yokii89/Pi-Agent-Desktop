@@ -1,10 +1,13 @@
 import {
   authorize,
   byteLength,
+  ControlError,
   exact,
   fail,
   type Grant,
+  type HistoryTail,
   id,
+  parseHistoryQuery,
   type RoutingContext,
   record,
 } from "../../shared/remote";
@@ -14,6 +17,7 @@ import {
   MAX_PROMPT_LENGTH,
   type RequestFrame,
 } from "../../shared/remote/business";
+import { type HistoryView, historyPage, historyRevision } from "./historySync";
 import { RemoteOperationLedger, type WriteCommand } from "./operationLedger";
 
 export interface RemoteProject {
@@ -52,6 +56,7 @@ export interface ReadOnlySource {
   projects(): RemoteProject[];
   sessions(projects: string[]): Promise<RemoteSession[]>;
   messages(session: RemoteSession): Promise<RemoteMessage[]>;
+  history?(session: RemoteSession): Promise<{ view: HistoryView; tail: HistoryTail }>;
   interactions(projects: string[]): Promise<RemoteInteraction[]>;
   send(session: RemoteSession, message: string): Promise<{ disposition: string }>;
   stop(session: RemoteSession): Promise<{ requested: boolean }>;
@@ -243,6 +248,14 @@ export class ReadOnlyBridge {
         nextCursor: end < sessions.length ? String(end) : null,
       });
     }
+    if (command === "sessions.history.sync") {
+      const query = parseHistoryQuery(r.payload);
+      const target = await this.session(context, command, query.sessionId);
+      if (!this.source.history) return fail("INVALID_COMMAND");
+      const { view, tail } = await this.source.history(target);
+      this.check(context, command, target.projectId);
+      return requestFrame(requestId, historyPage(view, context, query, tail));
+    }
     if (command === "sessions.history") {
       const p = exact(r.payload, ["sessionId", "cursor", "limit"]);
       const target = await this.session(context, command, p.sessionId);
@@ -358,7 +371,7 @@ export class ReadOnlyBridge {
     if (result.state === "completed") return requestFrame(requestId, result.result);
     return failedFrame(requestId, result.errorCode ?? "RESULT_UNCERTAIN");
   }
-  /** Events invalidate snapshots; the mobile client reloads authoritative pages and interactions. */
+  /** Events tell clients to check their cursor against the authoritative history. */
   async tick(send: (context: RoutingContext, frame: unknown) => void): Promise<void> {
     for (const [deviceId, watch] of this.devices) {
       if (this.now() >= watch.expires) {
@@ -390,21 +403,23 @@ export class ReadOnlyBridge {
       }
       try {
         this.check(lease.context, "sessions.subscribe", lease.session.projectId);
-        const [messages, interactions] = await Promise.all([
-          this.source.messages(lease.session),
-          this.source.interactions([lease.session.projectId]),
-        ]);
-        const fingerprint = JSON.stringify([
-          messages,
-          interactions.filter((interaction) => interaction.sessionId === lease.session.id),
-        ]);
+        const fingerprint = this.source.history
+          ? await this.source
+              .history(lease.session)
+              .then(({ view, tail }) => `${historyRevision(view)}:${tail.revision}`)
+          : JSON.stringify(await this.source.messages(lease.session));
+        if (this.leases.get(deviceId) !== lease) continue;
         if (lease.previous !== fingerprint) {
           lease.previous = fingerprint;
           this.check(lease.context, "sessions.subscribe", lease.session.projectId);
           this.emit(lease.context, lease.session.id, send);
         }
-      } catch {
-        this.leases.delete(deviceId);
+      } catch (cause) {
+        if (
+          this.leases.get(deviceId) === lease &&
+          !(cause instanceof ControlError && cause.code === "STATE_UNAVAILABLE")
+        )
+          this.leases.delete(deviceId);
       }
     }
   }

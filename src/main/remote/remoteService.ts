@@ -67,7 +67,10 @@ export class RemoteService {
     (sessionId) =>
       this.ready && this.source.isViewingLive(sessionId, (id) => this.bridge.isViewing(id)),
   );
-  private readonly unsubscribe = subscribeSessionEvents(() => this.scheduleEventTick());
+  private readonly unsubscribe = subscribeSessionEvents((event) => {
+    this.source.observe(event);
+    this.scheduleEventTick();
+  });
   private readonly unsubscribeUi = subscribeSessionUiEvents(() => this.scheduleEventTick());
   private scheduleEventTick(): void {
     if (!this.ready || this.eventTimer) return;

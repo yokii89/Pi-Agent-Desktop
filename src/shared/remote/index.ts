@@ -1,4 +1,5 @@
 export * from "./authorization";
 export * from "./client";
 export * from "./contract";
+export * from "./history";
 export * from "./labels";
