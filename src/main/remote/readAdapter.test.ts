@@ -47,6 +47,28 @@ describe("remote history projection", () => {
       { id: "m_4_0", role: "tool", text: "visible tool result", state: "done" },
     ]);
   });
+  it("preserves safe tool labels and failures without exposing call arguments", () => {
+    expect(
+      projectRemoteMessages([
+        {
+          role: "toolResult",
+          toolName: "bash",
+          isError: true,
+          content: [{ type: "text", text: "command failed" }],
+          arguments: { command: "secret command" },
+        },
+      ]),
+    ).toEqual([
+      {
+        id: "m_0_0",
+        role: "tool",
+        text: "command failed",
+        state: "done",
+        toolName: "bash",
+        isError: true,
+      },
+    ]);
+  });
   it("chunks long text without losing content or changing page identities", () => {
     const text = "文".repeat(12_001);
     const messages = projectRemoteMessages([{ role: "assistant", content: text }], true);

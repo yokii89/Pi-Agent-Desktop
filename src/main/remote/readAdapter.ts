@@ -62,6 +62,11 @@ export function projectRemoteMessages(raw: readonly unknown[], running = false):
             })
             .join("\n"),
     );
+    const toolName =
+      role === "tool" && typeof item.toolName === "string"
+        ? sanitizeRemoteText(item.toolName).slice(0, 120)
+        : undefined;
+    const isError = role === "tool" && item.isError === true;
     if (!body.trim()) continue;
     for (let start = 0; start < body.length; start += MESSAGE_CHUNK) {
       messages.push({
@@ -72,6 +77,8 @@ export function projectRemoteMessages(raw: readonly unknown[], running = false):
           role === "assistant" && running && start + MESSAGE_CHUNK >= body.length
             ? "running"
             : "done",
+        ...(toolName ? { toolName } : {}),
+        ...(isError ? { isError: true } : {}),
       });
     }
   }

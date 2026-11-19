@@ -34,6 +34,8 @@ export interface RemoteMessage {
   role: "user" | "assistant" | "tool";
   text: string;
   state?: "running" | "done";
+  toolName?: string;
+  isError?: boolean;
 }
 export interface RemoteInteraction {
   id: string;
