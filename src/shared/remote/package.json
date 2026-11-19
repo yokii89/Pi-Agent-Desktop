@@ -1,0 +1,11 @@
+{
+  "name": "@pidesk/remote-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./business": "./business.ts"
+  }
+}

@@ -150,6 +150,7 @@ export function buildResponseRecord(id: string, answer: SessionUiAnswer): Record
 interface Pending {
   method: SessionUiDialogMethod;
   options?: string[];
+  request: SessionUiDialogRequest;
   timer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -169,6 +170,18 @@ export class SessionUiLedger {
 
   listPending(sessionId: SessionId): string[] {
     return [...(this.#pending.get(sessionId)?.keys() ?? [])];
+  }
+
+  listPendingRequests(sessionId: SessionId): { id: string; request: SessionUiDialogRequest }[] {
+    const pending = this.#pending.get(sessionId);
+    if (!pending) return [];
+    return [...pending].map(([id, item]) => ({
+      id,
+      request: {
+        ...item.request,
+        ...(item.request.options ? { options: [...item.request.options] } : {}),
+      },
+    }));
   }
 
   /**
@@ -238,6 +251,7 @@ export class SessionUiLedger {
     byId.set(id, {
       method: request.method,
       options: request.options,
+      request,
       timer:
         request.timeoutMs === undefined ? null : this.#armTimeout(sessionId, id, request.timeoutMs),
     });
@@ -290,6 +304,12 @@ export function initSessionUi(sink: SessionUiSink): SessionUiLedger {
 /** 取登记表；尚未初始化（还没有任何会话）时为 null。 */
 export function getSessionUiLedger(): SessionUiLedger | null {
   return ledger;
+}
+
+export function pendingUiRequests(
+  sessionId: SessionId,
+): { id: string; request: SessionUiDialogRequest }[] {
+  return ledger?.listPendingRequests(sessionId) ?? [];
 }
 
 /** 该会话是否有等待用户作答的对话框；未初始化时为 0。 */

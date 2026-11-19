@@ -31,6 +31,12 @@ const MAX_RECLAIMS_PER_SCAN = 2;
 const STATE_PROBE_TIMEOUT_MS = 5000;
 type ScheduledOccupancy = (sessionId: SessionId) => boolean;
 let isScheduled: ScheduledOccupancy = () => false;
+let isRemoteViewing: ScheduledOccupancy = () => false;
+
+/** A remote viewer has a bounded lease; it never changes the desktop watched-session identity. */
+export function setRemoteViewing(fn: ScheduledOccupancy): () => void {
+  isRemoteViewing = fn; return () => { if (isRemoteViewing === fn) isRemoteViewing = () => false; };
+}
 let scanTimer: ReturnType<typeof setInterval> | null = null;
 let initialized = false;
 let scanning: Promise<ScanResult> | null = null;
@@ -112,7 +118,7 @@ function stillIdle(sessionId: SessionId, now: number): boolean {
       childAlive: hasSession(sessionId),
       hasPendingRequests: hasPendingSessionRequests(sessionId),
       pendingUiCount: pendingUiCount(sessionId) + (hasSessionModal(sessionId) ? 1 : 0),
-      isActive: getWatchedSession() === sessionId,
+      isActive: getWatchedSession() === sessionId || isRemoteViewing(sessionId),
       isScheduled: isScheduled(sessionId),
       // 后台作业由后续异步快照独立核对，本函数只读同步保护条件。
       hasBackgroundJobs: false,

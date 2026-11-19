@@ -1,6 +1,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
+import { publishSessionEvent, publishSessionUiEvent } from "./sessionEvents";
 import os from "node:os";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
@@ -110,10 +111,9 @@ function createSessionId(): SessionId {
 }
 
 function push(sessionId: SessionId, message: Omit<SessionPushMessage, "sessionId">): void {
-  getMainWindow()?.webContents.send(SESSION_IPC.output, {
-    ...message,
-    sessionId,
-  } as SessionPushMessage);
+  const output = { ...message, sessionId } as SessionPushMessage;
+  publishSessionEvent(output);
+  getMainWindow()?.webContents.send(SESSION_IPC.output, output);
 }
 
 /**
@@ -122,6 +122,7 @@ function push(sessionId: SessionId, message: Omit<SessionPushMessage, "sessionId
  */
 const sessionUiSink: SessionUiSink = {
   push(message) {
+    publishSessionUiEvent(message);
     const win = getMainWindow();
     if (!win) return false;
     win.webContents.send(SESSION_UI_IPC.output, message);
@@ -669,10 +670,14 @@ export async function clearSessionQueue(sessionId: SessionId): Promise<PiQueuedM
 }
 
 /** 中断当前执行（RPC abort；pi 会在空闲后应答）。 */
-export function interruptSession(sessionId: SessionId): void {
-  // 中断即撤窗：被 abort 的工具不会再消费应答，留着对话框只会把用户锁在死界面上
+export function abortSession(sessionId: SessionId): Promise<void> {
   sessionUi().dropSession(sessionId);
-  request(sessionId, "abort").catch(() => {});
+  return request(sessionId, "abort").then(() => undefined);
+}
+
+/** Existing desktop UI fire-and-forget wrapper. */
+export function interruptSession(sessionId: SessionId): void {
+  void abortSession(sessionId).catch(() => {});
 }
 
 /**

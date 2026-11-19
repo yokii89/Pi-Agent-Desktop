@@ -7,6 +7,7 @@ import {
   Folder,
   Keyboard,
   MagnifyingGlass,
+  DeviceMobile,
   Palette,
   PuzzlePiece,
   Rocket,
@@ -25,6 +26,7 @@ import styles from "./Settings.module.css";
 
 /** 设置浮窗左侧导航的分区 ID。 */
 export type SettingsSectionId =
+  | "remote"
   | "general"
   | "profile"
   | "usage"
@@ -147,6 +149,12 @@ const NAV_GROUPS: NavGroup[] = [
         id: "environment",
         labelKey: "settings.section.environment",
         icon: <TerminalWindow size={18} weight="regular" />,
+      },
+      {
+        id: "remote",
+        labelKey: "remote.title",
+        icon: <DeviceMobile size={20} weight="regular" />,
+        keywords: ["手机", "配对", "授权", "扫码", "mobile", "pairing", "relay"],
       },
       {
         id: "projects",

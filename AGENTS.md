@@ -63,6 +63,11 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 
 任何新增依赖（运行时或开发时）必须先在此处登记用途，再安装。
 
+- `qrcode`、`@types/qrcode`（devDep，渲染层构建期）：手机配对邀请二维码本地生成；二维码秘密只在内存，不进入 URL、日志、剪贴板或持久设置。
+- `src/shared/remote/` 作为 `@pidesk/remote-protocol` 零依赖源码包供相邻 Pi-Mobile 工程链接；桌面继续相对导入并由现有 tsc 编译，无新增主进程外部依赖。
+- 远程控制面使用 Node 内置 fetch / WebSocket / crypto；Windows 电脑凭证经 Electron 41 safeStorage 加密后由 settings 模块原子保存到 userData。手机原生存储与扫码依赖、中转构建边界登记在 Pi-Mobile/AGENTS.md。
+- 现有 vitest 纯逻辑测试扩展到 remote 配对授权、持久化失败与两端协调；不新增渲染测试框架。
+
 - @codemirror/legacy-modes（devDep，渲染层构建期打包）：为专用 CodeMirror 语言包未覆盖的文件提供 StreamLanguage 模式；首次打开对应文件的源码视图时按需加载，读写模式共用。
 
 **依赖分类契约（安装包体积基线，2026-11-08 瘦身确立）**：`dependencies` 只放**主进程运行时需要

@@ -13,6 +13,7 @@ import { registerModelOverridesIpc } from "../models/modelOverridesIpc";
 import { registerNotificationIpc } from "../notification/notificationIpc";
 import { registerProcIpc } from "../proc/processIpc";
 import { registerProjectIpc } from "../project/projectIpc";
+import { registerRemoteIpc } from "../remote/remoteIpc";
 import { registerSchedulerIpc } from "../scheduler/schedulerIpc";
 import { registerPrefetchIpc } from "../session/prefetchIpc";
 import { registerRuntimeIpc } from "../session/runtimeIpc";
@@ -38,6 +39,7 @@ export function registerIpc(): void {
     registerSystemAccentColorIpc,
     registerNotificationIpc,
     registerProjectIpc,
+    registerRemoteIpc,
     registerSessionIpc,
     registerSessionUiIpc,
     registerProcIpc,

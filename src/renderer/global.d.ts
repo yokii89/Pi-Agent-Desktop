@@ -149,6 +149,7 @@ import type { WindowCloseDecision, WindowCloseRequest } from "../shared/windowCl
 
 /** 渲染层可用的预加载白名单 API（与 src/preload/index.ts 保持同步）。 */
 export interface PideskGlobalApi {
+  remote: import("../shared/remoteDesktop").RemoteApi;
   window: {
     minimize(): Promise<IpcResult<null>>;
     toggleMaximize(): Promise<IpcResult<boolean>>;

@@ -12,6 +12,7 @@ import { LiveSessionsPanel } from "./LiveSessionsPanel";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { PersonalizationPanel } from "./PersonalizationPanel";
 import { ProfilePanel } from "./ProfilePanel";
+import { RemoteDevicesPanel } from "./RemoteDevicesPanel";
 import {
   AboutPanel,
   AppearancePanel,
@@ -28,6 +29,7 @@ import { StartupPanel } from "./StartupPanel";
 import { UsagePanel } from "./UsagePanel";
 
 const SECTION_TITLE_KEYS: Record<SettingsSectionId, string> = {
+  remote: "remote.title",
   general: "settings.section.general",
   profile: "settings.section.profile",
   usage: "settings.section.usage",
@@ -80,6 +82,8 @@ export function SettingsDialog() {
 
   const panel = useMemo(() => {
     switch (active) {
+      case "remote":
+        return <RemoteDevicesPanel />;
       case "general":
         return <GeneralPanel />;
       case "appearance":

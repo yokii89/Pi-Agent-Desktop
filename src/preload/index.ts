@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { REMOTE_IPC, type RemoteApi } from "../shared/remoteDesktop";
 import type {
   ActivateContributionRequest,
   ActivateContributionResult,
@@ -192,6 +193,16 @@ function subscribe<T>(channel: string, callback: (payload: T) => void): () => vo
 }
 
 contextBridge.exposeInMainWorld("pidesk", {
+  remote: {
+    snapshot: () => ipcRenderer.invoke(REMOTE_IPC.snapshot),
+    enroll: request => ipcRenderer.invoke(REMOTE_IPC.enroll, request),
+    connect: () => ipcRenderer.invoke(REMOTE_IPC.connect),
+    disconnect: () => ipcRenderer.invoke(REMOTE_IPC.disconnect),
+    invite: () => ipcRenderer.invoke(REMOTE_IPC.invite),
+    approve: (projects, scopes) => ipcRenderer.invoke(REMOTE_IPC.approve, { projects, scopes }),
+    reject: () => ipcRenderer.invoke(REMOTE_IPC.reject),
+    revoke: () => ipcRenderer.invoke(REMOTE_IPC.revoke),
+  } satisfies RemoteApi,
   window: {
     /** 最小化窗口。 */
     minimize: (): Promise<IpcResult<null>> => ipcRenderer.invoke(WINDOW_IPC.minimize),

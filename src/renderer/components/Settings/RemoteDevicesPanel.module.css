@@ -1,0 +1,76 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+}
+.panel p {
+  margin: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-md);
+}
+.notice svg {
+  flex-shrink: 0;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+.field input {
+  padding: var(--spacing-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+}
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-block: var(--spacing-sm);
+}
+.projects {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-block: var(--spacing-md);
+  padding: var(--spacing-md);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+.invitation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+.qr {
+  width: min(100%, 280px);
+  height: auto;
+}
+.code {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xl);
+  letter-spacing: 0.2em;
+}
+.muted {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.error {
+  color: var(--color-danger);
+}

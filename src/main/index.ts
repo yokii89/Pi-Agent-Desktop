@@ -14,6 +14,7 @@ import {
 } from "./mediaProtocols";
 import { registerToastActivation } from "./notification/toastService";
 import { procService } from "./proc/procService";
+import { remoteService } from "./remote/remoteService";
 import { disposeTaskScheduler, initTaskScheduler } from "./scheduler/taskScheduler";
 import { disposeIdleReclaim, initIdleReclaim } from "./session/idleReclaim";
 import { detectPiExecutablePath } from "./session/piLauncher";
@@ -113,6 +114,7 @@ app.whenReady().then(async () => {
   initTaskScheduler();
   // 后台会话空闲回收（docs/design/138）：依赖 powerMonitor 与上面的占用注入，启动越晚越安全
   initIdleReclaim();
+  void remoteService.start();
   // 应用更新静默检查：窗口已建后延迟触发，失败不打扰（docs/design/35）
   scheduleStartupCheck();
 
@@ -170,6 +172,7 @@ app.on("will-quit", () => {
   disposeTray();
   disposeTaskScheduler();
   disposeIdleReclaim();
+  remoteService.dispose();
   disposeUpdater();
   // 检查器浮窗：退出前强制销毁，避免残留独立窗
   disposeInspectorWindow();

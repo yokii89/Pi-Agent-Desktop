@@ -11,6 +11,7 @@ export default defineConfig({
   test: {
     include: [
       "view/**/*.test.ts",
+      "remote/**/*.test.ts",
       "window/**/*.test.ts",
       "wallpaper/**/*.test.ts",
       "notification/**/*.test.ts",

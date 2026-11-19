@@ -1,4 +1,5 @@
 import type { Catalog, LocaleId, MessageDefs } from "../types";
+import { pairingMessages } from "../../remote/labels";
 import { browserMessages } from "./browser";
 import { chromeMessages } from "./chrome";
 import { commandPaletteMessages } from "./commandPalette";
@@ -19,6 +20,7 @@ import { uiMessages } from "./ui";
 import { windowMessages } from "./window";
 
 const ALL_DEFS: MessageDefs = {
+  ...pairingMessages,
   ...commonMessages,
   ...settingsMessages,
   ...sidenavMessages,
