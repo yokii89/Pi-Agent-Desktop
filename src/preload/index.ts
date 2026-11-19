@@ -197,6 +197,7 @@ contextBridge.exposeInMainWorld("pidesk", {
     snapshot: () => ipcRenderer.invoke(REMOTE_IPC.snapshot),
     enroll: (request) => ipcRenderer.invoke(REMOTE_IPC.enroll, request),
     account: (request) => ipcRenderer.invoke(REMOTE_IPC.account, request),
+    logout: () => ipcRenderer.invoke(REMOTE_IPC.logout),
     connect: () => ipcRenderer.invoke(REMOTE_IPC.connect),
     disconnect: () => ipcRenderer.invoke(REMOTE_IPC.disconnect),
     invite: () => ipcRenderer.invoke(REMOTE_IPC.invite),

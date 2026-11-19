@@ -7,6 +7,18 @@ const fixture = vi.hoisted(() => ({
   desktop: "00000000-0000-4000-8000-000000000001",
   grant: null as Grant | null,
 }));
+
+vi.mock("./desktopAuth", () => ({
+  desktopAccessToken: async () => "header.payload.signature",
+  desktopAuthGeneration: () => 0,
+  hasDesktopAuth: () => true,
+  loginDesktop: async () => ({
+    accessToken: "header.payload.signature",
+    refreshToken: "refresh-token",
+    expiresAt: Date.now() + 300_000,
+  }),
+  clearDesktopAuth: vi.fn(),
+}));
 vi.mock("../settings/remoteStore", () => ({
   loadRemoteCredential: () => ({
     version: 1,
@@ -127,7 +139,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 async function connected() {
-  await service.setAccount({ relayOrigin: "https://relay.example", accessToken: accountToken });
+  await service.setAccount({ relayOrigin: "https://relay.example" });
   const socket = FakeSocket.instances[0];
   socket.onopen?.();
   socket.receive({

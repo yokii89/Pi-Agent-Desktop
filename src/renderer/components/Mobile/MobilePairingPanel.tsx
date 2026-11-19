@@ -164,7 +164,9 @@ export function MobilePairingPanel() {
                 {protocol === 2 ? (
                   <RemoteAccountForm
                     busy={busy}
+                    accountReady={snapshot.accountReady}
                     onEnroll={(request) => void run((api) => api.enroll(request))}
+                    onLogout={() => void run((api) => api.logout())}
                   />
                 ) : (
                   <RemoteEnrollmentForm
@@ -181,7 +183,9 @@ export function MobilePairingPanel() {
                   <RemoteAccountForm
                     busy={busy}
                     relayOrigin={snapshot.relayOrigin ?? undefined}
+                    accountReady={snapshot.accountReady}
                     onAccount={(request) => void run((api) => api.account(request))}
+                    onLogout={() => void run((api) => api.logout())}
                   />
                 )}
                 {snapshot.controlVersion === 2 && (
@@ -292,6 +296,11 @@ export function MobilePairingPanel() {
                             : "settings.remote.reconnect",
                         )}
                       </Button>
+                      {snapshot.controlVersion === 2 && snapshot.accountReady ? (
+                        <Button disabled={busy} onClick={() => void run((api) => api.logout())}>
+                          {t("settings.remote.accountLogout")}
+                        </Button>
+                      ) : null}
                     </div>
                   )}
                 </section>

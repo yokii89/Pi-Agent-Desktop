@@ -7,19 +7,22 @@ import styles from "../MobilePairingPanel.module.css";
 export function RemoteAccountForm({
   busy,
   relayOrigin,
+  accountReady = false,
   onEnroll,
   onAccount,
+  onLogout,
 }: {
   busy: boolean;
   relayOrigin?: string;
+  accountReady?: boolean;
   onEnroll?: (request: RemoteEnrollment) => void;
   onAccount?: (request: RemoteAccountInput) => void;
+  onLogout?: () => void;
 }) {
   const t = useT();
   const id = useId();
   const [origin, setOrigin] = useState(relayOrigin ?? "");
   const [name, setName] = useState("PiDesk");
-  const [token, setToken] = useState("");
   const [trusted, setTrusted] = useState(false);
   const registration = useRef<string | null>(null);
   return (
@@ -30,16 +33,13 @@ export function RemoteAccountForm({
         className={styles.form}
         onSubmit={(event) => {
           event.preventDefault();
-          if (busy || !trusted || !token.trim()) return;
-          const accessToken = token.trim();
-          setToken("");
-          if (onAccount) onAccount({ relayOrigin: origin.trim(), accessToken });
+          if (busy || !trusted || !origin.trim()) return;
+          if (onAccount) onAccount({ relayOrigin: origin.trim() });
           else {
             registration.current ??= crypto.randomUUID();
             onEnroll?.({
               controlVersion: 2,
               relayOrigin: origin.trim(),
-              accessToken,
               displayName: name.trim(),
               registrationRequestId: registration.current,
               trustRelay: trusted,
@@ -80,19 +80,6 @@ export function RemoteAccountForm({
             />
           </label>
         )}
-        <label className={styles.field} htmlFor={`${id}-token`}>
-          {t("settings.remote.accountToken")}
-          <input
-            id={`${id}-token`}
-            type="password"
-            required
-            value={token}
-            disabled={busy}
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(e) => setToken(e.target.value)}
-          />
-        </label>
         <label className={styles.choice}>
           <input
             type="checkbox"
@@ -106,12 +93,17 @@ export function RemoteAccountForm({
           <Button
             type="submit"
             variant="primary"
-            disabled={
-              busy || !trusted || !origin.trim() || !token.trim() || (!relayOrigin && !name.trim())
-            }
+            disabled={busy || !trusted || !origin.trim() || (!relayOrigin && !name.trim())}
           >
-            {t("settings.remote.accountConnect")}
+            {t(
+              accountReady ? "settings.remote.accountReconnect" : "settings.remote.accountConnect",
+            )}
           </Button>
+          {accountReady && onLogout ? (
+            <Button type="button" disabled={busy} onClick={onLogout}>
+              {t("settings.remote.accountLogout")}
+            </Button>
+          ) : null}
         </div>
       </form>
     </section>

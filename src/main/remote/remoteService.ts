@@ -40,11 +40,33 @@ import {
   saveRemoteOperations,
 } from "../settings/remoteStore";
 import { getSettings } from "../settings/settings";
+import {
+  desktopAccessToken,
+  desktopAuthGeneration,
+  hasDesktopAuth,
+  loginDesktop,
+  revokeDesktopAuth,
+} from "./desktopAuth";
 import { DesktopPairing } from "./desktopPairing";
 import { DesktopReadOnlySource } from "./desktopSource";
 import { RemoteOperationLedger } from "./operationLedger";
 import { ReadOnlyBridge } from "./readOnlyBridge";
 import { relaySocket } from "./relaySocket";
+
+async function ensureDesktopLogin(): Promise<number> {
+  if (!hasDesktopAuth()) {
+    await loginDesktop();
+    return desktopAuthGeneration();
+  }
+  try {
+    await desktopAccessToken();
+  } catch (cause) {
+    if (!(cause instanceof Error) || cause.message !== "ACCOUNT_AUTH_REQUIRED") throw cause;
+    await loginDesktop();
+  }
+  return desktopAuthGeneration();
+}
+
 export class RemoteService {
   private readonly account = new RelayAccountSession(randomUUID);
   private enrolling = false;
@@ -95,7 +117,7 @@ export class RemoteService {
     return {
       configured: !!this.credential,
       controlVersion: this.credential?.controlVersion ?? 1,
-      accountReady: !!this.account.getSnapshot(),
+      accountReady: hasDesktopAuth(),
       relayOrigin: this.credential?.relayOrigin ?? null,
       connected: this.ready,
       qr: this.pairing?.qr ?? null,
@@ -141,13 +163,22 @@ export class RemoteService {
     await this.start();
     return this.snapshot();
   }
+  async logout(): Promise<RemoteSnapshot> {
+    this.stop();
+    this.account.disconnect();
+    await revokeDesktopAuth();
+    return this.snapshot();
+  }
   async setAccount(raw: RemoteAccountInput): Promise<RemoteSnapshot> {
-    const r = exact(raw, ["relayOrigin", "accessToken"]);
+    const r = exact(raw, ["relayOrigin"]);
     const credential = this.credential ?? loadRemoteCredential();
     if (credential && (credential.controlVersion !== 2 || credential.relayOrigin !== r.relayOrigin))
       fail("AUTH_REQUIRED");
     this.stop();
-    await this.account.connect(origin(r.relayOrigin), String(r.accessToken));
+    const authGeneration = await ensureDesktopLogin();
+    await this.account.connectWithTokenProvider(origin(r.relayOrigin), () =>
+      desktopAccessToken(authGeneration),
+    );
     if (credential && this.account.getSnapshot()?.accountId !== credential.accountId) {
       this.account.disconnect();
       fail("AUTH_REQUIRED");
@@ -159,7 +190,6 @@ export class RemoteService {
     const r = exact(raw, [
       "controlVersion",
       "relayOrigin",
-      "accessToken",
       "displayName",
       "registrationRequestId",
       "trustRelay",
@@ -168,7 +198,10 @@ export class RemoteService {
     if (!remoteStorageAvailable()) fail("SECURE_STORAGE_UNAVAILABLE");
     if (this.credential || loadRemoteCredential()) fail("DEVICE_LIMIT_REACHED");
     const relayOrigin = origin(r.relayOrigin);
-    await this.account.connect(relayOrigin, String(r.accessToken));
+    const authGeneration = await ensureDesktopLogin();
+    await this.account.connectWithTokenProvider(relayOrigin, () =>
+      desktopAccessToken(authGeneration),
+    );
     const client = this.account.client();
     const meta = await client.request("GET", "/v1/meta", null, null, parseMeta);
     const credential = await client.request(
@@ -235,6 +268,17 @@ export class RemoteService {
       this.credential = loadRemoteCredential();
       if (!this.credential) return;
       if (Date.now() >= Date.parse(this.credential.expiresAt)) fail("AUTH_EXPIRED");
+      if (this.credential.controlVersion === 2) {
+        if (!this.account.getSnapshot()) {
+          if (!hasDesktopAuth()) fail("AUTH_REQUIRED");
+          const authGeneration = desktopAuthGeneration();
+          await this.account.connectWithTokenProvider(this.credential.relayOrigin, () =>
+            desktopAccessToken(authGeneration),
+          );
+        }
+        if (this.account.getSnapshot()?.accountId !== this.credential.accountId)
+          fail("AUTH_REQUIRED");
+      }
       this.client =
         this.credential.controlVersion === 2
           ? this.account.client(this.credential.desktopId, this.credential.accountId)

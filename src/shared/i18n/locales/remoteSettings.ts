@@ -4,17 +4,23 @@ export const remoteSettingsMessages = defineMessages({
   "settings.remote.v2": { "zh-CN": "共享中转 v2", "en-US": "Shared relay v2" },
   "settings.remote.v1": { "zh-CN": "单电脑中转 v1", "en-US": "Single-computer relay v1" },
   "settings.remote.protocol": { "zh-CN": "中转协议", "en-US": "Relay protocol" },
-  "settings.remote.accountToken": { "zh-CN": "账号访问令牌", "en-US": "Account access token" },
   "settings.remote.accountHint": {
-    "zh-CN":
-      "联调入口：输入身份提供方签发的短期访问令牌，仅驻内存。正式浏览器登录尚未接入，令牌失效后需要重新验证。",
+    "zh-CN": "使用 Auth0 登录账号。电脑账号凭证保存在系统安全存储中；登录本身不会批准手机访问。",
     "en-US":
-      "Integration access: supply a short-lived access token from your identity provider. Kept in memory only. Browser sign-in is not connected yet; verify again after token expiry.",
+      "Sign in with Auth0. Account credentials are protected by system secure storage; signing in does not approve phone access.",
   },
   "settings.remote.desktopName": { "zh-CN": "电脑显示名称", "en-US": "Computer display name" },
   "settings.remote.accountConnect": {
-    "zh-CN": "验证账号并连接",
-    "en-US": "Verify account and connect",
+    "zh-CN": "使用 Auth0 登录并连接",
+    "en-US": "Sign in with Auth0 and connect",
+  },
+  "settings.remote.accountReconnect": {
+    "zh-CN": "重新登录并连接账号",
+    "en-US": "Sign in again and reconnect account",
+  },
+  "settings.remote.accountLogout": {
+    "zh-CN": "退出 Auth0 账号",
+    "en-US": "Sign out of Auth0",
   },
   "settings.remote.readonly": {
     "zh-CN": "此 v2 中转目前仅开放项目、会话与历史读取。",

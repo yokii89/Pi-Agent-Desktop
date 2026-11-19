@@ -4,6 +4,7 @@ export const REMOTE_IPC = {
   snapshot: "pidesk:remote:snapshot",
   enroll: "pidesk:remote:enroll",
   account: "pidesk:remote:account",
+  logout: "pidesk:remote:logout",
   connect: "pidesk:remote:connect",
   disconnect: "pidesk:remote:disconnect",
   invite: "pidesk:remote:invite",
@@ -28,6 +29,7 @@ export interface RemoteApi {
   snapshot(): Promise<IpcResult<RemoteSnapshot>>;
   enroll(request: RemoteEnrollment): Promise<IpcResult<RemoteSnapshot>>;
   account(request: RemoteAccountInput): Promise<IpcResult<RemoteSnapshot>>;
+  logout(): Promise<IpcResult<RemoteSnapshot>>;
   connect(): Promise<IpcResult<RemoteSnapshot>>;
   disconnect(): Promise<IpcResult<RemoteSnapshot>>;
   invite(): Promise<IpcResult<RemoteSnapshot>>;
@@ -38,7 +40,6 @@ export interface RemoteApi {
 }
 export interface RemoteAccountInput {
   relayOrigin: string;
-  accessToken: string;
 }
 export type RemoteEnrollment =
   | {
@@ -49,7 +50,6 @@ export type RemoteEnrollment =
   | {
       controlVersion: 2;
       relayOrigin: string;
-      accessToken: string;
       displayName: string;
       registrationRequestId: string;
       trustRelay: boolean;

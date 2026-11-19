@@ -31,6 +31,7 @@ export function registerRemoteIpc(): void {
   handle(REMOTE_IPC.snapshot, async () => remoteService.snapshot());
   handle(REMOTE_IPC.enroll, (request) => remoteService.enroll(request as RemoteEnrollment));
   handle(REMOTE_IPC.account, (request) => remoteService.setAccount(request as RemoteAccountInput));
+  handle(REMOTE_IPC.logout, async () => remoteService.logout());
   handle(REMOTE_IPC.connect, async () => {
     await remoteService.start();
     return remoteService.snapshot();

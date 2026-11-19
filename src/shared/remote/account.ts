@@ -6,9 +6,13 @@ export interface AccountSnapshot {
   relayOrigin: string;
   accountId: string;
 }
-/** Provider-neutral session injection. Tokens stay in memory until a real PKCE adapter is selected. */
+/** Keeps account-token acquisition behind a provider callback so bearer tokens never cross the UI bridge. */
 export class RelayAccountSession {
-  private current: { snapshot: AccountSnapshot; token: string; generation: number } | null = null;
+  private current: {
+    snapshot: AccountSnapshot;
+    token: () => Promise<string>;
+    generation: number;
+  } | null = null;
   private generation = 0;
   private listeners = new Set<() => void>();
   constructor(
@@ -29,16 +33,14 @@ export class RelayAccountSession {
     this.emit();
   }
   async connect(relayOrigin: string, accessToken: string): Promise<void> {
+    return this.connectWithTokenProvider(relayOrigin, async () => accessToken);
+  }
+  async connectWithTokenProvider(relayOrigin: string, token: () => Promise<string>): Promise<void> {
     origin(relayOrigin);
-    if (
-      !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(accessToken) ||
-      accessToken.length > 8000
-    )
-      fail("AUTH_REQUIRED");
     this.disconnect();
     const generation = this.generation;
     const bootstrap = new ControlClient(relayOrigin, this.newId, this.fetcher, Date.now, {
-      account: { accountId: "", token: async () => accessToken },
+      account: { accountId: "", token },
     });
     const snapshot = await bootstrap.request("GET", "/v2/account/me", null, null, (value) => {
       const r = exact(value, ["accountId", "accountStatus"]);
@@ -46,7 +48,7 @@ export class RelayAccountSession {
       return { relayOrigin, accountId: accountId(r.accountId) };
     });
     if (generation !== this.generation) fail("ACCOUNT_CHANGED");
-    this.current = { snapshot, token: accessToken, generation };
+    this.current = { snapshot, token, generation };
     this.emit();
   }
   access(relayOrigin: string, expectedAccount?: string): AccountAccess {
@@ -61,7 +63,7 @@ export class RelayAccountSession {
       accountId: current.snapshot.accountId,
       token: async () => {
         if (this.current !== current) fail("ACCOUNT_CHANGED");
-        return current.token;
+        return current.token();
       },
     };
   }

@@ -69,7 +69,7 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 
 - `qrcode`、`@types/qrcode`（devDep，渲染层构建期）：手机配对邀请二维码本地生成；二维码秘密只在内存，不进入 URL、日志、剪贴板或持久设置。
 - `src/shared/remote/` 作为 `@pidesk/remote-protocol` 零依赖源码包供相邻 Pi-Mobile 工程链接；桌面继续相对导入并由现有 tsc 编译，无新增主进程外部依赖。
-- `ws`（runtime，主进程）与 `@types/ws`（dev）：v2 WSS 握手携带账号认证头，禁止重定向与压缩，限制帧大小；v1 保留原生 WebSocket。账号 provider 尚未选定时仅提供内存 access-token 接入，不持久化账号 token，不宣称完成 OAuth 登录。
+- `ws`（runtime，主进程）与 `@types/ws`（dev）：v2 WSS 握手携带账号认证头，禁止重定向与压缩，限制帧大小；v1 保留原生 WebSocket。Auth0 PKCE 会话由主进程管理；access/refresh token 经 Electron `safeStorage` 加密保存，渲染进程只看到账号就绪状态。
 - 远程控制面使用 Node 内置 fetch / WebSocket / crypto；Windows 电脑凭证经 Electron 41 safeStorage 加密后由 settings 模块原子保存到 userData。手机原生存储与扫码依赖、中转构建边界登记在 Pi-Mobile/AGENTS.md。
 - 现有 vitest 纯逻辑测试扩展到 remote 配对授权、持久化失败与两端协调；不新增渲染测试框架。
 
