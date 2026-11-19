@@ -12,7 +12,7 @@ import { READ_SCOPES } from "../../../../shared/remote";
 import type { RemoteSnapshot } from "../../../../shared/remoteDesktop";
 import { useT } from "../../../hooks/useT";
 import { Button } from "../../ui/Button";
-import styles from "../RemoteDevicesPanel.module.css";
+import styles from "../MobilePairingPanel.module.css";
 
 interface RemoteGrantedDeviceProps {
   grant: Grant;

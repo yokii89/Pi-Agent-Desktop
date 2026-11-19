@@ -4,7 +4,7 @@ import type { RemoteEnrollment } from "../../../../shared/remoteDesktop";
 import { useT } from "../../../hooks/useT";
 import { Button } from "../../ui/Button";
 import { IconButton } from "../../ui/IconButton";
-import styles from "../RemoteDevicesPanel.module.css";
+import styles from "../MobilePairingPanel.module.css";
 
 interface RemoteEnrollmentFormProps {
   busy: boolean;

@@ -6,6 +6,7 @@ import { ContextSidebar } from "./components/ContextSidebar/ContextSidebar";
 import { ExtensionsPage } from "./components/Extensions/ExtensionsPage";
 import { ExtensionViewHost } from "./components/ExtensionView/ExtensionViewHost";
 import { McpPage } from "./components/Mcp/McpPage";
+import { MobilePage } from "./components/Mobile/MobilePage";
 import { RollbackPromptHost } from "./components/Review/RollbackPromptHost";
 import { ReviewWindow } from "./components/ReviewWindow/ReviewWindow";
 import { ScheduledTasksPage } from "./components/ScheduledTasks/ScheduledTasksPage";
@@ -227,6 +228,7 @@ function AppLayout() {
       </main>
       {sidebar.mounted && <ContextSidebar />}
       <SettingsDialog />
+      <MobilePage />
       <AppErrorBoundary>
         <ExtensionViewHost />
         <ExtensionUiDialogHost />

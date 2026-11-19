@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { PairingQr } from "../../../../shared/remote";
 import { useT } from "../../../hooks/useT";
 import { Button } from "../../ui/Button";
-import styles from "../RemoteDevicesPanel.module.css";
+import styles from "../MobilePairingPanel.module.css";
 import { usePairingCountdown } from "./usePairingCountdown";
 
 interface RemotePairingInvitationProps {

@@ -71,7 +71,7 @@ import {
   type SidebarTabsState,
 } from "./sidebarTabs";
 
-/** 页面级路由目标（渲染层内部路由）；设置已改为浮窗，不进路由栈。 */
+/** 页面级路由目标（渲染层内部路由）；设置与手机配对均为浮窗，不进路由栈。 */
 export type PageId = "session" | "extensions" | "scheduled" | "mcp";
 
 /**
@@ -192,6 +192,8 @@ interface UiState {
   fileRevealRequest: { path: string; tick: number } | null;
   /** 设置浮窗是否打开（覆盖层，不占用中央路由）。 */
   settingsOpen: boolean;
+  /** 手机配对浮窗是否打开（覆盖层，不占用中央路由）。 */
+  mobileOpen: boolean;
   toast: ToastState | null;
   /** 设置是否已从磁盘恢复；恢复后主题/折叠态的变化才会回写。 */
   hydrated: boolean;
@@ -252,6 +254,7 @@ type UiAction =
   | { type: "openFileInPanel"; path: string }
   | { type: "revealInFilePanel"; path: string }
   | { type: "setSettingsOpen"; open: boolean }
+  | { type: "setMobileOpen"; open: boolean }
   | { type: "showToast"; message: string; action?: ToastAction }
   | { type: "dismissToast"; id: number }
   | { type: "setBrowserEnabled"; enabled: boolean }
@@ -325,6 +328,7 @@ const initialState: UiState = {
   fileOpenRequest: null,
   fileRevealRequest: null,
   settingsOpen: false,
+  mobileOpen: false,
   toast: null,
   hydrated: false,
   browserEnabled: true,
@@ -451,6 +455,8 @@ function uiReducer(state: UiState, action: UiAction): UiState {
       };
     case "setSettingsOpen":
       return state.settingsOpen === action.open ? state : { ...state, settingsOpen: action.open };
+    case "setMobileOpen":
+      return state.mobileOpen === action.open ? state : { ...state, mobileOpen: action.open };
     case "showToast":
       return {
         ...state,
@@ -620,6 +626,8 @@ interface UiStoreValue extends UiState {
   registerLeaveGuard: (guard: ((action: () => void) => boolean) | null) => void;
   openSettings: () => void;
   closeSettings: () => void;
+  openMobile: () => void;
+  closeMobile: () => void;
   showToast: (message: string, action?: ToastAction) => void;
   /** 打开命令面板浮层。 */
   openCommandPalette: () => void;
@@ -792,6 +800,14 @@ export function UiProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "setSettingsOpen", open: false });
     void browserService.setOverlaySuppressed(false, "settings");
   }, []);
+  const openMobile = useCallback(() => {
+    void browserService.setOverlaySuppressed(true, "mobile");
+    dispatch({ type: "setMobileOpen", open: true });
+  }, []);
+  const closeMobile = useCallback(() => {
+    dispatch({ type: "setMobileOpen", open: false });
+    void browserService.setOverlaySuppressed(false, "mobile");
+  }, []);
   const showToast = useCallback(
     (message: string, action?: ToastAction) => dispatch({ type: "showToast", message, action }),
     [],
@@ -825,6 +841,8 @@ export function UiProvider({ children }: { children: ReactNode }) {
       registerLeaveGuard,
       openSettings,
       closeSettings,
+      openMobile,
+      closeMobile,
       showToast,
       openCommandPalette,
       closeCommandPalette,
@@ -842,6 +860,8 @@ export function UiProvider({ children }: { children: ReactNode }) {
       registerLeaveGuard,
       openSettings,
       closeSettings,
+      openMobile,
+      closeMobile,
       showToast,
       openCommandPalette,
       closeCommandPalette,

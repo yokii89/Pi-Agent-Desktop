@@ -1,5 +1,6 @@
 import {
   ClockCounterClockwise,
+  DeviceMobile,
   Folder,
   GearSix,
   Plugs,
@@ -38,6 +39,8 @@ export function SideNav() {
     dispatch,
     settingsOpen,
     openSettings,
+    mobileOpen,
+    openMobile,
     shortcuts,
   } = useUiStore();
   const { newSession, allSessions, pinnedFiles, globalPinnedFiles, archivedFiles, sessionOrder } =
@@ -45,7 +48,7 @@ export function SideNav() {
   const { projects } = useProjectStore();
   const { sidebars: visibleSidebars } = useExtensionViewStore();
 
-  // 选中药丸（docs/design/54）：选中真值 = page / settingsOpen / activeSessionFile
+  // 选中药丸（docs/design/54）：选中真值 = page / settingsOpen / mobileOpen / activeSessionFile
   // 推导出的 data-side-active 标记，标记换行时药丸沿下拉曲线滑过去。
   const [navEl, setNavEl] = useState<HTMLElement | null>(null);
   const { pillRef } = useSelectionPill(navEl);
@@ -141,6 +144,9 @@ export function SideNav() {
           </IconButton>
           <div className={styles.spacer} />
           <UpdateButton collapsed />
+          <IconButton title={t("remote.title")} active={mobileOpen} onClick={openMobile}>
+            <DeviceMobile size={20} weight="regular" />
+          </IconButton>
           <IconButton title={t("sidenav.settings")} active={settingsOpen} onClick={openSettings}>
             <GearSix size={20} weight="regular" />
           </IconButton>
@@ -232,6 +238,16 @@ export function SideNav() {
 
         <div className={styles.spacer} />
 
+        <button
+          type="button"
+          className={[styles.navItem, mobileOpen ? styles.navItemActive : ""].join(" ")}
+          data-side-active={mobileOpen ? "page" : undefined}
+          data-side-hover=""
+          onClick={openMobile}
+        >
+          <DeviceMobile size={20} weight="regular" />
+          {t("remote.title")}
+        </button>
         <div className={styles.footer}>
           <button
             type="button"

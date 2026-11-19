@@ -186,13 +186,6 @@
   padding: 0 var(--spacing-xl) var(--spacing-xl);
 }
 
-.remoteContentBody {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 0;
-}
-
 .panel {
   display: flex;
   flex-direction: column;

@@ -20,7 +20,6 @@ import {
   ModelsPanel,
   ProjectsPanel,
 } from "./panels";
-import { RemoteDevicesPanel } from "./RemoteDevicesPanel";
 import { ScheduledSettingsPanel } from "./ScheduledSettingsPanel";
 import styles from "./Settings.module.css";
 import { SettingsNav, type SettingsSectionId } from "./SettingsNav";
@@ -29,7 +28,6 @@ import { StartupPanel } from "./StartupPanel";
 import { UsagePanel } from "./UsagePanel";
 
 const SECTION_TITLE_KEYS: Record<SettingsSectionId, string> = {
-  remote: "remote.title",
   general: "settings.section.general",
   profile: "settings.section.profile",
   usage: "settings.section.usage",
@@ -82,8 +80,6 @@ export function SettingsDialog() {
 
   const panel = useMemo(() => {
     switch (active) {
-      case "remote":
-        return <RemoteDevicesPanel />;
       case "general":
         return <GeneralPanel />;
       case "appearance":
@@ -138,11 +134,7 @@ export function SettingsDialog() {
             <X size={18} weight="regular" />
           </IconButton>
         </header>
-        <div
-          className={`${styles.contentBody} ${active === "remote" ? styles.remoteContentBody : ""}`}
-        >
-          {panel}
-        </div>
+        <div className={styles.contentBody}>{panel}</div>
       </div>
     </Modal>
   );

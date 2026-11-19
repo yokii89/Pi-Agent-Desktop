@@ -11,7 +11,7 @@ import { type ClaimStatus, LIMITS, READ_SCOPES, type Scope } from "../../../../s
 import type { RemoteSnapshot } from "../../../../shared/remoteDesktop";
 import { useT } from "../../../hooks/useT";
 import { Button } from "../../ui/Button";
-import styles from "../RemoteDevicesPanel.module.css";
+import styles from "../MobilePairingPanel.module.css";
 import { usePairingCountdown } from "./usePairingCountdown";
 
 const OPTIONAL_ACTIONS = [

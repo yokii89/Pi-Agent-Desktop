@@ -6,7 +6,7 @@ import { useT } from "../../hooks/useT";
 import { unwrap } from "../../services/ipc";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import styles from "./RemoteDevicesPanel.module.css";
+import styles from "./MobilePairingPanel.module.css";
 import { RemoteEnrollmentForm } from "./remote/RemoteEnrollmentForm";
 import { RemoteGrantedDevice } from "./remote/RemoteGrantedDevice";
 import { RemotePairingApproval } from "./remote/RemotePairingApproval";
@@ -21,7 +21,7 @@ function remoteApi(): RemoteApi {
 type RemoteOperation = (api: RemoteApi) => ReturnType<RemoteApi["snapshot"]>;
 
 /** Local-only pairing management. The relay connection and the phone's grant remain separate. */
-export function RemoteDevicesPanel() {
+export function MobilePairingPanel() {
   const t = useT();
   const id = useId();
   const [snapshot, setSnapshot] = useState<RemoteSnapshot | null>(null);
@@ -269,7 +269,6 @@ export function RemoteDevicesPanel() {
         </div>
       )}
       <ConfirmDialog
-        nested
         open={confirmRevoke}
         title={t("settings.remote.revokeTitle")}
         message={t("settings.remote.revokeBody")}

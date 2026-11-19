@@ -54,7 +54,7 @@ const INITIAL_STATE = {
  * 的底色。没有实现按住擦选：列表行按住拖动跨行松手会误触发点击。
  *
  * 落点时机全部由 DOM / 指针事件说话（hook 不知道选中真值是哪几个 store 字段）：
- * 标记换行（page / settingsOpen / activeSessionFile / 设置分区变化）是
+ * 标记换行（page / settingsOpen / mobileOpen / activeSessionFile / 设置分区变化）是
  * `data-side-active` 属性变更，分区折叠展开、「显示更多」、条目增删（设置左栏还有
  * 搜索过滤）是节点增删，都由 MutationObserver 驱动；悬浮由 pointerover / pointerleave
  * 驱动。落点逻辑统一：目标行没变就按当前几何对齐（行被布局挪动），变了才滑行/瞬移
