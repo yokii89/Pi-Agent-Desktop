@@ -1,0 +1,126 @@
+import { defineMessages } from "../types";
+
+export const remoteSettingsMessages = defineMessages({
+  "settings.remote.setup": { "zh-CN": "首次设置", "en-US": "First-time setup" },
+  "settings.remote.connectTitle": { "zh-CN": "连接中转服务", "en-US": "Connect your relay" },
+  "settings.remote.origin": { "zh-CN": "中转地址（HTTPS）", "en-US": "Relay address (HTTPS)" },
+  "settings.remote.ticket": { "zh-CN": "一次性登记票据", "en-US": "One-time enrollment ticket" },
+  "settings.remote.ticketHint": {
+    "zh-CN": "由中转管理员提供",
+    "en-US": "Provided by your relay administrator",
+  },
+  "settings.remote.showTicket": { "zh-CN": "显示票据", "en-US": "Show ticket" },
+  "settings.remote.hideTicket": { "zh-CN": "隐藏票据", "en-US": "Hide ticket" },
+  "settings.remote.trust": {
+    "zh-CN": "已核对域名，并信任此中转",
+    "en-US": "I checked the domain and trust this relay",
+  },
+  "settings.remote.enroll": { "zh-CN": "登记并连接", "en-US": "Enroll and connect" },
+  "settings.remote.connecting": { "zh-CN": "正在连接…", "en-US": "Connecting…" },
+  "settings.remote.securityTitle": {
+    "zh-CN": "仅使用可信的自部署中转。",
+    "en-US": "Use only a trusted, self-hosted relay.",
+  },
+  "settings.remote.securityBody": {
+    "zh-CN": "非端到端加密，中转可读取内容并冒充设备。",
+    "en-US": "No end-to-end encryption. The relay can read content and impersonate devices.",
+  },
+  "settings.remote.ready": { "zh-CN": "准备配对", "en-US": "Ready to pair" },
+  "settings.remote.waiting": { "zh-CN": "等待扫码", "en-US": "Waiting for scan" },
+  "settings.remote.expired": { "zh-CN": "邀请已过期", "en-US": "Invitation expired" },
+  "settings.remote.scanTitle": { "zh-CN": "扫码连接手机", "en-US": "Scan to pair your phone" },
+  "settings.remote.stepOpen": { "zh-CN": "打开 Pi-Mobile", "en-US": "Open Pi-Mobile" },
+  "settings.remote.stepScan": { "zh-CN": "扫描二维码", "en-US": "Scan the QR code" },
+  "settings.remote.stepApprove": {
+    "zh-CN": "在电脑核对并授权",
+    "en-US": "Verify and approve here",
+  },
+  "settings.remote.noQr": { "zh-CN": "尚未生成二维码", "en-US": "No invitation yet" },
+  "settings.remote.qrExpired": { "zh-CN": "二维码已过期", "en-US": "QR code expired" },
+  "settings.remote.qrLoading": { "zh-CN": "正在生成二维码…", "en-US": "Generating QR code…" },
+  "settings.remote.generate": { "zh-CN": "生成二维码", "en-US": "Create QR code" },
+  "settings.remote.regenerate": { "zh-CN": "重新生成", "en-US": "Generate again" },
+  "settings.remote.refresh": { "zh-CN": "刷新二维码", "en-US": "Refresh QR code" },
+  "settings.remote.expiry": { "zh-CN": "{time} 后过期", "en-US": "Expires in {time}" },
+  "settings.remote.devices": { "zh-CN": "已配对设备", "en-US": "Paired devices" },
+  "settings.remote.empty": { "zh-CN": "暂无配对设备", "en-US": "No paired devices" },
+  "settings.remote.device": { "zh-CN": "配对手机", "en-US": "Paired phone" },
+  "settings.remote.relay": { "zh-CN": "中转服务", "en-US": "Relay service" },
+  "settings.remote.connected": { "zh-CN": "已连接", "en-US": "Connected" },
+  "settings.remote.disconnected": { "zh-CN": "未连接", "en-US": "Disconnected" },
+  "settings.remote.manage": { "zh-CN": "管理连接", "en-US": "Manage connection" },
+  "settings.remote.collapse": { "zh-CN": "收起", "en-US": "Collapse" },
+  "settings.remote.pause": { "zh-CN": "暂停连接", "en-US": "Pause connection" },
+  "settings.remote.reconnect": { "zh-CN": "重新连接", "en-US": "Reconnect" },
+  "settings.remote.offlineTitle": { "zh-CN": "中转未连接", "en-US": "Relay disconnected" },
+  "settings.remote.offlinePaired": {
+    "zh-CN": "授权保留，手机暂不可访问。",
+    "en-US": "Access is paused. Existing permissions are retained.",
+  },
+  "settings.remote.offlineUnpaired": {
+    "zh-CN": "重新连接后即可配对。",
+    "en-US": "Reconnect to pair your phone.",
+  },
+  "settings.remote.request": { "zh-CN": "请求配对", "en-US": "Pairing request" },
+  "settings.remote.nameHint": { "zh-CN": "名称仅供参考", "en-US": "Device-reported name" },
+  "settings.remote.matched": {
+    "zh-CN": "双端域名与 8 位数字一致",
+    "en-US": "The domain and all 8 digits match on both devices",
+  },
+  "settings.remote.projects": { "zh-CN": "授权项目", "en-US": "Allowed projects" },
+  "settings.remote.selected": {
+    "zh-CN": "已选 {count} / {total}",
+    "en-US": "{count} / {total} selected",
+  },
+  "settings.remote.searchProjects": { "zh-CN": "搜索项目", "en-US": "Search projects" },
+  "settings.remote.noProjects": { "zh-CN": "暂无可授权项目", "en-US": "No projects available" },
+  "settings.remote.noMatches": { "zh-CN": "未找到相关项目", "en-US": "No matching projects" },
+  "settings.remote.projectLimit": {
+    "zh-CN": "选择 1–{max} 个项目",
+    "en-US": "Choose 1–{max} projects",
+  },
+  "settings.remote.permissions": { "zh-CN": "操作权限", "en-US": "Action permissions" },
+  "settings.remote.baseline": {
+    "zh-CN": "默认仅可查看所选项目、会话与历史。",
+    "en-US": "Read-only access to selected projects, sessions and history is included.",
+  },
+  "settings.remote.matchFirst": {
+    "zh-CN": "请先核对域名与数字",
+    "en-US": "Verify the domain and code",
+  },
+  "settings.remote.selectFirst": {
+    "zh-CN": "请至少选择 1 个项目",
+    "en-US": "Choose at least one project",
+  },
+  "settings.remote.readOnlySummary": {
+    "zh-CN": "{count} 个项目 · 仅查看",
+    "en-US": "{count} projects · Read only",
+  },
+  "settings.remote.actionSummary": {
+    "zh-CN": "{count} 个项目 · {actions} 项操作权限",
+    "en-US": "{count} projects · {actions} action permissions",
+  },
+  "settings.remote.approve": { "zh-CN": "确认配对", "en-US": "Confirm pairing" },
+  "settings.remote.activation": { "zh-CN": "等待双端激活", "en-US": "Waiting for activation" },
+  "settings.remote.expiredClaim": {
+    "zh-CN": "配对请求已过期，请重新扫码。",
+    "en-US": "This request expired. Scan a new invitation.",
+  },
+  "settings.remote.capabilities": { "zh-CN": "授权能力", "en-US": "Allowed capabilities" },
+  "settings.remote.readAccess": {
+    "zh-CN": "查看项目、会话与历史",
+    "en-US": "Read projects, sessions and history",
+  },
+  "settings.remote.changePermissions": {
+    "zh-CN": "调整权限需重新配对",
+    "en-US": "Pair again to change permissions",
+  },
+  "settings.remote.revoke": { "zh-CN": "撤销授权", "en-US": "Revoke access" },
+  "settings.remote.revokeTitle": { "zh-CN": "撤销手机授权？", "en-US": "Revoke phone access?" },
+  "settings.remote.revokeBody": {
+    "zh-CN": "手机将立即失去访问权限。项目与会话保留，再次访问需重新配对。",
+    "en-US":
+      "The phone will lose access immediately. Projects and sessions are kept. Pair again to restore access.",
+  },
+  "settings.remote.retry": { "zh-CN": "重试", "en-US": "Retry" },
+});

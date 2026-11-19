@@ -138,7 +138,11 @@ export function SettingsDialog() {
             <X size={18} weight="regular" />
           </IconButton>
         </header>
-        <div className={styles.contentBody}>{panel}</div>
+        <div
+          className={`${styles.contentBody} ${active === "remote" ? styles.remoteContentBody : ""}`}
+        >
+          {panel}
+        </div>
       </div>
     </Modal>
   );
