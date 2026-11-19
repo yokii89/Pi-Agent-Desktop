@@ -7,6 +7,7 @@ export const COMMANDS = [
   "projects.list",
   "sessions.list",
   "sessions.history",
+  "sessions.history.sync",
   "sessions.subscribe",
   "sessions.send",
   "sessions.stop",

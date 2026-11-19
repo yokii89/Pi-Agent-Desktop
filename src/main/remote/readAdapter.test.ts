@@ -64,7 +64,28 @@ describe("remote history projection", () => {
     expect(JSON.stringify(messages)).not.toContain("toolName");
     expect(JSON.stringify(messages)).not.toContain("secret.ts");
   });
-
+  it("preserves tool categories and failures without exposing call arguments", () => {
+    expect(
+      projectRemoteMessages([
+        {
+          role: "toolResult",
+          toolName: "bash",
+          isError: true,
+          content: [{ type: "text", text: "command failed" }],
+          arguments: { command: "secret command" },
+        },
+      ]),
+    ).toEqual([
+      {
+        id: "m_0_0",
+        role: "tool",
+        text: "command failed",
+        state: "done",
+        toolKind: "terminal",
+        isError: true,
+      },
+    ]);
+  });
   it("chunks long text without losing content or changing page identities", () => {
     const text = "文".repeat(12_001);
     const messages = projectRemoteMessages([{ role: "assistant", content: text }], true);

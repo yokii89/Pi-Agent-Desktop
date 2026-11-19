@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
+import type { SessionPushMessage } from "../../shared/ipc";
 import { pendingUiRequests } from "../session/extensionUi";
 import { getPiAgentDir } from "../session/piInfo";
 import {
@@ -19,6 +20,8 @@ import {
 } from "../session/runtimeCoordinator";
 import { encodeCwdToSessionDir, listSessions } from "../session/sessionHistory";
 import { getSettings } from "../settings/settings";
+import { RemoteHistoryReader } from "./historySync";
+import { RemoteHistoryTail } from "./historyTail";
 import { remoteInteractionAnswer } from "./interactionAnswer";
 import { projectRemoteMessages, readRemoteHistory, remoteSessionFile } from "./readAdapter";
 import type {
@@ -40,6 +43,19 @@ const sessionDirectory = (cwd: string) => path.join(sessionRoot(), encodeCwdToSe
 /** Only sanitized public DTOs leave the desktop main process. */
 export class DesktopReadOnlySource implements ReadOnlySource {
   private refs = new Map<string, { file: string; projectId: string; root: string }>();
+  private readonly historyReader = new RemoteHistoryReader();
+  private readonly historyTail = new RemoteHistoryTail();
+
+  observe(event: SessionPushMessage): void {
+    this.historyTail.observe(event);
+  }
+
+  async history(session: RemoteSession) {
+    const ref = this.ref(session);
+    const view = await this.historyReader.read(ref.file, sessionDirectory(ref.root), sessionRoot());
+    this.ref(session);
+    return { view, tail: this.historyTail.current(liveSessionIdForFile(ref.file), view) };
+  }
   projects(): RemoteProject[] {
     return getSettings().projects.map((p) => ({
       id: p.id,

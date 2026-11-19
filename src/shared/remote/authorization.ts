@@ -3,6 +3,7 @@ export const COMMAND_SCOPES = {
   "projects.list": "projects.read",
   "sessions.list": "sessions.read",
   "sessions.history": "sessions.read",
+  "sessions.history.sync": "sessions.read",
   "sessions.subscribe": "sessions.read",
   "interactions.list": "interactions.read",
   "requests.lookup": "sessions.read",

@@ -67,6 +67,7 @@ export function projectRemoteMessages(raw: readonly unknown[], running = false):
       role === "tool" && typeof item.toolName === "string"
         ? classifyRemoteTool(item.toolName)
         : undefined;
+    const isError = role === "tool" && item.isError === true;
     if (!body.trim()) continue;
     for (let start = 0; start < body.length; start += MESSAGE_CHUNK) {
       messages.push({
@@ -78,6 +79,7 @@ export function projectRemoteMessages(raw: readonly unknown[], running = false):
           role === "assistant" && running && start + MESSAGE_CHUNK >= body.length
             ? "running"
             : "done",
+        ...(isError ? { isError: true } : {}),
       });
     }
   }
