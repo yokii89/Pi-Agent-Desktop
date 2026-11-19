@@ -13,6 +13,7 @@ import {
   parsePrincipal,
   type RoutingContext,
   record,
+  revoked,
   type Scope,
   SECURITY_PROFILE,
   secret,
@@ -48,6 +49,7 @@ export class RemoteService {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private ticking = false;
   private connecting = false;
+  private generation = 0;
   private readonly source = new DesktopReadOnlySource();
   private readonly operations = new RemoteOperationLedger({
     load: loadRemoteOperations,
@@ -146,11 +148,14 @@ export class RemoteService {
   private async connect(): Promise<void> {
     if (this.stopped || this.connecting || !this.credential || !this.client) return;
     this.connecting = true;
+    const generation = this.generation;
+    const client = this.client;
+    const credential = this.credential;
     try {
-      this.access = await this.client.request(
+      const access = await client.request(
         "POST",
         "/v1/desktops/access-token",
-        this.credential.desktopCredential,
+        credential.desktopCredential,
         {},
         (v) => {
           const r = exact(v, ["accessToken", "accessExpiresAt"]);
@@ -160,9 +165,11 @@ export class RemoteService {
           };
         },
       );
-      const token = this.access.token;
+      if (this.stopped || generation !== this.generation) return;
+      this.access = access;
+      const token = access.token;
       const ws = new WebSocket(
-        `${this.credential.relayOrigin.replace(/^https:/, "wss:")}/v1/connect/${this.credential.desktopId}`,
+        `${credential.relayOrigin.replace(/^https:/, "wss:")}/v1/connect/${credential.desktopId}`,
       );
       this.socket = ws;
       const authTimer = setTimeout(() => ws.close(), LIMITS.authMs);
@@ -258,10 +265,12 @@ export class RemoteService {
         }
       };
     } catch (cause) {
-      this.error = cause instanceof ControlError ? cause.code : "DESKTOP_OFFLINE";
-      this.schedule();
+      if (generation === this.generation && !this.stopped) {
+        this.error = cause instanceof ControlError ? cause.code : "DESKTOP_OFFLINE";
+        this.schedule();
+      }
     } finally {
-      this.connecting = false;
+      if (generation === this.generation) this.connecting = false;
     }
   }
   private deliver(context: RoutingContext, frame: unknown, ws = this.socket): void {
@@ -280,21 +289,27 @@ export class RemoteService {
   private async tick(): Promise<void> {
     if (this.ticking || !this.ready || !this.pairing) return;
     this.ticking = true;
+    const generation = this.generation;
+    const pairing = this.pairing;
     try {
       if (!this.access || (this.client?.now() ?? Date.now()) >= this.access.expires - 60_000) {
         this.socket?.close();
         return;
       }
-      if (this.pairing.grant?.state === "revoked" && this.pairing.revocationPending)
-        await this.pairing.revoke();
-      await this.pairing.poll();
+      if (pairing.grant?.state === "revoked" && pairing.revocationPending) await pairing.revoke();
+      if (this.stopped || generation !== this.generation) return;
+      await pairing.poll();
+      if (this.stopped || generation !== this.generation) return;
       await this.bridge.tick((context, frame) => this.deliver(context, frame));
-      this.error = null;
+      if (generation === this.generation) this.error = null;
     } catch (cause) {
-      this.error = cause instanceof ControlError ? cause.code : "CONTROL_FAILED";
+      if (generation === this.generation)
+        this.error = cause instanceof ControlError ? cause.code : "CONTROL_FAILED";
     } finally {
-      this.ticking = false;
-      this.schedule();
+      if (generation === this.generation) {
+        this.ticking = false;
+        this.schedule();
+      }
     }
   }
   async invite() {
@@ -313,7 +328,13 @@ export class RemoteService {
     return this.snapshot();
   }
   async revoke() {
-    if (!this.pairing) fail("AUTH_REQUIRED");
+    if (!this.pairing) {
+      const grant = loadRemoteGrant();
+      if (!grant) fail("AUTH_REQUIRED");
+      saveRemoteGrant(revoked(grant, Date.now(), "user_revoked"));
+      this.bridge.clear();
+      return this.snapshot();
+    }
     try {
       await this.pairing.revoke();
     } catch (cause) {
@@ -324,12 +345,22 @@ export class RemoteService {
   }
   stop(): void {
     this.stopped = true;
+    this.generation++;
     this.ready = false;
+    this.connecting = false;
+    this.ticking = false;
     this.bridge.clear();
     if (this.timer) clearTimeout(this.timer);
-    this.socket?.close();
+    this.timer = null;
+    if (this.eventTimer) clearTimeout(this.eventTimer);
+    this.eventTimer = null;
+    const socket = this.socket;
     this.socket = null;
+    socket?.close();
     this.access = null;
+    this.pairing = null;
+    this.client = null;
+    this.error = null;
   }
   dispose(): void {
     this.stop();

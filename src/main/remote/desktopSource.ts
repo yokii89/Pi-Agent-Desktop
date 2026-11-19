@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
-import type { PiChatMessage } from "../../shared/ipc";
 import { pendingUiRequests } from "../session/extensionUi";
+import { getPiAgentDir } from "../session/piInfo";
 import {
   abortSession,
   fetchSessionMessages,
@@ -17,10 +17,10 @@ import {
   getRuntimeState,
   listRuntimeSnapshots,
 } from "../session/runtimeCoordinator";
-import { listSessions } from "../session/sessionHistory";
-import { readSessionTranscript } from "../session/sessionTranscriptRead";
+import { encodeCwdToSessionDir, listSessions } from "../session/sessionHistory";
 import { getSettings } from "../settings/settings";
 import { remoteInteractionAnswer } from "./interactionAnswer";
+import { projectRemoteMessages, readRemoteHistory, remoteSessionFile } from "./readAdapter";
 import type {
   ReadOnlySource,
   RemoteInteraction,
@@ -34,16 +34,8 @@ const publicId = (projectId: string, file: string) =>
   createHash("sha256").update(`${projectId}\0${file}`).digest("hex");
 const idForCreate = (creationKey: string) =>
   `remote_${createHash("sha256").update(creationKey).digest("hex").slice(0, 48)}`;
-const textFromContent = (content: unknown): string =>
-  (Array.isArray(content) ? content : [])
-    .flatMap((block) => {
-      if (!block || typeof block !== "object") return [];
-      const item = block as { type?: unknown; text?: unknown };
-      return item.type === "text" && typeof item.text === "string"
-        ? [sanitizeRemoteText(item.text)]
-        : [];
-    })
-    .join("\n");
+const sessionRoot = () => path.join(getPiAgentDir(), "sessions");
+const sessionDirectory = (cwd: string) => path.join(sessionRoot(), encodeCwdToSessionDir(cwd));
 
 /** Only sanitized public DTOs leave the desktop main process. */
 export class DesktopReadOnlySource implements ReadOnlySource {
@@ -64,6 +56,13 @@ export class DesktopReadOnlySource implements ReadOnlySource {
         const normalize = (value: string) =>
           process.platform === "win32" ? path.resolve(value).toLowerCase() : path.resolve(value);
         if (!s.cwd || normalize(s.cwd) !== normalize(project.dir)) continue;
+        try {
+          await remoteSessionFile(s.file, sessionDirectory(project.dir), sessionRoot());
+        } catch {
+          continue;
+        }
+        if (!getSettings().projects.some((p) => p.id === project.id && p.dir === project.dir))
+          continue;
         const id = publicId(project.id, s.file);
         refs.set(id, { file: s.file, projectId: project.id, root: project.dir });
         const live = runtime.find((r) => r.sessionFile === s.file);
@@ -83,11 +82,12 @@ export class DesktopReadOnlySource implements ReadOnlySource {
         });
       }
     }
+    for (const [id, ref] of this.refs) if (projectIds.includes(ref.projectId)) this.refs.delete(id);
     this.refs = new Map([...this.refs, ...refs]);
     for (const [id, ref] of this.refs)
       if (!getSettings().projects.some((p) => p.id === ref.projectId && p.dir === ref.root))
         this.refs.delete(id);
-    return result;
+    return result.filter((session) => this.refs.has(session.id));
   }
   private ref(session: RemoteSession): { file: string; projectId: string; root: string } {
     const ref = this.refs.get(session.id);
@@ -101,38 +101,23 @@ export class DesktopReadOnlySource implements ReadOnlySource {
   }
   async messages(session: RemoteSession): Promise<RemoteMessage[]> {
     const ref = this.ref(session);
+    const directory = sessionDirectory(ref.root);
+    await remoteSessionFile(ref.file, directory, sessionRoot());
     const liveId = liveSessionIdForFile(ref.file);
-    let raw: unknown[];
+    let messages: RemoteMessage[];
     if (liveId && hasSession(liveId)) {
       try {
-        raw = await fetchSessionMessages(liveId);
+        const raw = await fetchSessionMessages(liveId);
+        messages = projectRemoteMessages(raw, getRuntimeState(liveId) === "busy");
       } catch {
-        raw = (await readSessionTranscript(ref.file)).messages;
+        messages = await readRemoteHistory(ref.file, directory, sessionRoot());
       }
     } else {
-      raw = (await readSessionTranscript(ref.file)).messages;
+      messages = await readRemoteHistory(ref.file, directory, sessionRoot());
     }
-    const running = liveId ? getRuntimeState(liveId) === "busy" : false;
-    return raw.flatMap((value, index): RemoteMessage[] => {
-      if (!value || typeof value !== "object") return [];
-      const item = value as PiChatMessage;
-      if (item.display === false || !["user", "assistant", "toolResult"].includes(item.role))
-        return [];
-      const role = item.role === "toolResult" ? "tool" : item.role;
-      const body = textFromContent(item.content);
-      if (!body) return [];
-      const parts: RemoteMessage[] = [];
-      for (let start = 0; start < body.length; start += 6_000) {
-        const isLast = start + 6_000 >= body.length;
-        parts.push({
-          id: `m_${index}_${start}`,
-          role: role as RemoteMessage["role"],
-          text: body.slice(start, start + 6_000),
-          state: role === "assistant" && running && isLast ? "running" : "done",
-        });
-      }
-      return parts;
-    });
+    await remoteSessionFile(ref.file, directory, sessionRoot());
+    this.ref(session);
+    return messages;
   }
   async interactions(projectIds: string[]): Promise<RemoteInteraction[]> {
     const sessions = await this.sessions(projectIds);

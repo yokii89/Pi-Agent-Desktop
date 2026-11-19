@@ -9,6 +9,9 @@ describe("remote text redaction", () => {
       ),
     ).toBe("Open [local path] and [local path]");
   });
+  it("removes UNC network paths without exposing server or share names", () => {
+    expect(sanitizeRemoteText("Open \\\\server\\share\\private.txt")).toBe("Open [local path]");
+  });
   it("preserves ordinary prose, HTTPS links and relative project paths", () => {
     const text = "https://example.com/docs/remote-protocol.html; open src/main/session.ts";
     expect(sanitizeRemoteText(text)).toBe(text);
