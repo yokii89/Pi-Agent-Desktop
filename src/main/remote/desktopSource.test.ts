@@ -76,6 +76,65 @@ describe("desktop remote catalog integration", () => {
       path.join("C:/pi", "sessions"),
     );
   });
+  it("shares the catalog scan between concurrent session and interaction reads only", async () => {
+    const source = new DesktopReadOnlySource();
+    const [sessions, interactions] = await Promise.all([
+      source.sessions(["allowed", "unknown"]),
+      source.interactions(["unknown", "allowed", "allowed"]),
+    ]);
+    expect(sessions).toHaveLength(1);
+    expect(interactions).toEqual([]);
+    expect(f.list).toHaveBeenCalledTimes(1);
+    expect(f.guard).toHaveBeenCalledTimes(1);
+
+    f.list.mockResolvedValue([]);
+    expect(await source.sessions(["allowed"])).toEqual([]);
+    expect(f.list).toHaveBeenCalledTimes(2);
+    await expect(source.messages(sessions[0])).rejects.toThrow("RESOURCE_UNAVAILABLE");
+  });
+  it("retries a failed shared scan instead of retaining the rejected promise", async () => {
+    const source = new DesktopReadOnlySource();
+    f.list.mockRejectedValueOnce(new Error("disk unavailable"));
+    const results = await Promise.allSettled([
+      source.sessions(["allowed"]),
+      source.interactions(["allowed"]),
+    ]);
+    expect(results.map((result) => result.status)).toEqual(["rejected", "rejected"]);
+    expect(f.list).toHaveBeenCalledTimes(1);
+    expect(await source.sessions(["allowed"])).toHaveLength(1);
+    expect(f.list).toHaveBeenCalledTimes(2);
+  });
+  it("keeps concurrent scans of different project scopes isolated", async () => {
+    const source = new DesktopReadOnlySource();
+    f.list.mockImplementation(async (dir: string) => [
+      { ...summary(), cwd: dir, file: `${dir}/history.jsonl` },
+    ]);
+    const [allowed, privateSessions] = await Promise.all([
+      source.sessions(["allowed"]),
+      source.sessions(["private"]),
+    ]);
+    expect(allowed.map((session) => session.projectId)).toEqual(["allowed"]);
+    expect(privateSessions.map((session) => session.projectId)).toEqual(["private"]);
+    expect(f.list).toHaveBeenCalledTimes(2);
+  });
+  it("does not share scans across changes to a configured project directory", async () => {
+    const source = new DesktopReadOnlySource();
+    let resolve!: (items: ReturnType<typeof summary>[]) => void;
+    f.list.mockReturnValueOnce(
+      new Promise<ReturnType<typeof summary>[]>((done) => {
+        resolve = done;
+      }),
+    );
+    const stale = source.sessions(["allowed"]);
+    f.projects = [{ id: "allowed", name: "Allowed", dir: "C:/projects/new" }];
+    f.list.mockResolvedValue([{ ...summary(), cwd: "C:/projects/new", file: "new.jsonl" }]);
+    const current = await source.sessions(["allowed"]);
+    resolve([summary()]);
+    expect(await stale).toEqual([]);
+    expect(current).toHaveLength(1);
+    expect(f.list).toHaveBeenCalledTimes(2);
+    expect(await source.messages(current[0])).toHaveLength(1);
+  });
   it("hides escaped files and files claiming another working directory", async () => {
     const source = new DesktopReadOnlySource();
     f.guard.mockRejectedValue(new Error("RESOURCE_UNAVAILABLE"));

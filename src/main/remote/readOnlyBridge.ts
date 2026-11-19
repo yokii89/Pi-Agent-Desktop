@@ -110,6 +110,8 @@ export class ReadOnlyBridge {
   private devices = new Map<string, DeviceWatch>();
   private generations = new Map<string, number>();
   private sequences = new Map<string, number>();
+  private pendingTick: Promise<void> | null = null;
+  private generation = 0;
   constructor(
     private readonly grant: () => Grant | null,
     private readonly source: ReadOnlySource,
@@ -121,6 +123,8 @@ export class ReadOnlyBridge {
     }),
   ) {}
   clear(): void {
+    this.generation++;
+    this.pendingTick = null;
     this.leases.clear();
     this.devices.clear();
     this.generations.clear();
@@ -374,7 +378,19 @@ export class ReadOnlyBridge {
     return failedFrame(requestId, result.errorCode ?? "RESULT_UNCERTAIN");
   }
   /** Events tell clients to check their cursor against the authoritative history. */
-  async tick(send: (context: RoutingContext, frame: unknown) => void): Promise<void> {
+  tick(send: (context: RoutingContext, frame: unknown) => void): Promise<void> {
+    if (this.pendingTick) return this.pendingTick;
+    // Event notifications and periodic reconciliation can arrive during the same disk read.
+    const pending = this.sync(send, this.generation).finally(() => {
+      if (this.pendingTick === pending) this.pendingTick = null;
+    });
+    this.pendingTick = pending;
+    return pending;
+  }
+  private async sync(
+    send: (context: RoutingContext, frame: unknown) => void,
+    generation: number,
+  ): Promise<void> {
     for (const [deviceId, watch] of this.devices) {
       if (this.now() >= watch.expires) {
         this.devices.delete(deviceId);
@@ -385,8 +401,12 @@ export class ReadOnlyBridge {
         const projects = this.allowedProjects();
         const [sessions, interactions] = await Promise.all([
           this.source.sessions(projects),
-          this.source.interactions(projects),
+          this.grant()?.scopes.includes("interactions.read")
+            ? this.source.interactions(projects)
+            : Promise.resolve([]),
         ]);
+        if (generation !== this.generation) return;
+        if (this.devices.get(deviceId) !== watch) continue;
         const fingerprint = JSON.stringify([sessions, interactions]);
         if (watch.previous !== fingerprint) {
           watch.previous = fingerprint;
@@ -394,8 +414,11 @@ export class ReadOnlyBridge {
           this.emit(watch.context, "overview", send);
         }
       } catch {
-        this.devices.delete(deviceId);
-        this.leases.delete(deviceId);
+        if (generation !== this.generation) return;
+        if (this.devices.get(deviceId) === watch) {
+          this.devices.delete(deviceId);
+          this.leases.delete(deviceId);
+        }
       }
     }
     for (const [deviceId, lease] of this.leases) {
@@ -410,6 +433,7 @@ export class ReadOnlyBridge {
               .history(lease.session)
               .then(({ view, tail }) => `${historyRevision(view)}:${tail.revision}`)
           : JSON.stringify(await this.source.messages(lease.session));
+        if (generation !== this.generation) return;
         if (this.leases.get(deviceId) !== lease) continue;
         if (lease.previous !== fingerprint) {
           lease.previous = fingerprint;
@@ -417,6 +441,7 @@ export class ReadOnlyBridge {
           this.emit(lease.context, lease.session.id, send);
         }
       } catch (cause) {
+        if (generation !== this.generation) return;
         if (
           this.leases.get(deviceId) === lease &&
           !(cause instanceof ControlError && cause.code === "STATE_UNAVAILABLE")

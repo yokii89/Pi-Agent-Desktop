@@ -43,6 +43,7 @@ const sessionDirectory = (cwd: string) => path.join(sessionRoot(), encodeCwdToSe
 /** Only sanitized public DTOs leave the desktop main process. */
 export class DesktopReadOnlySource implements ReadOnlySource {
   private refs = new Map<string, { file: string; projectId: string; root: string }>();
+  private readonly pendingSessions = new Map<string, Promise<RemoteSession[]>>();
   private readonly historyReader = new RemoteHistoryReader();
   private readonly historyTail = new RemoteHistoryTail();
 
@@ -63,11 +64,24 @@ export class DesktopReadOnlySource implements ReadOnlySource {
       description: { "zh-CN": "", "en-US": "" },
     }));
   }
-  async sessions(projectIds: string[]): Promise<RemoteSession[]> {
+  sessions(projectIds: string[]): Promise<RemoteSession[]> {
+    const selected = new Set(projectIds);
+    const projects = getSettings().projects.filter((project) => selected.has(project.id));
+    // Share only work in flight; completed scans must not hide disk or configuration changes.
+    const key = JSON.stringify(projects.map(({ id, dir }) => [id, dir]));
+    const active = this.pendingSessions.get(key);
+    if (active) return active;
+    const pending = this.scanSessions(projects).finally(() => this.pendingSessions.delete(key));
+    this.pendingSessions.set(key, pending);
+    return pending;
+  }
+  private async scanSessions(
+    projects: readonly { id: string; dir: string }[],
+  ): Promise<RemoteSession[]> {
     const result: RemoteSession[] = [];
     const refs = new Map<string, { file: string; projectId: string; root: string }>();
     const runtime = listRuntimeSnapshots();
-    for (const project of getSettings().projects.filter((p) => projectIds.includes(p.id))) {
+    for (const project of projects) {
       for (const s of await listSessions(project.dir)) {
         const normalize = (value: string) =>
           process.platform === "win32" ? path.resolve(value).toLowerCase() : path.resolve(value);
@@ -98,8 +112,10 @@ export class DesktopReadOnlySource implements ReadOnlySource {
         });
       }
     }
-    for (const [id, ref] of this.refs) if (projectIds.includes(ref.projectId)) this.refs.delete(id);
-    this.refs = new Map([...this.refs, ...refs]);
+    const scanned = new Map(projects.map((project) => [project.id, project.dir]));
+    for (const [id, ref] of this.refs)
+      if (scanned.get(ref.projectId) === ref.root) this.refs.delete(id);
+    for (const [id, ref] of refs) this.refs.set(id, ref);
     for (const [id, ref] of this.refs)
       if (!getSettings().projects.some((p) => p.id === ref.projectId && p.dir === ref.root))
         this.refs.delete(id);

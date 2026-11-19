@@ -294,6 +294,138 @@ describe("desktop read-only authority and project isolation", () => {
     expect(emitted).toHaveLength(2);
     expect(f.bridge.isViewing("allowed-session")).toBe(false);
   });
+  it("does not read interaction details when only the session overview is authorized", async () => {
+    const interactions = vi.fn(async () => []);
+    const f = fixture(READ_SCOPES, { interactions });
+    await f.bridge.request(f.context(), frame("projects.list"));
+    const send = vi.fn();
+    await f.bridge.tick(send);
+    expect(interactions).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledWith(
+      f.context(),
+      expect.objectContaining({ sessionId: "overview" }),
+    );
+  });
+  it("still detects interaction changes when that capability is granted", async () => {
+    const interactions = vi.fn(async () => [
+      {
+        id: "interaction",
+        sessionId: "allowed-session",
+        projectId: "allowed",
+        kind: "confirm" as const,
+        title: "Continue?",
+        description: "",
+      },
+    ]);
+    const f = fixture([...READ_SCOPES, "interactions.read"], { interactions });
+    await f.bridge.request(f.context(), frame("projects.list"));
+    const send = vi.fn();
+    await f.bridge.tick(send);
+    expect(send).toHaveBeenCalledTimes(1);
+    interactions.mockResolvedValue([]);
+    await f.bridge.tick(send);
+    expect(interactions).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+  it("shares overlapping event and periodic ticks without duplicate reads or events", async () => {
+    const readSessions = vi.fn(async (_projects: string[]) => [sessions[0]]);
+    const f = fixture(READ_SCOPES, { sessions: readSessions });
+    await f.bridge.request(
+      f.context(),
+      frame("sessions.subscribe", { sessionId: "allowed-session" }),
+    );
+    let resolve!: (items: RemoteSession[]) => void;
+    readSessions.mockClear();
+    readSessions.mockReturnValueOnce(
+      new Promise<RemoteSession[]>((done) => {
+        resolve = done;
+      }),
+    );
+    const send = vi.fn();
+    const ticks = [f.bridge.tick(send), f.bridge.tick(send), f.bridge.tick(send)];
+    resolve([sessions[0]]);
+    await Promise.all(ticks);
+    expect(readSessions).toHaveBeenCalledTimes(1);
+    expect(f.historyReads()).toBe(1);
+    expect(send).toHaveBeenCalledTimes(2);
+
+    await f.bridge.tick(send);
+    expect(readSessions).toHaveBeenCalledTimes(2);
+    expect(f.historyReads()).toBe(2);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+  it("lets a fresh connection sync while discarding a tick from before clear", async () => {
+    const readSessions = vi.fn(async (_projects: string[]) => [sessions[0]]);
+    const f = fixture(READ_SCOPES, { sessions: readSessions });
+    await f.bridge.request(
+      f.context(),
+      frame("sessions.subscribe", { sessionId: "allowed-session" }),
+    );
+    let resolve!: (items: RemoteSession[]) => void;
+    readSessions.mockReturnValueOnce(
+      new Promise<RemoteSession[]>((done) => {
+        resolve = done;
+      }),
+    );
+    const staleSend = vi.fn();
+    const stale = f.bridge.tick(staleSend);
+    f.bridge.clear();
+    await f.bridge.request(
+      f.context(2),
+      frame("sessions.subscribe", { sessionId: "allowed-session" }),
+    );
+    const send = vi.fn();
+    await f.bridge.tick(send);
+    expect(send).toHaveBeenCalledTimes(2);
+    resolve([sessions[0]]);
+    await stale;
+    expect(staleSend).not.toHaveBeenCalled();
+    expect(f.historyReads()).toBe(1);
+    await f.bridge.tick(send);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+  it("does not let a failed stale tick remove the new connection's subscription", async () => {
+    const readSessions = vi.fn(async (_projects: string[]) => [sessions[0]]);
+    const f = fixture(READ_SCOPES, { sessions: readSessions });
+    await f.bridge.request(f.context(), frame("projects.list"));
+    let reject!: (cause: Error) => void;
+    readSessions.mockReturnValueOnce(
+      new Promise<RemoteSession[]>((_resolve, fail) => {
+        reject = fail;
+      }),
+    );
+    const staleSend = vi.fn();
+    const stale = f.bridge.tick(staleSend);
+    f.bridge.clear();
+    await f.bridge.request(
+      f.context(2),
+      frame("sessions.subscribe", { sessionId: "allowed-session" }),
+    );
+    reject(new Error("old connection read failed"));
+    await stale;
+    const send = vi.fn();
+    await f.bridge.tick(send);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(staleSend).not.toHaveBeenCalled();
+    expect(f.bridge.isViewing("allowed-session")).toBe(true);
+  });
+  it("still rechecks revocation after a shared tick finishes its reads", async () => {
+    const readSessions = vi.fn(async (_projects: string[]) => [sessions[0]]);
+    const f = fixture(READ_SCOPES, { sessions: readSessions });
+    await f.bridge.request(f.context(), frame("projects.list"));
+    let resolve!: (items: RemoteSession[]) => void;
+    readSessions.mockReturnValueOnce(
+      new Promise<RemoteSession[]>((done) => {
+        resolve = done;
+      }),
+    );
+    const send = vi.fn();
+    const ticks = [f.bridge.tick(send), f.bridge.tick(send)];
+    f.revoke();
+    resolve([sessions[0]]);
+    await Promise.all(ticks);
+    expect(send).not.toHaveBeenCalled();
+  });
   it("expires a viewing lease without continuing to read its session history", async () => {
     const f = fixture();
     await f.bridge.request(
