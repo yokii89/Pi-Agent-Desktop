@@ -1,6 +1,10 @@
 import { ipcMain } from "electron";
 import { exact, id, projectIds, type Scope } from "../../shared/remote";
-import { REMOTE_IPC, type RemoteEnrollment } from "../../shared/remoteDesktop";
+import {
+  REMOTE_IPC,
+  type RemoteAccountInput,
+  type RemoteEnrollment,
+} from "../../shared/remoteDesktop";
 import { envelopeAsync } from "../ipc/envelope";
 import { getMainWindow } from "../window/createMainWindow";
 import { remoteService } from "./remoteService";
@@ -26,6 +30,7 @@ export function registerRemoteIpc(): void {
   };
   handle(REMOTE_IPC.snapshot, async () => remoteService.snapshot());
   handle(REMOTE_IPC.enroll, (request) => remoteService.enroll(request as RemoteEnrollment));
+  handle(REMOTE_IPC.account, (request) => remoteService.setAccount(request as RemoteAccountInput));
   handle(REMOTE_IPC.connect, async () => {
     await remoteService.start();
     return remoteService.snapshot();

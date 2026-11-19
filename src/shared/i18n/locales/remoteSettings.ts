@@ -1,6 +1,25 @@
 import { defineMessages } from "../types";
 
 export const remoteSettingsMessages = defineMessages({
+  "settings.remote.v2": { "zh-CN": "共享中转 v2", "en-US": "Shared relay v2" },
+  "settings.remote.v1": { "zh-CN": "单电脑中转 v1", "en-US": "Single-computer relay v1" },
+  "settings.remote.protocol": { "zh-CN": "中转协议", "en-US": "Relay protocol" },
+  "settings.remote.accountToken": { "zh-CN": "账号访问令牌", "en-US": "Account access token" },
+  "settings.remote.accountHint": {
+    "zh-CN":
+      "联调入口：输入身份提供方签发的短期访问令牌，仅驻内存。正式浏览器登录尚未接入，令牌失效后需要重新验证。",
+    "en-US":
+      "Integration access: supply a short-lived access token from your identity provider. Kept in memory only. Browser sign-in is not connected yet; verify again after token expiry.",
+  },
+  "settings.remote.desktopName": { "zh-CN": "电脑显示名称", "en-US": "Computer display name" },
+  "settings.remote.accountConnect": {
+    "zh-CN": "验证账号并连接",
+    "en-US": "Verify account and connect",
+  },
+  "settings.remote.readonly": {
+    "zh-CN": "此 v2 中转目前仅开放项目、会话与历史读取。",
+    "en-US": "This v2 relay currently allows reading projects, sessions and history only.",
+  },
   "settings.remote.setup": { "zh-CN": "首次设置", "en-US": "First-time setup" },
   "settings.remote.connectTitle": { "zh-CN": "连接中转服务", "en-US": "Connect your relay" },
   "settings.remote.origin": { "zh-CN": "中转地址（HTTPS）", "en-US": "Relay address (HTTPS)" },

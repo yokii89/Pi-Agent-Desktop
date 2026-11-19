@@ -7,6 +7,7 @@ import { unwrap } from "../../services/ipc";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import styles from "./MobilePairingPanel.module.css";
+import { RemoteAccountForm } from "./remote/RemoteAccountForm";
 import { RemoteEnrollmentForm } from "./remote/RemoteEnrollmentForm";
 import { RemoteGrantedDevice } from "./remote/RemoteGrantedDevice";
 import { RemotePairingApproval } from "./remote/RemotePairingApproval";
@@ -26,6 +27,7 @@ export function MobilePairingPanel() {
   const id = useId();
   const [snapshot, setSnapshot] = useState<RemoteSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
+  const [protocol, setProtocol] = useState<1 | 2>(2);
   const [error, setError] = useState<string | null>(null);
   const [readFailed, setReadFailed] = useState(false);
   const [connectionExpanded, setConnectionExpanded] = useState(false);
@@ -113,6 +115,7 @@ export function MobilePairingPanel() {
         <RemotePairingApproval
           key={`${claim.claimId}:${claim.confirmationCode}`}
           claim={claim}
+          readOnly={snapshot.controlVersion === 2}
           relayOrigin={snapshot.relayOrigin ?? ""}
           projects={snapshot.projects}
           busy={busy}
@@ -144,15 +147,46 @@ export function MobilePairingPanel() {
               </>
             ) : !snapshot.configured ? (
               <>
-                <RemoteEnrollmentForm
-                  busy={busy}
-                  onEnroll={(request) => void run((api) => api.enroll(request))}
-                />
+                <fieldset disabled={busy} className={styles.card}>
+                  <legend>{t("settings.remote.protocol")}</legend>
+                  {([2, 1] as const).map((version) => (
+                    <label key={version} className={styles.choice}>
+                      <input
+                        type="radio"
+                        name={`${id}-protocol`}
+                        checked={protocol === version}
+                        onChange={() => setProtocol(version)}
+                      />
+                      <span>{t(version === 2 ? "settings.remote.v2" : "settings.remote.v1")}</span>
+                    </label>
+                  ))}
+                </fieldset>
+                {protocol === 2 ? (
+                  <RemoteAccountForm
+                    busy={busy}
+                    onEnroll={(request) => void run((api) => api.enroll(request))}
+                  />
+                ) : (
+                  <RemoteEnrollmentForm
+                    busy={busy}
+                    onEnroll={(request) => void run((api) => api.enroll(request))}
+                  />
+                )}
                 {securityNotice}
                 {errorNotice}
               </>
             ) : (
               <>
+                {snapshot.controlVersion === 2 && !snapshot.connected && (
+                  <RemoteAccountForm
+                    busy={busy}
+                    relayOrigin={snapshot.relayOrigin ?? undefined}
+                    onAccount={(request) => void run((api) => api.account(request))}
+                  />
+                )}
+                {snapshot.controlVersion === 2 && (
+                  <p className={styles.hint}>{t("settings.remote.readonly")}</p>
+                )}
                 {!snapshot.connected && (
                   <aside className={styles.offlineBanner}>
                     <WifiSlash size={20} weight="regular" />

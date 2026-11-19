@@ -24,6 +24,7 @@ const OPTIONAL_ACTIONS = [
 
 interface RemotePairingApprovalProps {
   claim: ClaimStatus;
+  readOnly?: boolean;
   relayOrigin: string;
   projects: RemoteSnapshot["projects"];
   busy: boolean;
@@ -36,6 +37,7 @@ interface RemotePairingApprovalProps {
 /** Mounted per claim so no confirmation or permission choice carries over to another phone. */
 export function RemotePairingApproval({
   claim,
+  readOnly = false,
   relayOrigin,
   projects,
   busy,
@@ -176,7 +178,7 @@ export function RemotePairingApproval({
                 <h3 id={`${id}-permissions`}>{t("settings.remote.permissions")}</h3>
               </div>
               <div className={styles.permissions}>
-                {OPTIONAL_ACTIONS.map((scope) => (
+                {(readOnly ? [] : OPTIONAL_ACTIONS).map((scope) => (
                   <label className={styles.permissionOption} key={scope}>
                     <input
                       type="checkbox"

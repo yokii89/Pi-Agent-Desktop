@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { app, safeStorage } from "electron";
 import {
+  accountId,
   type DesktopCredential,
   exact,
   fail,
@@ -83,17 +84,24 @@ export function loadRemoteCredential(): DesktopCredential | null {
   if (!data) return null;
   if (!safeStorage.isEncryptionAvailable()) fail("SECURE_STORAGE_UNAVAILABLE");
   try {
-    const r = exact(JSON.parse(safeStorage.decryptString(Buffer.from(data.credential, "base64"))), [
+    const raw: unknown = JSON.parse(
+      safeStorage.decryptString(Buffer.from(data.credential, "base64")),
+    );
+    const v2 =
+      !!raw && typeof raw === "object" && "controlVersion" in raw && raw.controlVersion === 2;
+    const r = exact(raw, [
       "version",
       "relayOrigin",
       "relayInstanceId",
       "desktopId",
       "desktopCredential",
       "expiresAt",
+      ...(v2 ? ["controlVersion", "accountId"] : []),
     ]);
     if (r.version !== 1) fail("STATE_UNAVAILABLE");
     return {
       version: 1,
+      ...(v2 ? { controlVersion: 2 as const, accountId: accountId(r.accountId) } : {}),
       relayOrigin: origin(r.relayOrigin),
       relayInstanceId: id(r.relayInstanceId),
       desktopId: id(r.desktopId),

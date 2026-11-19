@@ -69,7 +69,7 @@ export interface Grant extends Binding {
 }
 export interface PairingQr {
   kind: "pidesk.pairing";
-  pairingVersion: 1;
+  pairingVersion: 1 | 2;
   relayOrigin: string;
   relayInstanceId: string;
   desktopId: string;
@@ -79,7 +79,7 @@ export interface PairingQr {
 }
 export interface Meta {
   relayInstanceId: string;
-  controlVersion: 1;
+  controlVersion: 1 | 2;
   securityProfile: typeof SECURITY_PROFILE;
 }
 export interface ClaimStatus {
@@ -104,6 +104,8 @@ export interface PendingOperationRef {
 }
 export interface MobileCredential extends Binding {
   version: 1;
+  controlVersion?: 2;
+  accountId?: string;
   projectIds: string[];
   scopes: Scope[];
   relayOrigin: string;
@@ -126,6 +128,8 @@ export interface IssuedTokens {
 }
 export interface DesktopCredential {
   version: 1;
+  controlVersion?: 2;
+  accountId?: string;
   relayOrigin: string;
   relayInstanceId: string;
   desktopId: string;
@@ -270,10 +274,11 @@ export function parseQr(raw: string): PairingQr {
     "invitationSecret",
     "expiresAt",
   ]);
-  if (r.kind !== "pidesk.pairing" || r.pairingVersion !== 1) return fail("VERSION_MISMATCH");
+  if (r.kind !== "pidesk.pairing" || (r.pairingVersion !== 1 && r.pairingVersion !== 2))
+    return fail("VERSION_MISMATCH");
   return {
     kind: "pidesk.pairing",
-    pairingVersion: 1,
+    pairingVersion: r.pairingVersion as 1 | 2,
     relayOrigin: origin(r.relayOrigin),
     relayInstanceId: id(r.relayInstanceId),
     desktopId: id(r.desktopId),
@@ -283,12 +288,34 @@ export function parseQr(raw: string): PairingQr {
   };
 }
 export function parseMeta(v: unknown): Meta {
-  const r = exact(v, ["relayInstanceId", "controlVersion", "securityProfile"]);
-  if (r.controlVersion !== 1) fail("VERSION_MISMATCH");
+  const raw = record(v);
+  const r = exact(
+    v,
+    raw.controlVersion === 2
+      ? [
+          "relayInstanceId",
+          "controlVersion",
+          "businessVersion",
+          "securityProfile",
+          "maxDesktops",
+          "membershipLeaseMs",
+          "deliveryAck",
+        ]
+      : ["relayInstanceId", "controlVersion", "securityProfile"],
+  );
+  if (r.controlVersion !== 1 && r.controlVersion !== 2) fail("VERSION_MISMATCH");
+  if (
+    r.controlVersion === 2 &&
+    (r.businessVersion !== 1 ||
+      r.maxDesktops !== 5 ||
+      r.deliveryAck !== "cumulative-v1" ||
+      r.membershipLeaseMs !== 30_000)
+  )
+    fail("VERSION_MISMATCH");
   if (r.securityProfile !== SECURITY_PROFILE) fail("SECURITY_PROFILE_MISMATCH");
   return {
     relayInstanceId: id(r.relayInstanceId),
-    controlVersion: 1,
+    controlVersion: r.controlVersion as 1 | 2,
     securityProfile: SECURITY_PROFILE,
   };
 }
@@ -444,7 +471,10 @@ export function parseMobileCredential(v: unknown): MobileCredential {
       : Object.hasOwn(raw, "scopes")
         ? withScopes
         : legacyKeys;
-  const r = exact(v, allowedKeys);
+  const v2 = raw.controlVersion === 2;
+  const r = exact(v, v2 ? [...currentKeys, "controlVersion", "accountId"] : allowedKeys);
+  if (v2 && (typeof r.accountId !== "string" || !/^account-v1-[0-9a-f]{64}$/.test(r.accountId)))
+    fail("AUTH_REQUIRED");
   if (r.version !== 1 || r.securityProfile !== SECURITY_PROFILE) fail("SECURITY_PROFILE_MISMATCH");
   if ((r.state !== "activating" && r.state !== "active") || typeof r.refreshPending !== "boolean")
     fail("INVALID_FRAME");
@@ -477,6 +507,7 @@ export function parseMobileCredential(v: unknown): MobileCredential {
     : [];
   return {
     ...parseBinding(r),
+    ...(v2 ? { controlVersion: 2 as const, accountId: r.accountId as string } : {}),
     projectIds: projectIdsValue,
     scopes,
     pendingOperations,

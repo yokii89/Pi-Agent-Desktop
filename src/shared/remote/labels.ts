@@ -1,4 +1,26 @@
 export const pairingMessages = {
+  "remote.error.ACCOUNT_AUTH_REQUIRED": {
+    "zh-CN": "请先验证此中转的账号访问令牌。",
+    "en-US": "Verify your account access token for this relay first.",
+  },
+  "remote.error.ACCOUNT_CHANGED": {
+    "zh-CN": "账号会话已更改，请重新连接。",
+    "en-US": "The account session changed. Connect again.",
+  },
+  "remote.error.ACCOUNT_CLOSED": {
+    "zh-CN": "此账号已关闭或正在撤销。",
+    "en-US": "This account is closed or being revoked.",
+  },
+  "remote.error.REGISTRATION_PENDING": {
+    "zh-CN": "登记结果待核对。请保留原请求，在账号设备目录检查状态；不要重复创建电脑。",
+    "en-US":
+      "Registration needs reconciliation. Keep the original request and check your account directory before creating another computer.",
+  },
+  "remote.error.REGISTRATION_CREDENTIAL_LOST": {
+    "zh-CN": "该电脑已登记，但凭证未能安全恢复。请在账号设备目录移除此登记，再重新登记。",
+    "en-US":
+      "The computer is registered but its credential cannot be recovered. Remove this registration from your account directory, then register again.",
+  },
   "remote.title": { "zh-CN": "手机配对", "en-US": "Mobile pairing" },
   "remote.description": {
     "zh-CN": "电脑始终保留项目与会话控制权；配对时逐项选择手机可用的能力。",

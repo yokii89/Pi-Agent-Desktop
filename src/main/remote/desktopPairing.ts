@@ -112,6 +112,8 @@ export class DesktopPairing {
     const ids = projectIds(selected).sort();
     const selectedScopes = [...new Set(scopes)].sort();
     if (
+      (this.client.version === 2 &&
+        selectedScopes.some((scope) => scope !== "projects.read" && scope !== "sessions.read")) ||
       selectedScopes.some((scope) => !(ALL_SCOPES as readonly string[]).includes(scope)) ||
       !selectedScopes.includes("projects.read") ||
       !selectedScopes.includes("sessions.read") ||

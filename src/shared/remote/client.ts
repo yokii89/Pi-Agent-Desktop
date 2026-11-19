@@ -1,6 +1,5 @@
 import {
   byteLength,
-  CONTROL_VERSION,
   ControlError,
   exact,
   fail,
@@ -11,6 +10,8 @@ import {
   record,
   timestamp,
 } from "./contract";
+import { type V2ClientOptions, v2Path } from "./v2";
+
 export interface ControlResponse {
   status: number;
   headers: { get(name: string): string | null };
@@ -35,32 +36,49 @@ export class ControlClient {
     private readonly newId: () => string,
     private readonly fetcher: ControlFetch = fetch,
     private readonly clock = Date.now,
+    readonly v2?: V2ClientOptions,
   ) {
     origin(relayOrigin);
+  }
+  get version(): 1 | 2 {
+    return this.v2 ? 2 : 1;
+  }
+  async socketHeaders(): Promise<Record<string, string>> {
+    if (!this.v2) return {};
+    return {
+      Authorization: `Bearer ${await this.v2.account.token()}`,
+      "X-PiDesk-Control-Version": "2",
+      "X-Request-Id": id(this.newId()),
+    };
   }
   now(): number {
     return this.clock() + this.serverOffsetMs;
   }
   async request<T>(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "DELETE",
     path: string,
     token: string | null,
     body: Record<string, unknown> | null,
     decode: (v: unknown) => T,
+    stableRequestId?: string,
   ): Promise<T> {
-    if (!/^\/v1\/[a-zA-Z0-9_/-]+$/.test(path)) fail("INVALID_PATH");
-    const requestId = id(this.newId());
+    if (this.v2) path = v2Path(path, this.v2.desktopId);
+    else if (!/^\/v1\/[a-zA-Z0-9_/-]+$/.test(path)) fail("INVALID_PATH");
+    const requestId = id(stableRequestId ?? this.newId());
     const payload =
       body === null
         ? undefined
-        : JSON.stringify({ controlVersion: CONTROL_VERSION, requestId, ...body });
+        : JSON.stringify({ ...body, controlVersion: this.version, requestId });
     if (payload && byteLength(payload) > LIMITS.controlBytes) fail("FRAME_TOO_LARGE");
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "X-PiDesk-Control-Version": "1",
+      "X-PiDesk-Control-Version": String(this.version),
       "X-Request-Id": requestId,
     };
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (this.v2) {
+      if (path !== "/v2/meta") headers.Authorization = `Bearer ${await this.v2.account.token()}`;
+      if (token) headers["X-PiDesk-Room-Authorization"] = `Bearer ${token}`;
+    } else if (token) headers.Authorization = `Bearer ${token}`;
     let response: ControlResponse;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
@@ -80,11 +98,15 @@ export class ControlClient {
     }
     let r: Record<string, unknown>;
     try {
-      r = record(parseJson(await response.text()));
+      r = record(parseJson(await response.text(), this.v2 ? 32_768 : LIMITS.controlBytes));
     } catch {
       throw new ControlError("NETWORK_UNCERTAIN", true);
     }
-    if (r.controlVersion !== 1 || r.requestId !== requestId) fail("VERSION_MISMATCH");
+    if (
+      r.controlVersion !== this.version ||
+      (r.requestId !== requestId && !(this.v2 && path === "/v2/meta" && r.requestId === null))
+    )
+      fail("VERSION_MISMATCH");
     timestamp(r.serverTime);
     this.serverOffsetMs = Date.parse(r.serverTime as string) - this.clock();
     if (r.error) {

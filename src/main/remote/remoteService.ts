@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import {
+  record as asRecord,
   ControlClient,
   ControlError,
+  DeliveryReceiver,
   type DesktopCredential,
   exact,
   fail,
@@ -10,16 +12,22 @@ import {
   origin,
   parseJson,
   parseMeta,
-  parsePrincipal,
+  RelayAccountSession,
   type RoutingContext,
   record,
+  relayPrincipal,
   revoked,
   type Scope,
   SECURITY_PROFILE,
+  sameBinding,
   secret,
   timestamp,
 } from "../../shared/remote";
-import type { RemoteEnrollment, RemoteSnapshot } from "../../shared/remoteDesktop";
+import type {
+  RemoteAccountInput,
+  RemoteEnrollment,
+  RemoteSnapshot,
+} from "../../shared/remoteDesktop";
 import { setRemoteViewing } from "../session/idleReclaim";
 import { subscribeSessionEvents, subscribeSessionUiEvents } from "../session/sessionEvents";
 import {
@@ -36,7 +44,10 @@ import { DesktopPairing } from "./desktopPairing";
 import { DesktopReadOnlySource } from "./desktopSource";
 import { RemoteOperationLedger } from "./operationLedger";
 import { ReadOnlyBridge } from "./readOnlyBridge";
+import { relaySocket } from "./relaySocket";
 export class RemoteService {
+  private readonly account = new RelayAccountSession(randomUUID);
+  private enrolling = false;
   private credential: DesktopCredential | null = null;
   private pairing: DesktopPairing | null = null;
   private client: ControlClient | null = null;
@@ -49,6 +60,7 @@ export class RemoteService {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private ticking = false;
   private connecting = false;
+  private reconnectAttempts = 0;
   private generation = 0;
   private readonly source = new DesktopReadOnlySource();
   private readonly operations = new RemoteOperationLedger({
@@ -82,6 +94,8 @@ export class RemoteService {
   snapshot(): RemoteSnapshot {
     return {
       configured: !!this.credential,
+      controlVersion: this.credential?.controlVersion ?? 1,
+      accountReady: !!this.account.getSnapshot(),
       relayOrigin: this.credential?.relayOrigin ?? null,
       connected: this.ready,
       qr: this.pairing?.qr ?? null,
@@ -93,6 +107,16 @@ export class RemoteService {
     };
   }
   async enroll(raw: RemoteEnrollment): Promise<RemoteSnapshot> {
+    if (this.enrolling) fail("BUSY");
+    this.enrolling = true;
+    try {
+      return await this.enrollRequest(raw);
+    } finally {
+      this.enrolling = false;
+    }
+  }
+  private async enrollRequest(raw: RemoteEnrollment): Promise<RemoteSnapshot> {
+    if (asRecord(raw).controlVersion === 2) return this.enrollV2(raw);
     const r = exact(raw, ["relayOrigin", "enrollmentTicket", "trustRelay"]);
     if (r.trustRelay !== true) fail("SECURITY_PROFILE_MISMATCH");
     if (!remoteStorageAvailable()) fail("SECURE_STORAGE_UNAVAILABLE");
@@ -117,13 +141,104 @@ export class RemoteService {
     await this.start();
     return this.snapshot();
   }
+  async setAccount(raw: RemoteAccountInput): Promise<RemoteSnapshot> {
+    const r = exact(raw, ["relayOrigin", "accessToken"]);
+    const credential = this.credential ?? loadRemoteCredential();
+    if (credential && (credential.controlVersion !== 2 || credential.relayOrigin !== r.relayOrigin))
+      fail("AUTH_REQUIRED");
+    this.stop();
+    await this.account.connect(origin(r.relayOrigin), String(r.accessToken));
+    if (credential && this.account.getSnapshot()?.accountId !== credential.accountId) {
+      this.account.disconnect();
+      fail("AUTH_REQUIRED");
+    }
+    await this.start();
+    return this.snapshot();
+  }
+  private async enrollV2(raw: RemoteEnrollment): Promise<RemoteSnapshot> {
+    const r = exact(raw, [
+      "controlVersion",
+      "relayOrigin",
+      "accessToken",
+      "displayName",
+      "registrationRequestId",
+      "trustRelay",
+    ]);
+    if (r.trustRelay !== true) fail("SECURITY_PROFILE_MISMATCH");
+    if (!remoteStorageAvailable()) fail("SECURE_STORAGE_UNAVAILABLE");
+    if (this.credential || loadRemoteCredential()) fail("DEVICE_LIMIT_REACHED");
+    const relayOrigin = origin(r.relayOrigin);
+    await this.account.connect(relayOrigin, String(r.accessToken));
+    const client = this.account.client();
+    const meta = await client.request("GET", "/v1/meta", null, null, parseMeta);
+    const credential = await client.request(
+      "POST",
+      "/v2/account/me/desktops",
+      null,
+      {
+        displayName: r.displayName,
+        platform:
+          process.platform === "win32"
+            ? "windows"
+            : process.platform === "darwin"
+              ? "macos"
+              : "linux",
+        capabilities: ["pairing-v1", "readonly-relay-v1"],
+      },
+      (value) => {
+        const result = record(value);
+        exact(value, Object.hasOwn(result, "credential") ? ["item", "credential"] : ["item"]);
+        const item = asRecord(result.item);
+        if (!result.credential)
+          fail(
+            item.state === "registered" ? "REGISTRATION_CREDENTIAL_LOST" : "REGISTRATION_PENDING",
+          );
+        const c = exact(result.credential, [
+          "desktopId",
+          "relayInstanceId",
+          "desktopCredential",
+          "expiresAt",
+        ]);
+        if (
+          item.state !== "registered" ||
+          c.desktopId !== item.desktopId ||
+          c.relayInstanceId !== meta.relayInstanceId
+        )
+          fail("AUTH_REQUIRED");
+        return {
+          version: 1 as const,
+          controlVersion: 2 as const,
+          accountId: this.account.access(relayOrigin).accountId,
+          relayOrigin,
+          desktopId: id(c.desktopId),
+          relayInstanceId: id(c.relayInstanceId),
+          desktopCredential: secret(c.desktopCredential),
+          expiresAt: timestamp(c.expiresAt),
+        };
+      },
+      id(r.registrationRequestId),
+    );
+    saveRemoteCredential(credential);
+    const saved = loadRemoteCredential();
+    if (
+      !saved ||
+      saved.desktopCredential !== credential.desktopCredential ||
+      saved.desktopId !== credential.desktopId
+    )
+      fail("SECURE_STORAGE_UNAVAILABLE");
+    await this.start();
+    return this.snapshot();
+  }
   async start(): Promise<void> {
     if (!this.stopped) return;
     try {
       this.credential = loadRemoteCredential();
       if (!this.credential) return;
       if (Date.now() >= Date.parse(this.credential.expiresAt)) fail("AUTH_EXPIRED");
-      this.client = new ControlClient(this.credential.relayOrigin, randomUUID);
+      this.client =
+        this.credential.controlVersion === 2
+          ? this.account.client(this.credential.desktopId, this.credential.accountId)
+          : new ControlClient(this.credential.relayOrigin, randomUUID);
       this.pairing = new DesktopPairing(
         this.client,
         { read: loadRemoteGrant, save: saveRemoteGrant },
@@ -144,9 +259,20 @@ export class RemoteService {
   private schedule(): void {
     if (this.timer) clearTimeout(this.timer);
     if (!this.stopped)
-      this.timer = setTimeout(() => {
-        void (this.ready ? this.tick() : this.connect());
-      }, LIMITS.pollMs);
+      this.timer = setTimeout(
+        () => {
+          void (this.ready ? this.tick() : this.connect());
+        },
+        this.ready ? LIMITS.pollMs : this.reconnectDelay(),
+      );
+  }
+  private reconnectDelay(): number {
+    const attempt = this.reconnectAttempts++;
+    return attempt === 0
+      ? LIMITS.pollMs
+      : Math.round(
+          Math.min(60_000, LIMITS.pollMs * 2 ** Math.min(attempt, 5)) * (0.8 + Math.random() * 0.4),
+        );
   }
   private async connect(): Promise<void> {
     if (this.stopped || this.connecting || !this.credential || !this.client) return;
@@ -171,86 +297,130 @@ export class RemoteService {
       if (this.stopped || generation !== this.generation) return;
       this.access = access;
       const token = access.token;
-      const ws = new WebSocket(
-        `${credential.relayOrigin.replace(/^https:/, "wss:")}/v1/connect/${credential.desktopId}`,
-      );
+      const version = credential.controlVersion ?? 1;
+      const url = `${credential.relayOrigin.replace(/^https:/, "wss:")}/v${version}/connect/${credential.desktopId}`;
+      const headers = version === 2 ? await client.socketHeaders() : null;
+      if (this.stopped || generation !== this.generation) return;
+      const ws = headers ? relaySocket(url, headers) : new WebSocket(url);
+      const delivery = new DeliveryReceiver();
+      let received = Promise.resolve();
+      let queued = 0;
+      let queuedBytes = 0;
       this.socket = ws;
       const authTimer = setTimeout(() => ws.close(), LIMITS.authMs);
       let authenticated = false;
       ws.onopen = () => {
         if (this.socket === ws)
-          ws.send(JSON.stringify({ controlVersion: 1, type: "authenticate", accessToken: token }));
+          ws.send(
+            JSON.stringify({ controlVersion: version, type: "authenticate", accessToken: token }),
+          );
       };
       ws.onmessage = (event) => {
-        void (async () => {
-          if (this.socket !== ws) return;
-          const r = record(
-            parseJson(String(event.data), LIMITS.businessBytes + LIMITS.controlBytes),
-          );
-          if (!authenticated) {
-            if (
-              r.controlVersion !== 1 ||
-              r.type !== "authenticated" ||
-              r.securityProfile !== SECURITY_PROFILE
-            )
-              fail("AUTH_REQUIRED");
-            const p = parsePrincipal(r.principal);
-            if (
-              p.role !== "desktop" ||
-              p.desktopId !== this.credential?.desktopId ||
-              p.relayInstanceId !== this.credential?.relayInstanceId
-            )
-              fail("AUTH_REQUIRED");
-            authenticated = true;
-            clearTimeout(authTimer);
-            await this.pairing?.reconcile(this.startup);
-            if (this.socket !== ws) return;
-            this.startup = false;
-            this.ready = true;
-            this.error = null;
-            this.schedule();
-            return;
-          }
-          if (!this.ready) return;
-          const routed = exact(r, ["controlVersion", "type", "context", "frame"]);
-          if (routed.controlVersion !== 1 || routed.type !== "route") fail("FORBIDDEN");
-          const contextValue = exact(routed.context, [
-            "relayInstanceId",
-            "desktopId",
-            "deviceId",
-            "grantId",
-            "grantVersion",
-            "connectionGeneration",
-            "accessExpiresAt",
-          ]);
-          const p = parsePrincipal({ ...contextValue, role: "mobile" });
-          const { role: _role, ...context } = p;
-          if (
-            context.desktopId !== this.credential?.desktopId ||
-            context.relayInstanceId !== this.credential?.relayInstanceId
-          )
-            fail("AUTH_REQUIRED");
-          let frame: unknown;
-          try {
-            frame = await this.bridge.request(context, routed.frame);
-          } catch (cause) {
-            const request = record(routed.frame);
-            frame = {
-              version: 1,
-              type: "response",
-              id: id(request.id),
-              status: "failed",
-              error: {
-                code: cause instanceof ControlError ? cause.code : "RESOURCE_UNAVAILABLE",
-                message: cause instanceof ControlError ? cause.code : "RESOURCE_UNAVAILABLE",
-              },
-            };
-          }
-          this.deliver(context, frame, ws);
-        })().catch((cause) => {
-          this.error = cause instanceof ControlError ? cause.code : "CONTROL_FAILED";
+        const raw = String(event.data);
+        const size = new TextEncoder().encode(raw).byteLength;
+        queued++;
+        queuedBytes += size;
+        if (queued > 8 || queuedBytes > 262_144) {
           ws.close();
-        });
+          return;
+        }
+        received = received
+          .then(async () => {
+            if (this.socket !== ws) return;
+            const r = record(
+              parseJson(
+                raw,
+                version === 2 ? LIMITS.businessBytes : LIMITS.businessBytes + LIMITS.controlBytes,
+              ),
+            );
+            if (!authenticated) {
+              if (
+                r.controlVersion !== version ||
+                r.type !== "authenticated" ||
+                r.securityProfile !== SECURITY_PROFILE
+              )
+                fail("AUTH_REQUIRED");
+              const p = relayPrincipal(r.principal, version, credential.accountId);
+              if (
+                p.role !== "desktop" ||
+                p.desktopId !== this.credential?.desktopId ||
+                p.relayInstanceId !== this.credential?.relayInstanceId
+              )
+                fail("AUTH_REQUIRED");
+              authenticated = true;
+              clearTimeout(authTimer);
+              await this.pairing?.reconcile(this.startup);
+              if (this.socket !== ws) return;
+              this.startup = false;
+              this.ready = true;
+              this.reconnectAttempts = 0;
+              this.error = null;
+              this.schedule();
+              return;
+            }
+            if (!this.ready) return;
+            const routed = exact(
+              r,
+              version === 2
+                ? ["controlVersion", "type", "context", "frame", "deliverySequence"]
+                : ["controlVersion", "type", "context", "frame"],
+            );
+            if (routed.controlVersion !== version || routed.type !== "route") fail("FORBIDDEN");
+            const contextValue = exact(routed.context, [
+              "relayInstanceId",
+              "desktopId",
+              "deviceId",
+              "grantId",
+              "grantVersion",
+              "connectionGeneration",
+              "accessExpiresAt",
+              ...(version === 2 ? ["accountId"] : []),
+            ]);
+            const p = relayPrincipal(
+              { ...contextValue, role: "mobile" },
+              version,
+              credential.accountId,
+            );
+            const { role: _role, ...context } = p;
+            if (
+              context.desktopId !== this.credential?.desktopId ||
+              context.relayInstanceId !== this.credential?.relayInstanceId
+            )
+              fail("AUTH_REQUIRED");
+            if (version === 2)
+              ws.send(
+                JSON.stringify({
+                  controlVersion: 2,
+                  type: "ack",
+                  deliverySequence: delivery.accept(r),
+                }),
+              );
+            let frame: unknown;
+            try {
+              frame = await this.bridge.request(context, routed.frame);
+            } catch (cause) {
+              const request = record(routed.frame);
+              frame = {
+                version: 1,
+                type: "response",
+                id: id(request.id),
+                status: "failed",
+                error: {
+                  code: cause instanceof ControlError ? cause.code : "RESOURCE_UNAVAILABLE",
+                  message: cause instanceof ControlError ? cause.code : "RESOURCE_UNAVAILABLE",
+                },
+              };
+            }
+            this.deliver(context, frame, ws);
+          })
+          .catch((cause) => {
+            this.error = cause instanceof ControlError ? cause.code : "CONTROL_FAILED";
+            ws.close();
+          })
+          .finally(() => {
+            queued--;
+            queuedBytes -= size;
+          });
       };
       ws.onclose = () => {
         clearTimeout(authTimer);
@@ -281,13 +451,19 @@ export class RemoteService {
     const grant = loadRemoteGrant();
     if (
       grant?.state !== "active" ||
-      grant.deviceId !== context.deviceId ||
-      grant.grantVersion !== context.grantVersion ||
+      !sameBinding(grant, context) ||
       Date.now() >= Date.parse(grant.expiresAt) ||
       Date.now() >= Date.parse(context.accessExpiresAt)
     )
       return;
-    ws.send(JSON.stringify({ controlVersion: 1, type: "deliver", context, frame }));
+    ws.send(
+      JSON.stringify({
+        controlVersion: this.credential?.controlVersion ?? 1,
+        type: "deliver",
+        context,
+        frame,
+      }),
+    );
   }
   private async tick(): Promise<void> {
     if (this.ticking || !this.ready || !this.pairing) return;

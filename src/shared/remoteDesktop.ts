@@ -3,6 +3,7 @@ import type { ClaimStatus, Grant, PairingQr, Scope } from "./remote";
 export const REMOTE_IPC = {
   snapshot: "pidesk:remote:snapshot",
   enroll: "pidesk:remote:enroll",
+  account: "pidesk:remote:account",
   connect: "pidesk:remote:connect",
   disconnect: "pidesk:remote:disconnect",
   invite: "pidesk:remote:invite",
@@ -12,6 +13,8 @@ export const REMOTE_IPC = {
 } as const;
 export interface RemoteSnapshot {
   configured: boolean;
+  controlVersion?: 1 | 2;
+  accountReady?: boolean;
   relayOrigin: string | null;
   connected: boolean;
   qr: PairingQr | null;
@@ -24,6 +27,7 @@ export interface RemoteSnapshot {
 export interface RemoteApi {
   snapshot(): Promise<IpcResult<RemoteSnapshot>>;
   enroll(request: RemoteEnrollment): Promise<IpcResult<RemoteSnapshot>>;
+  account(request: RemoteAccountInput): Promise<IpcResult<RemoteSnapshot>>;
   connect(): Promise<IpcResult<RemoteSnapshot>>;
   disconnect(): Promise<IpcResult<RemoteSnapshot>>;
   invite(): Promise<IpcResult<RemoteSnapshot>>;
@@ -32,8 +36,21 @@ export interface RemoteApi {
   reject(): Promise<IpcResult<RemoteSnapshot>>;
   revoke(): Promise<IpcResult<RemoteSnapshot>>;
 }
-export interface RemoteEnrollment {
+export interface RemoteAccountInput {
   relayOrigin: string;
-  enrollmentTicket: string;
-  trustRelay: boolean;
+  accessToken: string;
 }
+export type RemoteEnrollment =
+  | {
+      relayOrigin: string;
+      enrollmentTicket: string;
+      trustRelay: boolean;
+    }
+  | {
+      controlVersion: 2;
+      relayOrigin: string;
+      accessToken: string;
+      displayName: string;
+      registrationRequestId: string;
+      trustRelay: boolean;
+    };
