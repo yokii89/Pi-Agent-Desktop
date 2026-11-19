@@ -35,7 +35,10 @@ let isRemoteViewing: ScheduledOccupancy = () => false;
 
 /** A remote viewer has a bounded lease; it never changes the desktop watched-session identity. */
 export function setRemoteViewing(fn: ScheduledOccupancy): () => void {
-  isRemoteViewing = fn; return () => { if (isRemoteViewing === fn) isRemoteViewing = () => false; };
+  isRemoteViewing = fn;
+  return () => {
+    if (isRemoteViewing === fn) isRemoteViewing = () => false;
+  };
 }
 let scanTimer: ReturnType<typeof setInterval> | null = null;
 let initialized = false;

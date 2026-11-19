@@ -103,6 +103,7 @@ export interface PendingOperationRef {
   createdAt: number;
 }
 export interface MobileCredential extends Binding {
+  version: 1;
   projectIds: string[];
   scopes: Scope[];
   relayOrigin: string;

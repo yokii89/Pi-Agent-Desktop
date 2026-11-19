@@ -7,15 +7,23 @@ import {
   type Grant,
   LIMITS,
   type PairingQr,
-  type Scope,
   parseClaim,
   parseGrant,
   parseQr,
   projectIds,
-  READ_SCOPES,
   revoked,
+  type Scope,
   sameBinding,
 } from "../../shared/remote";
+
+function sameAuthorization(a: Grant, b: Grant): boolean {
+  return (
+    sameBinding(a, b) &&
+    JSON.stringify([...a.projectIds].sort()) === JSON.stringify([...b.projectIds].sort()) &&
+    JSON.stringify([...a.scopes].sort()) === JSON.stringify([...b.scopes].sort())
+  );
+}
+
 export interface DesktopGrantStore {
   read(): Grant | null;
   save(grant: Grant): void;
@@ -89,18 +97,26 @@ export class DesktopPairing {
     if (this.claim?.state === "activating") await this.activate(this.claim);
   }
   async approve(
+    claimId: string,
     selected: string[],
     scopes: Scope[] = ["projects.read", "sessions.read"],
   ): Promise<void> {
     const claim = this.claim;
-    if (!claim || !["claimed", "approved"].includes(claim.state)) fail("PAIRING_UNAVAILABLE");
+    if (
+      !claim ||
+      claim.claimId !== claimId ||
+      !["claimed", "approved"].includes(claim.state) ||
+      this.client.now() >= Date.parse(claim.expiresAt)
+    )
+      fail("PAIRING_UNAVAILABLE");
     const ids = projectIds(selected).sort();
     const selectedScopes = [...new Set(scopes)].sort();
     if (
       selectedScopes.some((scope) => !(ALL_SCOPES as readonly string[]).includes(scope)) ||
       !selectedScopes.includes("projects.read") ||
       !selectedScopes.includes("sessions.read") ||
-      (selectedScopes.includes("interactions.answer") && !selectedScopes.includes("interactions.read"))
+      (selectedScopes.includes("interactions.answer") &&
+        !selectedScopes.includes("interactions.read"))
     )
       fail("FORBIDDEN");
     if (ids.some((p) => !this.projects().includes(p))) fail("INVALID_PROJECTS");
@@ -154,10 +170,11 @@ export class DesktopPairing {
       !local ||
       !remote ||
       local.state === "revoked" ||
-      !sameBinding(local, remote) ||
+      !sameAuthorization(local, remote) ||
+      claim.deviceId !== local.deviceId ||
+      remote.state === "revoked" ||
       !remote.activationId ||
       this.client.now() >= Date.parse(local.activationExpiresAt) ||
-      JSON.stringify(local.projectIds) !== JSON.stringify(remote.projectIds) ||
       local.projectIds.some((p) => !this.projects().includes(p))
     )
       fail("DEVICE_REVOKED");
@@ -180,7 +197,11 @@ export class DesktopPairing {
         return parseGrant(r.grant);
       },
     );
-    if (!sameBinding(local, confirmed)) fail("DEVICE_REVOKED");
+    if (!sameAuthorization(local, confirmed) || confirmed.activationId !== local.activationId) {
+      this.store.save(revoked(local, this.client.now(), "activation_mismatch"));
+      this.revocationPending = true;
+      fail("DEVICE_REVOKED");
+    }
   }
   async reconcile(startup: boolean): Promise<void> {
     const local = this.grant;
@@ -199,7 +220,7 @@ export class DesktopPairing {
     if (
       current &&
       current.state !== "revoked" &&
-      (!remote || remote.state === "revoked" || !sameBinding(current, remote))
+      (!remote || remote.state === "revoked" || !sameAuthorization(current, remote))
     )
       this.store.save(revoked(current, this.client.now(), "reconciliation"));
     this.revocationPending = false;

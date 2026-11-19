@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { fail, id } from "../../shared/remote";
+import { ControlError, fail, id } from "../../shared/remote";
 
 export type RemoteOperationState = "running" | "completed" | "failed" | "uncertain";
 export type WriteCommand =
@@ -31,11 +31,16 @@ const RETAIN_MS = 30 * 86_400_000;
 export class RemoteOperationLedger {
   private readonly operations = new Map<string, RemoteOperation>();
   private readonly flights = new Map<string, Promise<unknown>>();
+  private loaded = false;
   constructor(
     private readonly store: RemoteOperationStore,
     private readonly now = Date.now,
-  ) {
-    for (const loaded of store.load()) {
+  ) {}
+  private ensureLoaded(): void {
+    if (this.loaded) return;
+    const saved = this.store.load();
+    this.operations.clear();
+    for (const loaded of saved) {
       const operation = structuredClone(loaded);
       if (operation.state === "running") {
         operation.state = "uncertain";
@@ -46,23 +51,30 @@ export class RemoteOperationLedger {
     }
     this.prune();
     this.persist();
+    this.loaded = true;
   }
   private key(deviceId: string, requestId: string): string {
     return `${deviceId}:${requestId}`;
   }
   private fingerprint(command: WriteCommand, payload: unknown): string {
-    return createHash("sha256").update(JSON.stringify([command, payload])).digest("hex");
+    return createHash("sha256")
+      .update(JSON.stringify([command, payload]))
+      .digest("hex");
   }
   private persist(): void {
-    this.store.save([...this.operations.values()]);
+    this.store.save(
+      [...this.operations.values()].map((operation) => ({ ...operation, result: null })),
+    );
   }
-  private prune(): void {
+  private prune(reserve = 0): void {
     const now = this.now();
     for (const [key, operation] of this.operations)
       if (operation.state !== "running" && now - operation.updatedAt > RETAIN_MS)
         this.operations.delete(key);
-    while (this.operations.size >= MAX_OPERATIONS) {
-      const oldest = [...this.operations.entries()].find(([, operation]) => operation.state !== "running");
+    while (this.operations.size + reserve > MAX_OPERATIONS) {
+      const oldest = [...this.operations.entries()].find(
+        ([, operation]) => operation.state !== "running",
+      );
       if (!oldest) fail("BUSY");
       this.operations.delete(oldest[0]);
     }
@@ -77,6 +89,7 @@ export class RemoteOperationLedger {
     payload: unknown,
     action: () => Promise<unknown>,
   ): Promise<Pick<RemoteOperation, "state" | "result" | "errorCode">> {
+    this.ensureLoaded();
     id(requestId);
     const key = this.key(deviceId, requestId);
     const digest = this.fingerprint(command, payload);
@@ -91,7 +104,7 @@ export class RemoteOperationLedger {
       return this.describe(current);
     }
 
-    this.prune();
+    this.prune(1);
     const operation: RemoteOperation = {
       deviceId,
       requestId,
@@ -106,19 +119,18 @@ export class RemoteOperationLedger {
     // The durable marker must be written before any session side effect.
     this.persist();
 
-    const flight = (async (): Promise<unknown> => {
-      let result: unknown;
+    const flight = (async (): Promise<void> => {
       try {
-        result = await action();
+        operation.result = await action();
+        operation.state = "completed";
       } catch (cause) {
-        operation.state = "failed";
-        operation.errorCode = cause instanceof Error ? cause.message : "CONTROL_FAILED";
-        operation.updatedAt = this.now();
-        this.persist();
-        return null;
+        const rejected =
+          cause instanceof ControlError &&
+          !["CONTROL_FAILED", "NETWORK_UNCERTAIN", "RESULT_UNCERTAIN"].includes(cause.code);
+        // An RPC failure can arrive after a side effect; only explicit rejections are definitive.
+        operation.state = rejected ? "failed" : "uncertain";
+        operation.errorCode = rejected ? cause.code : "RESULT_UNCERTAIN";
       }
-      operation.state = "completed";
-      operation.result = result;
       operation.updatedAt = this.now();
       try {
         this.persist();
@@ -133,13 +145,13 @@ export class RemoteOperationLedger {
           // The on-disk running marker still prevents replay after restart.
         }
       }
-      return result;
     })().finally(() => this.flights.delete(key));
     this.flights.set(key, flight);
     await flight;
     return this.describe(operation);
   }
   lookup(deviceId: string, requestId: string): Omit<RemoteOperation, "digest"> | null {
+    this.ensureLoaded();
     id(requestId);
     const operation = this.operations.get(this.key(deviceId, requestId));
     if (!operation) return null;

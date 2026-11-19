@@ -1,5 +1,5 @@
-import type { Catalog, LocaleId, MessageDefs } from "../types";
 import { pairingMessages } from "../../remote/labels";
+import type { Catalog, LocaleId, MessageDefs } from "../types";
 import { browserMessages } from "./browser";
 import { chromeMessages } from "./chrome";
 import { commandPaletteMessages } from "./commandPalette";

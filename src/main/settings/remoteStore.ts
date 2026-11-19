@@ -42,7 +42,11 @@ function read(): RemoteFile | null {
       return cache;
     }
     const current = exact(raw, ["version", "credential", "grant", "operations"]);
-    if (current.version !== 2 || typeof current.credential !== "string" || !Array.isArray(current.operations))
+    if (
+      current.version !== 2 ||
+      typeof current.credential !== "string" ||
+      !Array.isArray(current.operations)
+    )
       fail("STATE_UNAVAILABLE");
     cache = {
       version: 2,

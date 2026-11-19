@@ -25,7 +25,7 @@ export function RemoteDevicesPanel() {
   const [trust, setTrust] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [scopes, setScopes] = useState<Scope[]>(["projects.read", "sessions.read"]);
-  const [matched, setMatched] = useState(false);
+  const [matchedClaimId, setMatchedClaimId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [image, setImage] = useState("");
@@ -56,11 +56,14 @@ export function RemoteDevicesPanel() {
       clearInterval(timer);
     };
   }, []);
+  const claimId = snapshot?.claim?.claimId;
+  const matched = !!claimId && matchedClaimId === claimId;
   useEffect(() => {
+    if (!claimId) return;
     setSelected([]);
     setScopes(["projects.read", "sessions.read"]);
-    setMatched(false);
-  }, []);
+    setMatchedClaimId(null);
+  }, [claimId]);
   const qr = snapshot?.qr ? JSON.stringify(snapshot.qr) : null;
   useEffect(() => {
     let active = true;
@@ -174,6 +177,9 @@ export function RemoteDevicesPanel() {
                   .map((id) => snapshot.projects.find((p) => p.id === id)?.name ?? id)
                   .join(" · ")}
               </p>
+              <p data-selectable-text>
+                {snapshot.grant?.scopes.map((scope) => text(`scope.${scope}`)).join(" · ")}
+              </p>
               <Button variant="danger" disabled={busy} onClick={() => setConfirmRevoke(true)}>
                 {text("revoke")}
               </Button>
@@ -214,31 +220,44 @@ export function RemoteDevicesPanel() {
                     <input
                       type="checkbox"
                       checked={matched}
-                      onChange={(e) => setMatched(e.target.checked)}
+                      disabled={busy}
+                      onChange={(e) =>
+                        setMatchedClaimId(e.target.checked ? (claimId ?? null) : null)
+                      }
                     />
                     {text("confirmationHint")}
                   </label>
                   <fieldset className={styles.projects}>
                     <legend>{text("capabilities")}</legend>
-                    {([
-                      ["sessions.send", "scope.sessions.send"],
-                      ["sessions.stop", "scope.sessions.stop"],
-                      ["sessions.create", "scope.sessions.create"],
-                      ["interactions.read", "scope.interactions.read"],
-                      ["interactions.answer", "scope.interactions.answer"],
-                    ] as const).map(([scope, label]) => (
+                    {(
+                      [
+                        ["sessions.send", "scope.sessions.send"],
+                        ["sessions.stop", "scope.sessions.stop"],
+                        ["sessions.create", "scope.sessions.create"],
+                        ["interactions.read", "scope.interactions.read"],
+                        ["interactions.answer", "scope.interactions.answer"],
+                      ] as const
+                    ).map(([scope, label]) => (
                       <label className={styles.choice} key={scope}>
                         <input
                           type="checkbox"
                           checked={scopes.includes(scope)}
-                          disabled={busy || (scope === "interactions.read" && scopes.includes("interactions.answer"))}
-                          onChange={(e) =>
-                            setScopes((current) =>
-                              e.target.checked
-                                ? [...current, scope]
-                                : current.filter((value) => value !== scope && !(scope === "interactions.read" && value === "interactions.answer")),
-                            )
-                          }
+                          disabled={busy}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setScopes((current) => {
+                              const next = new Set(current);
+                              if (checked) {
+                                next.add(scope);
+                                if (scope === "interactions.answer") next.add("interactions.read");
+                              } else {
+                                next.delete(scope);
+                                if (scope === "interactions.read")
+                                  next.delete("interactions.answer");
+                              }
+                              return [...next];
+                            });
+                          }}
                         />
                         {text(label)}
                       </label>
@@ -268,7 +287,9 @@ export function RemoteDevicesPanel() {
                     <Button
                       variant="primary"
                       disabled={busy || !matched || selected.length === 0}
-                      onClick={() => void run((api) => api.approve(selected, scopes))}
+                      onClick={() => {
+                        if (claimId) void run((api) => api.approve(claimId, selected, scopes));
+                      }}
                     >
                       {text("approve")}
                     </Button>

@@ -27,7 +27,8 @@ export interface RemoteApi {
   connect(): Promise<IpcResult<RemoteSnapshot>>;
   disconnect(): Promise<IpcResult<RemoteSnapshot>>;
   invite(): Promise<IpcResult<RemoteSnapshot>>;
-  approve(projects: string[], scopes: Scope[]): Promise<IpcResult<RemoteSnapshot>>;
+  /** Approve the exact locally confirmed claim; stale callers and missing claim ids are rejected. */
+  approve(claimId: string, projects: string[], scopes: Scope[]): Promise<IpcResult<RemoteSnapshot>>;
   reject(): Promise<IpcResult<RemoteSnapshot>>;
   revoke(): Promise<IpcResult<RemoteSnapshot>>;
 }

@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { exact, projectIds, type Scope } from "../../shared/remote";
+import { exact, id, projectIds, type Scope } from "../../shared/remote";
 import { REMOTE_IPC, type RemoteEnrollment } from "../../shared/remoteDesktop";
 import { envelopeAsync } from "../ipc/envelope";
 import { remoteService } from "./remoteService";
@@ -24,9 +24,9 @@ export function registerRemoteIpc(): void {
   ipcMain.handle(REMOTE_IPC.invite, () => envelopeAsync(() => remoteService.invite()));
   ipcMain.handle(REMOTE_IPC.approve, (_event, request: unknown) =>
     envelopeAsync(async () => {
-      const r = exact(request, ["projects", "scopes"]);
+      const r = exact(request, ["claimId", "projects", "scopes"]);
       if (!Array.isArray(r.projects) || !Array.isArray(r.scopes)) throw new Error("INVALID_FRAME");
-      return remoteService.approve(projectIds(r.projects), r.scopes as Scope[]);
+      return remoteService.approve(id(r.claimId), projectIds(r.projects), r.scopes as Scope[]);
     }),
   );
   ipcMain.handle(REMOTE_IPC.reject, () => envelopeAsync(() => remoteService.reject()));

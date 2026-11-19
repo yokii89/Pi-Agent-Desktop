@@ -1373,8 +1373,7 @@ function appendTextDelta(
 
   const firstIndex = blocks.findIndex(
     (block) =>
-      (block.kind === "text" ||
-        (block.kind === "thinking" && block.streamSource !== undefined)) &&
+      (block.kind === "text" || (block.kind === "thinking" && block.streamSource !== undefined)) &&
       block.contentIndex === resolvedIndex,
   );
   const next = blocks.filter(
@@ -1396,8 +1395,7 @@ function splitThinkingMarkup(
   const segments: Array<{ kind: "text" | "thinking"; text: string }> = [];
   const opening = "<thinking>";
   const closing = "</thinking>";
-  const findTag = (tag: string, from: number) =>
-    source.toLowerCase().indexOf(tag, from);
+  const findTag = (tag: string, from: number) => source.toLowerCase().indexOf(tag, from);
   let cursor = 0;
 
   while (cursor < source.length) {

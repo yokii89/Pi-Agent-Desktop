@@ -42,12 +42,23 @@ export const pairingMessages = {
     "zh-CN": "允许访问的项目（最多 20 个）",
     "en-US": "Projects allowed (up to 20)",
   },
-  "remote.capabilities": { "zh-CN": "手机能力（单独授权）", "en-US": "Phone capabilities (granted individually)" },
+  "remote.capabilities": {
+    "zh-CN": "手机能力（单独授权）",
+    "en-US": "Phone capabilities (granted individually)",
+  },
+  "remote.scope.projects.read": { "zh-CN": "读取项目列表", "en-US": "Read project list" },
+  "remote.scope.sessions.read": { "zh-CN": "读取会话与历史", "en-US": "Read sessions and history" },
   "remote.scope.sessions.send": { "zh-CN": "发送消息", "en-US": "Send messages" },
   "remote.scope.sessions.stop": { "zh-CN": "停止运行中的任务", "en-US": "Stop running tasks" },
   "remote.scope.sessions.create": { "zh-CN": "新建会话", "en-US": "Create sessions" },
-  "remote.scope.interactions.read": { "zh-CN": "查看待处理交互", "en-US": "View pending interactions" },
-  "remote.scope.interactions.answer": { "zh-CN": "回答待处理交互", "en-US": "Answer pending interactions" },
+  "remote.scope.interactions.read": {
+    "zh-CN": "查看待处理交互",
+    "en-US": "View pending interactions",
+  },
+  "remote.scope.interactions.answer": {
+    "zh-CN": "回答待处理交互",
+    "en-US": "Answer pending interactions",
+  },
   "remote.approve": {
     "zh-CN": "核对一致，授予所选能力",
     "en-US": "Codes match: grant selected capabilities",
@@ -83,7 +94,32 @@ export const pairingMessages = {
   "remote.retry": { "zh-CN": "重新扫码", "en-US": "Scan again" },
   "remote.readOnly": {
     "zh-CN": "手机只能使用电脑明确授权的能力；所有操作仍由电脑本地校验。",
-    "en-US": "The phone can use only capabilities explicitly granted by the desktop; every action is checked locally.",
+    "en-US":
+      "The phone can use only capabilities explicitly granted by the desktop; every action is checked locally.",
+  },
+  "remote.noAnswerPermission": {
+    "zh-CN": "当前设备没有回答交互的授权，请在电脑端检查设备权限。",
+    "en-US":
+      "This device is not allowed to answer interactions. Check permissions on your desktop.",
+  },
+  "remote.operationPending": {
+    "zh-CN": "有 {count} 项操作结果待核对。已连接时会向电脑查询；核对完成前请勿重复提交。",
+    "en-US":
+      "{count} operation(s) need reconciliation. The app will query the desktop when connected; do not resubmit until checked.",
+  },
+  "remote.operationUncertain": {
+    "zh-CN": "电脑记录显示操作可能已执行，但结果尚不确定。请先检查会话，不要再次发送。",
+    "en-US":
+      "The desktop cannot confirm whether the operation took effect. Check the session before sending again.",
+  },
+  "remote.operationNotFound": {
+    "zh-CN": "电脑没有找到该操作记录。请检查会话当前状态后再决定是否重试。",
+    "en-US":
+      "No record was found on the desktop. Check the current session before deciding whether to retry.",
+  },
+  "remote.operationFailed": {
+    "zh-CN": "电脑确认该操作失败。请检查会话当前状态。",
+    "en-US": "The desktop confirmed the operation failed. Check the current session.",
   },
   "remote.openTasks": {
     "zh-CN": "查看授权项目和会话",
@@ -109,7 +145,7 @@ export const pairingMessages = {
     "en-US": "Paired; desktop offline or not connected",
   },
   "remote.phase_connecting": { "zh-CN": "正在连接", "en-US": "Connecting" },
-  "remote.phase_online": { "zh-CN": "已在线（只读）", "en-US": "Online (read-only)" },
+  "remote.phase_online": { "zh-CN": "已在线", "en-US": "Online" },
   "remote.phase_repair_required": {
     "zh-CN": "需要重新配对，请在电脑核对旧授权",
     "en-US": "Pair again; check the old grant on your desktop",

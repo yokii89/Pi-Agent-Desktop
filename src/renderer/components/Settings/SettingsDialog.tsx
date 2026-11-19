@@ -12,7 +12,6 @@ import { LiveSessionsPanel } from "./LiveSessionsPanel";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { PersonalizationPanel } from "./PersonalizationPanel";
 import { ProfilePanel } from "./ProfilePanel";
-import { RemoteDevicesPanel } from "./RemoteDevicesPanel";
 import {
   AboutPanel,
   AppearancePanel,
@@ -21,6 +20,7 @@ import {
   ModelsPanel,
   ProjectsPanel,
 } from "./panels";
+import { RemoteDevicesPanel } from "./RemoteDevicesPanel";
 import { ScheduledSettingsPanel } from "./ScheduledSettingsPanel";
 import styles from "./Settings.module.css";
 import { SettingsNav, type SettingsSectionId } from "./SettingsNav";

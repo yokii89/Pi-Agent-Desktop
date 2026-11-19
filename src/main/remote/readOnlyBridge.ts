@@ -1,7 +1,6 @@
 import {
   authorize,
   byteLength,
-  ControlError,
   exact,
   fail,
   type Grant,
@@ -9,7 +8,12 @@ import {
   type RoutingContext,
   record,
 } from "../../shared/remote";
-import { COMMANDS, MAX_FRAME_BYTES, MAX_PROMPT_LENGTH, type RequestFrame } from "../../shared/remote/business";
+import {
+  COMMANDS,
+  MAX_FRAME_BYTES,
+  MAX_PROMPT_LENGTH,
+  type RequestFrame,
+} from "../../shared/remote/business";
 import { RemoteOperationLedger, type WriteCommand } from "./operationLedger";
 
 export interface RemoteProject {
@@ -49,8 +53,12 @@ export interface ReadOnlySource {
   interactions(projects: string[]): Promise<RemoteInteraction[]>;
   send(session: RemoteSession, message: string): Promise<{ disposition: string }>;
   stop(session: RemoteSession): Promise<{ requested: boolean }>;
-  create(projectId: string, title: string, operationId: string): Promise<RemoteSession>;
-  answer(session: RemoteSession, interactionId: string, value: string | boolean): { settled: boolean };
+  create(projectId: string, title: string, creationKey: string): Promise<RemoteSession>;
+  answer(
+    session: RemoteSession,
+    interactionId: string,
+    value: string | boolean,
+  ): { settled: boolean };
 }
 interface Lease {
   context: RoutingContext;
@@ -210,16 +218,18 @@ export class ReadOnlyBridge {
     if (command === "projects.list") {
       exact(r.payload, []);
       return requestFrame(requestId, {
-        projects: this.source.projects().filter((project) => this.grant()?.projectIds.includes(project.id)),
+        projects: this.source
+          .projects()
+          .filter((project) => this.grant()?.projectIds.includes(project.id)),
       });
     }
     if (command === "sessions.list") {
       const p = exact(r.payload, ["projectId", "cursor", "limit"]);
       const projectId = p.projectId === null ? null : id(p.projectId);
       if (projectId) this.check(context, command, projectId);
-      const projects = this
-        .allowedProjects()
-        .filter((allowed) => !projectId || allowed === projectId);
+      const projects = this.allowedProjects().filter(
+        (allowed) => !projectId || allowed === projectId,
+      );
       const sessions = (await this.source.sessions(projects))
         .filter((session) => projects.includes(session.projectId))
         .sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
@@ -316,7 +326,11 @@ export class ReadOnlyBridge {
       this.check(context, command, projectId);
       if (typeof p.title !== "string" || !p.title.trim() || p.title.length > 120)
         fail("INVALID_FRAME");
-      action = async () => ({ id: (await this.source.create(projectId as string, p.title as string, operationId)).id });
+      // Operation ids are device-local; session identities must also isolate devices and projects.
+      const creationKey = JSON.stringify([context.deviceId, projectId, operationId]);
+      action = async () => ({
+        id: (await this.source.create(projectId as string, p.title as string, creationKey)).id,
+      });
     } else {
       const p = exact(rawPayload, ["operationId", "sessionId", "interactionId", "value"]);
       const target = await this.session(context, command, p.sessionId);
@@ -335,17 +349,10 @@ export class ReadOnlyBridge {
       operationId,
       command,
       payload,
-      async () => {
-        try {
-          const value = await action();
-          this.check(context, command, projectId);
-          return value;
-        } catch (cause) {
-          if (cause instanceof ControlError) throw cause;
-          throw new ControlError("CONTROL_FAILED");
-        }
-      },
+      action,
     );
+    // Record the actual outcome even if access was revoked while the operation was running.
+    this.check(context, command, projectId);
     if (result.state === "completed") return requestFrame(requestId, result.result);
     return failedFrame(requestId, result.errorCode ?? "RESULT_UNCERTAIN");
   }

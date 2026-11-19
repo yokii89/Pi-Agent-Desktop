@@ -212,7 +212,8 @@ export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   next.splashTextEn = normalizeSplashText(next.splashTextEn, DEFAULT_SPLASH_TEXT_EN);
   next.splashTextSub = normalizeSplashText(next.splashTextSub, DEFAULT_SPLASH_TEXT_SUB);
   next.splashSpeed = clampSplashSpeed(next.splashSpeed);
-  if (patch.projects !== undefined) revokeRemoteForProjectChanges(getSettings().projects, next.projects);
+  if (patch.projects !== undefined)
+    revokeRemoteForProjectChanges(getSettings().projects, next.projects);
   const file = settingsFilePath();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const payload = legacySessionTitlesPresent

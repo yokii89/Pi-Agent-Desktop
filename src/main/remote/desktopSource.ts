@@ -3,11 +3,6 @@ import path from "node:path";
 import type { PiChatMessage } from "../../shared/ipc";
 import { pendingUiRequests } from "../session/extensionUi";
 import {
-  ensureSessionReady,
-  getRuntimeState,
-  listRuntimeSnapshots,
-} from "../session/runtimeCoordinator";
-import {
   abortSession,
   fetchSessionMessages,
   fetchSessionState,
@@ -17,22 +12,36 @@ import {
   respondSessionUi,
   setSessionName,
 } from "../session/piSession";
+import {
+  ensureSessionReady,
+  getRuntimeState,
+  listRuntimeSnapshots,
+} from "../session/runtimeCoordinator";
 import { listSessions } from "../session/sessionHistory";
 import { readSessionTranscript } from "../session/sessionTranscriptRead";
 import { getSettings } from "../settings/settings";
-import type { ReadOnlySource, RemoteInteraction, RemoteMessage, RemoteProject, RemoteSession } from "./readOnlyBridge";
+import { remoteInteractionAnswer } from "./interactionAnswer";
+import type {
+  ReadOnlySource,
+  RemoteInteraction,
+  RemoteMessage,
+  RemoteProject,
+  RemoteSession,
+} from "./readOnlyBridge";
 import { sanitizeRemoteText } from "./sanitize";
 
 const publicId = (projectId: string, file: string) =>
   createHash("sha256").update(`${projectId}\0${file}`).digest("hex");
-const idForCreate = (operationId: string) =>
-  `remote_${createHash("sha256").update(operationId).digest("hex").slice(0, 48)}`;
+const idForCreate = (creationKey: string) =>
+  `remote_${createHash("sha256").update(creationKey).digest("hex").slice(0, 48)}`;
 const textFromContent = (content: unknown): string =>
   (Array.isArray(content) ? content : [])
     .flatMap((block) => {
       if (!block || typeof block !== "object") return [];
       const item = block as { type?: unknown; text?: unknown };
-      return item.type === "text" && typeof item.text === "string" ? [sanitizeRemoteText(item.text)] : [];
+      return item.type === "text" && typeof item.text === "string"
+        ? [sanitizeRemoteText(item.text)]
+        : [];
     })
     .join("\n");
 
@@ -107,7 +116,8 @@ export class DesktopReadOnlySource implements ReadOnlySource {
     return raw.flatMap((value, index): RemoteMessage[] => {
       if (!value || typeof value !== "object") return [];
       const item = value as PiChatMessage;
-      if (item.display === false || !["user", "assistant", "toolResult"].includes(item.role)) return [];
+      if (item.display === false || !["user", "assistant", "toolResult"].includes(item.role))
+        return [];
       const role = item.role === "toolResult" ? "tool" : item.role;
       const body = textFromContent(item.content);
       if (!body) return [];
@@ -135,11 +145,19 @@ export class DesktopReadOnlySource implements ReadOnlySource {
         result.push({
           id: pending.id,
           sessionId: session.id,
+          projectId: session.projectId,
           kind: pending.request.method,
           title: sanitizeRemoteText(pending.request.title),
           description: sanitizeRemoteText(pending.request.message ?? ""),
-          ...(pending.request.options ? { options: pending.request.options.map(sanitizeRemoteText) } : {}),
-          ...(pending.request.prefill !== undefined ? { initialValue: sanitizeRemoteText(pending.request.prefill) } : {}),
+          ...(pending.request.options
+            ? { options: pending.request.options.map(sanitizeRemoteText) }
+            : {}),
+          ...(pending.request.prefill !== undefined
+            ? { initialValue: sanitizeRemoteText(pending.request.prefill) }
+            : {}),
+          ...(pending.request.placeholder !== undefined
+            ? { placeholder: sanitizeRemoteText(pending.request.placeholder) }
+            : {}),
         });
       }
       if (result.length >= 100) return result.slice(0, 100);
@@ -163,15 +181,15 @@ export class DesktopReadOnlySource implements ReadOnlySource {
     await abortSession(liveId);
     return { requested: true };
   }
-  async create(projectId: string, title: string, operationId: string): Promise<RemoteSession> {
+  async create(projectId: string, title: string, creationKey: string): Promise<RemoteSession> {
     const project = getSettings().projects.find((p) => p.id === projectId);
     if (!project) throw new Error("RESOURCE_UNAVAILABLE");
-    const sessionId = idForCreate(operationId);
+    const sessionId = idForCreate(creationKey);
     const started = await ensureSessionReady({ sessionId, cwd: project.dir, reason: "manual" });
     await setSessionName(started.sessionId, title);
-    const { fetchSessionState } = await import("../session/piSession");
     const state = await fetchSessionState(started.sessionId);
-    const file = state && typeof state === "object" ? (state as { sessionFile?: unknown }).sessionFile : null;
+    const file =
+      state && typeof state === "object" ? (state as { sessionFile?: unknown }).sessionFile : null;
     if (typeof file !== "string" || !file) throw new Error("STATE_UNAVAILABLE");
     const id = publicId(projectId, file);
     this.refs.set(id, { file, projectId, root: project.dir });
@@ -186,20 +204,17 @@ export class DesktopReadOnlySource implements ReadOnlySource {
       preview: sanitizeRemoteText(summary?.firstUserMessage ?? "").slice(0, 256),
     };
   }
-  answer(session: RemoteSession, interactionId: string, value: string | boolean): { settled: boolean } {
+  answer(
+    session: RemoteSession,
+    interactionId: string,
+    value: string | boolean,
+  ): { settled: boolean } {
     const ref = this.ref(session);
     const liveId = liveSessionIdForFile(ref.file);
     if (!liveId) throw new Error("RESOURCE_UNAVAILABLE");
     const pending = pendingUiRequests(liveId).find((entry) => entry.id === interactionId);
     if (!pending) return { settled: false };
-    const answer =
-      pending.request.method === "confirm"
-        ? typeof value === "boolean"
-          ? { confirmed: value }
-          : { cancelled: true }
-        : typeof value === "string"
-          ? { value }
-          : { cancelled: true };
+    const answer = remoteInteractionAnswer(pending.request, value);
     return { settled: respondSessionUi(liveId, interactionId, answer) };
   }
   isViewingLive(sessionId: string, viewing: (publicId: string) => boolean): boolean {

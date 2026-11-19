@@ -32,8 +32,8 @@ import {
 } from "../settings/remoteStore";
 import { getSettings } from "../settings/settings";
 import { DesktopPairing } from "./desktopPairing";
-import { RemoteOperationLedger } from "./operationLedger";
 import { DesktopReadOnlySource } from "./desktopSource";
+import { RemoteOperationLedger } from "./operationLedger";
 import { ReadOnlyBridge } from "./readOnlyBridge";
 export class RemoteService {
   private credential: DesktopCredential | null = null;
@@ -302,9 +302,9 @@ export class RemoteService {
     await this.pairing.invite();
     return this.snapshot();
   }
-  async approve(projects: string[], scopes: Scope[]) {
+  async approve(claimId: string, projects: string[], scopes: Scope[]) {
     if (!this.ready || !this.pairing) fail("DESKTOP_OFFLINE");
-    await this.pairing.approve(projects, scopes);
+    await this.pairing.approve(claimId, projects, scopes);
     return this.snapshot();
   }
   async reject() {
