@@ -1,5 +1,6 @@
 import { open, realpath, stat } from "node:fs/promises";
 import path from "node:path";
+import { classifyRemoteTool } from "../../shared/remote/toolKind";
 import type { RemoteMessage } from "./readOnlyBridge";
 import { sanitizeRemoteText } from "./sanitize";
 
@@ -62,12 +63,17 @@ export function projectRemoteMessages(raw: readonly unknown[], running = false):
             })
             .join("\n"),
     );
+    const toolKind =
+      role === "tool" && typeof item.toolName === "string"
+        ? classifyRemoteTool(item.toolName)
+        : undefined;
     if (!body.trim()) continue;
     for (let start = 0; start < body.length; start += MESSAGE_CHUNK) {
       messages.push({
         id: `m_${index}_${start}`,
         role,
         text: body.slice(start, start + MESSAGE_CHUNK),
+        ...(toolKind ? { toolKind } : {}),
         state:
           role === "assistant" && running && start + MESSAGE_CHUNK >= body.length
             ? "running"

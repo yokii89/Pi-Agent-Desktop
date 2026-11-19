@@ -4,16 +4,9 @@
  */
 
 import { t } from "../../shared/i18n";
+import { classifyRemoteTool, type RemoteToolKind } from "../../shared/remote/toolKind";
 
-export type ToolKind =
-  | "terminal"
-  | "read"
-  | "write"
-  | "edit"
-  | "search"
-  | "diff"
-  | "mcp"
-  | "generic";
+export type ToolKind = RemoteToolKind;
 
 export type ToolStatus = "pending" | "running" | "ok" | "error" | "cancelled";
 
@@ -121,35 +114,8 @@ export type ToolResultPayload = (
   | GenericPayload
 ) & { images?: ToolImage[] };
 
-// 后两个是 pi-bash-jobs 的作业工具（docs/design/129 §8.2）：读作业输出、停作业进程，
-// 本质都是对命令行的操作，落 generic 会丢「已运行 N 条命令」的摘要口径。
-const TERMINAL_TOOLS = new Set([
-  "bash",
-  "shell",
-  "pwsh",
-  "sh",
-  "zsh",
-  "cmd",
-  "tool_execution_inspect_output",
-  "bash_job_stop",
-]);
-const READ_TOOLS = new Set(["read", "cat", "view", "ls", "list"]);
-const WRITE_TOOLS = new Set(["write", "create", "new"]);
-const EDIT_TOOLS = new Set(["edit", "apply_patch", "patch", "str_replace"]);
-const SEARCH_TOOLS = new Set(["grep", "glob", "search", "rg", "find", "codebase_search"]);
-const DIFF_TOOLS = new Set(["diff", "git_diff"]);
-
 export function classifyTool(name: string): ToolKind {
-  // MCP 工具全名 `mcp__<server>__<tool>`（pi 内置 MCP 扩展，docs/design/40）
-  if (name.startsWith("mcp__")) return "mcp";
-  const key = name.trim().toLowerCase();
-  if (TERMINAL_TOOLS.has(key)) return "terminal";
-  if (READ_TOOLS.has(key)) return "read";
-  if (WRITE_TOOLS.has(key)) return "write";
-  if (EDIT_TOOLS.has(key)) return "edit";
-  if (SEARCH_TOOLS.has(key)) return "search";
-  if (DIFF_TOOLS.has(key)) return "diff";
-  return "generic";
+  return classifyRemoteTool(name);
 }
 
 export function actionLabel(kind: ToolKind): string {

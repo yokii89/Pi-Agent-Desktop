@@ -47,6 +47,24 @@ describe("remote history projection", () => {
       { id: "m_4_0", role: "tool", text: "visible tool result", state: "done" },
     ]);
   });
+  it("projects only a finite tool category, never tool names or arguments", () => {
+    const messages = projectRemoteMessages([
+      {
+        role: "toolResult",
+        toolName: "read",
+        arguments: { path: "C:\\Users\\alice\\secret.ts" },
+        content: [{ type: "text", text: "visible source" }],
+      },
+      { role: "toolResult", toolName: "mcp__server__tool", content: "visible MCP result" },
+    ]);
+    expect(messages).toMatchObject([
+      { id: "m_0_0", role: "tool", text: "visible source", toolKind: "read" },
+      { id: "m_1_0", role: "tool", text: "visible MCP result", toolKind: "mcp" },
+    ]);
+    expect(JSON.stringify(messages)).not.toContain("toolName");
+    expect(JSON.stringify(messages)).not.toContain("secret.ts");
+  });
+
   it("chunks long text without losing content or changing page identities", () => {
     const text = "文".repeat(12_001);
     const messages = projectRemoteMessages([{ role: "assistant", content: text }], true);

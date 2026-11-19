@@ -5,6 +5,7 @@ import {
   fail,
   type Grant,
   id,
+  type RemoteToolKind,
   type RoutingContext,
   record,
 } from "../../shared/remote";
@@ -33,6 +34,8 @@ export interface RemoteMessage {
   id: string;
   role: "user" | "assistant" | "tool";
   text: string;
+  /** Finite presentation category; tool names and invocation arguments stay local. */
+  toolKind?: RemoteToolKind;
   state?: "running" | "done";
 }
 export interface RemoteInteraction {
