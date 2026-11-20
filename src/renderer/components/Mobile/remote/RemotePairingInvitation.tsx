@@ -109,6 +109,11 @@ export function RemotePairingInvitation({
                 </p>
                 {(!active || imageFailed) && (
                   <Button variant="primary" disabled={busy || !connected} onClick={onInvite}>
+                    {expired || imageFailed ? (
+                      <ArrowClockwise size={16} weight="regular" />
+                    ) : (
+                      <QrCode size={16} weight="regular" />
+                    )}
                     {t(
                       expired || imageFailed
                         ? "settings.remote.regenerate"

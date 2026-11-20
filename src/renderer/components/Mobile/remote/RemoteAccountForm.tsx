@@ -1,3 +1,11 @@
+import {
+  ArrowCounterClockwise,
+  ArrowsLeftRight,
+  Desktop,
+  Devices,
+  SignIn,
+  SignOut,
+} from "@phosphor-icons/react";
 import { useId, useRef, useState } from "react";
 import { origin as parseOrigin } from "../../../../shared/remote";
 import type { RemoteEnrollment, RemoteSnapshot } from "../../../../shared/remoteDesktop";
@@ -79,7 +87,6 @@ export function RemoteAccountForm({
           {t(snapshot.accountReady ? "settings.remote.signedIn" : "settings.remote.signedOut")}
         </span>
       </div>
-      <p className={styles.hint}>{t("settings.remote.accountHint")}</p>
       {loggingIn ? (
         <RemoteLoginProgress auth={snapshot.auth} cancelling={cancelling} onCancel={onCancel} />
       ) : (
@@ -90,10 +97,12 @@ export function RemoteAccountForm({
               <div className={styles.accountActions}>
                 {snapshot.relayOrigin && (
                   <Button disabled={busy} onClick={() => onSignIn(snapshot.relayOrigin ?? "")}>
+                    <ArrowsLeftRight size={16} weight="regular" />
                     {t("settings.remote.switchAccount")}
                   </Button>
                 )}
                 <Button disabled={busy} onClick={onLogout}>
+                  <SignOut size={16} weight="regular" />
                   {t("settings.remote.accountLogout")}
                 </Button>
               </div>
@@ -101,10 +110,10 @@ export function RemoteAccountForm({
           )}
           {snapshot.configured ? (
             <>
-              <p className={`${styles.domain} ${styles.accountDomain}`}>{relayOrigin}</p>
               {needsSignIn && relayOrigin && (
                 <div className={styles.accountActions}>
                   <Button variant="primary" disabled={busy} onClick={() => onSignIn(relayOrigin)}>
+                    <SignIn size={16} weight="regular" />
                     {t(
                       snapshot.accountReady
                         ? "settings.remote.switchAccount"
@@ -116,6 +125,7 @@ export function RemoteAccountForm({
               {!snapshot.accountReady && canClearAccount && (
                 <div className={styles.accountActions}>
                   <Button disabled={busy} onClick={onLogout}>
+                    <SignOut size={16} weight="regular" />
                     {t("settings.remote.accountLogout")}
                   </Button>
                 </div>
@@ -192,6 +202,13 @@ export function RemoteAccountForm({
                     snapshot.error === "REGISTRATION_CREDENTIAL_LOST"
                   }
                 >
+                  {snapshot.enrollment ? (
+                    <ArrowCounterClockwise size={16} weight="regular" />
+                  ) : snapshot.accountReady ? (
+                    <Desktop size={16} weight="regular" />
+                  ) : (
+                    <SignIn size={16} weight="regular" />
+                  )}
                   {t(
                     snapshot.enrollment
                       ? "settings.remote.resumeEnrollment"
@@ -202,6 +219,7 @@ export function RemoteAccountForm({
                 </Button>
                 {!snapshot.accountReady && canClearAccount && (
                   <Button disabled={busy} onClick={onLogout}>
+                    <SignOut size={16} weight="regular" />
                     {t("settings.remote.accountLogout")}
                   </Button>
                 )}
@@ -217,11 +235,13 @@ export function RemoteAccountForm({
             <div className={styles.accountManagement}>
               {snapshot.accountReady && snapshot.relayOrigin && (
                 <Button disabled={busy} onClick={() => onDirectory(relayOrigin)}>
+                  <Devices size={16} weight="regular" />
                   {t("settings.remote.directory")}
                 </Button>
               )}
               {recovery && (
                 <Button disabled={busy} onClick={onReset}>
+                  <ArrowCounterClockwise size={16} weight="regular" />
                   {t("settings.remote.resetEnrollment")}
                 </Button>
               )}

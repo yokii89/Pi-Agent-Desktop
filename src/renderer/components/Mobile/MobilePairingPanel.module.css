@@ -92,8 +92,7 @@
   min-width: 0;
 }
 
-.accountSummary,
-.accountDomain {
+.accountSummary {
   margin-top: var(--spacing-sm);
 }
 

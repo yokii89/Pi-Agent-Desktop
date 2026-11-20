@@ -1,4 +1,4 @@
-import { Check, DeviceMobile, Eye, Folder, MagnifyingGlass } from "@phosphor-icons/react";
+import { Check, DeviceMobile, Eye, Folder, MagnifyingGlass, X } from "@phosphor-icons/react";
 import { type ReactNode, useId, useState } from "react";
 import { type ClaimStatus, LIMITS, READ_SCOPES, type Scope } from "../../../../shared/remote";
 import type { RemoteSnapshot } from "../../../../shared/remoteDesktop";
@@ -168,6 +168,7 @@ export function RemotePairingApproval({
         </p>
         <div className={styles.actions}>
           <Button disabled={busy} onClick={onReject}>
+            <X size={16} weight="regular" />
             {t("remote.reject")}
           </Button>
           <Button

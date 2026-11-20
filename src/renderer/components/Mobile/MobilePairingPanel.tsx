@@ -1,4 +1,4 @@
-import { CheckCircle, Devices, ShieldWarning } from "@phosphor-icons/react";
+import { ArrowClockwise, CheckCircle, Devices, ShieldWarning } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useT } from "../../hooks/useT";
 import { Button } from "../ui/Button";
@@ -20,7 +20,6 @@ export function MobilePairingPanel() {
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [directoryOrigin, setDirectoryOrigin] = useState<string | null>(null);
-  const [localResetOrigin, setLocalResetOrigin] = useState<string | null>(null);
   const grant = snapshot?.grant && snapshot.grant.state !== "revoked" ? snapshot.grant : null;
   const claim = !grant && snapshot?.claim?.state === "claimed" ? snapshot.claim : null;
   const errorCode = error ?? snapshot?.error ?? (readFailed ? "STATE_UNAVAILABLE" : null);
@@ -47,12 +46,8 @@ export function MobilePairingPanel() {
       snapshot.credentialState === "expired" ||
       !!snapshot.enrollment?.desktopId);
   const reset = (localOnly: boolean): void => {
-    const origin = snapshot?.relayOrigin ?? null;
     void run((api) => api.resetEnrollment(localOnly)).then((success) => {
-      if (success) {
-        setConfirmReset(false);
-        setLocalResetOrigin(localOnly ? origin : null);
-      }
+      if (success) setConfirmReset(false);
     });
   };
   return (
@@ -86,7 +81,10 @@ export function MobilePairingPanel() {
                 {errorNotice}
                 {readFailed && (
                   <div>
-                    <Button onClick={() => void refresh()}>{t("settings.remote.retry")}</Button>
+                    <Button onClick={() => void refresh()}>
+                      <ArrowClockwise size={16} weight="regular" />
+                      {t("settings.remote.retry")}
+                    </Button>
                   </div>
                 )}
               </>
@@ -111,22 +109,6 @@ export function MobilePairingPanel() {
                   onDirectory={setDirectoryOrigin}
                 />
                 {!confirmReset && !directoryOrigin && errorNotice}
-                {localResetOrigin && (
-                  <aside className={styles.securityNote}>
-                    <ShieldWarning size={16} weight="regular" />
-                    <div>
-                      <p>{t("settings.remote.resetLocalWarning")}</p>
-                      {snapshot.accountReady && (
-                        <Button
-                          disabled={busy}
-                          onClick={() => setDirectoryOrigin(localResetOrigin)}
-                        >
-                          {t("settings.remote.directory")}
-                        </Button>
-                      )}
-                    </div>
-                  </aside>
-                )}
                 {snapshot.configured && (
                   <>
                     <RemoteConnectionPanel

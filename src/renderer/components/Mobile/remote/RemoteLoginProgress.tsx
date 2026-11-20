@@ -1,4 +1,4 @@
-import { ArrowSquareOut } from "@phosphor-icons/react";
+import { ArrowSquareOut, X } from "@phosphor-icons/react";
 import type { DesktopAuthSnapshot } from "../../../../shared/remoteDesktop";
 import { useT } from "../../../hooks/useT";
 import { Button } from "../../ui/Button";
@@ -42,6 +42,7 @@ export function RemoteLoginProgress({
           {t("settings.remote.loginRemaining", { time })}
         </span>
         <Button disabled={cancelling} onClick={onCancel}>
+          <X size={16} weight="regular" />
           {t(cancelling ? "settings.remote.cancellingLogin" : "settings.remote.cancelLogin")}
         </Button>
       </div>

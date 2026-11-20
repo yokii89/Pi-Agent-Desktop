@@ -1,4 +1,11 @@
-import { Broadcast, ShieldWarning, WifiSlash } from "@phosphor-icons/react";
+import {
+  ArrowClockwise,
+  ArrowCounterClockwise,
+  Broadcast,
+  Pause,
+  ShieldWarning,
+  WifiSlash,
+} from "@phosphor-icons/react";
 import type { RemoteSnapshot } from "../../../../shared/remoteDesktop";
 import { useT } from "../../../hooks/useT";
 import { Button } from "../../ui/Button";
@@ -54,6 +61,11 @@ export function RemoteConnectionPanel({
             disabled={busy || !snapshot.accountReady}
             onClick={snapshot.connected || connecting ? onDisconnect : onConnect}
           >
+            {snapshot.connected || connecting ? (
+              <Pause size={16} weight="regular" />
+            ) : (
+              <ArrowClockwise size={16} weight="regular" />
+            )}
             {t(
               snapshot.connected || connecting
                 ? "settings.remote.pause"
@@ -76,6 +88,7 @@ export function RemoteConnectionPanel({
             <p className={styles.hint}>{t("settings.remote.registrationRecovery")}</p>
           </div>
           <Button disabled={busy} onClick={onReset}>
+            <ArrowCounterClockwise size={16} weight="regular" />
             {t("settings.remote.resetEnrollment")}
           </Button>
         </div>

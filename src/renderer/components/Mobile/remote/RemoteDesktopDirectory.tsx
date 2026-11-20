@@ -1,4 +1,4 @@
-import { Desktop, X } from "@phosphor-icons/react";
+import { ArrowClockwise, Desktop, Trash, X } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopSummary } from "../../../../shared/remote";
 import { useT } from "../../../hooks/useT";
@@ -109,6 +109,7 @@ export function RemoteDesktopDirectory({
                 disabled={busy || loading || item.state === "revoked"}
                 onClick={() => setSelected(item)}
               >
+                <Trash size={16} weight="regular" />
                 {t("settings.remote.removeComputer")}
               </Button>
             </li>
@@ -117,9 +118,11 @@ export function RemoteDesktopDirectory({
       </div>
       <footer className={styles.directoryFooter}>
         <Button disabled={busy || loading} onClick={() => void refresh()}>
+          <ArrowClockwise size={16} weight="regular" />
           {t("settings.remote.directoryRefresh")}
         </Button>
         <Button disabled={busy} onClick={onClose}>
+          <X size={16} weight="regular" />
           {t("settings.close")}
         </Button>
       </footer>

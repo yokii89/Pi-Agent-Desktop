@@ -5,11 +5,6 @@ export const remoteSettingsMessages = defineMessages({
     "zh-CN": "远程账号与电脑登记",
     "en-US": "Remote account and computer registration",
   },
-  "settings.remote.accountHint": {
-    "zh-CN": "在系统浏览器中登录。账号凭证由系统安全存储保护；登录本身不会批准手机访问。",
-    "en-US":
-      "Sign in in your system browser. Account credentials are protected by secure storage; signing in does not approve phone access.",
-  },
   "settings.remote.desktopName": { "zh-CN": "电脑显示名称", "en-US": "Computer display name" },
   "settings.remote.accountConnect": {
     "zh-CN": "登录并登记此电脑",
