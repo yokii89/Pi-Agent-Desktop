@@ -14,7 +14,7 @@ import { renderDesktopAuthPage } from "./authCallbackPage";
 
 const DOMAIN = "dev-f8lj4bpd4yx0iiob.us.auth0.com";
 const CLIENT_ID = "zZopmSsOjW3u7cqK4G5ATxqmcTiRRC3P";
-const AUDIENCE = "https://pidesk-relay-v2-staging.yecenglinjian.workers.dev";
+const AUDIENCE = "https://pidesk-pairing-relay.yecenglinjian.workers.dev";
 const PORT = 49182;
 const CALLBACK = `http://127.0.0.1:${PORT}/callback`;
 const SCOPE = "openid profile offline_access pidesk.relay";

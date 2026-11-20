@@ -131,6 +131,18 @@ afterEach(() => {
 });
 
 describe("Auth0 desktop PKCE", () => {
+  it("uses the official relay audience for authorization and token exchange", async () => {
+    await loginDesktop();
+    const authorize = new URL(fixture.authorizeUrl);
+    expect(authorize.searchParams.get("audience")).toBe(
+      "https://pidesk-pairing-relay.yecenglinjian.workers.dev",
+    );
+    expect(fixture.requests[0]).toMatchObject({
+      grant_type: "authorization_code",
+      audience: "https://pidesk-pairing-relay.yecenglinjian.workers.dev",
+    });
+  });
+
   it("ignores a forged loopback callback and accepts the matching state", async () => {
     fixture.wrongState = true;
     await loginDesktop();
