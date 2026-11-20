@@ -6,7 +6,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { dropTargetIndex, insertionIndexAt, type RowBand } from "../../utils/listReorder";
+import {
+  dropTargetIndex,
+  insertionIndexAt,
+  listDragScrollDelta,
+  type RowBand,
+} from "../../utils/listReorder";
 
 /** 长按判定时长：按住列表行不动到这个时长才进入拖动（短于此的按压仍是普通点击）。 */
 const LONG_PRESS_MS = 320;
@@ -45,8 +50,9 @@ interface PressSession {
 interface DragSession extends Omit<PressSession, "timer"> {
   clientX: number;
   clientY: number;
-  /** 当前插入位（0..N，含被拖行本身）。 */
-  insert: number;
+  scroller: HTMLElement;
+  /** 视口内的插入位（0..N），拖出列表时没有落点。 */
+  insert: number | null;
   rect: ListDragView["rect"];
   dy: number;
   lineY: number | null;
@@ -105,27 +111,39 @@ export function useLongPressReorder({
     return container ? [...container.querySelectorAll<HTMLElement>(itemSelector)] : [];
   }
 
-  /** 按当前指针位置重算插入位与落点线；线的落点画在「组边界」上（展开的子列表不穿线）。 */
-  function measure(session: DragSession): void {
+  function scrollDelta(session: DragSession): number | null {
+    return listDragScrollDelta(
+      session.scroller.getBoundingClientRect(),
+      session.clientX,
+      session.clientY,
+      AUTO_SCROLL_EDGE_PX,
+      AUTO_SCROLL_STEP_PX,
+    );
+  }
+
+  /** 按当前指针位置重算插入位与落点线；线的落点画在组边界上。 */
+  function measure(session: DragSession, inside = scrollDelta(session) !== null): void {
     const container = containerRef.current;
     if (!container) return;
-    const items = draggableItems();
-    const bands: RowBand[] = [];
-    for (const item of items) {
-      const rect = item.getBoundingClientRect();
-      bands.push({ top: rect.top, height: rect.height });
-    }
-    const insert = insertionIndexAt(bands, session.clientY);
+    let insert: number | null = null;
     let lineY: number | null = null;
-    if (dropTargetIndex(insert, session.index) !== session.index) {
-      const containerRect = container.getBoundingClientRect();
-      const groups = items.map((item) => item.closest<HTMLElement>("li") ?? item);
-      const boundary =
-        insert >= groups.length
-          ? (groups[groups.length - 1]?.getBoundingClientRect().bottom ?? containerRect.top)
-          : (groups[insert]?.getBoundingClientRect().top ?? containerRect.top);
-      // -1 让 2px 的线落在组间 2px 空隙的正中；贴顶时不下探出列表
-      lineY = Math.max(0, boundary - containerRect.top - 1);
+    if (inside) {
+      const items = draggableItems();
+      const bands: RowBand[] = items.map((item) => {
+        const { top, height } = item.getBoundingClientRect();
+        return { top, height };
+      });
+      insert = insertionIndexAt(bands, session.clientY);
+      if (dropTargetIndex(insert, session.index) !== session.index) {
+        const containerRect = container.getBoundingClientRect();
+        const groups = items.map((item) => item.closest<HTMLElement>("li") ?? item);
+        const boundary =
+          insert >= groups.length
+            ? (groups[groups.length - 1]?.getBoundingClientRect().bottom ?? containerRect.top)
+            : (groups[insert]?.getBoundingClientRect().top ?? containerRect.top);
+        // -1 让 2px 的线落在组间 2px 空隙的正中；贴顶时不下探出列表。
+        lineY = Math.max(0, boundary - containerRect.top - 1);
+      }
     }
     const dy = session.clientY - session.startY;
     const changed = session.dy !== dy || session.lineY !== lineY;
@@ -139,33 +157,17 @@ export function useLongPressReorder({
   /** 贴边自动滚动：拖动期间按帧推进，滚动后落点跟着重算（指针不动、列表在动）。 */
   function autoScroll(): void {
     const session = dragRef.current;
-    const container = containerRef.current;
-    if (!session || !container) return;
+    if (!session) return;
     rafRef.current = window.requestAnimationFrame(autoScroll);
-    // 侧栏根节点就是滚动容器（.nav 的 overflow-y: auto）
-    const scroller = container.closest<HTMLElement>("nav");
-    if (!scroller) return;
-    const bounds = scroller.getBoundingClientRect();
-    // 只在指针仍贴着侧栏时滚动：拖到中央区顶部/底部不该把侧栏带跑
-    if (session.clientX < bounds.left - 24 || session.clientX > bounds.right + 24) return;
-    const distanceAbove = bounds.top + AUTO_SCROLL_EDGE_PX - session.clientY;
-    const distanceBelow = session.clientY - (bounds.bottom - AUTO_SCROLL_EDGE_PX);
-    let delta = 0;
-    if (distanceAbove > 0) {
-      delta = -Math.min(
-        AUTO_SCROLL_STEP_PX,
-        Math.ceil((distanceAbove / AUTO_SCROLL_EDGE_PX) * AUTO_SCROLL_STEP_PX),
-      );
-    } else if (distanceBelow > 0) {
-      delta = Math.min(
-        AUTO_SCROLL_STEP_PX,
-        Math.ceil((distanceBelow / AUTO_SCROLL_EDGE_PX) * AUTO_SCROLL_STEP_PX),
-      );
+    const delta = scrollDelta(session);
+    if (delta === null) {
+      if (session.insert !== null) measure(session, false);
+      return;
     }
-    if (delta === 0) return;
+    const { scroller } = session;
     const before = scroller.scrollTop;
-    scroller.scrollTop = before + delta;
-    if (scroller.scrollTop !== before) measure(session);
+    if (delta) scroller.scrollTop += delta;
+    if (session.insert === null || scroller.scrollTop !== before) measure(session, true);
   }
 
   function finishDrag(): void {
@@ -186,7 +188,8 @@ export function useLongPressReorder({
   function arm(session: PressSession): void {
     pressRef.current = null;
     const container = containerRef.current;
-    if (!container || !session.item.isConnected) return;
+    const scroller = container?.closest<HTMLElement>("[data-side-nav-scroll]");
+    if (!container || !scroller || !session.item.isConnected) return;
     const rect = session.item.getBoundingClientRect();
     const dragSession: DragSession = {
       pointerId: session.pointerId,
@@ -198,6 +201,7 @@ export function useLongPressReorder({
       label: session.label,
       index: session.index,
       item: session.item,
+      scroller,
       insert: session.index,
       rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
       dy: 0,
@@ -278,7 +282,8 @@ export function useLongPressReorder({
     session.clientX = event.clientX;
     session.clientY = event.clientY;
     measure(session);
-    const target = dropTargetIndex(session.insert, session.index);
+    const target =
+      session.insert === null ? session.index : dropTargetIndex(session.insert, session.index);
     finishDrag();
     // 进入过拖动态就算一次拖动：松手后紧跟的 click 不能当成点击
     suppressUntilRef.current = performance.now() + CLICK_SUPPRESS_MS;

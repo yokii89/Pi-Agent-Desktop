@@ -12,6 +12,7 @@ import { useExtensionViewStore } from "../../stores/extensionViewStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useSessionMeta, useSessionQueue } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
+import { useComposerDraft } from "../../stores/useComposerDraft";
 import {
   createFileAttachmentId,
   MAX_ATTACH_FILES,
@@ -50,13 +51,22 @@ type SlashGroupItem = PiSlashCommand | LocalSlashCommand;
 
 interface TaskInputProps {
   variant: "empty" | "session";
+  draftKey: string;
+  /** SessionArea 持有的聚焦请求；工作目录变更导致输入栏重挂载时仍可恢复焦点。 */
+  workspaceFocusSeq: number;
+  onWorkspaceSelected: () => void;
 }
 
 /**
  * 任务输入栏：empty 显示工作区/Git 顶栏；running/idle 为底部停靠精简版。
  * 元素芯片内联嵌在文本中间；@ 文件与 / 命令走上方建议列表。
  */
-export function TaskInput({ variant }: TaskInputProps) {
+export function TaskInput({
+  variant,
+  draftKey,
+  workspaceFocusSeq,
+  onWorkspaceSelected,
+}: TaskInputProps) {
   const t = useT();
   const {
     phase,
@@ -71,28 +81,27 @@ export function TaskInput({ variant }: TaskInputProps) {
   const { showToast, inputBuddy, inputEffect } = useUiStore();
   const browser = useBrowserStore();
   const { currentProject } = useProjectStore();
+  const { thinkingLevel, thinkingLevels } = useComposerStore();
   const {
-    thinkingLevel,
-    thinkingLevels,
+    content: draftContent,
+    record,
+    setContent: setDraftContent,
+    sending,
+    submit,
+    edits,
+    takeEdits,
     fileMentions,
     addFileMention,
     removeFileMention,
-    clearFileMentions,
     imageAttachments,
     addImageAttachment,
     removeImageAttachment,
-    clearImageAttachments,
     fileAttachments,
     addFileAttachment,
     removeFileAttachment,
-    clearFileAttachments,
     reorderImageAttachments,
     reorderFileAttachments,
-    pendingQuote,
-    consumePendingQuote,
-    pendingInsert,
-    consumePendingInsert,
-  } = useComposerStore();
+  } = useComposerDraft(draftKey);
 
   const [staleConfirm, setStaleConfirm] = useState(false);
   const [hasContent, setHasContent] = useState(false);
@@ -161,9 +170,17 @@ export function TaskInput({ variant }: TaskInputProps) {
       fileAttachments.length > 0) &&
     !hasBlockingView &&
     !switching &&
-    !modeTransitioning;
-  /** 运行中发送等 pi 受理后再清空，失败时草稿原样保留。 */
-  const queueSendingRef = useRef(false);
+    !modeTransitioning &&
+    !sending;
+  const currentDraftRef = useRef(record);
+  currentDraftRef.current = record;
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const cwd = currentProject?.dir ?? null;
 
   const placeholder = switching
@@ -307,23 +324,24 @@ export function TaskInput({ variant }: TaskInputProps) {
     composerRef.current = handle;
   }, []);
 
+  const focusWorkspaceInput = useCallback(() => {
+    composerRef.current?.focus();
+    onWorkspaceSelected();
+  }, [onWorkspaceSelected]);
+
   useEffect(() => {
     composerRef.current?.focus();
   }, []);
 
-  // 会话流「添加到对话栏」（docs/design/12）：消费待引用文本追加进编辑器，seq 由 store 保证单次
+  // 回填属于发起操作的草稿；多个异步结果按顺序消费，后台会话等再次打开再恢复。
   useEffect(() => {
-    if (!pendingQuote) return;
-    composerRef.current?.appendQuote(pendingQuote.text);
-    consumePendingQuote();
-  }, [pendingQuote, consumePendingQuote]);
-
-  // 清空队列 / 停止取回的文本：纯文本追加到编辑器末尾（不是引用块）
-  useEffect(() => {
-    if (!pendingInsert) return;
-    composerRef.current?.appendText(pendingInsert.text);
-    consumePendingInsert();
-  }, [pendingInsert, consumePendingInsert]);
+    const composer = composerRef.current;
+    if (!composer || edits.length === 0) return;
+    for (const edit of takeEdits()) {
+      if (edit.kind === "quote") composer.appendQuote(edit.text);
+      else composer.appendText(edit.text);
+    }
+  }, [edits, takeEdits]);
 
   /**
    * ↑ / ↓ 历史召回（docs/design/127）：进入召回时快照一份当前会话的用户输入（最新在前），
@@ -478,7 +496,7 @@ export function TaskInput({ variant }: TaskInputProps) {
     const composer = composerRef.current;
     if (!composer) return;
     // modal 打开时忽略发送（abort 仍可用，走 toolbar stop）；切换中同样忽略
-    if (hasBlockingView || switching) {
+    if (hasBlockingView || switching || modeTransitioning || sending) {
       buddyRef.current?.nudge("angry");
       return;
     }
@@ -539,34 +557,14 @@ export function TaskInput({ variant }: TaskInputProps) {
           }
         : {}),
     };
-    const clearAfterSend = (): void => {
-      composer.clear();
-      historyNavRef.current = null;
-      setStaleConfirm(false);
-      hideSuggestNow();
-      clearFileMentions();
-      clearImageAttachments();
-      clearFileAttachments();
-      browser.clearChatElements();
-      composer.focus();
-    };
-
-    // 运行中发送：等 pi 受理（queued/started/handled）后再清空，失败时草稿与附件保留
-    if (running) {
-      if (queueSendingRef.current) return;
-      queueSendingRef.current = true;
-      try {
-        const accepted = await send(finalText, contextPayload, intent);
-        if (accepted === null) return;
-      } finally {
-        queueSendingRef.current = false;
-      }
-      clearAfterSend();
-      return;
-    }
-
-    void send(finalText, contextPayload, intent);
-    clearAfterSend();
+    // 首页冷启动也等待受理；上限/启动失败保留完整草稿，回执只清理发起发送的那份。
+    const accepted = await submit(() => send(finalText, contextPayload, intent));
+    if (!accepted) return;
+    if (!mountedRef.current || currentDraftRef.current !== record) return;
+    historyNavRef.current = null;
+    setStaleConfirm(false);
+    hideSuggestNow();
+    composer.focus();
   };
 
   const onImages = useCallback(
@@ -866,7 +864,7 @@ export function TaskInput({ variant }: TaskInputProps) {
         {/* 与设置预览共用渲染器，保留最高思考档的激活条件。 */}
         {thinkingAtTop && inputEffect !== "none" && <InputAura effect={inputEffect} />}
 
-        {variant === "empty" && <TaskInputContextBar />}
+        {variant === "empty" && <TaskInputContextBar onWorkspaceSelected={focusWorkspaceInput} />}
 
         {staleConfirm && (
           <div className={styles.staleConfirm}>
@@ -892,6 +890,8 @@ export function TaskInput({ variant }: TaskInputProps) {
             onReorder={reorderFileAttachments}
           />
           <Composer
+            draftContent={draftContent}
+            onDraftChange={setDraftContent}
             elements={chatElements}
             onRemoveElement={browser.removeChatElement}
             fileMentions={fileMentions}
@@ -909,7 +909,7 @@ export function TaskInput({ variant }: TaskInputProps) {
             // 编辑锁定与发送解锁分离（docs/design/12 P1-1）：running 期间可编辑草稿，
             // 发送由 canSend / doSend 拦截，只有阻断浮层与会话切换锁编辑
             disabled={hasBlockingView || switching}
-            focusSeq={focusSeq}
+            focusSeq={focusSeq + workspaceFocusSeq}
             onReady={onComposerReady}
           />
           <TaskInputToolbar

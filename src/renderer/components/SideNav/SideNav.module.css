@@ -1,9 +1,5 @@
 .shell {
-  /* 左栏外壳：网格第一列的 grid item。玻璃与右缘描边都挂在它身上，
-     面板（.nav）退成透明滚动层——只有这样，右缘的拖拽把手才不会盖住滚动条：
-     把手与滑条都贴右缘，若让 .nav 自己既是滚动盒又是玻璃，把手必然压在滑条上
-     （滑条就点不到、也看不到）。现在 .shell 让出 8px 让位带，.nav 的滚动盒
-     止于让位带左侧，滑条在让位带外面，把手在让位带里面。 */
+  /* 玻璃、右缘描边与拖拽把手共用网格外壳；内容不占把手的命中区。 */
   composes: glass from "../../styles/glass.module.css";
   position: relative;
   grid-area: nav;
@@ -23,31 +19,48 @@
 }
 
 .nav {
-  /* 选中药丸（.selectionPill）的定位父级：绝对定位子元素随滚动内容一起移动 */
+  /* 滚动区和底部入口共用同一个药丸坐标系。 */
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  /* 填满外壳内容盒（拖拽宽度由网格轨道承担） */
   width: 100%;
   min-width: 0;
+  min-height: 0;
+}
+
+.scrollArea,
+.scrollContent,
+.bottomActions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scrollArea,
+.bottomActions {
   padding: var(--spacing-sm);
-  overflow-y: auto;
+}
+
+.scrollArea {
+  flex: 1;
+  min-height: 0;
   overflow-x: hidden;
-  /* 三栏滚动条淡出（机制见 global.css 的 --sb-alpha）：指针不在本栏时滑条全透明，
-     进入本栏才淡入；.extSlots 等栏内滚动容器沿继承拿到同一份插值 */
-  --sb-alpha: 0;
-  transition: --sb-alpha var(--scrollbar-fade-duration) linear;
+  overflow-y: auto;
+  scroll-padding-block: var(--spacing-xs);
 }
 
-.nav:hover {
-  --sb-alpha: 1;
+.bottomActions {
+  flex: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .nav {
-    transition: none;
-  }
+.scrollArea > * {
+  flex-shrink: 0;
+}
+
+.scrollArea,
+.extSlots,
+.extSlots [data-panel-scroll] {
+  scrollbar-width: none;
 }
 
 /* 拖拽把手（docs/design/137）：贴在左栏右缘，向右拖增宽。
@@ -103,9 +116,10 @@
 }
 
 /* 收起态：图标列水平居中，与顶栏开关同一中轴（TitleBar .leftCollapsed） */
-.collapsed {
+.collapsed .scrollArea,
+.collapsed .bottomActions {
   align-items: center;
-  padding: var(--spacing-sm) 0;
+  padding-inline: 0;
 }
 
 /* 扩展 View sidebar 槽：纵向堆叠卡片，整体限高避免挤掉项目树 */
@@ -210,13 +224,13 @@
   background: var(--color-border);
 }
 
-.spacer {
-  flex: 1;
-  min-height: var(--spacing-lg);
+.bottomActions .navItem > svg {
+  flex-shrink: 0;
 }
 
 /* 底部行：「设置」占剩余宽度，「更新」按钮贴右（docs/design/55：发现新版本才出现） */
 .footer {
+  container: side-nav-footer / inline-size;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -245,6 +259,13 @@
   transition:
     background-color 0.12s ease,
     opacity 0.12s ease;
+}
+
+/* 窄栏先给「设置」留足宽度，更新按钮仍可操作，状态和进度留在提示中。 */
+@container side-nav-footer (max-width: 12rem) {
+  .updateLabel {
+    display: none;
+  }
 }
 
 .updateBtn:hover:not(:disabled) {
@@ -690,7 +711,7 @@
 }
 
 /* ── 长按拖拽排序（docs/design/108）─────────────────────────────────────
-   被拖行原地淡出、跟手浮层 portal 到 body：侧栏 .nav 带 backdrop-filter，
+   被拖行原地淡出、跟手浮层 portal 到 body：侧栏 .shell 带 backdrop-filter，
    它会让 fixed 后代的包含块变成侧栏自身并被 overflow 裁掉，浮层不能留在树里。 */
 .reorderList {
   position: relative;

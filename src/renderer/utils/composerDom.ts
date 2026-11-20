@@ -1,3 +1,4 @@
+import type { ComposerDraftPart } from "../stores/composerDrafts";
 import type { PositionedFileMention } from "./fileMentionFormat";
 
 export const EL_ID_ATTR = "data-el-id";
@@ -72,6 +73,70 @@ export function readComposerDom(root: HTMLElement): {
   };
   for (const child of root.childNodes) walk(child);
   return { text, itemIds, filePaths, fileMentions };
+}
+
+/** 保存文字、换行和原子芯片的顺序；URL 等展示装饰不进入草稿。 */
+export function readComposerDraft(root: HTMLElement): ComposerDraftPart[] {
+  const parts: ComposerDraftPart[] = [];
+  let hasContent = false;
+  let endsWithNewline = false;
+  const appendText = (text: string): void => {
+    if (!text) return;
+    const last = parts[parts.length - 1];
+    if (last?.kind === "text") last.text += text;
+    else parts.push({ kind: "text", text });
+    hasContent = true;
+    endsWithNewline = text.endsWith("\n");
+  };
+  const walk = (node: Node): void => {
+    if (node instanceof Text) {
+      appendText(node.data);
+      return;
+    }
+    if (!(node instanceof HTMLElement)) return;
+    const path = node.getAttribute(FILE_ID_ATTR);
+    const name = node.getAttribute(SLASH_CMD_ATTR);
+    const id = node.getAttribute(EL_ID_ATTR);
+    if (path || name || id) {
+      if (path) parts.push({ kind: "file", path });
+      else if (name) parts.push({ kind: "slash", name });
+      else if (id) parts.push({ kind: "element", id });
+      hasContent = true;
+      endsWithNewline = false;
+      return;
+    }
+    if (node.tagName === "BR") {
+      appendText("\n");
+      return;
+    }
+    if ((node.tagName === "DIV" || node.tagName === "P") && hasContent && !endsWithNewline) {
+      appendText("\n");
+    }
+    for (const child of node.childNodes) walk(child);
+  };
+  for (const child of root.childNodes) walk(child);
+  return parts;
+}
+
+/** 从语义草稿恢复内容，芯片由当前组件重建以保留图标和交互。 */
+export function restoreComposerDraft(
+  root: HTMLElement,
+  parts: ComposerDraftPart[],
+  paintChip: (part: Exclude<ComposerDraftPart, { kind: "text" }>) => Node | null,
+): void {
+  const fragment = document.createDocumentFragment();
+  for (const part of parts) {
+    if (part.kind !== "text") {
+      const chip = paintChip(part);
+      if (chip) fragment.appendChild(chip);
+      continue;
+    }
+    part.text.split("\n").forEach((text, index) => {
+      if (index > 0) fragment.appendChild(document.createElement("br"));
+      if (text) fragment.appendChild(document.createTextNode(text));
+    });
+  }
+  root.replaceChildren(fragment);
 }
 
 /** Chips count as content even if there is no user text. */

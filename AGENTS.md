@@ -354,12 +354,11 @@ import { Play } from "@phosphor-icons/react";
 
 左栏展开态宽度是**用户偏好**（`settings.navWidth`，进设置同步白名单），把手贴右缘：
 
-- **玻璃 + 把手都在外壳 `.shell` 上，`.nav` 退成透明滚动层**：`.nav` 是滚动盒
-  （`overflow-y: auto`），把手的悬停竖线是 `::before`，画在里面会被裁掉；更关键的是
-  把手与滑条都贴右缘，若 `.nav` 仍是玻璃滚动盒，把手（`z-index: 2`）会整条压住滑条
-  （滑条看不见也点不到）。现在 `.shell`（`grid-area: nav`）承担玻璃与右描边并让出
-  `--context-sidebar-resize-gutter` 让位带，**滑条在带外、把手在带内**。
-  折叠态取消让位带（`.shellCollapsed`），否则 56px 图标列会偏左 4px、与顶栏开关不同轴。
+- **玻璃与把手由外壳 `.shell` 承担**：把手保留 `--context-sidebar-resize-gutter` 命中区，
+  不盖住导航内容。列表由 `.scrollArea` 滚动，滚动条隐藏，滚轮和触控板仍可用。
+  「手机配对」和「设置」（含更新入口）固定在底栏；拖拽贴边滚动和落点都限于列表视口，
+  进入底栏不提交排序。窄栏的更新按钮仅显示图标，提示保留状态与进度。
+  折叠态取消把手让位带（`.shellCollapsed`），否则图标会与顶栏开关不同轴。
 - **写网格轨道只有一个地方**：`utils/panelGeometry.ts`（`nav` / `sidebar` / `monitor` 三个字段）。
   左栏「能有多宽」的判定在独立的 `utils/navGeometry.ts`（`navMaxWidth` / `clampNavWidthToGrid` /
   `readGridTracks`），但落盘必须调 `writePanelGeometry(grid, { nav })`。
@@ -420,8 +419,8 @@ import { Play } from "@phosphor-icons/react";
 ### 导航列表选中高亮：一块选中药丸（docs/design/54 / 56）
 
 左侧边栏与设置浮窗左栏的选中底色各只有一块，共用同一个选中药丸 hook
-（`hooks/useSelectionPill.ts`，`nav` 传「承载行的滚动容器」）。顶部导航项 / 设置、
-历史会话行、设置分区行的 `data-side-active` 标记换行时，药丸沿同一条
+（`hooks/useSelectionPill.ts`，`nav` 是事件委托与定位根，桌面左栏另传独立的 `scrollArea`）。
+顶部导航项 / 设置、历史会话行、设置分区行的 `data-side-active` 标记换行时，药丸沿同一条
 `GLIDE_MOTION.glide` 时长与 easeOut 曲线、定帧时间轴（封顶 60fps）滑到新行：
 
 - 可承载选中的新行**必须打 `data-side-active` 标记**（页面级 `"page"`、会话行
@@ -433,8 +432,9 @@ import { Play } from "@phosphor-icons/react";
   **不得再写 `:hover` 底色与常驻填充**——newTask 的 bg-surface 常驻底曾被读成
   "一直处于激活态"；标题位移、⋯ 揭示、悬浮卡等其余悬浮反馈仍归行自身。
   不做按住擦选：跨行拖动松手会误开会话。
-- 落点触发归 MutationObserver（属性 + 子树），选中行不在 DOM（分区折叠、超出
-  「显示更多」）时药丸淡出、回来瞬移落位；不在 store 里另存一份高亮状态。
+- 落点由 MutationObserver（属性 + 子树）跟踪。桌面左栏再监听列表滚动及内容尺寸变化，
+  高亮仅覆盖实际可见的行段（含折叠裁剪），避免盖住固定底栏。选中行卸载后淡出，
+  重新出现时瞬移落位；不在 store 里另存一份高亮状态。
 - 瞬移只认「没有停驻目标」或「正在淡出」，**正常换行必须走滑行**——瞬移条件一旦
   误判成"目标变了"，整条曲线就被短路成瞬移，而其余表现（落点、标记、淡入淡出）全部
   正常，极易漏检（docs/design/54 §四）。

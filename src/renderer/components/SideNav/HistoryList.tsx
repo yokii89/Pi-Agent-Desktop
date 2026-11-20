@@ -242,7 +242,7 @@ export function HistoryList({
   if (containerRef && innerRef) {
     return (
       <>
-        <div ref={containerRef} className={styles.collapseRoot}>
+        <div ref={containerRef} className={styles.collapseRoot} data-side-nav-clip="">
           <ul ref={innerRef} {...listProps}>
             {rows}
             {dropLine}

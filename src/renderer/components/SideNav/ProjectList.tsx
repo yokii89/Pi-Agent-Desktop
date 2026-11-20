@@ -122,7 +122,7 @@ export const ProjectList = memo(function ProjectList({ groups }: ProjectListProp
         }
       />
       {collapse.rendered && (
-        <div ref={collapse.ref} className={styles.collapseRoot}>
+        <div ref={collapse.ref} className={styles.collapseRoot} data-side-nav-clip="">
           <ul
             ref={collapse.innerRef}
             className={[styles.list, styles.reorderList].join(" ")}
