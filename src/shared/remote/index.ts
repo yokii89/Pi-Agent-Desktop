@@ -1,4 +1,5 @@
 export * from "./account";
+export * from "./accountProfile";
 export * from "./authorization";
 export * from "./client";
 export * from "./contract";

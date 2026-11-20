@@ -15,6 +15,9 @@ const fixture = vi.hoisted(() => ({
   tokenStatus: 200,
   tokenBody: null as (() => Promise<unknown>) | null,
   networkError: false,
+  profile: null as unknown,
+  profileError: false,
+  profileBody: null as (() => Promise<unknown>) | null,
   encryptionFails: false,
   secureStorage: true,
 }));
@@ -86,16 +89,22 @@ beforeEach(() => {
   fixture.tokenStatus = 200;
   fixture.tokenBody = null;
   fixture.networkError = false;
+  fixture.profile = {
+    sub: "auth0|test-account",
+    name: "Remote test account",
+    picture: "https://avatars.example/test-account",
+  };
+  fixture.profileError = false;
+  fixture.profileBody = null;
   fixture.encryptionFails = false;
   fixture.secureStorage = true;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: { body?: string }) => {
-      if (url.endsWith("/userinfo"))
-        return {
-          ok: true,
-          json: async () => ({ sub: "auth0|test-account", name: "Remote test account" }),
-        };
+      if (url.endsWith("/userinfo")) {
+        if (fixture.profileError) throw new TypeError("profile service unavailable");
+        return { ok: true, json: fixture.profileBody ?? (async () => fixture.profile) };
+      }
       const body = JSON.parse(init?.body ?? "{}") as Record<string, string>;
       if (url.endsWith("/oauth/revoke")) {
         fixture.revokeRequests.push(body);
@@ -167,9 +176,153 @@ describe("Auth0 desktop PKCE", () => {
     expect(fixture.callbackBodies[0]).toContain("--color-bg");
     expect(desktopAuthSnapshot()).toMatchObject({
       phase: "signed_in",
-      identity: { name: "Remote test account" },
+      identity: {
+        name: "Remote test account",
+        picture: "https://avatars.example/test-account",
+      },
     });
     expect(JSON.stringify(desktopAuthSnapshot())).not.toContain("refresh-token");
+  });
+
+  it("restores the display name and avatar from encrypted account storage", async () => {
+    await loginDesktop();
+    vi.resetModules();
+    const store = await import("../settings/desktopAuthStore");
+    expect(store.loadDesktopAuth()?.identity).toEqual({
+      subject: "auth0|test-account",
+      name: "Remote test account",
+      picture: "https://avatars.example/test-account",
+    });
+  });
+
+  it("accepts an existing saved identity without an avatar", async () => {
+    fs.mkdirSync(fixture.directory, { recursive: true });
+    fs.writeFileSync(
+      `${fixture.directory}/auth0-session.bin`,
+      JSON.stringify({
+        accessToken: "saved-access",
+        refreshToken: "saved-refresh",
+        expiresAt: Date.now() + 900_000,
+        identity: { subject: "github|123", name: "Existing account" },
+      }),
+    );
+    vi.resetModules();
+    const store = await import("../settings/desktopAuthStore");
+    expect(store.loadDesktopAuth()?.identity).toEqual({
+      subject: "github|123",
+      name: "Existing account",
+      picture: null,
+    });
+    fixture.profile = {
+      sub: "github|123",
+      name: "Existing account",
+      picture: "https://avatars.example/123",
+    };
+    const auth = await import("./desktopAuth");
+    expect(await auth.desktopAccessToken()).toBe("saved-access");
+    await vi.waitFor(() =>
+      expect(auth.desktopAuthSnapshot().identity?.picture).toBe("https://avatars.example/123"),
+    );
+    expect(store.loadDesktopAuth()?.refreshToken).toBe("saved-refresh");
+    auth.clearDesktopAuth();
+  });
+
+  it("preserves rotated refresh credentials when a restored profile arrives later", async () => {
+    fixture.responses.push({
+      access_token: "saved-access",
+      refresh_token: "saved-refresh",
+      expires_in: 900,
+    });
+    await loginDesktop();
+    vi.resetModules();
+    const auth = await import("./desktopAuth");
+    const store = await import("../settings/desktopAuthStore");
+    let finish!: (value: unknown) => void;
+    fixture.profileBody = () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      });
+    expect(await auth.desktopAccessToken()).toBe("saved-access");
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+    const saved = store.loadDesktopAuth();
+    if (!saved) throw new Error("missing saved credentials");
+    store.saveDesktopAuth({ ...saved, expiresAt: 1 });
+    fixture.responses.push({
+      access_token: "rotated-access",
+      refresh_token: "rotated-refresh",
+      expires_in: 900,
+    });
+    expect(await auth.desktopAccessToken()).toBe("rotated-access");
+    finish({
+      sub: "auth0|test-account",
+      name: "Updated account",
+      picture: "https://avatars.example/updated",
+    });
+    await vi.waitFor(() =>
+      expect(auth.desktopAuthSnapshot().identity?.name).toBe("Updated account"),
+    );
+    expect(store.loadDesktopAuth()?.refreshToken).toBe("rotated-refresh");
+    auth.clearDesktopAuth();
+  });
+
+  it("discards restored display metadata after switching accounts", async () => {
+    fixture.responses.push({
+      access_token: "saved-access",
+      refresh_token: "saved-refresh",
+      expires_in: 900,
+    });
+    await loginDesktop();
+    vi.resetModules();
+    const auth = await import("./desktopAuth");
+    let finish!: (value: unknown) => void;
+    fixture.profileBody = () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      });
+    expect(await auth.desktopAccessToken()).toBe("saved-access");
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+    auth.clearDesktopAuth();
+    fixture.profileBody = null;
+    fixture.profile = {
+      sub: "github|new",
+      name: "New account",
+      picture: "https://avatars.example/new",
+    };
+    await auth.loginDesktop();
+    finish({
+      sub: "auth0|test-account",
+      name: "Old account",
+      picture: "https://avatars.example/old",
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(auth.desktopAuthSnapshot().identity).toEqual({
+      subject: "github|new",
+      name: "New account",
+      picture: "https://avatars.example/new",
+    });
+    auth.clearDesktopAuth();
+  });
+
+  it("uses a provider nickname when its name and avatar are absent", async () => {
+    fixture.profile = { sub: "github|123", name: "", nickname: "yoki89" };
+    await loginDesktop();
+    expect(desktopAuthSnapshot().identity).toEqual({
+      subject: "github|123",
+      name: "yoki89",
+      picture: null,
+    });
+    expect(hasDesktopAuth()).toBe(true);
+  });
+
+  it("keeps successful sign-in available when userinfo cannot be retrieved", async () => {
+    fixture.profileError = true;
+    await loginDesktop();
+    expect(desktopAuthSnapshot()).toMatchObject({
+      phase: "signed_in",
+      identity: null,
+      error: null,
+    });
+    expect(hasDesktopAuth()).toBe(true);
   });
 
   it("keeps the browser pending until token exchange and secure persistence succeed", async () => {

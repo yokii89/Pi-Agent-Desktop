@@ -1,10 +1,10 @@
-import { UserCircle } from "@phosphor-icons/react";
 import { useId, useRef, useState } from "react";
 import { origin as parseOrigin } from "../../../../shared/remote";
 import type { RemoteEnrollment, RemoteSnapshot } from "../../../../shared/remoteDesktop";
 import { useT } from "../../../hooks/useT";
 import { Button } from "../../ui/Button";
 import styles from "../MobilePairingPanel.module.css";
+import { RemoteAccountIdentity } from "./RemoteAccountIdentity";
 import { RemoteLoginProgress } from "./RemoteLoginProgress";
 
 /** Keep account identity, browser authentication and computer registration separate from relay reconnect. */
@@ -86,17 +86,7 @@ export function RemoteAccountForm({
         <>
           {snapshot.accountReady && (
             <div className={styles.accountSummary}>
-              <div className={styles.accountIdentity}>
-                <UserCircle size={24} weight="regular" />
-                <div>
-                  <p>{identity?.name ?? t("settings.remote.savedAccount")}</p>
-                  <p className={styles.hint}>
-                    {identity?.subject ??
-                      snapshot.accountId ??
-                      t("settings.remote.identityUnavailable")}
-                  </p>
-                </div>
-              </div>
+              <RemoteAccountIdentity profile={identity} accountId={snapshot.accountId} />
               <div className={styles.accountActions}>
                 {snapshot.relayOrigin && (
                   <Button disabled={busy} onClick={() => onSignIn(snapshot.relayOrigin ?? "")}>

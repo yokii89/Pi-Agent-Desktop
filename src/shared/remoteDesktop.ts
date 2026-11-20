@@ -1,5 +1,12 @@
 import type { IpcResult } from "./ipc";
-import type { ClaimStatus, DesktopSummary, Grant, PairingQr, Scope } from "./remote";
+import type {
+  AccountProfile,
+  ClaimStatus,
+  DesktopSummary,
+  Grant,
+  PairingQr,
+  Scope,
+} from "./remote";
 
 export const REMOTE_IPC = {
   snapshot: "pidesk:remote:snapshot",
@@ -29,7 +36,7 @@ export type DesktopLoginPhase =
 /** Display-only identity. Tokens and the authorization URL never cross IPC. */
 export interface DesktopAuthSnapshot {
   phase: DesktopLoginPhase;
-  identity: { name: string; subject: string } | null;
+  identity: AccountProfile | null;
   deadline: number | null;
   error: string | null;
 }

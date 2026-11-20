@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app, safeStorage } from "electron";
+import { parseAccountProfile } from "../../shared/remote";
 import type { DesktopAuthSnapshot } from "../../shared/remoteDesktop";
 
 export interface DesktopAuthTokens {
@@ -49,7 +50,13 @@ export function loadDesktopAuth(): DesktopAuthTokens | null {
       accessToken: record.accessToken,
       refreshToken: record.refreshToken,
       expiresAt: record.expiresAt,
-      identity: identity ?? null,
+      identity: identity
+        ? parseAccountProfile({
+            sub: identity.subject,
+            name: identity.name,
+            picture: identity.picture,
+          })
+        : null,
     };
     return cached;
   } catch {

@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import { shell } from "electron";
 import { getI18nLocale, type LocaleId } from "../../shared/i18n";
+import { parseAccountProfile } from "../../shared/remote";
 import type { DesktopAuthSnapshot } from "../../shared/remoteDesktop";
 import {
   clearDesktopAuthStore,
@@ -39,6 +40,8 @@ let loginFlight: LoginAttempt | null = null;
 let loginCleanup: Promise<unknown> = Promise.resolve();
 let refreshFlight: RefreshAttempt | null = null;
 let authError: string | null = null;
+let profileEpoch: number | null = null;
+let profileFlight: AbortController | null = null;
 
 /** Preserve finite authentication errors without forwarding provider bodies or local paths. */
 export function desktopAuthError(cause: unknown, fallback = "AUTH_EXCHANGE_FAILED"): string {
@@ -134,18 +137,41 @@ async function identity(
     if (!response.ok) return null;
     const raw: unknown = await response.json();
     checkCurrent(epoch, signal);
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-    const profile = raw as Record<string, unknown>;
-    if (typeof profile.sub !== "string" || !profile.sub || profile.sub.length > 256) return null;
-    const name = [profile.name, profile.nickname, profile.sub].find(
-      (value): value is string => typeof value === "string" && !!value.trim(),
-    );
-    return { subject: profile.sub, name: (name ?? profile.sub).trim().slice(0, 256) };
+    return parseAccountProfile(raw);
   } catch {
     checkCurrent(epoch, signal);
     // A missing display profile does not invalidate a successfully exchanged account token.
     return null;
   }
+}
+
+function cancelProfile(): void {
+  profileFlight?.abort();
+  profileFlight = null;
+  profileEpoch = null;
+}
+
+function restoreProfile(tokens: DesktopAuthTokens, epoch: number): void {
+  if (profileEpoch === epoch) return;
+  profileEpoch = epoch;
+  const controller = new AbortController();
+  profileFlight = controller;
+  // Refresh saved display data in the background without delaying relay authentication.
+  void identity(tokens.accessToken, epoch, controller.signal)
+    .then((profile) => {
+      if (!profile) return;
+      checkCurrent(epoch, controller.signal);
+      const current = loadDesktopAuth();
+      if (!current || (current.identity && current.identity.subject !== profile.subject)) return;
+      // A token refresh may have completed during the lookup; preserve its latest credential set.
+      saveDesktopAuth({ ...current, identity: profile });
+    })
+    .catch(() => {
+      // Optional metadata and its persistence must not invalidate a working account session.
+    })
+    .finally(() => {
+      if (profileFlight === controller) profileFlight = null;
+    });
 }
 
 async function performLogin(
@@ -261,6 +287,7 @@ async function performLogin(
         tokens.identity = await identity(tokens.accessToken, epoch, signal);
         checkCurrent(epoch, signal);
         saveDesktopAuth(tokens);
+        profileEpoch = epoch;
         respond(response, "success");
         resolve(tokens);
       } catch (cause) {
@@ -321,6 +348,7 @@ async function performLogin(
 export function loginDesktop(options: LoginOptions = {}): Promise<DesktopAuthTokens> {
   if (loginFlight?.promise) return loginFlight.promise;
   const epoch = ++credentialEpoch;
+  cancelProfile();
   refreshFlight?.controller.abort(new Error("AUTH_CHANGED"));
   refreshFlight = null;
   authError = null;
@@ -366,7 +394,10 @@ export async function desktopAccessToken(expectedEpoch = credentialEpoch): Promi
   checkCurrent(expectedEpoch);
   const current = loadDesktopAuth();
   if (!current) throw new Error("ACCOUNT_AUTH_REQUIRED");
-  if (current.expiresAt > Date.now() + 60_000) return current.accessToken;
+  if (current.expiresAt > Date.now() + 60_000) {
+    restoreProfile(current, expectedEpoch);
+    return current.accessToken;
+  }
   if (refreshFlight) return refreshFlight.promise;
   const controller = new AbortController();
   const attempt: RefreshAttempt = { controller, promise: Promise.resolve("") };
@@ -384,7 +415,9 @@ export async function desktopAccessToken(expectedEpoch = credentialEpoch): Promi
     .then((tokens) => {
       checkCurrent(expectedEpoch, controller.signal);
       authError = null;
-      return saveDesktopAuth(tokens).accessToken;
+      const saved = saveDesktopAuth(tokens);
+      restoreProfile(saved, expectedEpoch);
+      return saved.accessToken;
     })
     .catch((cause: unknown) => {
       const code = desktopAuthError(cause);
@@ -426,6 +459,7 @@ export function desktopAuthSnapshot(): DesktopAuthSnapshot {
 export function clearDesktopAuth(): void {
   cancelDesktopLogin();
   credentialEpoch++;
+  cancelProfile();
   refreshFlight?.controller.abort(new Error("AUTH_CHANGED"));
   refreshFlight = null;
   authError = null;
