@@ -1,22 +1,26 @@
 import { randomUUID } from "node:crypto";
 import {
+  ConnectionRenewal,
   type ControlClient,
   ControlError,
   DeliveryReceiver,
   type DesktopCredential,
   type DesktopSummary,
   desktopId,
+  encodeClientSocketFrame,
   exact,
   fail,
   id,
   LIMITS,
   origin,
-  parseJson,
   parseMeta,
+  parseRelaySocketFrame,
+  RELAY_TIMING,
   RelayAccountSession,
   type RoutingContext,
   record,
   relayPrincipal,
+  requireRelayFeatures,
   revoked,
   type Scope,
   SECURITY_PROFILE,
@@ -127,14 +131,15 @@ export class RemoteService {
     () => this.client?.now() ?? Date.now(),
     this.operations,
   );
+  private renewal: ConnectionRenewal | null = null;
+  private stateRevision = -1;
   private eventTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly releaseViewing = setRemoteViewing(
     (sessionId) =>
       this.ready && this.source.isViewingLive(sessionId, (id) => this.bridge.isViewing(id)),
   );
   private readonly unsubscribe = subscribeSessionEvents((event) => {
-    this.source.observe(event);
-    this.scheduleEventTick();
+    if (this.source.observe(event)) this.scheduleEventTick();
   });
   private readonly unsubscribeUi = subscribeSessionUiEvents(() => this.scheduleEventTick());
   private scheduleEventTick(): void {
@@ -145,6 +150,7 @@ export class RemoteService {
     }, 250);
   }
   snapshot(): RemoteSnapshot {
+    this.pairing?.expireInvitation();
     const auth = desktopAuthSnapshot();
     let credential = this.credential;
     let credentialState: RemoteSnapshot["credentialState"] = "none";
@@ -524,14 +530,14 @@ export class RemoteService {
       if (generation === this.generation) this.starting = false;
     }
   }
-  private schedule(): void {
+  private schedule(delay?: number): void {
     if (this.timer) clearTimeout(this.timer);
     if (!this.stopped)
       this.timer = setTimeout(
         () => {
           void (this.ready ? this.tick() : this.connect());
         },
-        this.ready ? LIMITS.pollMs : this.reconnectDelay(),
+        delay ?? (this.ready ? RELAY_TIMING.localReconcileMs : this.reconnectDelay()),
       );
   }
   private reconnectDelay(): number {
@@ -578,7 +584,12 @@ export class RemoteService {
       let authenticated = false;
       ws.onopen = () => {
         if (this.socket === ws)
-          ws.send(JSON.stringify({ controlVersion: 2, type: "authenticate", accessToken: token }));
+          ws.send(
+            encodeClientSocketFrame(
+              { controlVersion: 2, type: "authenticate", accessToken: token },
+              { role: "desktop", authenticated: false },
+            ),
+          );
       };
       ws.onmessage = (event) => {
         const raw = String(event.data);
@@ -592,13 +603,10 @@ export class RemoteService {
         received = received
           .then(async () => {
             if (this.socket !== ws) return;
-            const r = record(parseJson(raw, LIMITS.businessBytes));
+            const raw = String(event.data);
+            const r = parseRelaySocketFrame(raw, "desktop");
             if (!authenticated) {
-              if (
-                r.controlVersion !== 2 ||
-                r.type !== "authenticated" ||
-                r.securityProfile !== SECURITY_PROFILE
-              )
+              if (r.type !== "authenticated" || r.securityProfile !== SECURITY_PROFILE)
                 fail("AUTH_REQUIRED");
               const p = relayPrincipal(r.principal, credential.accountId);
               if (
@@ -607,7 +615,49 @@ export class RemoteService {
                 p.relayInstanceId !== this.credential?.relayInstanceId
               )
                 fail("AUTH_REQUIRED");
+              requireRelayFeatures(r.features);
               authenticated = true;
+              const renewal = new ConnectionRenewal(
+                {
+                  accountId: credential.accountId,
+                  newId: randomUUID,
+                  now: () => client.now(),
+                  credentials: async () => {
+                    const refreshed = await client.request(
+                      "POST",
+                      "/auth/desktop-access",
+                      credential.desktopCredential,
+                      {},
+                      (value) => {
+                        const item = exact(value, ["accessToken", "accessExpiresAt"]);
+                        return {
+                          token: secret(item.accessToken),
+                          expires: Date.parse(timestamp(item.accessExpiresAt)),
+                        };
+                      },
+                    );
+                    if (this.socket !== ws) fail("DESKTOP_OFFLINE");
+                    this.access = refreshed;
+                    return {
+                      accessToken: refreshed.token,
+                      accountToken: await client.v2.account.token(),
+                    };
+                  },
+                  send: (frame) => {
+                    if (this.socket !== ws) fail("DESKTOP_OFFLINE");
+                    ws.send(
+                      encodeClientSocketFrame(frame, { role: "desktop", authenticated: true }),
+                    );
+                  },
+                  close: () => ws.close(),
+                  renewed: () => {},
+                },
+                p,
+              );
+              this.renewal?.dispose();
+              this.renewal = renewal;
+              this.stateRevision = -1;
+              renewal.start(r.accountExpiresAt);
               clearTimeout(authTimer);
               await this.pairing?.reconcile(this.startup);
               if (this.socket !== ws) return;
@@ -619,25 +669,30 @@ export class RemoteService {
               return;
             }
             if (!this.ready) return;
-            const routed = exact(r, [
-              "controlVersion",
-              "type",
-              "context",
-              "frame",
-              "deliverySequence",
-            ]);
-            if (routed.controlVersion !== 2 || routed.type !== "route") fail("FORBIDDEN");
-            const contextValue = exact(routed.context, [
-              "relayInstanceId",
-              "desktopId",
-              "deviceId",
-              "grantId",
-              "grantVersion",
-              "connectionGeneration",
-              "accessExpiresAt",
-              "accountId",
-            ]);
-            const p = relayPrincipal({ ...contextValue, role: "mobile" }, credential.accountId);
+            if (r.type === "pairing_state" || r.type === "reauthenticated") {
+              ws.send(
+                encodeClientSocketFrame(
+                  {
+                    controlVersion: 2,
+                    type: "ack",
+                    deliverySequence: delivery.accept(r),
+                  },
+                  { role: "desktop", authenticated: true },
+                ),
+              );
+              if (r.type === "reauthenticated") {
+                this.renewal?.accept(r);
+              } else {
+                const state = r.state;
+                if (state.revision > this.stateRevision) {
+                  await this.pairing?.applyState(state);
+                  this.stateRevision = state.revision;
+                }
+              }
+              return;
+            }
+            if (r.type !== "route") fail("FORBIDDEN");
+            const p = relayPrincipal({ ...r.context, role: "mobile" }, credential.accountId);
             const { role: _role, ...context } = p;
             if (
               context.desktopId !== this.credential?.desktopId ||
@@ -645,17 +700,20 @@ export class RemoteService {
             )
               fail("AUTH_REQUIRED");
             ws.send(
-              JSON.stringify({
-                controlVersion: 2,
-                type: "ack",
-                deliverySequence: delivery.accept(r),
-              }),
+              encodeClientSocketFrame(
+                {
+                  controlVersion: 2,
+                  type: "ack",
+                  deliverySequence: delivery.accept(r),
+                },
+                { role: "desktop", authenticated: true },
+              ),
             );
             let frame: unknown;
             try {
-              frame = await this.bridge.request(context, routed.frame);
+              frame = await this.bridge.request(context, r.frame);
             } catch (cause) {
-              const request = record(routed.frame);
+              const request = record(r.frame);
               frame = {
                 version: 1,
                 type: "response",
@@ -681,10 +739,14 @@ export class RemoteService {
       ws.onclose = () => {
         clearTimeout(authTimer);
         if (this.socket === ws) {
+          this.renewal?.dispose();
+          this.renewal = null;
           this.socket = null;
           this.ready = false;
           this.bridge.clear();
-          this.schedule();
+          this.schedule(
+            this.error === "VERSION_MISMATCH" ? RELAY_TIMING.unavailableRetryMs : undefined,
+          );
         }
       };
       ws.onerror = () => {
@@ -709,7 +771,13 @@ export class RemoteService {
           this.account.disconnect();
           this.accountAuthEpoch = null;
         } else {
-          this.schedule();
+          this.schedule(
+            code === "STATE_UNAVAILABLE"
+              ? RELAY_TIMING.unavailableRetryMs
+              : cause instanceof ControlError && cause.code === "RATE_LIMITED"
+                ? Math.max(LIMITS.pollMs, cause.retryAfterMs)
+                : undefined,
+          );
         }
         this.error = code;
       }
@@ -728,12 +796,10 @@ export class RemoteService {
     )
       return;
     ws.send(
-      JSON.stringify({
-        controlVersion: 2,
-        type: "deliver",
-        context,
-        frame,
-      }),
+      encodeClientSocketFrame(
+        { controlVersion: 2, type: "deliver", context, frame },
+        { role: "desktop", authenticated: true },
+      ),
     );
   }
   private async tick(): Promise<void> {
@@ -742,13 +808,14 @@ export class RemoteService {
     const generation = this.generation;
     const pairing = this.pairing;
     try {
-      if (!this.access || (this.client?.now() ?? Date.now()) >= this.access.expires - 60_000) {
+      if (
+        !this.access ||
+        (!this.renewal && (this.client?.now() ?? Date.now()) >= this.access.expires)
+      ) {
         this.socket?.close();
         return;
       }
       if (pairing.grant?.state === "revoked" && pairing.revocationPending) await pairing.revoke();
-      if (this.stopped || generation !== this.generation) return;
-      await pairing.poll();
       if (this.stopped || generation !== this.generation) return;
       await this.bridge.tick((context, frame) => this.deliver(context, frame));
       if (generation === this.generation) this.error = null;
@@ -801,6 +868,8 @@ export class RemoteService {
     this.connecting = false;
     this.ticking = false;
     this.bridge.clear();
+    this.renewal?.dispose();
+    this.renewal = null;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     if (this.eventTimer) clearTimeout(this.eventTimer);

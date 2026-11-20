@@ -20,6 +20,9 @@ export const EMPTY_TAIL: HistoryTail = { revision: "empty", messages: [] };
 
 interface Entry {
   parent: string | null;
+  toolCalls: string[];
+  toolResult: string | null;
+  closesTools: boolean;
   messages: Omit<HistoryRecord, "position">[];
 }
 
@@ -27,6 +30,7 @@ export interface HistoryView {
   identity: string;
   messages: HistoryRecord[];
   prefixes: string[];
+  pendingToolStart?: number | null;
 }
 
 interface HistoryIndex extends HistoryView {
@@ -36,6 +40,7 @@ interface HistoryIndex extends HistoryView {
   mtime: number;
   ctime: number;
   completeBytes: number;
+  pendingTools: string[];
   completeHash: string;
 }
 
@@ -64,12 +69,44 @@ function indexLines(index: HistoryIndex, bytes: Buffer): void {
             state: "done" as const,
           }))
         : [];
+    const message =
+      entry.message && typeof entry.message === "object"
+        ? (entry.message as Record<string, unknown>)
+        : {};
+    const toolCalls =
+      message.role === "assistant" && Array.isArray(message.content)
+        ? message.content.flatMap((part: Record<string, unknown>) =>
+            part.type === "toolCall" && typeof part.id === "string" ? [part.id] : [],
+          )
+        : [];
+    const metadata = {
+      toolCalls,
+      toolResult:
+        message.role === "toolResult" && typeof message.toolCallId === "string"
+          ? message.toolCallId
+          : null,
+      closesTools: message.role === "assistant" || message.role === "user",
+    };
     const extendsBranch = parent === index.leaf && !index.entries.has(key);
-    index.entries.set(key, { parent, messages });
+    const indexed = { parent, messages, ...metadata };
+    index.entries.set(key, indexed);
     index.leaf = key;
-    if (extendsBranch) append(index, messages);
+    if (extendsBranch) appendEntry(index, indexed);
     else rebuildBranch(index);
   }
+}
+
+function appendEntry(index: HistoryIndex, entry: Entry): void {
+  if (entry.closesTools) {
+    index.pendingTools = [...entry.toolCalls];
+    index.pendingToolStart = null;
+  }
+  if (entry.toolResult && index.pendingTools.includes(entry.toolResult)) {
+    index.pendingToolStart ??= index.messages.length;
+    index.pendingTools = index.pendingTools.filter((id) => id !== entry.toolResult);
+    if (!index.pendingTools.length) index.pendingToolStart = null;
+  }
+  append(index, entry.messages);
 }
 
 function append(index: HistoryIndex, messages: Entry["messages"]): void {
@@ -93,7 +130,9 @@ function rebuildBranch(index: HistoryIndex): void {
   }
   index.messages = [];
   index.prefixes = [];
-  for (const entry of branch.reverse()) append(index, entry.messages);
+  index.pendingTools = [];
+  index.pendingToolStart = null;
+  for (const entry of branch.reverse()) appendEntry(index, entry);
 }
 
 /** Cache projections by file identity and verify the previous prefix before appending. */
@@ -150,6 +189,8 @@ export class RemoteHistoryReader {
           leaf: matchingPrefix ? cached.leaf : null,
           messages: matchingPrefix ? [...cached.messages] : [],
           prefixes: matchingPrefix ? [...cached.prefixes] : [],
+          pendingTools: matchingPrefix ? [...cached.pendingTools] : [],
+          pendingToolStart: matchingPrefix ? cached.pendingToolStart : null,
         };
         indexLines(index, bytes.subarray(matchingPrefix ? cached.completeBytes : 0, completeBytes));
       }
@@ -179,6 +220,17 @@ export class RemoteHistoryReader {
       await handle.close();
     }
   }
+}
+
+export function completedHistory(view: HistoryView, settled: boolean): HistoryView {
+  const boundary = settled ? null : view.pendingToolStart;
+  return boundary === null || boundary === undefined
+    ? view
+    : {
+        ...view,
+        messages: view.messages.slice(0, boundary),
+        prefixes: view.prefixes.slice(0, boundary),
+      };
 }
 
 export function historyRevision(view: HistoryView): string {

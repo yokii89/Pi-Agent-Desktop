@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   type Grant,
+  type HistoryQuery,
+  type HistoryRecord,
   LIMITS,
+  parseHistoryReply,
   READ_SCOPES,
   type RoutingContext,
   type Scope,
@@ -121,6 +124,69 @@ function fixture(
 }
 
 describe("desktop read-only authority and project isolation", () => {
+  it("syncs one page per completed batch regardless of intermediate token updates", async () => {
+    const records: HistoryRecord[] = [];
+    let tailRevision = "initial";
+    let updatedAt = 0;
+    const f = fixture(READ_SCOPES, {
+      sessions: async () => [{ ...sessions[0], status: "running", updatedAt }],
+      history: async () => ({
+        view: {
+          identity: "file",
+          messages: [...records],
+          prefixes: records.map((record) => record.id),
+        },
+        tail: { revision: tailRevision, messages: [] },
+      }),
+    });
+    await f.bridge.request(
+      f.context(),
+      frame("sessions.subscribe", { sessionId: "allowed-session" }),
+    );
+    const events: { sessionId: string; payload: { kind: string } }[] = [];
+    const tick = () =>
+      f.bridge.tick((_context, value) => events.push(value as (typeof events)[number]));
+    await tick();
+    events.length = 0;
+    let checkpoint: string | null = null;
+    let pages = 0;
+    for (let batch = 0; batch < 100; batch++) {
+      for (let token = 0; token < 10; token++) {
+        tailRevision = `${batch}-${token}`;
+        updatedAt++;
+        await tick();
+      }
+      expect(events).toHaveLength(batch);
+      records.push({
+        id: `record-${batch}`,
+        position: batch,
+        role: "assistant",
+        text: `completed ${batch}`,
+        state: "done",
+      });
+      await tick();
+      expect(events.at(-1)?.payload.kind).toBe("history_committed");
+      const query: HistoryQuery = {
+        sessionId: "allowed-session",
+        direction: checkpoint ? "after" : "latest",
+        cursor: checkpoint,
+        limit: 50,
+        tailRevision,
+      };
+      const response = (await f.bridge.request(
+        f.context(),
+        frame("sessions.history.sync", { ...query }, `page-${batch}`),
+      )) as { data: unknown };
+      const page = parseHistoryReply(response.data, query);
+      expect(page.status).toBe("page");
+      if (page.status !== "page") throw new Error("expected completed batch");
+      expect(page.messages).toHaveLength(1);
+      checkpoint = page.checkpoint;
+      pages++;
+    }
+    expect(events).toHaveLength(100);
+    expect(pages).toBe(100);
+  });
   it("authorizes incremental pages and never uses the legacy full transcript path", async () => {
     const history = vi.fn(async () => ({
       view: { identity: "file", messages: [], prefixes: [] },

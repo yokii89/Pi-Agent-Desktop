@@ -5,7 +5,6 @@ import { pendingUiRequests } from "../session/extensionUi";
 import { getPiAgentDir } from "../session/piInfo";
 import {
   abortSession,
-  fetchSessionMessages,
   fetchSessionState,
   hasSession,
   liveSessionIdForFile,
@@ -13,17 +12,12 @@ import {
   respondSessionUi,
   setSessionName,
 } from "../session/piSession";
-import {
-  ensureSessionReady,
-  getRuntimeState,
-  listRuntimeSnapshots,
-} from "../session/runtimeCoordinator";
+import { ensureSessionReady, listRuntimeSnapshots } from "../session/runtimeCoordinator";
 import { encodeCwdToSessionDir, listSessions } from "../session/sessionHistory";
 import { getSettings } from "../settings/settings";
-import { RemoteHistoryReader } from "./historySync";
-import { RemoteHistoryTail } from "./historyTail";
+import { completedHistory, EMPTY_TAIL, RemoteHistoryReader } from "./historySync";
 import { remoteInteractionAnswer } from "./interactionAnswer";
-import { projectRemoteMessages, readRemoteHistory, remoteSessionFile } from "./readAdapter";
+import { remoteSessionFile } from "./readAdapter";
 import type {
   ReadOnlySource,
   RemoteInteraction,
@@ -45,17 +39,32 @@ export class DesktopReadOnlySource implements ReadOnlySource {
   private refs = new Map<string, { file: string; projectId: string; root: string }>();
   private readonly pendingSessions = new Map<string, Promise<RemoteSession[]>>();
   private readonly historyReader = new RemoteHistoryReader();
-  private readonly historyTail = new RemoteHistoryTail();
 
-  observe(event: SessionPushMessage): void {
-    this.historyTail.observe(event);
+  observe(event: SessionPushMessage): boolean {
+    if (event.type === "exit" || event.type === "error") return true;
+    const updates =
+      event.type === "eventBatch" ? event.payload : event.type === "event" ? [event.payload] : [];
+    return updates.some((update) =>
+      [
+        "agent_start",
+        "agent_end",
+        "agent_settled",
+        "message_end",
+        "tool_execution_start",
+        "tool_execution_end",
+        "session_name_changed",
+      ].includes(update.type),
+    );
   }
 
   async history(session: RemoteSession) {
     const ref = this.ref(session);
     const view = await this.historyReader.read(ref.file, sessionDirectory(ref.root), sessionRoot());
     this.ref(session);
-    return { view, tail: this.historyTail.current(liveSessionIdForFile(ref.file), view) };
+    const busy = listRuntimeSnapshots().some(
+      (runtime) => runtime.sessionFile === ref.file && runtime.state === "busy",
+    );
+    return { view: completedHistory(view, !busy), tail: EMPTY_TAIL };
   }
   projects(): RemoteProject[] {
     return getSettings().projects.map((p) => ({
@@ -132,24 +141,7 @@ export class DesktopReadOnlySource implements ReadOnlySource {
     return ref;
   }
   async messages(session: RemoteSession): Promise<RemoteMessage[]> {
-    const ref = this.ref(session);
-    const directory = sessionDirectory(ref.root);
-    await remoteSessionFile(ref.file, directory, sessionRoot());
-    const liveId = liveSessionIdForFile(ref.file);
-    let messages: RemoteMessage[];
-    if (liveId && hasSession(liveId)) {
-      try {
-        const raw = await fetchSessionMessages(liveId);
-        messages = projectRemoteMessages(raw, getRuntimeState(liveId) === "busy");
-      } catch {
-        messages = await readRemoteHistory(ref.file, directory, sessionRoot());
-      }
-    } else {
-      messages = await readRemoteHistory(ref.file, directory, sessionRoot());
-    }
-    await remoteSessionFile(ref.file, directory, sessionRoot());
-    this.ref(session);
-    return messages;
+    return (await this.history(session)).view.messages;
   }
   async interactions(projectIds: string[]): Promise<RemoteInteraction[]> {
     const sessions = await this.sessions(projectIds);

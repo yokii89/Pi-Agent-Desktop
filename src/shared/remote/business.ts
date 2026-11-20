@@ -3,6 +3,15 @@ export const PROTOCOL_VERSION = 1;
 export const MAX_FRAME_BYTES = 64 * 1024;
 export const MAX_PROMPT_LENGTH = 16_000;
 export const MAX_REQUESTS = 64;
+export const READ_COMMANDS = [
+  "projects.list",
+  "sessions.list",
+  "sessions.history",
+  "sessions.history.sync",
+  "sessions.subscribe",
+  "requests.lookup",
+] as const satisfies readonly Command[];
+
 export const COMMANDS = [
   "projects.list",
   "sessions.list",
@@ -24,6 +33,38 @@ export interface RequestFrame {
   id: string;
   command: Command;
   payload: Record<string, unknown>;
+}
+
+export function parseRequestFrame(raw: string): RequestFrame {
+  if (utf8ByteLength(raw) > MAX_FRAME_BYTES) {
+    throw new ProtocolError("FRAME_TOO_LARGE", "Frame exceeds budget");
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new ProtocolError("INVALID_JSON", "Invalid JSON frame");
+  }
+  if (!isRecord(value) || value.version !== PROTOCOL_VERSION) {
+    throw new ProtocolError("VERSION_MISMATCH", "Unsupported protocol version");
+  }
+  if (
+    value.type !== "request" ||
+    !isId(value.id) ||
+    typeof value.command !== "string" ||
+    !(COMMANDS as readonly string[]).includes(value.command) ||
+    !isRecord(value.payload) ||
+    Object.keys(value).length !== 5
+  ) {
+    throw new ProtocolError("INVALID_FRAME", "Invalid request frame");
+  }
+  return {
+    version: PROTOCOL_VERSION,
+    type: "request",
+    id: value.id,
+    command: value.command as Command,
+    payload: value.payload,
+  };
 }
 
 export type ServerFrame =
@@ -95,12 +136,22 @@ export function parseServerFrame(raw: string): ServerFrame {
     throw new ProtocolError("VERSION_MISMATCH", "Unsupported protocol version");
   }
   if (value.type === "response" && isId(value.id)) {
-    if (value.status === "accepted" || value.status === "completed") {
+    if (
+      (value.status === "accepted" || value.status === "completed") &&
+      Object.keys(value).length === 5 &&
+      Object.hasOwn(value, "version") &&
+      Object.hasOwn(value, "type") &&
+      Object.hasOwn(value, "id") &&
+      Object.hasOwn(value, "status") &&
+      Object.hasOwn(value, "data")
+    ) {
       return { version: 1, type: "response", id: value.id, status: value.status, data: value.data };
     }
     if (
       value.status === "failed" &&
+      Object.keys(value).length === 5 &&
       isRecord(value.error) &&
+      Object.keys(value.error).length === 2 &&
       typeof value.error.code === "string" &&
       typeof value.error.message === "string"
     ) {
@@ -120,7 +171,8 @@ export function parseServerFrame(raw: string): ServerFrame {
     typeof value.sequence === "number" &&
     Number.isSafeInteger(value.sequence) &&
     value.sequence >= 1 &&
-    isRecord(value.payload)
+    isRecord(value.payload) &&
+    Object.keys(value).length === 6
   ) {
     return {
       version: 1,

@@ -10,6 +10,7 @@ import {
   record,
   timestamp,
 } from "./contract";
+import { RELAY_FEATURE_HEADER, RELAY_FEATURE_VALUE, RELAY_TIMING } from "./features";
 import { controlPath, type V2ClientOptions } from "./v2";
 
 export interface ControlResponse {
@@ -46,6 +47,7 @@ export class ControlClient {
       Authorization: `Bearer ${await this.v2.account.token()}`,
       "X-PiDesk-Control-Version": "2",
       "X-Request-Id": id(this.newId()),
+      [RELAY_FEATURE_HEADER]: RELAY_FEATURE_VALUE,
     };
   }
   now(): number {
@@ -73,7 +75,7 @@ export class ControlClient {
     };
     if (path !== "/v2/meta") headers.Authorization = `Bearer ${await this.v2.account.token()}`;
     if (token) headers["X-PiDesk-Room-Authorization"] = `Bearer ${token}`;
-    let response: ControlResponse;
+    let response: ControlResponse | undefined;
     let r: Record<string, unknown>;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
@@ -89,6 +91,14 @@ export class ControlClient {
       // Receiving headers does not mean the response body has finished downloading.
       r = record(parseJson(await response.text(), 32_768));
     } catch {
+      if (response && (response.status === 429 || response.status >= 500)) {
+        const retry = Number(response.headers.get("Retry-After")) * 1000;
+        throw new ControlError(
+          response.status === 429 ? "RATE_LIMITED" : "STATE_UNAVAILABLE",
+          true,
+          Number.isFinite(retry) && retry > 0 ? retry : RELAY_TIMING.unavailableRetryMs,
+        );
+      }
       throw new ControlError("NETWORK_UNCERTAIN", true);
     } finally {
       clearTimeout(timeout);

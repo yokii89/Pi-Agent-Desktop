@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Grant } from "../../shared/remote";
+import { type Grant, RELAY_FEATURES, RELAY_TIMING } from "../../shared/remote";
 
 const f = vi.hoisted(() => ({
   request: vi.fn(),
@@ -60,6 +60,7 @@ vi.mock("./desktopPairing", () => ({
     qr = { invitationSecret: "private-invitation" };
     claim = { claimId: "claim-1" };
     grant = null;
+    expireInvitation = () => {};
     poll = f.poll;
     reconcile = f.reconcile;
   },
@@ -123,6 +124,9 @@ const authenticate = async (socket: FakeSocket) => {
       controlVersion: 2,
       type: "authenticated",
       securityProfile: "trusted-relay-tls-v1",
+      features: RELAY_FEATURES,
+      accountExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      desktopOnline: true,
       principal: {
         accountId: f.credential.accountId,
         role: "desktop",
@@ -238,22 +242,15 @@ describe("remote service pause and shutdown", () => {
     expect(f.saveGrant).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   });
-  it("does not recreate polling after an in-flight poll completes following pause", async () => {
+  it("never polls pairing state while idle and clears maintenance on pause", async () => {
     await service.start();
     await authenticate(FakeSocket.instances[0]);
     expect(service.snapshot().connected).toBe(true);
-    let resolve!: () => void;
-    f.poll.mockReturnValueOnce(
-      new Promise<void>((done) => {
-        resolve = done;
-      }),
-    );
-    await vi.advanceTimersByTimeAsync(2_000);
-    expect(f.poll).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(RELAY_TIMING.localReconcileMs * 6);
+    expect(f.poll).not.toHaveBeenCalled();
+    expect(f.request).toHaveBeenCalledTimes(1);
     service.stop();
-    resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(RELAY_TIMING.localReconcileMs * 6);
     expect(service.snapshot()).toMatchObject({ connected: false, qr: null, claim: null });
     expect(vi.getTimerCount()).toBe(0);
   });

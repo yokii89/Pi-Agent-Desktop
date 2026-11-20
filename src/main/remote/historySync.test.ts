@@ -11,7 +11,7 @@ import {
   parseHistoryReply,
 } from "../../shared/remote";
 import { MAX_FRAME_BYTES } from "../../shared/remote/business";
-import { EMPTY_TAIL, historyPage, RemoteHistoryReader } from "./historySync";
+import { completedHistory, EMPTY_TAIL, historyPage, RemoteHistoryReader } from "./historySync";
 
 const binding: Binding = {
   relayInstanceId: "relay",
@@ -80,6 +80,60 @@ function page(
 }
 
 describe("incremental desktop history", () => {
+  it("holds a partial tool group until all results settle and reconstructs the boundary after restart", async () => {
+    const f = await fixture(1);
+    const line = (id: string, parentId: string, message: unknown) =>
+      `${JSON.stringify({ type: "message", id, parentId, message })}\n`;
+    await appendFile(
+      f.file,
+      line("calls", "entry-0", {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Reading two files" },
+          { type: "toolCall", id: "tool-a", name: "read", arguments: {} },
+          { type: "toolCall", id: "tool-b", name: "read", arguments: {} },
+        ],
+      }),
+    );
+    const before = completedHistory(await f.read(), false);
+    expect(before.messages.map((message) => message.text)).toEqual([
+      "message 0",
+      "Reading two files",
+    ]);
+    await appendFile(
+      f.file,
+      line("result-a", "calls", {
+        role: "toolResult",
+        toolCallId: "tool-a",
+        toolName: "read",
+        content: "first result",
+      }),
+    );
+    const partial = await f.read();
+    expect(partial.messages).toHaveLength(3);
+    expect(completedHistory(partial, false).messages).toHaveLength(2);
+    expect(completedHistory(partial, true).messages).toHaveLength(3);
+    f.restart();
+    expect(completedHistory(await f.read(), false).messages).toHaveLength(2);
+    await appendFile(
+      f.file,
+      line("result-b", "result-a", {
+        role: "toolResult",
+        toolCallId: "tool-b",
+        toolName: "read",
+        isError: true,
+        content: "second failed",
+      }),
+    );
+    const completed = completedHistory(await f.read(), false);
+    expect(completed.messages.map((message) => message.text)).toEqual([
+      "message 0",
+      "Reading two files",
+      "first result",
+      "second failed",
+    ]);
+    expect(completed.messages.at(-1)?.isError).toBe(true);
+  });
   it("sends 50 of 1000, zero unchanged messages, then only three new messages", async () => {
     const f = await fixture();
     const latest = page(await f.query("latest"));

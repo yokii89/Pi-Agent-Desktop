@@ -5,9 +5,11 @@ import {
   exact,
   fail,
   type Grant,
+  type HistoryNotice,
   type HistoryTail,
   id,
   parseHistoryQuery,
+  RELAY_TIMING,
   type RemoteToolKind,
   type RoutingContext,
   record,
@@ -79,6 +81,9 @@ interface DeviceWatch {
   context: RoutingContext;
   expires: number;
   previous: string;
+  projects: string;
+  summary: string;
+  summaryAt: number;
 }
 function offset(v: unknown): number {
   if (v === null) return 0;
@@ -160,8 +165,14 @@ export class ReadOnlyBridge {
     const previous = this.devices.get(context.deviceId);
     this.devices.set(context.deviceId, {
       context,
-      expires: Math.min(this.now() + 60_000, Date.parse(context.accessExpiresAt)),
+      expires: Math.min(
+        this.now() + RELAY_TIMING.overviewLeaseMs,
+        Date.parse(context.accessExpiresAt),
+      ),
       previous: previous?.previous ?? "",
+      projects: previous?.projects ?? "",
+      summary: previous?.summary ?? "",
+      summaryAt: previous?.summaryAt ?? 0,
     });
   }
   private allowedProjects(): string[] {
@@ -192,6 +203,7 @@ export class ReadOnlyBridge {
     context: RoutingContext,
     sessionId: string,
     send: (context: RoutingContext, frame: unknown) => void,
+    payload: HistoryNotice,
   ): void {
     this.check(context, "sessions.subscribe");
     send(context, {
@@ -200,7 +212,7 @@ export class ReadOnlyBridge {
       sessionId,
       epoch: this.epoch,
       sequence: this.nextSequence(context.deviceId),
-      payload: { kind: "snapshot_changed" },
+      payload,
     });
   }
   async request(context: RoutingContext, raw: unknown): Promise<unknown> {
@@ -407,11 +419,27 @@ export class ReadOnlyBridge {
         ]);
         if (generation !== this.generation) return;
         if (this.devices.get(deviceId) !== watch) continue;
-        const fingerprint = JSON.stringify([sessions, interactions]);
-        if (watch.previous !== fingerprint) {
+        const projectFingerprint = JSON.stringify(this.source.projects());
+        const fingerprint = JSON.stringify([
+          projectFingerprint,
+          sessions.map(({ updatedAt: _updatedAt, ...session }) => session),
+          interactions,
+        ]);
+        const summary = JSON.stringify(sessions.map(({ id, updatedAt }) => [id, updatedAt]));
+        if (
+          watch.previous !== fingerprint ||
+          (summary !== watch.summary && this.now() - watch.summaryAt >= 5_000)
+        ) {
+          const projectsChanged = watch.projects !== projectFingerprint;
+          watch.summary = summary;
+          watch.summaryAt = this.now();
           watch.previous = fingerprint;
+          watch.projects = projectFingerprint;
           this.check(watch.context, "sessions.list");
-          this.emit(watch.context, "overview", send);
+          this.emit(watch.context, "overview", send, {
+            kind: "status_changed",
+            changes: projectsChanged ? ["projects", "sessions"] : ["sessions"],
+          });
         }
       } catch {
         if (generation !== this.generation) return;
@@ -429,16 +457,17 @@ export class ReadOnlyBridge {
       try {
         this.check(lease.context, "sessions.subscribe", lease.session.projectId);
         const fingerprint = this.source.history
-          ? await this.source
-              .history(lease.session)
-              .then(({ view, tail }) => `${historyRevision(view)}:${tail.revision}`)
+          ? await this.source.history(lease.session).then(({ view }) => historyRevision(view))
           : JSON.stringify(await this.source.messages(lease.session));
         if (generation !== this.generation) return;
         if (this.leases.get(deviceId) !== lease) continue;
         if (lease.previous !== fingerprint) {
           lease.previous = fingerprint;
           this.check(lease.context, "sessions.subscribe", lease.session.projectId);
-          this.emit(lease.context, lease.session.id, send);
+          this.emit(lease.context, lease.session.id, send, {
+            kind: "history_committed",
+            revision: fingerprint,
+          });
         }
       } catch (cause) {
         if (generation !== this.generation) return;

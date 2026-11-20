@@ -42,6 +42,21 @@ vi.mock("./readAdapter", async (original) => ({
   readRemoteHistory: f.history,
 }));
 
+vi.mock("./historySync", async (original) => ({
+  ...(await original<typeof import("./historySync")>()),
+  RemoteHistoryReader: class {
+    async read(file: string, directory: string, root: string) {
+      await f.guard(file, directory, root);
+      const messages = await f.history(file, directory, root);
+      return {
+        identity: file,
+        messages,
+        prefixes: messages.map((message: { id: string }) => message.id),
+      };
+    }
+  },
+}));
+
 import { DesktopReadOnlySource } from "./desktopSource";
 
 const summary = () => ({
@@ -161,17 +176,17 @@ describe("desktop remote catalog integration", () => {
     expect(f.history).toHaveBeenCalledOnce();
     expect(f.fetch).not.toHaveBeenCalled();
   });
-  it("preserves active-session text projection and disk fallback", async () => {
+  it("reads committed disk history during generation without requesting a live preview", async () => {
     const source = new DesktopReadOnlySource();
     const [session] = await source.sessions(["allowed"]);
     f.liveId.mockReturnValue("live-1");
     f.hasSession.mockReturnValue(true);
-    f.fetch.mockResolvedValue([{ role: "assistant", content: "live answer" }]);
+    f.fetch.mockResolvedValue([{ role: "assistant", content: "unfinished live answer" }]);
     expect(await source.messages(session)).toEqual([
-      { id: "m_0_0", role: "assistant", text: "live answer", state: "running" },
+      { id: "m_0_0", role: "user", text: "disk", state: "done" },
     ]);
-    f.fetch.mockRejectedValue(new Error("RPC_EXITED"));
-    expect((await source.messages(session))[0].text).toBe("disk");
+    expect(f.fetch).not.toHaveBeenCalled();
+    expect((await source.history(session)).tail.messages).toEqual([]);
   });
   it("rejects history when the project is removed during an asynchronous read", async () => {
     const source = new DesktopReadOnlySource();

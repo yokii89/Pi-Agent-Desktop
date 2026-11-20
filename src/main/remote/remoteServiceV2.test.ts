@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Grant } from "../../shared/remote";
+import { type Grant, RELAY_FEATURES } from "../../shared/remote";
 
 const fixture = vi.hoisted(() => ({
   owner: `account-v1-${"a".repeat(64)}`,
@@ -157,6 +157,9 @@ async function connected() {
     controlVersion: 2,
     type: "authenticated",
     securityProfile: "trusted-relay-tls-v1",
+    features: RELAY_FEATURES,
+    accountExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+    desktopOnline: true,
     principal: {
       accountId: fixture.owner,
       role: "desktop",

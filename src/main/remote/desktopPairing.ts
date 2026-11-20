@@ -63,6 +63,9 @@ export class DesktopPairing {
     this.qr = await this.call("/pairings", {}, (v) => parseQr(JSON.stringify(v)));
     return this.qr;
   }
+  expireInvitation(): void {
+    if (this.qr && this.client.now() >= Date.parse(this.qr.expiresAt)) this.qr = null;
+  }
   async poll(): Promise<void> {
     const state = await this.call("/state", null, (v) => {
       const r = exact(v, ["grant", "claim"]);
@@ -71,6 +74,9 @@ export class DesktopPairing {
         claim: r.claim === null ? null : parseClaim(r.claim),
       };
     });
+    await this.applyState(state);
+  }
+  async applyState(state: { grant: Grant | null; claim: ClaimStatus | null }): Promise<void> {
     this.claim = state.claim;
     if (state.claim || (this.qr && this.client.now() >= Date.parse(this.qr.expiresAt)))
       this.qr = null;
