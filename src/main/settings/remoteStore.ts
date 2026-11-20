@@ -109,6 +109,17 @@ export function saveRemoteCredential(credential: DesktopCredential): void {
     operations: [],
   });
 }
+/** Forget only remote enrollment after its connection has stopped; never touch project or session data. */
+export function clearRemoteCredential(): void {
+  try {
+    fs.rmSync(filePath(), { force: true });
+    fs.rmSync(`${filePath()}.tmp`, { force: true });
+    cache = null;
+  } catch {
+    fail("STATE_UNAVAILABLE");
+  }
+}
+
 /** Removing or replacing an authorized project invalidates the grant before settings change. */
 export function revokeRemoteForProjectChanges(
   previous: { id: string; dir: string }[],

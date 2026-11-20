@@ -18,6 +18,16 @@ vi.mock("./desktopAuth", () => ({
     expiresAt: Date.now() + 300_000,
   }),
   clearDesktopAuth: vi.fn(),
+  cancelDesktopLogin: vi.fn(),
+  revokeDesktopAuth: vi.fn(async () => {}),
+  desktopAuthSnapshot: () => ({ phase: "signed_in", identity: null, deadline: null, error: null }),
+  desktopAuthError: (cause: unknown, fallback: string) =>
+    cause instanceof Error && /^(AUTH_|ACCOUNT_)/.test(cause.message) ? cause.message : fallback,
+}));
+vi.mock("../settings/remoteEnrollmentStore", () => ({
+  loadRemoteEnrollment: () => null,
+  saveRemoteEnrollment: vi.fn(),
+  clearRemoteEnrollmentDraft: vi.fn(),
 }));
 vi.mock("../settings/remoteStore", () => ({
   loadRemoteCredential: () => ({
@@ -37,6 +47,7 @@ vi.mock("../settings/remoteStore", () => ({
   loadRemoteOperations: () => [],
   saveRemoteOperations: vi.fn(),
   saveRemoteCredential: vi.fn(),
+  clearRemoteCredential: vi.fn(),
   remoteStorageAvailable: () => true,
 }));
 vi.mock("../settings/settings", () => ({

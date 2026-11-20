@@ -12,6 +12,7 @@ import { monitorMessages } from "./monitor";
 import { notificationMessages } from "./notification";
 import { panelMessages } from "./panels";
 import { procMessages } from "./proc";
+import { remoteAccountMessages } from "./remoteAccount";
 import { remoteSettingsMessages } from "./remoteSettings";
 import { scheduledMessages } from "./scheduled";
 import { sessionMessages } from "./session";
@@ -25,6 +26,7 @@ const ALL_DEFS: MessageDefs = {
   ...commonMessages,
   ...settingsMessages,
   ...remoteSettingsMessages,
+  ...remoteAccountMessages,
   ...sidenavMessages,
   ...sessionMessages,
   ...panelMessages,

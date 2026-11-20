@@ -4,6 +4,8 @@ import {
   ControlError,
   DeliveryReceiver,
   type DesktopCredential,
+  type DesktopSummary,
+  desktopId,
   exact,
   fail,
   id,
@@ -23,6 +25,7 @@ import {
   timestamp,
 } from "../../shared/remote";
 import type {
+  DesktopEnrollmentDraft,
   RemoteAccountInput,
   RemoteEnrollment,
   RemoteSnapshot,
@@ -30,6 +33,12 @@ import type {
 import { setRemoteViewing } from "../session/idleReclaim";
 import { subscribeSessionEvents, subscribeSessionUiEvents } from "../session/sessionEvents";
 import {
+  clearRemoteEnrollmentDraft,
+  loadRemoteEnrollment,
+  saveRemoteEnrollment,
+} from "../settings/remoteEnrollmentStore";
+import {
+  clearRemoteCredential,
   loadRemoteCredential,
   loadRemoteGrant,
   loadRemoteOperations,
@@ -40,8 +49,11 @@ import {
 } from "../settings/remoteStore";
 import { getSettings } from "../settings/settings";
 import {
+  cancelDesktopLogin,
   desktopAccessToken,
+  desktopAuthError,
   desktopAuthGeneration,
+  desktopAuthSnapshot,
   hasDesktopAuth,
   loginDesktop,
   revokeDesktopAuth,
@@ -52,23 +64,42 @@ import { RemoteOperationLedger } from "./operationLedger";
 import { ReadOnlyBridge } from "./readOnlyBridge";
 import { relaySocket } from "./relaySocket";
 
-async function ensureDesktopLogin(): Promise<number> {
-  if (!hasDesktopAuth()) {
-    await loginDesktop();
-    return desktopAuthGeneration();
+function remoteError(cause: unknown, fallback = "CONTROL_FAILED"): string {
+  if (cause instanceof ControlError) return cause.code;
+  const code = desktopAuthError(cause, fallback);
+  if (cause instanceof Error && /^REGISTRATION_[A-Z_]+$/.test(cause.message)) return cause.message;
+  return code;
+}
+
+async function ensureDesktopLogin(reauthenticate = false): Promise<number> {
+  let needsLogin = reauthenticate;
+  if (!needsLogin) {
+    try {
+      if (hasDesktopAuth()) await desktopAccessToken();
+      else needsLogin = true;
+    } catch (cause) {
+      if (!["ACCOUNT_AUTH_REQUIRED", "AUTH_STORE_INVALID"].includes(remoteError(cause)))
+        throw cause;
+      needsLogin = true;
+    }
   }
-  try {
-    await desktopAccessToken();
-  } catch (cause) {
-    if (!(cause instanceof Error) || cause.message !== "ACCOUNT_AUTH_REQUIRED") throw cause;
-    await loginDesktop();
+  if (needsLogin) {
+    const settings = getSettings();
+    await loginDesktop({
+      reauthenticate: true,
+      theme: settings.theme === "light" ? "light" : "dark",
+    });
   }
   return desktopAuthGeneration();
 }
 
 export class RemoteService {
   private readonly account = new RelayAccountSession(randomUUID);
-  private enrolling = false;
+  private operation: RemoteSnapshot["operation"] = null;
+  private operationSequence = 0;
+  private accountAuthEpoch: number | null = null;
+  private readonly removalRequests = new Map<string, string>();
+  private readonly trustedOrigins = new Set<string>();
   private starting = false;
   private credential: DesktopCredential | null = null;
   private pairing: DesktopPairing | null = null;
@@ -114,55 +145,235 @@ export class RemoteService {
     }, 250);
   }
   snapshot(): RemoteSnapshot {
+    const auth = desktopAuthSnapshot();
+    let credential = this.credential;
+    let credentialState: RemoteSnapshot["credentialState"] = "none";
+    let enrollment: DesktopEnrollmentDraft | null = null;
+    let grant: ReturnType<typeof loadRemoteGrant> = null;
+    let storageError: string | null = null;
+    try {
+      credential ??= loadRemoteCredential();
+      credentialState = credential
+        ? Date.now() >= Date.parse(credential.expiresAt)
+          ? "expired"
+          : "ready"
+        : "none";
+      grant = loadRemoteGrant();
+    } catch (cause) {
+      credentialState = "invalid";
+      storageError = remoteError(cause, "STATE_UNAVAILABLE");
+    }
+    try {
+      enrollment = loadRemoteEnrollment();
+    } catch (cause) {
+      storageError ??= remoteError(cause);
+    }
+    let accountReady = false;
+    try {
+      accountReady = hasDesktopAuth();
+    } catch {
+      // The auth snapshot carries the recoverable error instead of hiding the entire panel.
+    }
     return {
-      configured: !!this.credential,
+      configured: !!credential || credentialState === "invalid",
       controlVersion: 2,
-      accountReady: hasDesktopAuth(),
-      relayOrigin: this.credential?.relayOrigin ?? null,
+      accountReady,
+      auth,
+      accountId: accountReady ? (this.account.getSnapshot()?.accountId ?? null) : null,
+      desktopId: credential?.desktopId ?? null,
+      operation: this.operation,
+      connectionState: this.ready
+        ? "connected"
+        : this.starting || this.connecting || this.socket
+          ? "connecting"
+          : this.stopped
+            ? "paused"
+            : "disconnected",
+      enrollment,
+      credentialState,
+      relayOrigin: credential?.relayOrigin ?? enrollment?.relayOrigin ?? null,
       connected: this.ready,
       qr: this.pairing?.qr ?? null,
       claim: this.pairing?.claim ?? null,
-      grant: loadRemoteGrant(),
-      revocationPending: this.pairing?.revocationPending ?? loadRemoteGrant()?.state === "revoked",
+      grant,
+      revocationPending: this.pairing?.revocationPending ?? grant?.state === "revoked",
       projects: getSettings().projects.map((p) => ({ id: p.id, name: p.name })),
-      error: this.error,
+      error: this.error ?? auth.error ?? storageError,
     };
   }
-  async enroll(raw: RemoteEnrollment): Promise<RemoteSnapshot> {
-    if (this.enrolling) fail("BUSY");
-    this.enrolling = true;
+  private async manage(
+    operation: NonNullable<RemoteSnapshot["operation"]>,
+    action: () => Promise<void>,
+  ): Promise<RemoteSnapshot> {
+    if (this.operation) fail("BUSY");
+    const sequence = ++this.operationSequence;
+    this.operation = operation;
+    this.error = null;
     try {
-      return await this.enrollRequest(raw);
+      await action();
+    } catch (cause) {
+      const code = remoteError(cause);
+      if (
+        sequence === this.operationSequence &&
+        !["AUTH_CANCELLED", "ACCOUNT_CHANGED"].includes(code)
+      )
+        this.error = code;
+      throw new ControlError(code, false);
     } finally {
-      this.enrolling = false;
+      if (sequence === this.operationSequence) this.operation = null;
     }
+    return this.snapshot();
+  }
+  async enroll(raw: RemoteEnrollment): Promise<RemoteSnapshot> {
+    return this.manage("enrolling", () => this.enrollRequest(raw));
   }
   async logout(): Promise<RemoteSnapshot> {
+    return this.manage("signing_out", async () => {
+      this.stop();
+      this.account.disconnect();
+      this.accountAuthEpoch = null;
+      await revokeDesktopAuth();
+    });
+  }
+  /** Cancel only browser authentication; registration requests retain their durable intent. */
+  cancelLogin(): RemoteSnapshot {
+    const phase = desktopAuthSnapshot().phase;
+    if (!["opening_browser", "waiting_for_browser", "exchanging_code"].includes(phase))
+      return this.snapshot();
+    this.operationSequence++;
+    this.operation = null;
+    cancelDesktopLogin();
     this.stop();
     this.account.disconnect();
-    await revokeDesktopAuth();
+    this.accountAuthEpoch = null;
     return this.snapshot();
   }
   async setAccount(raw: RemoteAccountInput): Promise<RemoteSnapshot> {
-    const r = exact(raw, ["relayOrigin"]);
-    const credential = this.credential ?? loadRemoteCredential();
-    if (credential && credential.relayOrigin !== r.relayOrigin) fail("AUTH_REQUIRED");
-    this.stop();
-    const generation = this.generation;
-    const authGeneration = await ensureDesktopLogin();
-    if (generation !== this.generation) fail("ACCOUNT_CHANGED");
-    await this.account.connectWithTokenProvider(origin(r.relayOrigin), () =>
-      desktopAccessToken(authGeneration),
+    const r = exact(
+      raw,
+      Object.hasOwn(record(raw), "reauthenticate")
+        ? ["relayOrigin", "reauthenticate"]
+        : ["relayOrigin"],
     );
-    if (generation !== this.generation) fail("ACCOUNT_CHANGED");
-    if (credential && this.account.getSnapshot()?.accountId !== credential.accountId) {
-      this.account.disconnect();
-      fail("AUTH_REQUIRED");
-    }
-    await this.start();
-    return this.snapshot();
+    if (r.reauthenticate !== undefined && typeof r.reauthenticate !== "boolean")
+      fail("INVALID_FRAME");
+    const relayOrigin = origin(r.relayOrigin);
+    return this.manage("signing_in", async () => {
+      const credential = this.credential ?? loadRemoteCredential();
+      if (credential && credential.relayOrigin !== relayOrigin) fail("AUTH_REQUIRED");
+      if (!credential && loadRemoteEnrollment()?.relayOrigin !== relayOrigin)
+        fail("SECURITY_PROFILE_MISMATCH");
+      this.stop();
+      const generation = this.generation;
+      const authGeneration = await ensureDesktopLogin(r.reauthenticate !== false);
+      if (generation !== this.generation) fail("ACCOUNT_CHANGED");
+      await this.account.connectWithTokenProvider(relayOrigin, () =>
+        desktopAccessToken(authGeneration),
+      );
+      if (generation !== this.generation) fail("ACCOUNT_CHANGED");
+      this.accountAuthEpoch = authGeneration;
+      if (credential && this.account.getSnapshot()?.accountId !== credential.accountId) {
+        this.account.disconnect();
+        fail("ACCOUNT_MISMATCH");
+      }
+      await this.start();
+    });
   }
-  private async enrollRequest(raw: RemoteEnrollment): Promise<RemoteSnapshot> {
+  private async directoryAccount(relayOrigin: string): Promise<RelayAccountSession> {
+    origin(relayOrigin);
+    const credential = this.credential ?? loadRemoteCredential();
+    if (
+      !this.trustedOrigins.has(relayOrigin) &&
+      credential?.relayOrigin !== relayOrigin &&
+      loadRemoteEnrollment()?.relayOrigin !== relayOrigin
+    )
+      fail("SECURITY_PROFILE_MISMATCH");
+    this.trustedOrigins.add(relayOrigin);
+    if (!hasDesktopAuth()) fail("ACCOUNT_AUTH_REQUIRED");
+    const epoch = desktopAuthGeneration();
+    const account = new RelayAccountSession(randomUUID);
+    await account.connectWithTokenProvider(origin(relayOrigin), () => desktopAccessToken(epoch));
+    return account;
+  }
+  /** Fetch the account directory explicitly without replacing an active desktop connection. */
+  async desktops(relayOrigin: string): Promise<DesktopSummary[]> {
+    const account = await this.directoryAccount(relayOrigin);
+    return account.desktops();
+  }
+  private async deleteRegistration(
+    relayOrigin: string,
+    target: string,
+    owner: string | null,
+  ): Promise<void> {
+    const account = await this.directoryAccount(relayOrigin);
+    if (owner && account.getSnapshot()?.accountId !== owner) fail("ACCOUNT_MISMATCH");
+    const key = `${account.getSnapshot()?.accountId}:${relayOrigin}:${target}`;
+    const requestId = this.removalRequests.get(key) ?? randomUUID();
+    this.removalRequests.set(key, requestId);
+    await account
+      .client()
+      .request(
+        "DELETE",
+        `/v2/account/me/desktops/${desktopId(target)}`,
+        null,
+        {},
+        (value) => value,
+        requestId,
+      );
+    this.removalRequests.delete(key);
+  }
+  private forgetEnrollment(): void {
+    let relayOrigin = this.credential?.relayOrigin;
+    try {
+      relayOrigin ??= loadRemoteCredential()?.relayOrigin ?? loadRemoteEnrollment()?.relayOrigin;
+    } catch {
+      // Explicit local recovery must also work when the persisted registration is unreadable.
+    }
+    if (relayOrigin) this.trustedOrigins.add(relayOrigin);
+    clearRemoteCredential();
+    this.credential = null;
+    clearRemoteEnrollmentDraft();
+    this.account.disconnect();
+    this.accountAuthEpoch = null;
+    this.startup = true;
+  }
+  /** Stop and revoke local access first; local-only reset explicitly leaves relay cleanup to the user. */
+  async resetEnrollment(localOnly: boolean): Promise<RemoteSnapshot> {
+    if (typeof localOnly !== "boolean") fail("INVALID_FRAME");
+    return this.manage("resetting", async () => {
+      this.stop();
+      if (!localOnly) {
+        const credential = this.credential ?? loadRemoteCredential();
+        const draft = loadRemoteEnrollment();
+        const target = credential?.desktopId ?? draft?.desktopId;
+        const relayOrigin = credential?.relayOrigin ?? draft?.relayOrigin;
+        if (!target || !relayOrigin) fail("REGISTRATION_PENDING");
+        const grant = loadRemoteGrant();
+        if (grant && grant.state !== "revoked")
+          saveRemoteGrant(revoked(grant, Date.now(), "user_revoked"));
+        await this.deleteRegistration(
+          relayOrigin,
+          target,
+          credential?.accountId ?? draft?.accountId ?? null,
+        );
+      }
+      this.forgetEnrollment();
+    });
+  }
+  /** Directory removal requires an explicit user-selected desktop and the current account. */
+  async removeDesktop(relayOrigin: string, target: string): Promise<RemoteSnapshot> {
+    origin(relayOrigin);
+    desktopId(target);
+    const credential = this.credential ?? loadRemoteCredential();
+    const draft = loadRemoteEnrollment();
+    if (
+      (credential?.desktopId === target && credential.relayOrigin === relayOrigin) ||
+      (draft?.desktopId === target && draft.relayOrigin === relayOrigin)
+    )
+      return this.resetEnrollment(false);
+    return this.manage("resetting", () => this.deleteRegistration(relayOrigin, target, null));
+  }
+  private async enrollRequest(raw: RemoteEnrollment): Promise<void> {
     const r = exact(raw, [
       "controlVersion",
       "relayOrigin",
@@ -175,18 +386,48 @@ export class RemoteService {
     if (!remoteStorageAvailable()) fail("SECURE_STORAGE_UNAVAILABLE");
     if (this.credential || loadRemoteCredential()) fail("DEVICE_LIMIT_REACHED");
     const relayOrigin = origin(r.relayOrigin);
+    if (
+      typeof r.displayName !== "string" ||
+      !r.displayName.trim() ||
+      Array.from(r.displayName).length > 64
+    )
+      fail("INVALID_FRAME");
+    const previous = loadRemoteEnrollment();
+    if (
+      previous &&
+      (previous.relayOrigin !== relayOrigin || previous.displayName !== r.displayName.trim())
+    )
+      fail("REGISTRATION_PENDING");
+    const draft: DesktopEnrollmentDraft = previous ?? {
+      relayOrigin,
+      displayName: r.displayName.trim(),
+      registrationRequestId: id(r.registrationRequestId),
+      desktopId: null,
+      accountId: null,
+    };
+    saveRemoteEnrollment(draft);
+    this.stop();
+    const generation = this.generation;
     const authGeneration = await ensureDesktopLogin();
+    if (generation !== this.generation) fail("ACCOUNT_CHANGED");
     await this.account.connectWithTokenProvider(relayOrigin, () =>
       desktopAccessToken(authGeneration),
     );
+    if (generation !== this.generation) fail("ACCOUNT_CHANGED");
+    this.accountAuthEpoch = authGeneration;
+    const owner = this.account.getSnapshot()?.accountId ?? fail("ACCOUNT_AUTH_REQUIRED");
+    if (draft.accountId && draft.accountId !== owner) fail("ACCOUNT_MISMATCH");
+    draft.accountId = owner;
+    saveRemoteEnrollment(draft);
     const client = this.account.client();
     const meta = await client.request("GET", "/v2/meta", null, null, parseMeta);
+    if (generation !== this.generation) fail("ACCOUNT_CHANGED");
     const credential = await client.request(
       "POST",
       "/v2/account/me/desktops",
       null,
       {
-        displayName: r.displayName,
+        displayName: draft.displayName,
         platform:
           process.platform === "win32"
             ? "windows"
@@ -199,6 +440,8 @@ export class RemoteService {
         const result = record(value);
         exact(value, Object.hasOwn(result, "credential") ? ["item", "credential"] : ["item"]);
         const item = record(result.item);
+        draft.desktopId = desktopId(item.desktopId);
+        saveRemoteEnrollment(draft);
         if (!result.credential)
           fail(
             item.state === "registered" ? "REGISTRATION_CREDENTIAL_LOST" : "REGISTRATION_PENDING",
@@ -226,8 +469,10 @@ export class RemoteService {
           expiresAt: timestamp(c.expiresAt),
         };
       },
-      id(r.registrationRequestId),
+      draft.registrationRequestId,
     );
+    // A completed registration can return its credential only once. Persist it even if a
+    // concurrent pause occurred, but never resume sharing after that pause.
     saveRemoteCredential(credential);
     const saved = loadRemoteCredential();
     if (
@@ -236,8 +481,9 @@ export class RemoteService {
       saved.desktopId !== credential.desktopId
     )
       fail("SECURE_STORAGE_UNAVAILABLE");
-    await this.start();
-    return this.snapshot();
+    this.credential = credential;
+    clearRemoteEnrollmentDraft();
+    if (generation === this.generation) await this.start();
   }
   async start(): Promise<void> {
     if (!this.stopped || this.starting) return;
@@ -247,16 +493,17 @@ export class RemoteService {
       this.credential = loadRemoteCredential();
       if (!this.credential) return;
       if (Date.now() >= Date.parse(this.credential.expiresAt)) fail("AUTH_EXPIRED");
-      if (!this.account.getSnapshot()) {
-        if (!hasDesktopAuth()) fail("AUTH_REQUIRED");
+      if (!this.account.getSnapshot() || this.accountAuthEpoch !== desktopAuthGeneration()) {
+        if (!hasDesktopAuth()) fail("ACCOUNT_AUTH_REQUIRED");
         const authGeneration = desktopAuthGeneration();
         await this.account.connectWithTokenProvider(this.credential.relayOrigin, () =>
           desktopAccessToken(authGeneration),
         );
+        this.accountAuthEpoch = authGeneration;
       }
       if (generation !== this.generation) return;
       if (this.account.getSnapshot()?.accountId !== this.credential.accountId)
-        fail("AUTH_REQUIRED");
+        fail("ACCOUNT_MISMATCH");
       this.client = this.account.client(this.credential.desktopId, this.credential.accountId);
       this.pairing = new DesktopPairing(
         this.client,
@@ -272,8 +519,7 @@ export class RemoteService {
       this.stopped = false;
       await this.connect();
     } catch (cause) {
-      if (generation === this.generation)
-        this.error = cause instanceof ControlError ? cause.code : "SECURE_STORAGE_UNAVAILABLE";
+      if (generation === this.generation) this.error = remoteError(cause, "CONTROL_FAILED");
     } finally {
       if (generation === this.generation) this.starting = false;
     }
@@ -424,8 +670,7 @@ export class RemoteService {
             this.deliver(context, frame, ws);
           })
           .catch((cause) => {
-            if (this.socket === ws)
-              this.error = cause instanceof ControlError ? cause.code : "CONTROL_FAILED";
+            if (this.socket === ws) this.error = remoteError(cause);
             ws.close();
           })
           .finally(() => {
@@ -450,8 +695,23 @@ export class RemoteService {
       };
     } catch (cause) {
       if (generation === this.generation && !this.stopped) {
-        this.error = cause instanceof ControlError ? cause.code : "DESKTOP_OFFLINE";
-        this.schedule();
+        const code = remoteError(cause, "DESKTOP_OFFLINE");
+        if (
+          [
+            "ACCOUNT_AUTH_REQUIRED",
+            "ACCOUNT_CLOSED",
+            "AUTH_EXPIRED",
+            "DEVICE_REVOKED",
+            "AUTH_STORE_INVALID",
+          ].includes(code)
+        ) {
+          this.stop();
+          this.account.disconnect();
+          this.accountAuthEpoch = null;
+        } else {
+          this.schedule();
+        }
+        this.error = code;
       }
     } finally {
       if (generation === this.generation) this.connecting = false;
@@ -493,8 +753,7 @@ export class RemoteService {
       await this.bridge.tick((context, frame) => this.deliver(context, frame));
       if (generation === this.generation) this.error = null;
     } catch (cause) {
-      if (generation === this.generation)
-        this.error = cause instanceof ControlError ? cause.code : "CONTROL_FAILED";
+      if (generation === this.generation) this.error = remoteError(cause);
     } finally {
       if (generation === this.generation) {
         this.ticking = false;
@@ -528,12 +787,13 @@ export class RemoteService {
     try {
       await this.pairing.revoke();
     } catch (cause) {
-      this.error = cause instanceof ControlError ? cause.code : "CONTROL_FAILED";
+      this.error = remoteError(cause);
     }
     this.bridge.clear();
     return this.snapshot();
   }
   stop(): void {
+    cancelDesktopLogin();
     this.stopped = true;
     this.generation++;
     this.ready = false;

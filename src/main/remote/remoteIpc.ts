@@ -31,6 +31,23 @@ export function registerRemoteIpc(): void {
   handle(REMOTE_IPC.snapshot, async () => remoteService.snapshot());
   handle(REMOTE_IPC.enroll, (request) => remoteService.enroll(request as RemoteEnrollment));
   handle(REMOTE_IPC.account, (request) => remoteService.setAccount(request as RemoteAccountInput));
+  handle(REMOTE_IPC.cancelLogin, async () => remoteService.cancelLogin());
+  handle(REMOTE_IPC.resetEnrollment, async (request) => {
+    const r = exact(request, ["localOnly"]);
+    if (typeof r.localOnly !== "boolean") throw new Error("INVALID_FRAME");
+    return remoteService.resetEnrollment(r.localOnly);
+  });
+  handle(REMOTE_IPC.desktops, async (request) => {
+    const r = exact(request, ["relayOrigin"]);
+    if (typeof r.relayOrigin !== "string") throw new Error("INVALID_FRAME");
+    return remoteService.desktops(r.relayOrigin);
+  });
+  handle(REMOTE_IPC.removeDesktop, async (request) => {
+    const r = exact(request, ["relayOrigin", "desktopId"]);
+    if (typeof r.relayOrigin !== "string" || typeof r.desktopId !== "string")
+      throw new Error("INVALID_FRAME");
+    return remoteService.removeDesktop(r.relayOrigin, r.desktopId);
+  });
   handle(REMOTE_IPC.logout, async () => remoteService.logout());
   handle(REMOTE_IPC.connect, async () => {
     await remoteService.start();

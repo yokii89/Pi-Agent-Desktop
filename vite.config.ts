@@ -2,6 +2,7 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 import { pdfAssets } from "./scripts/vite/pdfAssets";
+import { remoteAuthAssets } from "./scripts/vite/remoteAuthAssets";
 
 /**
  * 开发态放宽 CSP。
@@ -44,7 +45,7 @@ function devCsp(): Plugin {
 export default defineConfig({
   root: "src/renderer",
   base: "./",
-  plugins: [react(), devCsp(), pdfAssets()],
+  plugins: [react(), devCsp(), pdfAssets(), remoteAuthAssets()],
   // 类名只由路径决定、不含内容哈希：改 CSS 属性不会让 contenteditable
   // 里已插入的芯片类名失效（Composer 侧另有 className 回写兜底）。
   css: {

@@ -34,7 +34,7 @@ export function MobilePage() {
           <h1 className={styles.title}>{t("remote.title")}</h1>
         </div>
         <IconButton title={t("settings.close")} onClick={closeMobile}>
-          <X size={18} weight="regular" />
+          <X size={20} weight="regular" />
         </IconButton>
       </header>
       <div className={styles.content}>

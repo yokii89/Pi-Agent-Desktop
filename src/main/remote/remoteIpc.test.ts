@@ -10,6 +10,12 @@ const f = vi.hoisted(() => {
     snapshot: vi.fn(() => ({ connected: false })),
     approve: vi.fn(async () => ({ connected: true })),
     enroll: vi.fn(),
+    setAccount: vi.fn(),
+    cancelLogin: vi.fn(() => ({ connected: false })),
+    resetEnrollment: vi.fn(async () => ({ configured: false })),
+    desktops: vi.fn(async () => []),
+    removeDesktop: vi.fn(async () => ({ configured: false })),
+    logout: vi.fn(),
     start: vi.fn(),
     stop: vi.fn(),
     invite: vi.fn(),
@@ -60,6 +66,12 @@ describe("remote IPC caller boundary", () => {
       f.snapshot,
       f.approve,
       f.enroll,
+      f.setAccount,
+      f.cancelLogin,
+      f.resetEnrollment,
+      f.desktops,
+      f.removeDesktop,
+      f.logout,
       f.start,
       f.stop,
       f.invite,
@@ -85,6 +97,27 @@ describe("remote IPC caller boundary", () => {
       data: { connected: true },
     });
     expect(f.approve).toHaveBeenCalledWith(request.claimId, request.projects, request.scopes);
+  });
+  it("exposes cancellation and explicit reset through the trusted envelope", async () => {
+    expect(await f.handlers.get(REMOTE_IPC.cancelLogin)?.(event())).toMatchObject({ ok: true });
+    expect(
+      await f.handlers.get(REMOTE_IPC.resetEnrollment)?.(event(), { localOnly: true }),
+    ).toMatchObject({ ok: true });
+    expect(f.resetEnrollment).toHaveBeenCalledWith(true);
+    expect(
+      await f.handlers.get(REMOTE_IPC.resetEnrollment)?.(event(), { localOnly: "true" }),
+    ).toMatchObject({ ok: false, error: "INVALID_FRAME" });
+    expect(f.resetEnrollment).toHaveBeenCalledOnce();
+  });
+  it("does not allow an extra field in directory removal requests", async () => {
+    expect(
+      await f.handlers.get(REMOTE_IPC.removeDesktop)?.(event(), {
+        relayOrigin: "https://relay.example",
+        desktopId: "desktop",
+        accountId: "another-account",
+      }),
+    ).toMatchObject({ ok: false, error: "INVALID_FRAME" });
+    expect(f.removeDesktop).not.toHaveBeenCalled();
   });
   it("rejects the old approval payload without invoking the service", async () => {
     expect(await f.handlers.get(REMOTE_IPC.approve)?.(event(), { id: "phone-1" })).toMatchObject({

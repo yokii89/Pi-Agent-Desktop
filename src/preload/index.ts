@@ -197,6 +197,11 @@ contextBridge.exposeInMainWorld("pidesk", {
     snapshot: () => ipcRenderer.invoke(REMOTE_IPC.snapshot),
     enroll: (request) => ipcRenderer.invoke(REMOTE_IPC.enroll, request),
     account: (request) => ipcRenderer.invoke(REMOTE_IPC.account, request),
+    cancelLogin: () => ipcRenderer.invoke(REMOTE_IPC.cancelLogin),
+    resetEnrollment: (localOnly) => ipcRenderer.invoke(REMOTE_IPC.resetEnrollment, { localOnly }),
+    desktops: (relayOrigin) => ipcRenderer.invoke(REMOTE_IPC.desktops, { relayOrigin }),
+    removeDesktop: (relayOrigin, desktopId) =>
+      ipcRenderer.invoke(REMOTE_IPC.removeDesktop, { relayOrigin, desktopId }),
     logout: () => ipcRenderer.invoke(REMOTE_IPC.logout),
     connect: () => ipcRenderer.invoke(REMOTE_IPC.connect),
     disconnect: () => ipcRenderer.invoke(REMOTE_IPC.disconnect),

@@ -2,26 +2,26 @@ import { defineMessages } from "../types";
 
 export const remoteSettingsMessages = defineMessages({
   "settings.remote.accountTitle": {
-    "zh-CN": "账号与电脑连接",
-    "en-US": "Account and computer connection",
+    "zh-CN": "远程账号与电脑登记",
+    "en-US": "Remote account and computer registration",
   },
   "settings.remote.accountHint": {
-    "zh-CN": "使用 Auth0 登录账号。电脑账号凭证保存在系统安全存储中；登录本身不会批准手机访问。",
+    "zh-CN": "在系统浏览器中登录。账号凭证由系统安全存储保护；登录本身不会批准手机访问。",
     "en-US":
-      "Sign in with Auth0. Account credentials are protected by system secure storage; signing in does not approve phone access.",
+      "Sign in in your system browser. Account credentials are protected by secure storage; signing in does not approve phone access.",
   },
   "settings.remote.desktopName": { "zh-CN": "电脑显示名称", "en-US": "Computer display name" },
   "settings.remote.accountConnect": {
-    "zh-CN": "使用 Auth0 登录并连接",
-    "en-US": "Sign in with Auth0 and connect",
+    "zh-CN": "登录并登记此电脑",
+    "en-US": "Sign in and register this computer",
   },
   "settings.remote.accountReconnect": {
-    "zh-CN": "重新登录并连接账号",
-    "en-US": "Sign in again and reconnect account",
+    "zh-CN": "重新登录账号",
+    "en-US": "Sign in again",
   },
   "settings.remote.accountLogout": {
-    "zh-CN": "退出 Auth0 账号",
-    "en-US": "Sign out of Auth0",
+    "zh-CN": "退出远程账号",
+    "en-US": "Sign out of remote account",
   },
   "settings.remote.readonly": {
     "zh-CN": "中转目前仅开放项目、会话与历史读取。",

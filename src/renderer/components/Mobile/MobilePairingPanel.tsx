@@ -1,104 +1,37 @@
-import { Broadcast, CheckCircle, Devices, ShieldWarning, WifiSlash } from "@phosphor-icons/react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { LIMITS } from "../../../shared/remote";
-import type { RemoteApi, RemoteSnapshot } from "../../../shared/remoteDesktop";
+import { CheckCircle, Devices, ShieldWarning } from "@phosphor-icons/react";
+import { useState } from "react";
 import { useT } from "../../hooks/useT";
-import { unwrap } from "../../services/ipc";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import styles from "./MobilePairingPanel.module.css";
 import { RemoteAccountForm } from "./remote/RemoteAccountForm";
+import { RemoteConnectionPanel } from "./remote/RemoteConnectionPanel";
+import { RemoteDesktopDirectory } from "./remote/RemoteDesktopDirectory";
 import { RemoteGrantedDevice } from "./remote/RemoteGrantedDevice";
 import { RemotePairingApproval } from "./remote/RemotePairingApproval";
 import { RemotePairingInvitation } from "./remote/RemotePairingInvitation";
+import { useRemoteManagement } from "./remote/useRemoteManagement";
 
-function remoteApi(): RemoteApi {
-  const api = window.pidesk?.remote;
-  if (!api) throw new Error("AUTH_REQUIRED");
-  return api;
-}
-
-type RemoteOperation = (api: RemoteApi) => ReturnType<RemoteApi["snapshot"]>;
-
-/** Local-only pairing management. The relay connection and the phone's grant remain separate. */
+/** Account authentication, computer enrollment, relay connectivity and phone grants have independent states. */
 export function MobilePairingPanel() {
   const t = useT();
-  const id = useId();
-  const [snapshot, setSnapshot] = useState<RemoteSnapshot | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [readFailed, setReadFailed] = useState(false);
-  const [connectionExpanded, setConnectionExpanded] = useState(false);
+  const { snapshot, busy, cancelling, error, readFailed, refresh, run, cancelLogin, listDesktops } =
+    useRemoteManagement();
   const [confirmRevoke, setConfirmRevoke] = useState(false);
-  const mounted = useRef(false);
-  const operationPending = useRef(false);
-  const reading = useRef(false);
-  const revision = useRef(0);
-  const refresh = useCallback(async () => {
-    if (reading.current || operationPending.current) return;
-    reading.current = true;
-    const version = revision.current;
-    try {
-      const value = await unwrap(remoteApi().snapshot());
-      if (mounted.current && version === revision.current) {
-        setSnapshot(value);
-        setReadFailed(false);
-      }
-    } catch {
-      if (mounted.current && version === revision.current) setReadFailed(true);
-    } finally {
-      reading.current = false;
-    }
-  }, []);
-  useEffect(() => {
-    mounted.current = true;
-    void refresh();
-    const timer = setInterval(() => void refresh(), LIMITS.pollMs);
-    return () => {
-      mounted.current = false;
-      revision.current += 1;
-      clearInterval(timer);
-    };
-  }, [refresh]);
-  const run = async (operation: RemoteOperation): Promise<void> => {
-    if (operationPending.current) return;
-    operationPending.current = true;
-    revision.current += 1;
-    setBusy(true);
-    setError(null);
-    try {
-      const value = await unwrap(operation(remoteApi()));
-      if (mounted.current) {
-        setSnapshot(value);
-        setReadFailed(false);
-      }
-    } catch (cause) {
-      if (mounted.current) setError(cause instanceof Error ? cause.message : "CONTROL_FAILED");
-      // A failed response may still have persisted a grant or a local revocation.
-      try {
-        const value = await unwrap(remoteApi().snapshot());
-        if (mounted.current) {
-          setSnapshot(value);
-          setReadFailed(false);
-        }
-      } catch {
-        if (mounted.current) setReadFailed(true);
-      }
-    } finally {
-      operationPending.current = false;
-      if (mounted.current) setBusy(false);
-    }
-  };
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [directoryOrigin, setDirectoryOrigin] = useState<string | null>(null);
+  const [localResetOrigin, setLocalResetOrigin] = useState<string | null>(null);
   const grant = snapshot?.grant && snapshot.grant.state !== "revoked" ? snapshot.grant : null;
   const claim = !grant && snapshot?.claim?.state === "claimed" ? snapshot.claim : null;
   const errorCode = error ?? snapshot?.error ?? (readFailed ? "STATE_UNAVAILABLE" : null);
   const errorKey = `remote.error.${errorCode}`;
   const errorText = errorCode ? t(errorKey) : "";
-  const errorNotice = errorCode ? (
-    <p className={styles.error} role="alert">
-      {errorText === errorKey ? t("remote.error_generic") : errorText}
-    </p>
-  ) : null;
+  const errorNotice =
+    errorCode && errorCode !== "AUTH_CANCELLED" ? (
+      <p className={styles.error} role="alert">
+        {errorText === errorKey ? t("remote.error_generic") : errorText}
+      </p>
+    ) : null;
   const securityNotice = (
     <aside className={styles.securityNote}>
       <ShieldWarning size={16} weight="regular" />
@@ -107,6 +40,21 @@ export function MobilePairingPanel() {
       </p>
     </aside>
   );
+  const canRemoveRegistration =
+    !!snapshot?.accountReady &&
+    !!snapshot.relayOrigin &&
+    (snapshot.credentialState === "ready" ||
+      snapshot.credentialState === "expired" ||
+      !!snapshot.enrollment?.desktopId);
+  const reset = (localOnly: boolean): void => {
+    const origin = snapshot?.relayOrigin ?? null;
+    void run((api) => api.resetEnrollment(localOnly)).then((success) => {
+      if (success) {
+        setConfirmReset(false);
+        setLocalResetOrigin(localOnly ? origin : null);
+      }
+    });
+  };
   return (
     <div className={styles.panel} data-selectable-text>
       {claim && snapshot ? (
@@ -142,144 +90,106 @@ export function MobilePairingPanel() {
                   </div>
                 )}
               </>
-            ) : !snapshot.configured ? (
-              <>
-                <RemoteAccountForm
-                  busy={busy}
-                  accountReady={snapshot.accountReady}
-                  onEnroll={(request) => void run((api) => api.enroll(request))}
-                  onLogout={() => void run((api) => api.logout())}
-                />
-                {securityNotice}
-                {errorNotice}
-              </>
             ) : (
               <>
-                {!snapshot.connected && (
-                  <RemoteAccountForm
-                    busy={busy}
-                    relayOrigin={snapshot.relayOrigin ?? undefined}
-                    accountReady={snapshot.accountReady}
-                    onAccount={(request) => void run((api) => api.account(request))}
-                    onLogout={() => void run((api) => api.logout())}
-                  />
-                )}
-                <p className={styles.hint}>{t("settings.remote.readonly")}</p>
-                {!snapshot.connected && (
-                  <aside className={styles.offlineBanner}>
-                    <WifiSlash size={20} weight="regular" />
+                <RemoteAccountForm
+                  key={
+                    snapshot.configured
+                      ? `registered:${snapshot.relayOrigin}`
+                      : (snapshot.enrollment?.registrationRequestId ?? "new")
+                  }
+                  snapshot={snapshot}
+                  busy={busy}
+                  cancelling={cancelling}
+                  onEnroll={(request) => void run((api) => api.enroll(request))}
+                  onSignIn={(relayOrigin) =>
+                    void run((api) => api.account({ relayOrigin, reauthenticate: true }))
+                  }
+                  onLogout={() => void run((api) => api.logout())}
+                  onCancel={() => void cancelLogin()}
+                  onReset={() => setConfirmReset(true)}
+                  onDirectory={setDirectoryOrigin}
+                />
+                {!confirmReset && !directoryOrigin && errorNotice}
+                {localResetOrigin && (
+                  <aside className={styles.securityNote}>
+                    <ShieldWarning size={16} weight="regular" />
                     <div>
-                      <strong>{t("settings.remote.offlineTitle")}</strong>
-                      <p className={styles.hint}>
-                        {t(
-                          grant
-                            ? "settings.remote.offlinePaired"
-                            : "settings.remote.offlineUnpaired",
-                        )}
-                      </p>
+                      <p>{t("settings.remote.resetLocalWarning")}</p>
+                      {snapshot.accountReady && (
+                        <Button
+                          disabled={busy}
+                          onClick={() => setDirectoryOrigin(localResetOrigin)}
+                        >
+                          {t("settings.remote.directory")}
+                        </Button>
+                      )}
                     </div>
-                    <Button disabled={busy} onClick={() => void run((api) => api.connect())}>
-                      {t(busy ? "settings.remote.connecting" : "settings.remote.reconnect")}
-                    </Button>
                   </aside>
                 )}
-                {grant ? (
-                  <RemoteGrantedDevice
-                    grant={grant}
-                    deviceName={
-                      snapshot.claim?.deviceId === grant.deviceId ? snapshot.claim.deviceName : null
-                    }
-                    projects={snapshot.projects}
-                    busy={busy}
-                    onRevoke={() => setConfirmRevoke(true)}
-                  />
-                ) : (
+                {snapshot.configured && (
                   <>
-                    <RemotePairingInvitation
-                      qr={snapshot.qr}
-                      connected={snapshot.connected}
+                    <RemoteConnectionPanel
+                      snapshot={snapshot}
                       busy={busy}
-                      onInvite={() => void run((api) => api.invite())}
+                      onConnect={() => void run((api) => api.connect())}
+                      onDisconnect={() => void run((api) => api.disconnect())}
+                      onReset={() => setConfirmReset(true)}
                     />
-                    <section>
-                      <div className={styles.sectionHeading}>
-                        <h3>
-                          {t("settings.remote.devices")}
-                          <span className={styles.count}>0</span>
-                        </h3>
-                      </div>
-                      <div className={styles.emptyDevices}>
-                        <Devices size={24} weight="regular" />
-                        <span>{t("settings.remote.empty")}</span>
-                      </div>
-                    </section>
+                    <p className={styles.hint}>{t("settings.remote.readonly")}</p>
+                    {grant ? (
+                      <RemoteGrantedDevice
+                        grant={grant}
+                        deviceName={
+                          snapshot.claim?.deviceId === grant.deviceId
+                            ? snapshot.claim.deviceName
+                            : null
+                        }
+                        projects={snapshot.projects}
+                        busy={busy}
+                        onRevoke={() => setConfirmRevoke(true)}
+                      />
+                    ) : (
+                      <>
+                        {snapshot.connected && (
+                          <RemotePairingInvitation
+                            qr={snapshot.qr}
+                            connected
+                            busy={busy}
+                            onInvite={() => void run((api) => api.invite())}
+                          />
+                        )}
+                        <section>
+                          <div className={styles.sectionHeading}>
+                            <h3>
+                              {t("settings.remote.devices")}
+                              <span className={styles.count}>0</span>
+                            </h3>
+                          </div>
+                          <div className={styles.emptyDevices}>
+                            <Devices size={24} weight="regular" />
+                            <span>{t("settings.remote.empty")}</span>
+                          </div>
+                        </section>
+                      </>
+                    )}
+                    {snapshot.grant?.state === "revoked" && (
+                      <p className={`${styles.revokedNotice} ${styles.hint}`} role="status">
+                        {snapshot.revocationPending ? (
+                          <ShieldWarning size={16} weight="regular" />
+                        ) : (
+                          <CheckCircle size={16} weight="regular" />
+                        )}
+                        {t(
+                          snapshot.revocationPending
+                            ? "remote.revocationPending"
+                            : "remote.revoked",
+                        )}
+                      </p>
+                    )}
                   </>
                 )}
-                {snapshot.grant?.state === "revoked" && (
-                  <p className={`${styles.revokedNotice} ${styles.hint}`} role="status">
-                    {snapshot.revocationPending ? (
-                      <ShieldWarning size={16} weight="regular" />
-                    ) : (
-                      <CheckCircle size={16} weight="regular" />
-                    )}
-                    {t(snapshot.revocationPending ? "remote.revocationPending" : "remote.revoked")}
-                  </p>
-                )}
-                <section className={styles.relay} aria-label={t("settings.remote.relay")}>
-                  <div className={styles.relayMain}>
-                    <Broadcast size={20} weight="regular" />
-                    <div className={styles.relayText}>
-                      <div className={styles.relayTitle}>
-                        {t("settings.remote.relay")}
-                        <span
-                          className={`${styles.status} ${snapshot.connected ? styles.online : styles.pending}`}
-                        >
-                          <span className={styles.dot} />
-                          {t(
-                            snapshot.connected
-                              ? "settings.remote.connected"
-                              : "settings.remote.disconnected",
-                          )}
-                        </span>
-                      </div>
-                      <p className={styles.domain}>{snapshot.relayOrigin}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className={styles.textButton}
-                      aria-expanded={connectionExpanded}
-                      aria-controls={`${id}-connection`}
-                      onClick={() => setConnectionExpanded((expanded) => !expanded)}
-                    >
-                      {t(
-                        connectionExpanded ? "settings.remote.collapse" : "settings.remote.manage",
-                      )}
-                    </button>
-                  </div>
-                  {connectionExpanded && (
-                    <div className={styles.relayDetails} id={`${id}-connection`}>
-                      <Button
-                        disabled={busy}
-                        onClick={() =>
-                          void run((api) => (snapshot.connected ? api.disconnect() : api.connect()))
-                        }
-                      >
-                        {t(
-                          snapshot.connected
-                            ? "settings.remote.pause"
-                            : "settings.remote.reconnect",
-                        )}
-                      </Button>
-                      {snapshot.controlVersion === 2 && snapshot.accountReady ? (
-                        <Button disabled={busy} onClick={() => void run((api) => api.logout())}>
-                          {t("settings.remote.accountLogout")}
-                        </Button>
-                      ) : null}
-                    </div>
-                  )}
-                </section>
                 {securityNotice}
-                {errorNotice}
               </>
             )}
           </div>
@@ -287,19 +197,69 @@ export function MobilePairingPanel() {
       )}
       <ConfirmDialog
         open={confirmRevoke}
+        nested
         title={t("settings.remote.revokeTitle")}
-        message={t("settings.remote.revokeBody")}
+        message={
+          <>
+            {t("settings.remote.revokeBody")}
+            {confirmRevoke && errorNotice}
+          </>
+        }
         confirmLabel={t("settings.remote.revoke")}
-        cancelLabel={t("common.cancel")}
         tone="danger"
         busy={busy}
         onCancel={() => setConfirmRevoke(false)}
         onConfirm={() => {
-          void run((api) => api.revoke()).finally(() => {
-            if (mounted.current) setConfirmRevoke(false);
+          void run((api) => api.revoke()).then((success) => {
+            if (success) setConfirmRevoke(false);
           });
         }}
       />
+      <ConfirmDialog
+        open={confirmReset}
+        nested
+        title={t("settings.remote.resetTitle")}
+        message={
+          <div className={styles.resetDescription}>
+            <p>
+              {t(
+                canRemoveRegistration
+                  ? "settings.remote.resetBody"
+                  : "settings.remote.resetLocalBody",
+              )}
+            </p>
+            {canRemoveRegistration && (
+              <p className={styles.hint}>{t("settings.remote.resetLocalWarning")}</p>
+            )}
+            {confirmReset && errorNotice}
+          </div>
+        }
+        confirmLabel={t(
+          canRemoveRegistration
+            ? "settings.remote.removeAndReset"
+            : "settings.remote.resetLocalOnly",
+        )}
+        secondaryLabel={canRemoveRegistration ? t("settings.remote.resetLocalOnly") : undefined}
+        onSecondary={canRemoveRegistration ? () => reset(true) : undefined}
+        tone="danger"
+        busy={busy}
+        busyLabel={t("settings.remote.resetting")}
+        onCancel={() => setConfirmReset(false)}
+        onConfirm={() => reset(!canRemoveRegistration)}
+      />
+      {directoryOrigin && (
+        <RemoteDesktopDirectory
+          relayOrigin={directoryOrigin}
+          currentDesktopId={snapshot?.desktopId ?? snapshot?.enrollment?.desktopId ?? null}
+          busy={busy}
+          operationError={errorCode}
+          onList={listDesktops}
+          onRemove={(relayOrigin, desktopId) =>
+            run((api) => api.removeDesktop(relayOrigin, desktopId))
+          }
+          onClose={() => setDirectoryOrigin(null)}
+        />
+      )}
     </div>
   );
 }

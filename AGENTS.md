@@ -69,9 +69,10 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 
 - `qrcode`、`@types/qrcode`（devDep，渲染层构建期）：手机配对邀请二维码本地生成；二维码秘密只在内存，不进入 URL、日志、剪贴板或持久设置。
 - `src/shared/remote/` 作为 `@pidesk/remote-protocol` 零依赖源码包供相邻 Pi-Mobile 工程链接；桌面继续相对导入并由现有 tsc 编译，无新增主进程外部依赖。
-- `ws`（runtime，主进程）与 `@types/ws`（dev）：v2 WSS 握手携带账号认证头，禁止重定向与压缩，限制帧大小。Auth0 PKCE 会话由主进程管理；access/refresh token 经 Electron `safeStorage` 加密保存，渲染进程只看到账号就绪状态。
+- `ws`（runtime，主进程）与 `@types/ws`（dev）：v2 WSS 握手携带账号认证头，禁止重定向与压缩，限制帧大小。Auth0 PKCE 会话由主进程管理；access/refresh token 经 Electron `safeStorage` 加密保存，渲染进程只看到账号显示信息和登录阶段，不接触令牌、授权 URL 或 PKCE 材料。
 - 远程控制面使用 Node 内置 fetch / WebSocket / crypto；Windows 电脑凭证经 Electron 41 safeStorage 加密后由 settings 模块原子保存到 userData。手机原生存储与扫码依赖、中转构建边界登记在 Pi-Mobile/AGENTS.md。
 - 现有 vitest 纯逻辑测试扩展到 remote 配对授权、持久化失败与两端协调；不新增渲染测试框架。
+- 远程账号登录、电脑登记、中转连接与手机授权分别建模（`shared/remoteDesktop`）。主进程持有可取消登录；面板重开通过快照恢复进度，取消与退出必须废止旧回调/令牌响应。电脑登记请求 ID 在 POST 前经 settings 模块持久化，重试不得换 ID。重置先停止本机共享并撤销授权，再移除中转登记；离线时“仅重置本机”须明确确认未清理中转登记。账号电脑目录只在用户打开后读取，移除具体电脑须确认，IPC 仍只信任主窗口顶层 frame。回调页复用 `tokens.css`，构建资源经 `scripts/vite/remoteAuthAssets.ts` 输出；Auth0 托管页的租户配置与真实账号验收见 `src/main/remote/README.md`，不能把本地主题产物当作已发布配置。
 
 - @codemirror/legacy-modes（devDep，渲染层构建期打包）：为专用 CodeMirror 语言包未覆盖的文件提供 StreamLanguage 模式；首次打开对应文件的源码视图时按需加载，读写模式共用。
 

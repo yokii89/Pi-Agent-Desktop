@@ -24,6 +24,8 @@ vi.mock("../../shared/remote", async (original) => {
     ...actual,
     RelayAccountSession: class {
       getSnapshot = () => ({ accountId: f.credential.accountId });
+      disconnect = vi.fn();
+      connectWithTokenProvider = vi.fn(async () => {});
       client = () => ({
         request: f.request,
         now: Date.now,
@@ -39,6 +41,7 @@ vi.mock("../settings/remoteStore", () => ({
   saveRemoteOperations: vi.fn(),
   saveRemoteGrant: f.saveGrant,
   saveRemoteCredential: vi.fn(),
+  clearRemoteCredential: vi.fn(),
   remoteStorageAvailable: () => true,
 }));
 vi.mock("../settings/settings", () => ({ getSettings: () => ({ projects: [] }) }));
@@ -62,7 +65,20 @@ vi.mock("./desktopPairing", () => ({
   },
 }));
 
-vi.mock("./desktopAuth", () => ({ hasDesktopAuth: () => true }));
+vi.mock("./desktopAuth", () => ({
+  hasDesktopAuth: () => true,
+  cancelDesktopLogin: vi.fn(),
+  desktopAuthGeneration: () => 0,
+  desktopAccessToken: async () => "account-token",
+  desktopAuthSnapshot: () => ({ phase: "signed_in", identity: null, deadline: null, error: null }),
+  desktopAuthError: (cause: unknown, fallback: string) =>
+    cause instanceof Error && /^(AUTH_|ACCOUNT_)/.test(cause.message) ? cause.message : fallback,
+}));
+vi.mock("../settings/remoteEnrollmentStore", () => ({
+  loadRemoteEnrollment: () => null,
+  saveRemoteEnrollment: vi.fn(),
+  clearRemoteEnrollmentDraft: vi.fn(),
+}));
 vi.mock("./relaySocket", () => ({ relaySocket: (url: string) => new FakeSocket(url) }));
 
 import { RemoteService, remoteService } from "./remoteService";
