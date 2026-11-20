@@ -147,7 +147,10 @@ describe("Auth0 desktop PKCE", () => {
     fixture.wrongState = true;
     await loginDesktop();
     expect(fixture.requests).toHaveLength(1);
-    expect(fixture.requests[0]).toMatchObject({ code: "authorization-code" });
+    expect(fixture.requests[0]).toMatchObject({
+      code: "authorization-code",
+      audience: "https://pidesk-pairing-relay.yecenglinjian.workers.dev",
+    });
     expect(fixture.callbackBodies[0]).toContain('<main class="auth-card" data-outcome="error">');
   });
 
@@ -155,6 +158,9 @@ describe("Auth0 desktop PKCE", () => {
     await loginDesktop();
     const authorize = new URL(fixture.authorizeUrl);
     expect(authorize.searchParams.get("response_type")).toBe("code");
+    expect(authorize.searchParams.get("audience")).toBe(
+      "https://pidesk-pairing-relay.yecenglinjian.workers.dev",
+    );
     expect(authorize.searchParams.get("redirect_uri")).toBe("http://127.0.0.1:49182/callback");
     expect(authorize.searchParams.get("code_challenge_method")).toBe("S256");
     const verifier = fixture.requests[0]?.code_verifier;
@@ -172,6 +178,7 @@ describe("Auth0 desktop PKCE", () => {
     expect(fixture.requests[1]).toMatchObject({
       grant_type: "refresh_token",
       refresh_token: "refresh-token",
+      audience: "https://pidesk-pairing-relay.yecenglinjian.workers.dev",
     });
     await revokeDesktopAuth();
     expect(fixture.revokeRequests[0]).toMatchObject({ token: "refresh-token-2" });
