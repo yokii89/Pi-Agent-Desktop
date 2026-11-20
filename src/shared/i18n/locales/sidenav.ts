@@ -22,8 +22,8 @@ export const sidenavMessages = defineMessages({
     "en-US": "v{version} is available — click to download it",
   },
   "sidenav.update.tip.downloading": {
-    "zh-CN": "正在下载更新，完成后会提示重启",
-    "en-US": "Downloading — you'll be asked to restart when it's done",
+    "zh-CN": "正在下载更新（{percent}%），完成后会提示重启",
+    "en-US": "Downloading ({percent}%) – you'll be asked to restart when it's done",
   },
   "sidenav.update.tip.restart": {
     "zh-CN": "下载完成，点击重启完成安装",

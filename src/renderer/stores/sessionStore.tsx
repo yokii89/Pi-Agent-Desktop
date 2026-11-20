@@ -30,11 +30,16 @@ import { piService } from "../services/piService";
 import { procService } from "../services/procService";
 import { sessionService } from "../services/sessionService";
 import { settingsService } from "../services/settingsService";
-import { readSlashCommandCache, writeSlashCommandCache } from "../services/slashCommandCache";
+import {
+  normalizeCwdKey,
+  readSlashCommandCache,
+  writeSlashCommandCache,
+} from "../services/slashCommandCache";
 import { prefetchService } from "../services/workerService";
 import { buildUserHistory } from "../utils/composerHistory";
 import { piImageFromDisplay, type UserMessageImage } from "../utils/imageAttach";
 import { buildPageContext } from "../utils/pageContext";
+import { type ComposerDraftHandle, composerDraftKey } from "./composerDrafts";
 import { getComposerThinkingLevel, useComposerStore } from "./composerStore";
 import { createContextUsageRefresh } from "./contextUsageRefresh";
 import { isModeTransitioning } from "./modeTransitionBarrier";
@@ -397,8 +402,7 @@ export function pickClaimedFile(
 export function SessionProvider({ children }: { children: ReactNode }) {
   const { currentProject } = useProjectStore();
   const { page, navigate, showToast } = useUiStore();
-  /** 停止 / 清空队列后把取回的文本交回输入栏（TaskInput 消费并写入编辑器）。 */
-  const { appendToComposer, syncThinkingState } = useComposerStore();
+  const { syncThinkingState, drafts } = useComposerStore();
   const [bucketsState, dispatchBuckets] = useReducer(bucketsReducer, undefined, createBucketsState);
   const [allSessions, setAllSessions] = useState<SessionSummary[]>([]);
   const [pinnedFiles, setPinnedFiles] = useState<string[]>([]);
@@ -434,6 +438,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /** 高频动作只读 ref，避免 useCallback 依赖桶 state 导致闭包过期。 */
   const activeKeyRef = useRef<SessionId | null>(null);
   activeKeyRef.current = bucketsState.activeKey;
+  const activeIntentRef = useRef(0);
   /** 待用新会话 id（docs/design/44 A2）：点击"新建会话"即对它预热，发送时消费。 */
   const pendingNewChatRef = useRef<{ cwd: string | null; id: SessionId } | null>(null);
   /** 在途的单条队列动作：stop 等它落定再 abort，避免重排的消息在停止后开新一轮。 */
@@ -493,9 +498,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   /** active 切换：绑定 sessionService 当前 id（进程绑定型 IPC 路由用）。 */
   const bindActive = useCallback((id: SessionId | null) => {
+    activeIntentRef.current += 1;
     sessionService.bindActiveSession(id);
     activeKeyRef.current = id;
   }, []);
+
+  // 首页换项目后，旧项目预启动的空实例不能承接新项目的提示词。
+  useEffect(() => {
+    const id = activeKeyRef.current;
+    const bucket = id ? bucketsStateRef.current.buckets.get(id) : undefined;
+    if (
+      !id ||
+      bucket?.phase !== "empty" ||
+      normalizeCwdKey(bucket.cwd) === normalizeCwdKey(currentProject?.dir ?? null)
+    )
+      return;
+    setState((prev) => (prev.activeKey === id ? setActiveKey(prev, null) : prev));
+    bindActive(null);
+  }, [currentProject?.dir, bindActive, setState]);
 
   /** 磁盘 listAll 最近一次结果（claim diff 用）；侧栏展示 = disk + pending 合并。 */
   const diskSessionsRef = useRef<SessionSummary[]>([]);
@@ -778,6 +798,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const runStartBucket = useCallback(
     async (bucketId: SessionId, opts: StartBucketOpts): Promise<SessionId | null> => {
       const activeAtStart = activeKeyRef.current;
+      const intentAtStart = activeIntentRef.current;
+      const cwdAtStart = cwdRef.current;
       setState((prev) =>
         patchBucket(prev, bucketId, {
           sessionFile: opts.sessionFile ?? prev.buckets.get(bucketId)?.sessionFile ?? null,
@@ -795,6 +817,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         });
         if (opts.sessionFile) sessionIdByFileRef.current.set(opts.sessionFile, id);
         if (id !== bucketId) {
+          drafts.move(composerDraftKey(bucketId, null), composerDraftKey(id, null));
           // 临时桶换成权威 id 时，pending 行上的名字跟着换 key，别留在旧 id 下
           const from = pendingFileKey(bucketId);
           const to = pendingFileKey(id);
@@ -805,7 +828,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             pendingNamesRef.current.delete(from);
           }
         }
-        const shouldActivate = opts.makeActive !== false && activeKeyRef.current === activeAtStart;
+        const shouldActivate =
+          opts.makeActive !== false &&
+          activeKeyRef.current === activeAtStart &&
+          activeIntentRef.current === intentAtStart &&
+          (activeAtStart !== null || cwdAtStart === cwdRef.current);
         setState((prev) => {
           let next = prev;
           if (id !== bucketId) {
@@ -877,7 +904,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    [bindActive, refreshModelState, setState, showToast],
+    [bindActive, drafts, refreshModelState, setState, showToast],
   );
 
   /**
@@ -1500,6 +1527,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const thinkingLevelAtSend = getComposerThinkingLevel();
 
       let targetId = activeKeyRef.current;
+      const sourceBucket = targetId ? bucketsStateRef.current.buckets.get(targetId) : undefined;
+      const sourceKey = composerDraftKey(targetId, cwdRef.current ?? null, sourceBucket?.phase);
+      const sourceDraft = drafts.bind(sourceKey);
+      const fromHome = targetId === null || sourceBucket?.phase === "empty";
       if (isModeTransitioning(targetId)) return null;
       if (!targetId) {
         // docs/design/44 A2：优先消费"新建会话"预热的待用 id（命中则主进程直接复用实例）
@@ -1564,6 +1595,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         bindActive(targetId);
       }
 
+      // 预启动仍属于首页；真正提交后才迁移到会话，启动失败则首页草稿原样保留。
+      if (fromHome) drafts.move(sourceKey, composerDraftKey(targetId, null), sourceDraft);
       const promptText =
         items.length > 0
           ? buildPageContext({ text: trimmed, items, consoleErrors: context?.consoleErrors ?? [] })
@@ -1593,7 +1626,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       scheduleClaim(targetId);
       const sid = targetId as SessionId;
       try {
-        sessionService.bindActiveSession(targetId);
         const disposition = await sessionService.prompt(
           promptText,
           targetId,
@@ -1649,6 +1681,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     },
     [
       bindActive,
+      drafts,
       dropPendingSummary,
       refreshModelState,
       scheduleClaim,
@@ -1716,6 +1749,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const id = activeKeyRef.current;
     if (!id) return;
     const bucket = bucketsStateRef.current.buckets.get(id);
+    const draft = drafts.bind(composerDraftKey(id, null));
     const hasQueued = Boolean(
       bucket && bucket.queue.steering.length + bucket.queue.followUp.length > 0,
     );
@@ -1735,7 +1769,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           const cleared = await clearQueue(id);
           if (cleared) {
             const texts = [...cleared.steering, ...cleared.followUp];
-            if (texts.length > 0) appendToComposer(texts.join("\n\n"));
+            if (texts.length > 0) draft.enqueue({ kind: "text", text: texts.join("\n\n") });
           } else {
             const again = bucketsStateRef.current.buckets.get(id);
             if (again && again.queue.steering.length + again.queue.followUp.length > 0) {
@@ -1748,7 +1782,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         queueStopsRef.current = Math.max(0, queueStopsRef.current - 1);
       }
     })();
-  }, [appendToComposer, clearQueue, setState, showToast]);
+  }, [drafts, clearQueue, setState, showToast]);
 
   /**
    * 单条队列动作的共同路径（docs/design/93）：pi 只有全量 clear_queue，
@@ -1761,17 +1795,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const applyQueueRewrite = useCallback(
     async (
       rewrite: QueueRewrite,
-      onSuccess: (removed: string | null) => void,
+      onSuccess: (removed: string | null, draft: ComposerDraftHandle) => void,
     ): Promise<boolean> => {
       const id = activeKeyRef.current;
       if (!id) return false;
+      const draft = drafts.bind(composerDraftKey(id, null));
       const cleared = await clearQueue(id);
       if (!cleared) return false;
       const next = rewrite(cleared);
       if (!next) {
         // 清空往返期间该条已交付、下标指到了别人：整队文本回填输入框，一条都不能丢
         const texts = [...cleared.steering, ...cleared.followUp];
-        if (texts.length > 0) appendToComposer(texts.join("\n\n"));
+        if (texts.length > 0) draft.enqueue({ kind: "text", text: texts.join("\n\n") });
         showToast(t("session.queue.stale"));
         return false;
       }
@@ -1797,11 +1832,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (failedAt >= 0) {
           // 部分失败：尚未排回的文本回填输入框，已排回的留在 pi 队列
           const rest = toQueue.slice(failedAt).map((item) => item.text);
-          if (rest.length > 0) appendToComposer(rest.join("\n\n"));
+          if (rest.length > 0) draft.enqueue({ kind: "text", text: rest.join("\n\n") });
           showToast(t("session.queue.editFailed"));
           return false;
         }
-        onSuccess(next.removed);
+        onSuccess(next.removed, draft);
         return true;
       } finally {
         setState((prev) =>
@@ -1809,12 +1844,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [appendToComposer, clearQueue, setState, showToast],
+    [drafts, clearQueue, setState, showToast],
   );
 
   /** 队列动作串行化：同一会话内同一时刻只允许一个单条动作。 */
   const runQueueAction = useCallback(
-    (rewrite: QueueRewrite, onSuccess: (removed: string | null) => void): Promise<boolean> => {
+    (
+      rewrite: QueueRewrite,
+      onSuccess: (removed: string | null, draft: ComposerDraftHandle) => void,
+    ): Promise<boolean> => {
       if (queueActionInFlightRef.current || queueStopsRef.current > 0) {
         return Promise.resolve(false);
       }
@@ -1833,12 +1871,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     (kind: QueueIntent, index: number, source: string): Promise<boolean> =>
       runQueueAction(
         (cleared) => removeQueueItem(cleared, kind, index, source),
-        (removed) => {
-          if (removed) appendToComposer(removed);
+        (removed, draft) => {
+          if (removed) draft.enqueue({ kind: "text", text: removed });
           showToast(t("session.queue.editingReturned"));
         },
       ),
-    [appendToComposer, runQueueAction, showToast],
+    [runQueueAction, showToast],
   );
 
   /** 删除：移除该条，文字不回填。 */

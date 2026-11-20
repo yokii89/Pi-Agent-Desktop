@@ -27,13 +27,13 @@ import { useNotificationSounds } from "./hooks/useNotificationSounds";
 import { useSessionMonitorDock } from "./hooks/useSessionMonitorDock";
 import { useSessionUsageHeartbeat } from "./hooks/useSessionUsageHeartbeat";
 import { procService } from "./services/procService";
-import { BrowserProvider } from "./stores/browserStore";
 import { ComposerProvider } from "./stores/composerStore";
 import { ExtensionViewProvider, useExtensionViewStore } from "./stores/extensionViewStore";
 import { InspectorProvider } from "./stores/inspectorStore";
 import { bindProcOutputStream, bindProcStream } from "./stores/procStore";
 import { ProjectProvider } from "./stores/projectStore";
 import { ReviewProvider } from "./stores/reviewStore";
+import { SessionBrowserProvider } from "./stores/SessionBrowserProvider";
 import { SchedulerProvider, useSchedulerStore } from "./stores/schedulerStore";
 import { SessionProvider, useSessionMeta } from "./stores/sessionStore";
 import { StyleEditProvider } from "./stores/styleEditStore";
@@ -261,7 +261,7 @@ export function App() {
                     <ReviewProvider>
                       <RollbackPromptHost />
                       <TerminalProvider>
-                        <BrowserProvider>
+                        <SessionBrowserProvider>
                           <InspectorProvider>
                             <StyleEditProvider>
                               <UpdateStatusBridge />
@@ -269,7 +269,7 @@ export function App() {
                               <AppLayout />
                             </StyleEditProvider>
                           </InspectorProvider>
-                        </BrowserProvider>
+                        </SessionBrowserProvider>
                       </TerminalProvider>
                     </ReviewProvider>
                   </SchedulerProvider>

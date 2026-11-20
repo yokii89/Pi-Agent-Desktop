@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { dropTargetIndex, insertionIndexAt, moveById, moveToIndex } from "./listReorder";
+import {
+  dropTargetIndex,
+  insertionIndexAt,
+  listDragScrollDelta,
+  moveById,
+  moveToIndex,
+} from "./listReorder";
 
 const list = [{ id: "a" }, { id: "b" }, { id: "c" }];
 
@@ -47,6 +53,35 @@ describe("insertionIndexAt", () => {
     expect(insertionIndexAt(uneven, 61)).toBe(1);
     expect(insertionIndexAt(uneven, 133)).toBe(1);
     expect(insertionIndexAt(uneven, 135)).toBe(2);
+  });
+});
+
+describe("listDragScrollDelta", () => {
+  const viewport = { left: 0, right: 180, top: 40, bottom: 640 };
+  const delta = (x: number, y: number) => listDragScrollDelta(viewport, x, y, 28, 12);
+
+  it("scrolls at both list edges and keeps the center still", () => {
+    expect(delta(90, 40)).toBe(-12);
+    expect(delta(90, 54)).toBe(-6);
+    expect(delta(90, 68)).toBe(0);
+    expect(delta(90, 612)).toBe(0);
+    expect(delta(90, 626)).toBe(6);
+    expect(delta(90, 639)).toBe(12);
+  });
+
+  it("rejects the header, fixed footer and panels outside the list", () => {
+    expect(delta(90, 39)).toBeNull();
+    expect(delta(90, 640)).toBeNull();
+    expect(delta(90, 680)).toBeNull();
+    expect(delta(-1, 50)).toBeNull();
+    expect(delta(180, 639)).toBeNull();
+  });
+
+  it("splits the edge zones rather than overlapping in a short viewport", () => {
+    const short = { ...viewport, bottom: 60 };
+    expect(listDragScrollDelta(short, 90, 45, 28, 12)).toBe(-6);
+    expect(listDragScrollDelta(short, 90, 50, 28, 12)).toBe(0);
+    expect(listDragScrollDelta(short, 90, 55, 28, 12)).toBe(6);
   });
 });
 

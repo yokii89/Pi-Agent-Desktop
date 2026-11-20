@@ -24,6 +24,7 @@ import {
 } from "../services/browserService";
 import { inspectorFloatService } from "../services/inspectorFloatService";
 import { settingsService } from "../services/settingsService";
+import { type ComposerDraftHandle, MAX_CHAT_ELEMENTS } from "./composerDrafts";
 import { useUiStore } from "./uiStore";
 
 /** 检查器浮窗渲染进程（docs/design/38）：加入对话须跨窗回主窗。 */
@@ -31,8 +32,6 @@ function isInspectorFloatSurface(): boolean {
   return document.documentElement.dataset.surface === "inspector";
 }
 
-/** 对话区元素芯片上限：超出时淘汰最旧的未发送元素。 */
-const MAX_CHAT_ELEMENTS = 12;
 /** 缩放区间与步进（与主进程 setBrowserZoom 的夹取一致）。 */
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 3;
@@ -374,9 +373,53 @@ async function cropBase64Png(
   return dataUrl.slice(dataUrl.indexOf(",") + 1);
 }
 
-/** 浏览器面板状态：拾取 → Enter 进对话芯片；截图是显式兜底，默认不走。 */
-export function BrowserProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(browserReducer, initialState);
+export interface BrowserComposerDraft {
+  record: ComposerDraftHandle;
+  elements: BrowserContextItem[];
+  markStale: () => void;
+}
+
+/** 浏览器面板状态；主窗引用归属会话草稿，独立检查器保留原有跨窗转发。 */
+export function BrowserProvider({
+  children,
+  composerDraft,
+}: {
+  children: ReactNode;
+  composerDraft?: BrowserComposerDraft;
+}) {
+  const [state, dispatchState] = useReducer(browserReducer, initialState);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const composerDraftRef = useRef(composerDraft);
+  composerDraftRef.current = composerDraft;
+  const regionCaptureDraftRef = useRef<ComposerDraftHandle | undefined>(undefined);
+  const dispatch = useCallback((action: BrowserAction): void => {
+    const bridge = composerDraftRef.current;
+    if (bridge) {
+      if (action.type === "chatAdd") {
+        bridge.record.addChatElement(action.item);
+        return;
+      }
+      if (action.type === "chatAddFromLastPicked") {
+        const picked = stateRef.current.lastPicked;
+        if (picked) bridge.record.addChatElement({ ...picked, screenshot: null });
+        return;
+      }
+      if (action.type === "chatRemove") {
+        bridge.record.removeChatElement(action.id);
+        return;
+      }
+      if (action.type === "chatClear") {
+        bridge.record.clearChatElements();
+        return;
+      }
+      if (action.type === "navigated" && (action.commit || action.url !== stateRef.current.url)) {
+        bridge.markStale();
+      }
+    }
+    stateRef.current = browserReducer(stateRef.current, action);
+    dispatchState(action);
+  }, []);
   const { showToast, dispatch: uiDispatch } = useUiStore();
   const activePageIdRef = useRef("");
   // 同步 ref，供推送订阅闭包读取最新活跃页
@@ -474,7 +517,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
           break;
       }
     });
-  }, [showToast]);
+  }, [showToast, dispatch]);
 
   const createPage = useCallback(async (): Promise<string | null> => {
     if (state.pages.length >= MAX_BROWSER_INSTANCES) {
@@ -504,7 +547,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
       showToast(err instanceof Error ? err.message : t("browser.toast.createFailed"));
       return null;
     }
-  }, [state.pages.length, showToast]);
+  }, [state.pages.length, showToast, dispatch]);
 
   const closePage = useCallback(
     async (id: string): Promise<void> => {
@@ -529,7 +572,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
         showToast(err instanceof Error ? err.message : t("browser.toast.closeFailed"));
       }
     },
-    [state.pages, state.activePageId, showToast],
+    [state.pages, state.activePageId, showToast, dispatch],
   );
 
   const setActivePage = useCallback(
@@ -547,7 +590,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
         showToast(err instanceof Error ? err.message : t("browser.toast.switchFailed"));
       }
     },
-    [state.activePageId, showToast],
+    [state.activePageId, showToast, dispatch],
   );
 
   const navigate = useCallback(
@@ -561,7 +604,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [showToast],
+    [showToast, dispatch],
   );
 
   /**
@@ -620,9 +663,12 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
     [showToast],
   );
 
-  const addChatElement = useCallback((item: BrowserContextItem): void => {
-    dispatch({ type: "chatAdd", item });
-  }, []);
+  const addChatElement = useCallback(
+    (item: BrowserContextItem): void => {
+      dispatch({ type: "chatAdd", item });
+    },
+    [dispatch],
+  );
 
   const addLastPickedToChat = useCallback((): void => {
     if (isInspectorFloatSurface()) {
@@ -630,38 +676,46 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
       return;
     }
     dispatch({ type: "chatAddFromLastPicked" });
-  }, []);
+  }, [dispatch]);
 
   const addLastPickedScreenshot = useCallback((): void => {
     if (!state.lastPicked) return;
     dispatch({ type: "chatAdd", item: screenshotItemFromElement(state.lastPicked) });
-  }, [state.lastPicked]);
+  }, [state.lastPicked, dispatch]);
 
-  const removeChatElement = useCallback((id: string): void => {
-    dispatch({ type: "chatRemove", id });
-  }, []);
+  const removeChatElement = useCallback(
+    (id: string): void => {
+      dispatch({ type: "chatRemove", id });
+    },
+    [dispatch],
+  );
 
   const clearChatElements = useCallback((): void => {
     dispatch({ type: "chatClear" });
-  }, []);
+  }, [dispatch]);
 
   const captureViewportToChat = useCallback(async (): Promise<void> => {
+    const draft = composerDraftRef.current?.record;
     const shot = await browserService.screenshot();
     if (!shot) {
       showToast(t("browser.toast.captureNoPage"));
       return;
     }
     screenshotSeq += 1;
-    dispatch({ type: "chatAdd", item: itemFromScreenshot(shot, screenshotSeq) });
-  }, [showToast]);
+    const item = itemFromScreenshot(shot, screenshotSeq);
+    if (draft) draft.addChatElement(item);
+    else dispatch({ type: "chatAdd", item });
+  }, [dispatch, showToast]);
 
   const endRegionCapture = useCallback((): void => {
     void browserService.setOverlaySuppressed(false, "regionCapture");
     dispatch({ type: "regionCaptureEnd" });
-  }, []);
+    regionCaptureDraftRef.current = undefined;
+  }, [dispatch]);
 
   const startRegionCapture = useCallback(async (): Promise<void> => {
     if (state.regionCapture) return;
+    const draft = composerDraftRef.current?.record;
     // 拾取 overlay 与选区 UI 冲突，先退出拾取
     if (state.pickActive) browserService.pickStop().catch(() => {});
     const shot = await browserService.screenshot();
@@ -670,6 +724,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
       return;
     }
     // 冻结帧先落到宿主区，再藏原生视图，避免闪一帧底色
+    regionCaptureDraftRef.current = draft;
     dispatch({
       type: "regionCaptureStart",
       session: {
@@ -680,11 +735,12 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
       },
     });
     void browserService.setOverlaySuppressed(true, "regionCapture");
-  }, [state.regionCapture, state.pickActive, showToast]);
+  }, [state.regionCapture, state.pickActive, showToast, dispatch]);
 
   const confirmRegionCapture = useCallback(
     async (clip: { x: number; y: number; width: number; height: number }): Promise<void> => {
       const session = state.regionCapture;
+      const draft = regionCaptureDraftRef.current;
       if (!session) return;
       if (clip.width < 2 || clip.height < 2) {
         showToast(t("browser.toast.regionTooSmall"));
@@ -698,26 +754,25 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
           return;
         }
         screenshotSeq += 1;
-        dispatch({
-          type: "chatAdd",
-          item: itemFromScreenshot(
-            {
-              base64: cropped,
-              path,
-              url: session.url,
-              width: Math.round(clip.width),
-              height: Math.round(clip.height),
-            },
-            screenshotSeq,
-          ),
-        });
+        const item = itemFromScreenshot(
+          {
+            base64: cropped,
+            path,
+            url: session.url,
+            width: Math.round(clip.width),
+            height: Math.round(clip.height),
+          },
+          screenshotSeq,
+        );
+        if (draft) draft.addChatElement(item);
+        else dispatch({ type: "chatAdd", item });
       } catch {
         showToast(t("browser.toast.regionFailed"));
       } finally {
         endRegionCapture();
       }
     },
-    [state.regionCapture, showToast, endRegionCapture],
+    [state.regionCapture, showToast, endRegionCapture, dispatch],
   );
 
   const reloadAndCapture = useCallback(async (): Promise<{
@@ -758,11 +813,14 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
     return { base64: shot.base64, url: shot.url };
   }, [state.url, showToast]);
 
-  const setViewport = useCallback((width: number | null): void => {
-    dispatch({ type: "setViewport", width });
-    browserService.setViewport(width);
-    settingsService.set({ browserViewportWidth: width });
-  }, []);
+  const setViewport = useCallback(
+    (width: number | null): void => {
+      dispatch({ type: "setViewport", width });
+      browserService.setViewport(width);
+      settingsService.set({ browserViewportWidth: width });
+    },
+    [dispatch],
+  );
 
   const forceReload = useCallback(async (): Promise<void> => {
     try {
@@ -786,12 +844,15 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "setZoom", factor: next });
       browserService.setZoom(next);
     },
-    [state.zoomFactor],
+    [state.zoomFactor, dispatch],
   );
 
-  const setOverlayFreeze = useCallback((freeze: string | null): void => {
-    dispatch({ type: "setOverlayFreeze", freeze });
-  }, []);
+  const setOverlayFreeze = useCallback(
+    (freeze: string | null): void => {
+      dispatch({ type: "setOverlayFreeze", freeze });
+    },
+    [dispatch],
+  );
 
   const clearCookies = useCallback(async (): Promise<void> => {
     try {
@@ -824,6 +885,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
   const value = useMemo<BrowserStoreValue>(
     () => ({
       ...state,
+      chatElements: composerDraft?.elements ?? state.chatElements,
       createPage,
       closePage,
       setActivePage,
@@ -864,6 +926,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
     }),
     [
       state,
+      composerDraft,
       createPage,
       closePage,
       setActivePage,

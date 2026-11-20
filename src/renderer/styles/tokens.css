@@ -340,7 +340,7 @@
   /** 细滚动条尺寸（全项目统一窄槽）：global.css 的 ::-webkit-scrollbar、PtyTerminal 半宽胶囊
    *  与悬浮输入栏的右内缩共用它（各处必须同值才能对齐中轴）。 */
   --scrollbar-size: 6px;
-  /** 三栏滚动条淡入淡出时长：SideNav / App.main / ContextSidebar 对 --sb-alpha 的过渡（机制见 global.css）。 */
+  /** 滚动条淡入淡出时长：App.main / ContextSidebar 对 --sb-alpha 的过渡（机制见 global.css）。 */
   --scrollbar-fade-duration: 150ms;
 
   /* 层级 */

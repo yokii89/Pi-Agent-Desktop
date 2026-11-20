@@ -36,13 +36,15 @@ function toViewModel(
           : t("sidenav.update.tip.openDownloads"),
         disabled: false,
       };
-    case "downloading":
+    case "downloading": {
+      const percent = Math.round(status.percent);
       return {
         icon: <DownloadSimple size={16} weight="fill" />,
-        label: t("sidenav.update.percent", { percent: Math.round(status.percent) }),
-        title: t("sidenav.update.tip.downloading"),
+        label: t("sidenav.update.percent", { percent }),
+        title: t("sidenav.update.tip.downloading", { percent }),
         disabled: true,
       };
+    }
     case "downloaded":
       return {
         icon: <ArrowsClockwise size={16} weight="regular" />,
@@ -95,12 +97,16 @@ export function UpdateButton({ collapsed = false }: { collapsed?: boolean }) {
       type="button"
       className={[styles.updateBtn, collapsed ? styles.updateBtnMini : ""].join(" ").trim()}
       title={view.title}
-      aria-label={collapsed ? view.title : undefined}
+      aria-label={collapsed || view.disabled ? view.title : view.label}
       disabled={view.disabled}
       onClick={onClick}
     >
       {view.icon}
-      {collapsed ? <span className={styles.updateDot} aria-hidden="true" /> : view.label}
+      {collapsed ? (
+        <span className={styles.updateDot} aria-hidden="true" />
+      ) : (
+        <span className={styles.updateLabel}>{view.label}</span>
+      )}
     </button>
   );
 }

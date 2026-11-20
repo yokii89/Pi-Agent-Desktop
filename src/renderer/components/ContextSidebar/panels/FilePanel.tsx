@@ -36,6 +36,7 @@ import { useT } from "../../../hooks/useT";
 import type { OfficePreviewHandle } from "../../../office/officeSearchTypes";
 import { fsService } from "../../../services/fsService";
 import { useBrowserStore } from "../../../stores/browserStore";
+import { composerDraftKey } from "../../../stores/composerDrafts";
 import { useComposerStore } from "../../../stores/composerStore";
 import { useExtensionViewStore } from "../../../stores/extensionViewStore";
 import { useProjectStore } from "../../../stores/projectStore";
@@ -152,7 +153,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     useUiStore();
   const browserStore = useBrowserStore();
   const { currentProject } = useProjectStore();
-  const { sessionWorkingDir, activeSessionId, switchingTo } = useSessionMeta();
+  const { sessionWorkingDir, activeSessionId, switchingTo, phase } = useSessionMeta();
   const { quoteComposer } = useComposerStore();
   const { hasBlockingViewFor } = useExtensionViewStore();
   const rootDir = currentProject?.dir ?? null;
@@ -891,9 +892,9 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     (text: string): void => {
       if (!activePreview) return;
       const source = toNativePath(relativeToPath(rootDir ?? "", activePreview.path));
-      quoteComposer(`${source}\n${text}`);
+      quoteComposer(`${source}\n${text}`, composerDraftKey(activeSessionId, rootDir, phase));
     },
-    [activePreview, quoteComposer, rootDir],
+    [activePreview, activeSessionId, phase, quoteComposer, rootDir],
   );
 
   return (

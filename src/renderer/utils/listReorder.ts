@@ -34,6 +34,31 @@ export function insertionIndexAt(bands: readonly RowBand[], y: number): number {
   return insert;
 }
 
+interface DragViewport {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+/** 列表拖拽的贴边步长；视口外返回 null，表示该处也不是可用落点。 */
+export function listDragScrollDelta(
+  bounds: DragViewport,
+  x: number,
+  y: number,
+  edgeSize: number,
+  maxStep: number,
+): number | null {
+  const { top, bottom, left, right } = bounds;
+  if (x < left || x >= right || y < top || y >= bottom) return null;
+  const edge = Math.min(edgeSize, (bottom - top) / 2);
+  const fromTop = y - top;
+  const fromBottom = bottom - y;
+  if (fromTop < edge) return -Math.ceil((1 - fromTop / edge) * maxStep);
+  if (fromBottom < edge) return Math.ceil((1 - fromBottom / edge) * maxStep);
+  return 0;
+}
+
 /** 插入位 → 拖拽落点下标：拖回自己的原位（前后两个槽位）都算原地不动。 */
 export function dropTargetIndex(insert: number, from: number): number {
   return insert > from ? insert - 1 : insert;

@@ -4,6 +4,26 @@ import { runtimeService } from "../services/contributionService";
 import { claimFile, patchBucket, type SessionBucketsState } from "./sessionBuckets";
 import { notifySessionRuntimeContext } from "./sessionContextBridge";
 
+/** 运行时就绪不等于已提交任务：预启动的空桶继续使用首页和首页草稿。 */
+export function reconcileSessionRuntime(
+  state: SessionBucketsState,
+  runtime: SessionRuntimeSnapshot,
+): SessionBucketsState {
+  if (runtime.state === "starting" || runtime.state === "stopping") return state;
+  const alive = runtime.state === "ready" || runtime.state === "idle" || runtime.state === "busy";
+  const current = state.buckets.get(runtime.sessionId);
+  if (!alive && !current) return state;
+  const empty = current?.phase === "empty" && !current.sessionFile && !runtime.sessionFile;
+  let next = patchBucket(state, runtime.sessionId, {
+    cwd: runtime.cwd,
+    sessionFile: runtime.sessionFile ?? current?.sessionFile ?? null,
+    processAlive: alive,
+    phase: runtime.state === "busy" ? "running" : empty ? "empty" : "idle",
+  });
+  if (runtime.sessionFile) next = claimFile(next, runtime.sessionId, runtime.sessionFile);
+  return next;
+}
+
 /** Renderer reload 后恢复主进程已有实例；读取快照不启动进程或切换当前会话。 */
 export function useRuntimeReconciliation(
   update: (fn: (state: SessionBucketsState) => SessionBucketsState) => void,
@@ -16,18 +36,7 @@ export function useRuntimeReconciliation(
       const alive =
         runtime.state === "ready" || runtime.state === "idle" || runtime.state === "busy";
       if (runtime.state === "starting" || runtime.state === "stopping") return;
-      update((state) => {
-        if (!alive && !state.buckets.has(runtime.sessionId)) return state;
-        let next = patchBucket(state, runtime.sessionId, {
-          cwd: runtime.cwd,
-          sessionFile:
-            runtime.sessionFile ?? state.buckets.get(runtime.sessionId)?.sessionFile ?? null,
-          processAlive: alive,
-          phase: runtime.state === "busy" ? "running" : "idle",
-        });
-        if (runtime.sessionFile) next = claimFile(next, runtime.sessionId, runtime.sessionFile);
-        return next;
-      });
+      update((state) => reconcileSessionRuntime(state, runtime));
       notifySessionRuntimeContext(runtime.sessionId, {
         cwd: runtime.cwd,
         sessionFile: runtime.sessionFile,

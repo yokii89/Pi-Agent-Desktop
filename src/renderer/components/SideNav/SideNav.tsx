@@ -47,11 +47,15 @@ export function SideNav() {
     useSessionMeta();
   const { projects } = useProjectStore();
   const { sidebars: visibleSidebars } = useExtensionViewStore();
+  // 设置快捷键可从配对浮窗内调用，此时高亮留给上层设置。
+  const pairingActive = mobileOpen && !settingsOpen;
+  const navPage = settingsOpen || mobileOpen ? null : page;
 
   // 选中药丸（docs/design/54）：选中真值 = page / settingsOpen / mobileOpen / activeSessionFile
   // 推导出的 data-side-active 标记，标记换行时药丸沿下拉曲线滑过去。
   const [navEl, setNavEl] = useState<HTMLElement | null>(null);
-  const { pillRef } = useSelectionPill(navEl);
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const { pillRef } = useSelectionPill(navEl, scrollEl);
 
   // 拖拽调宽（docs/design/137）：把手贴在右缘，宽度持久化进设置。
   // 拖拽帧直写网格轨道，松手才提交 store（与右栏把手同一套语义）。
@@ -102,54 +106,67 @@ export function SideNav() {
           className={[styles.nav, styles.collapsed].join(" ")}
           aria-label={t("sidenav.aria.main")}
         >
-          <div className={styles.brandMini}>P</div>
-          <IconButton
-            title={t("sidenav.newTask.title", { shortcut: shortcuts.newTask })}
-            onClick={newSession}
-          >
-            <PlusCircle size={20} weight="regular" />
-          </IconButton>
-          <IconButton
-            title={t("sidenav.extensions")}
-            active={page === "extensions"}
-            onClick={() => navigate("extensions")}
-          >
-            <PuzzlePiece size={20} weight="regular" />
-          </IconButton>
-          <IconButton
-            title={t("sidenav.mcp")}
-            active={page === "mcp"}
-            onClick={() => navigate("mcp")}
-          >
-            <Plugs size={20} weight="regular" />
-          </IconButton>
-          <IconButton
-            title={t("sidenav.scheduled")}
-            active={page === "scheduled"}
-            onClick={() => navigate("scheduled")}
-          >
-            <Timer size={20} weight="regular" />
-          </IconButton>
-          <IconButton
-            title={t("sidenav.projects")}
-            onClick={() => dispatch({ type: "toggleNavCollapsed" })}
-          >
-            <Folder size={20} weight="regular" />
-          </IconButton>
-          <IconButton
-            title={t("sidenav.tasks")}
-            onClick={() => dispatch({ type: "toggleNavCollapsed" })}
-          >
-            <ClockCounterClockwise size={20} weight="regular" />
-          </IconButton>
-          <div className={styles.spacer} />
-          <UpdateButton collapsed />
-          <IconButton title={t("remote.title")} active={mobileOpen} onClick={openMobile}>
-            <DeviceMobile size={20} weight="regular" />
-          </IconButton>
-          <IconButton title={t("sidenav.settings")} active={settingsOpen} onClick={openSettings}>
-            <GearSix size={20} weight="regular" />
-          </IconButton>
+          <div className={styles.scrollArea}>
+            <div className={styles.brandMini}>P</div>
+            <IconButton
+              title={t("sidenav.newTask.title", { shortcut: shortcuts.newTask })}
+              onClick={newSession}
+            >
+              <PlusCircle size={20} weight="regular" />
+            </IconButton>
+            <IconButton
+              title={t("sidenav.extensions")}
+              active={navPage === "extensions"}
+              onClick={() => navigate("extensions")}
+            >
+              <PuzzlePiece size={20} weight="regular" />
+            </IconButton>
+            <IconButton
+              title={t("sidenav.mcp")}
+              active={navPage === "mcp"}
+              onClick={() => navigate("mcp")}
+            >
+              <Plugs size={20} weight="regular" />
+            </IconButton>
+            <IconButton
+              title={t("sidenav.scheduled")}
+              active={navPage === "scheduled"}
+              onClick={() => navigate("scheduled")}
+            >
+              <Timer size={20} weight="regular" />
+            </IconButton>
+            <IconButton
+              title={t("sidenav.projects")}
+              onClick={() => dispatch({ type: "toggleNavCollapsed" })}
+            >
+              <Folder size={20} weight="regular" />
+            </IconButton>
+            <IconButton
+              title={t("sidenav.tasks")}
+              onClick={() => dispatch({ type: "toggleNavCollapsed" })}
+            >
+              <ClockCounterClockwise size={20} weight="regular" />
+            </IconButton>
+          </div>
+          <div className={styles.bottomActions}>
+            <UpdateButton collapsed />
+            <IconButton
+              title={t("remote.title")}
+              active={pairingActive}
+              onClick={openMobile}
+              aria-haspopup="dialog"
+            >
+              <DeviceMobile size={20} weight="regular" />
+            </IconButton>
+            <IconButton
+              title={t("sidenav.settings")}
+              active={settingsOpen}
+              onClick={openSettings}
+              aria-haspopup="dialog"
+            >
+              <GearSix size={20} weight="regular" />
+            </IconButton>
+          </div>
         </nav>
       </div>
     );
@@ -168,98 +185,116 @@ export function SideNav() {
         onPointerMove={resize.onPointerMove}
       />
       <nav ref={setNavEl} className={styles.nav} aria-label={t("sidenav.aria.main")}>
-        {/* 选中药丸：选项/项目/历史记录共用的一块选中底色，由 useSelectionPill 沿下拉曲线滑行 */}
+        {/* 列表和固定底部入口仍共用同一块选中药丸。 */}
         <span ref={pillRef} className={styles.selectionPill} aria-hidden="true" />
-        <div className={styles.brand}>
-          <span className={styles.brandName}>PiDesk</span>
-          <span className={styles.beta}>{t("common.beta")}</span>
+        <div ref={setScrollEl} className={styles.scrollArea} data-side-nav-scroll="">
+          <div className={styles.scrollContent}>
+            <div className={styles.brand}>
+              <span className={styles.brandName}>PiDesk</span>
+              <span className={styles.beta}>{t("common.beta")}</span>
+            </div>
+
+            <button
+              type="button"
+              className={styles.newTask}
+              data-side-hover=""
+              onClick={newSession}
+            >
+              <PlusCircle size={20} weight="regular" />
+              {t("sidenav.newTask")}
+            </button>
+
+            <button
+              type="button"
+              className={[
+                styles.navItem,
+                navPage === "extensions" ? styles.navItemActive : "",
+              ].join(" ")}
+              data-side-active={navPage === "extensions" ? "page" : undefined}
+              data-side-hover=""
+              onClick={() => navigate("extensions" satisfies PageId)}
+            >
+              <PuzzlePiece size={20} weight="regular" />
+              {t("sidenav.extensions")}
+            </button>
+
+            <button
+              type="button"
+              className={[styles.navItem, navPage === "mcp" ? styles.navItemActive : ""].join(" ")}
+              data-side-active={navPage === "mcp" ? "page" : undefined}
+              data-side-hover=""
+              onClick={() => navigate("mcp" satisfies PageId)}
+            >
+              <Plugs size={20} weight="regular" />
+              {t("sidenav.mcp")}
+            </button>
+
+            <button
+              type="button"
+              className={[styles.navItem, navPage === "scheduled" ? styles.navItemActive : ""].join(
+                " ",
+              )}
+              data-side-active={navPage === "scheduled" ? "page" : undefined}
+              data-side-hover=""
+              onClick={() => navigate("scheduled" satisfies PageId)}
+            >
+              <Timer size={20} weight="regular" />
+              {t("sidenav.scheduled")}
+            </button>
+
+            <div className={styles.divider} />
+            {tree.globalPinned.length > 0 ? (
+              <>
+                <PinnedList sessions={tree.globalPinned} />
+                <div className={styles.divider} />
+              </>
+            ) : null}
+            <ProjectList groups={tree.projectGroups} />
+
+            <div className={styles.divider} />
+            <TaskList tasks={tree.tasks} />
+
+            {visibleSidebars.length > 0 ? (
+              <>
+                <div className={styles.divider} />
+                <div className={styles.extSlots}>
+                  {visibleSidebars.map((entry) => (
+                    <SidebarMount key={entry.id} entry={entry} />
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
         </div>
 
-        <button type="button" className={styles.newTask} data-side-hover="" onClick={newSession}>
-          <PlusCircle size={20} weight="regular" />
-          {t("sidenav.newTask")}
-        </button>
-
-        <button
-          type="button"
-          className={[styles.navItem, page === "extensions" ? styles.navItemActive : ""].join(" ")}
-          data-side-active={page === "extensions" ? "page" : undefined}
-          data-side-hover=""
-          onClick={() => navigate("extensions" satisfies PageId)}
-        >
-          <PuzzlePiece size={20} weight="regular" />
-          {t("sidenav.extensions")}
-        </button>
-
-        <button
-          type="button"
-          className={[styles.navItem, page === "mcp" ? styles.navItemActive : ""].join(" ")}
-          data-side-active={page === "mcp" ? "page" : undefined}
-          data-side-hover=""
-          onClick={() => navigate("mcp" satisfies PageId)}
-        >
-          <Plugs size={20} weight="regular" />
-          {t("sidenav.mcp")}
-        </button>
-
-        <button
-          type="button"
-          className={[styles.navItem, page === "scheduled" ? styles.navItemActive : ""].join(" ")}
-          data-side-active={page === "scheduled" ? "page" : undefined}
-          data-side-hover=""
-          onClick={() => navigate("scheduled" satisfies PageId)}
-        >
-          <Timer size={20} weight="regular" />
-          {t("sidenav.scheduled")}
-        </button>
-
-        <div className={styles.divider} />
-        {tree.globalPinned.length > 0 ? (
-          <>
-            <PinnedList sessions={tree.globalPinned} />
-            <div className={styles.divider} />
-          </>
-        ) : null}
-        <ProjectList groups={tree.projectGroups} />
-
-        <div className={styles.divider} />
-        <TaskList tasks={tree.tasks} />
-
-        {visibleSidebars.length > 0 ? (
-          <>
-            <div className={styles.divider} />
-            <div className={styles.extSlots}>
-              {visibleSidebars.map((entry) => (
-                <SidebarMount key={entry.id} entry={entry} />
-              ))}
-            </div>
-          </>
-        ) : null}
-
-        <div className={styles.spacer} />
-
-        <button
-          type="button"
-          className={[styles.navItem, mobileOpen ? styles.navItemActive : ""].join(" ")}
-          data-side-active={mobileOpen ? "page" : undefined}
-          data-side-hover=""
-          onClick={openMobile}
-        >
-          <DeviceMobile size={20} weight="regular" />
-          {t("remote.title")}
-        </button>
-        <div className={styles.footer}>
+        <div className={styles.bottomActions}>
           <button
             type="button"
-            className={[styles.navItem, settingsOpen ? styles.navItemActive : ""].join(" ")}
-            data-side-active={settingsOpen ? "page" : undefined}
+            className={[styles.navItem, pairingActive ? styles.navItemActive : ""].join(" ")}
+            data-side-active={pairingActive ? "page" : undefined}
             data-side-hover=""
-            onClick={openSettings}
+            aria-haspopup="dialog"
+            title={t("remote.title")}
+            onClick={openMobile}
           >
-            <GearSix size={20} weight="regular" />
-            {t("sidenav.settings")}
+            <DeviceMobile size={20} weight="regular" />
+            <span className={styles.itemText}>{t("remote.title")}</span>
           </button>
-          <UpdateButton />
+          <div className={styles.footer}>
+            <button
+              type="button"
+              className={[styles.navItem, settingsOpen ? styles.navItemActive : ""].join(" ")}
+              data-side-active={settingsOpen ? "page" : undefined}
+              data-side-hover=""
+              aria-haspopup="dialog"
+              title={t("sidenav.settings")}
+              onClick={openSettings}
+            >
+              <GearSix size={20} weight="regular" />
+              <span className={styles.itemText}>{t("sidenav.settings")}</span>
+            </button>
+            <UpdateButton />
+          </div>
         </div>
       </nav>
     </div>

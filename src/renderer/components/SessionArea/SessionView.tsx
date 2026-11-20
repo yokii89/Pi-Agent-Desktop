@@ -2,6 +2,7 @@ import { Camera } from "@phosphor-icons/react";
 import { Fragment, memo, useCallback, useEffect, useRef, useState } from "react";
 import { useStickToBottom } from "../../hooks/useStickToBottom";
 import { useT } from "../../hooks/useT";
+import { composerDraftKey } from "../../stores/composerDrafts";
 import { useComposerStore } from "../../stores/composerStore";
 import {
   type ExtensionViewEntry,
@@ -218,9 +219,9 @@ export function SessionView() {
 
   const handleQuoteSelection = useCallback(
     (text: string) => {
-      quoteComposer(text);
+      quoteComposer(text, composerDraftKey(activeSessionId, null));
     },
-    [quoteComposer],
+    [quoteComposer, activeSessionId],
   );
 
   // stream 卡片：afterEntryId 命中则插在该条目后，未命中/缺省 → 追加流末尾（§5.3.2）

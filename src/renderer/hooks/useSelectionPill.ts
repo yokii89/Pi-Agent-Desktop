@@ -60,13 +60,14 @@ const INITIAL_STATE = {
  * 驱动。落点逻辑统一：目标行没变就按当前几何对齐（行被布局挪动），变了才滑行/瞬移
  * （瞬移只认「没有停驻目标」或「正在淡出」）。
  *
- * `nav` 传「承载行的滚动容器」：它同时是药丸的定位父级（position: relative），
- * 行坐标按它的 scrollTop/scrollLeft 补偿。几何用 getBoundingClientRect 差值 +
- * 滚动补偿，而不是 offsetTop：不依赖「nav 恰好是行的 offsetParent」，未来任何
- * 中间层挂上定位都不静默漂移；两个使用方全程没有 scale 变换（SideNav 折叠是高度
- * 补间、设置浮窗无入场缩放），rect 不存在 doc 52 量小的坑。
+ * `nav` 是药丸的定位父级与事件委托根。设置左栏本身可滚动，坐标需补偿它的滚动偏移；
+ * 桌面左栏另传 `scrollArea`，用它和折叠容器裁剪行的可见部分，避免高亮盖住其它行或底栏。
+ * `scrollArea` 的首个子元素随内容自然增高，供尺寸观察器跟踪分区动画中的行位移。
  */
-export function useSelectionPill(nav: HTMLElement | null): {
+export function useSelectionPill(
+  nav: HTMLElement | null,
+  scrollArea: HTMLElement | null = null,
+): {
   pillRef: RefObject<HTMLSpanElement | null>;
 } {
   const pillRef = useRef<HTMLSpanElement>(null);
@@ -89,36 +90,58 @@ export function useSelectionPill(nav: HTMLElement | null): {
       if (!nav?.isConnected) return null;
       const navRect = nav.getBoundingClientRect();
       const rowRect = row.getBoundingClientRect();
-      // 坐标落在滚动内容上：药丸是滚动容器（nav）的绝对定位子元素，随内容一起滚
+      let { top, bottom } = rowRect;
+      if (scrollArea?.contains(row)) {
+        for (let parent = row.parentElement; parent; parent = parent.parentElement) {
+          if (parent === scrollArea || parent.hasAttribute("data-side-nav-clip")) {
+            const clip = parent.getBoundingClientRect();
+            top = Math.max(top, clip.top);
+            bottom = Math.min(bottom, clip.bottom);
+          }
+          if (parent === scrollArea || bottom <= top) break;
+        }
+      }
+      if (bottom <= top) return null;
       return {
         x: rowRect.left - navRect.left + nav.scrollLeft,
-        y: rowRect.top - navRect.top + nav.scrollTop,
+        y: top - navRect.top + nav.scrollTop,
         width: rowRect.width,
-        height: rowRect.height,
+        height: bottom - top,
       };
     },
-    [nav],
+    [nav, scrollArea],
   );
 
   const retarget = useCallback(() => {
     if (!nav?.isConnected) return;
-    const { hoverRow } = state.current;
-    const row = hoverRow?.isConnected
+    const current = state.current;
+    const hoverRow = current.hoverRow;
+    const hoverInside = hoverRow !== null && nav.contains(hoverRow);
+    const hoverRect = hoverInside ? measure(hoverRow) : null;
+    if (!hoverRect) current.hoverRow = null;
+    const row = hoverRect
       ? hoverRow
       : (nav.querySelector<HTMLElement>(PAGE_TARGET) ??
         nav.querySelector<HTMLElement>(SESSION_TARGET));
-    const current = state.current;
+    const rect = hoverRect ?? (row ? measure(row) : null);
 
-    if (!row) {
-      // 目标行不在 DOM（所在分区折叠、会话被删、无选中且指针已离开）：淡出，回来再瞬移落位
-      if (!current.target && current.opacity === 0) return;
+    if (!row || !rect) {
+      const clipped = row !== null || hoverInside;
+      if (!current.target && (!clipped || current.opacity === 0)) return;
       current.target = null;
       current.moving = false;
       current.tweenTarget = null;
       moveTween.current();
+      fadeTween.current();
+      if (clipped) {
+        // 行已不可见，不能让旧高亮停在相邻行上。
+        current.opacity = 0;
+        apply();
+        return;
+      }
+      // 目标已卸载：淡出，回来再瞬移落位。
       if (current.opacity <= 0) return;
       const from = current.opacity;
-      fadeTween.current();
       fadeTween.current = glide({
         duration: GLIDE_MOTION.pillFade,
         onUpdate: (p) => {
@@ -128,9 +151,6 @@ export function useSelectionPill(nav: HTMLElement | null): {
       });
       return;
     }
-
-    const rect = measure(row);
-    if (!rect) return;
 
     if (current.target === row) {
       const baseline = current.moving ? current.tweenTarget : current.rect;
@@ -226,17 +246,27 @@ export function useSelectionPill(nav: HTMLElement | null): {
       attributes: true,
       attributeFilter: ["data-side-active"],
     });
+    const resizeObserver = scrollArea ? new ResizeObserver(retarget) : null;
+    if (resizeObserver && scrollArea) {
+      resizeObserver.observe(nav);
+      resizeObserver.observe(scrollArea);
+      const content = scrollArea.firstElementChild;
+      if (content) resizeObserver.observe(content);
+    }
+    scrollArea?.addEventListener("scroll", retarget, { capture: true, passive: true });
     nav.addEventListener("pointerover", onPointerOver);
     nav.addEventListener("pointerleave", onPointerLeave);
     return () => {
       observer.disconnect();
+      resizeObserver?.disconnect();
+      scrollArea?.removeEventListener("scroll", retarget, true);
       nav.removeEventListener("pointerover", onPointerOver);
       nav.removeEventListener("pointerleave", onPointerLeave);
       moveTween.current();
       fadeTween.current();
       state.current = { ...INITIAL_STATE };
     };
-  }, [nav, retarget]);
+  }, [nav, retarget, scrollArea]);
 
   return { pillRef };
 }

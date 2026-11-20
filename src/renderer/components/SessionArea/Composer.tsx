@@ -1,9 +1,17 @@
 import { Folder, Globe, PuzzlePiece } from "@phosphor-icons/react";
-import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { t as translate } from "../../../shared/i18n";
 import { getFileIconUrl } from "../../fileIcons";
 import { useT } from "../../hooks/useT";
 import type { BrowserContextItem } from "../../services/browserService";
+import { type ComposerDraftPart, sameComposerContent } from "../../stores/composerDrafts";
 import type { FileMention } from "../../stores/composerStore";
 import { useUiStore } from "../../stores/uiStore";
 import { loadGsap, prefersReducedMotion } from "../../utils/animation";
@@ -14,6 +22,8 @@ import {
   hasVisibleContent,
   insertNodeAtCaret,
   readComposerDom,
+  readComposerDraft,
+  restoreComposerDraft,
   SLASH_CMD_ATTR,
 } from "../../utils/composerDom";
 import type { PositionedFileMention } from "../../utils/fileMentionFormat";
@@ -72,6 +82,8 @@ export interface ComposerHandle {
 }
 
 interface ComposerProps {
+  draftContent: ComposerDraftPart[];
+  onDraftChange: (content: ComposerDraftPart[]) => void;
   /** 与 store 对齐的元素列表；新增会插入光标处，移除会删掉对应芯片。 */
   elements: BrowserContextItem[];
   onRemoveElement: (id: string) => void;
@@ -102,7 +114,7 @@ interface ComposerProps {
   onEscape?: () => void;
   placeholder?: string;
   disabled?: boolean;
-  /** 外部（浏览器拾取 Enter）要求聚焦时递增；0 表示尚未发生。 */
+  /** 外部要求聚焦并把光标落到末尾时递增（浏览器拾取 / 工作区切换）；0 表示尚未发生。 */
   focusSeq?: number;
   onReady?: (handle: ComposerHandle) => void;
 }
@@ -155,6 +167,8 @@ function flashQuoteBlock(span: HTMLSpanElement): void {
 }
 
 export function Composer({
+  draftContent,
+  onDraftChange,
   elements,
   onRemoveElement,
   fileMentions,
@@ -209,6 +223,11 @@ export function Composer({
     [],
   );
 
+  const reportDraft = useCallback(() => {
+    const root = rootRef.current;
+    if (root) onDraftChange(readComposerDraft(root));
+  }, [onDraftChange]);
+
   const reportContent = useCallback(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -216,7 +235,8 @@ export function Composer({
     setIsEmpty(empty);
     onContentChange?.(!empty);
     onTextChange?.(textBeforeCaret(root)?.text ?? "");
-  }, [onContentChange, onTextChange]);
+    reportDraft();
+  }, [onContentChange, onTextChange, reportDraft]);
 
   const paintChip = useCallback(
     (item: BrowserContextItem): HTMLElement => {
@@ -290,6 +310,35 @@ export function Composer({
       createFileChip(item, theme, pickSvgIconNode(folderIconRef.current)),
     [theme],
   );
+
+  // 在 store → DOM 的被动同步前恢复，避免挂载时的空 DOM 覆盖已保存的草稿。
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root || sameComposerContent(readComposerDraft(root), draftContent)) return;
+    restoreComposerDraft(root, draftContent, (part) => {
+      if (part.kind === "slash") {
+        return createSlashChip(part.name, pickSvgIconNode(skillIconRef.current));
+      }
+      if (part.kind === "file") {
+        const mention = fileMentions?.find((item) => item.path === part.path);
+        return mention ? paintFileChip(mention) : null;
+      }
+      const element = elements.find((item) => item.id === part.id);
+      return element ? paintChip(element) : null;
+    });
+    const empty = !hasVisibleContent(root);
+    setIsEmpty(empty);
+    onContentChange?.(!empty);
+    scheduleLinkify(0);
+  }, [
+    draftContent,
+    elements,
+    fileMentions,
+    paintChip,
+    paintFileChip,
+    onContentChange,
+    scheduleLinkify,
+  ]);
 
   /**
    * CSS Modules 类名带哈希，改样式后哈希会变；contenteditable 里已有芯片
@@ -449,6 +498,7 @@ export function Composer({
         setIsEmpty(true);
         onContentChange?.(false);
         onTextChange?.("");
+        reportDraft();
       },
       focus: () => rootRef.current?.focus(),
       isBlank: () => {
@@ -471,6 +521,7 @@ export function Composer({
         const empty = !text.trim();
         setIsEmpty(empty);
         onContentChange?.(!empty);
+        reportDraft();
         root.focus();
         const selection = window.getSelection();
         if (!selection) return;
@@ -537,6 +588,7 @@ export function Composer({
         setIsEmpty(false);
         onContentChange?.(true);
         onTextChange?.(root.textContent ?? "");
+        reportDraft();
         // 引用落点即反馈：聚焦输入栏，光标移到末尾承接追问
         root.focus();
         const selection = window.getSelection();
@@ -563,6 +615,7 @@ export function Composer({
         setIsEmpty(false);
         onContentChange?.(true);
         onTextChange?.(root.textContent ?? "");
+        reportDraft();
         root.focus();
         const selection = window.getSelection();
         if (!selection) return;
@@ -575,7 +628,15 @@ export function Composer({
         scheduleLinkify(0);
       },
     });
-  }, [onReady, onContentChange, onTextChange, paintFileChip, reportContent, scheduleLinkify]);
+  }, [
+    onReady,
+    onContentChange,
+    onTextChange,
+    paintFileChip,
+    reportContent,
+    reportDraft,
+    scheduleLinkify,
+  ]);
 
   // + 菜单插入 @ / / 触发符（仅 seq 变化时插入一次）
   const lastTriggerSeqRef = useRef(0);
@@ -770,6 +831,7 @@ export function Composer({
         }}
         onCompositionEnd={() => {
           composingRef.current = false;
+          reportDraft();
           scheduleLinkify();
         }}
         onDragOver={(event) => {

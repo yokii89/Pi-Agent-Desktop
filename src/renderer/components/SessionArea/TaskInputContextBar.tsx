@@ -12,7 +12,7 @@ import styles from "./TaskInputContextBar.module.css";
  * 空态输入栏顶栏：工作区芯片 + Git 分支芯片（docs/用户对话栏/1–3）。
  * 会话态不显示本栏——项目/分支信息进 SessionHeader（docs/用户对话栏/7.1）。
  */
-export function TaskInputContextBar() {
+export function TaskInputContextBar({ onWorkspaceSelected }: { onWorkspaceSelected: () => void }) {
   const t = useT();
   const { projects, currentProject, selectProject, addProjectByPicker } = useProjectStore();
   const [workspaceQuery, setWorkspaceQuery] = useState("");
@@ -26,9 +26,19 @@ export function TaskInputContextBar() {
     );
   }, [projects, workspaceQuery]);
 
+  const finishSelection = (close: () => void) => {
+    // 在 Popover 检查关闭焦点之前移走，避免退场后焦点返回触发器。
+    onWorkspaceSelected();
+    close();
+  };
+  const chooseProject = (id: string | null, close: () => void) => {
+    selectProject(id);
+    finishSelection(close);
+  };
+
   // rows 与 actions 同序（分隔线不占行序），OptionList 的行序就是这里的下标
   const rows: OptionRow[] = [];
-  const actions: Array<() => void> = [];
+  const actions: Array<(close: () => void) => void> = [];
   for (const project of filteredProjects) {
     const isCurrent = project.id === currentProject?.id;
     rows.push({
@@ -44,7 +54,7 @@ export function TaskInputContextBar() {
         </>
       ),
     });
-    actions.push(() => selectProject(project.id));
+    actions.push((close) => chooseProject(project.id, close));
   }
   rows.push({ key: "group-divider", node: null, separator: true });
   rows.push({
@@ -57,8 +67,10 @@ export function TaskInputContextBar() {
       </>
     ),
   });
-  actions.push(() => {
-    void addProjectByPicker();
+  actions.push((close) => {
+    void addProjectByPicker().then((project) => {
+      if (project) finishSelection(close);
+    });
   });
   rows.push({
     key: "remote-project",
@@ -83,7 +95,7 @@ export function TaskInputContextBar() {
       </>
     ),
   });
-  actions.push(() => selectProject(null));
+  actions.push((close) => chooseProject(null, close));
 
   return (
     <div className={styles.bar}>
@@ -98,10 +110,7 @@ export function TaskInputContextBar() {
                 className={styles.clearButton}
                 title={t("session.workspace.none")}
                 aria-label={t("session.workspace.none")}
-                onClick={() => {
-                  selectProject(null);
-                  close();
-                }}
+                onClick={() => chooseProject(null, close)}
               >
                 <span className={styles.folderIcon} aria-hidden="true">
                   <Folder size={16} weight="regular" />
@@ -136,26 +145,28 @@ export function TaskInputContextBar() {
           </div>
         )}
       >
-        <div className={styles.panel}>
-          <div className={styles.searchRow}>
-            <input
-              className={styles.search}
-              placeholder={t("session.workspace.search")}
-              value={workspaceQuery}
-              onChange={(e) => setWorkspaceQuery(e.target.value)}
+        {(close) => (
+          <div className={styles.panel}>
+            <div className={styles.searchRow}>
+              <input
+                className={styles.search}
+                placeholder={t("session.workspace.search")}
+                value={workspaceQuery}
+                onChange={(e) => setWorkspaceQuery(e.target.value)}
+              />
+            </div>
+            <OptionList
+              rows={rows}
+              role="listbox"
+              ariaLabel={t("session.workspace.select")}
+              className={styles.list}
+              onSelect={(index) => actions[index]?.(close)}
             />
+            {filteredProjects.length === 0 && (
+              <p className={styles.empty}>{t("session.workspace.empty")}</p>
+            )}
           </div>
-          <OptionList
-            rows={rows}
-            role="listbox"
-            ariaLabel={t("session.workspace.select")}
-            className={styles.list}
-            onSelect={(index) => actions[index]?.()}
-          />
-          {filteredProjects.length === 0 && (
-            <p className={styles.empty}>{t("session.workspace.empty")}</p>
-          )}
-        </div>
+        )}
       </Popover>
 
       {cwd && <GitBranchChip cwd={cwd} direction="top" />}
