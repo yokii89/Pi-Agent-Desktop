@@ -1,12 +1,5 @@
 import type { IpcResult } from "./ipc";
-import type {
-  AccountProfile,
-  ClaimStatus,
-  DesktopSummary,
-  Grant,
-  PairingQr,
-  Scope,
-} from "./remote";
+import type { AccountProfile, ClaimStatus, DesktopSummary, Grant, PairingQr } from "./remote";
 
 export const REMOTE_IPC = {
   snapshot: "pidesk:remote:snapshot",
@@ -84,7 +77,7 @@ export interface RemoteApi {
   disconnect(): Promise<IpcResult<RemoteSnapshot>>;
   invite(): Promise<IpcResult<RemoteSnapshot>>;
   /** Approve the exact locally confirmed claim; stale callers and missing claim ids are rejected. */
-  approve(claimId: string, projects: string[], scopes: Scope[]): Promise<IpcResult<RemoteSnapshot>>;
+  approve(claimId: string): Promise<IpcResult<RemoteSnapshot>>;
   reject(): Promise<IpcResult<RemoteSnapshot>>;
   revoke(): Promise<IpcResult<RemoteSnapshot>>;
 }

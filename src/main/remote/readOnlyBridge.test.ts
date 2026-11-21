@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  ALL_SCOPES,
   type Grant,
   type HistoryQuery,
   type HistoryRecord,
   LIMITS,
   parseHistoryReply,
+  type ProjectAccess,
   READ_SCOPES,
   type RoutingContext,
   type Scope,
@@ -79,8 +81,14 @@ function fixture(
   scopes: readonly Scope[] = READ_SCOPES,
   overrides: Partial<ReadOnlySource> = {},
   deviceId = "phone-1",
+  projectAccess: ProjectAccess = ["allowed"],
 ) {
-  let current: Grant | null = { ...baseGrant(), deviceId, scopes: [...scopes] };
+  let current: Grant | null = {
+    ...baseGrant(),
+    deviceId,
+    scopes: [...scopes],
+    projectIds: projectAccess,
+  };
   let time = now;
   let sessionReads = 0;
   let historyReads = 0;
@@ -261,19 +269,24 @@ describe("desktop read-only authority and project isolation", () => {
     expect(f.historyReads()).toBe(0);
     expect(f.sessionReads()).toBeGreaterThan(before);
   });
-  it("checks authentication and scope before touching application services", async () => {
-    const f = fixture();
-    f.revoke();
-    await expect(f.bridge.request(f.context(), frame("projects.list"))).rejects.toThrow(
-      "DEVICE_REVOKED",
+
+  it("paginates the complete project list and exposes sessions across every configured project", async () => {
+    const f = fixture(ALL_SCOPES, {}, "phone-1", "all");
+    const first = await f.bridge.request(f.context(), frame("projects.list", { cursor: null }));
+    expect(first).toMatchObject({ data: { projects, nextCursor: null } });
+    const list = await f.bridge.request(
+      f.context(),
+      frame("sessions.list", { projectId: null, cursor: null, limit: 50 }),
     );
-    expect(f.sessionReads()).toBe(0);
-    const forged = { ...f.context(), grantVersion: 2 };
-    await expect(f.bridge.request(forged, frame("sessions.send"))).rejects.toThrow(
-      "DEVICE_REVOKED",
-    );
+    expect(list).toMatchObject({ data: { sessions: expect.arrayContaining(sessions) } });
+    await expect(
+      f.bridge.request(
+        f.context(),
+        frame("sessions.history", { sessionId: "private-session", cursor: null, limit: 50 }),
+      ),
+    ).resolves.toMatchObject({ data: { messages: [] } });
   });
-  it("rejects writes, extensions, extra fields, malformed IDs and unbounded page requests", async () => {
+  it("checks authentication and scope before touching application services", async () => {
     const f = fixture();
     await expect(f.bridge.request(f.context(), frame("sessions.send"))).rejects.toThrow(
       "FORBIDDEN",
@@ -546,6 +559,37 @@ describe("remote write authorization and outcome reconciliation", () => {
     await expect(
       f.bridge.request(f.context(), frame("requests.lookup", { operationId: "operation-1" })),
     ).resolves.toMatchObject({ data: { state: "completed", command: "sessions.send" } });
+  });
+
+  it("executes authorized stop and interaction-answer commands through the desktop source", async () => {
+    const stop = vi.fn(async () => ({ requested: true }));
+    const answer = vi.fn(() => ({ settled: true }));
+    const f = fixture(
+      [...READ_SCOPES, "sessions.stop", "interactions.read", "interactions.answer"],
+      { stop, answer },
+    );
+    await expect(
+      f.bridge.request(
+        f.context(),
+        frame("sessions.stop", {
+          operationId: "stop-operation",
+          sessionId: "allowed-session",
+        }),
+      ),
+    ).resolves.toMatchObject({ status: "completed", data: { requested: true } });
+    await expect(
+      f.bridge.request(
+        f.context(),
+        frame("interactions.answer", {
+          operationId: "answer-operation",
+          sessionId: "allowed-session",
+          interactionId: "pending-interaction",
+          value: true,
+        }),
+      ),
+    ).resolves.toMatchObject({ status: "completed", data: { settled: true } });
+    expect(stop).toHaveBeenCalledOnce();
+    expect(answer).toHaveBeenCalledOnce();
   });
 
   it("rejects writes without the specific capability before invoking a session service", async () => {

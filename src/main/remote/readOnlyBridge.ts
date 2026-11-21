@@ -1,4 +1,5 @@
 import {
+  allowsProject,
   authorize,
   byteLength,
   ControlError,
@@ -18,6 +19,7 @@ import {
   COMMANDS,
   MAX_FRAME_BYTES,
   MAX_PROMPT_LENGTH,
+  PROJECT_PAGE_SIZE,
   type RequestFrame,
 } from "../../shared/remote/business";
 import { type HistoryView, historyPage, historyRevision } from "./historySync";
@@ -175,11 +177,14 @@ export class ReadOnlyBridge {
       summaryAt: previous?.summaryAt ?? 0,
     });
   }
+  private visibleProjects(): RemoteProject[] {
+    const grant = this.grant();
+    return grant
+      ? this.source.projects().filter((project) => allowsProject(grant.projectIds, project.id))
+      : [];
+  }
   private allowedProjects(): string[] {
-    return this.source
-      .projects()
-      .filter((project) => this.grant()?.projectIds.includes(project.id))
-      .map((project) => project.id);
+    return this.visibleProjects().map((project) => project.id);
   }
   private async session(
     context: RoutingContext,
@@ -241,11 +246,17 @@ export class ReadOnlyBridge {
       });
     }
     if (command === "projects.list") {
-      exact(r.payload, []);
+      if (this.grant()?.projectIds !== "all") {
+        exact(r.payload, []);
+        return requestFrame(requestId, { projects: this.visibleProjects() });
+      }
+      const p = exact(r.payload, ["cursor"]);
+      const projects = this.visibleProjects();
+      const start = offset(p.cursor);
+      const end = start + PROJECT_PAGE_SIZE;
       return requestFrame(requestId, {
-        projects: this.source
-          .projects()
-          .filter((project) => this.grant()?.projectIds.includes(project.id)),
+        projects: projects.slice(start, end),
+        nextCursor: end < projects.length ? String(end) : null,
       });
     }
     if (command === "sessions.list") {
@@ -255,8 +266,9 @@ export class ReadOnlyBridge {
       const projects = this.allowedProjects().filter(
         (allowed) => !projectId || allowed === projectId,
       );
+      const allowed = new Set(projects);
       const sessions = (await this.source.sessions(projects))
-        .filter((session) => projects.includes(session.projectId))
+        .filter((session) => allowed.has(session.projectId))
         .sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
       const start = offset(p.cursor);
       const end = start + limit(p.limit);
@@ -419,7 +431,7 @@ export class ReadOnlyBridge {
         ]);
         if (generation !== this.generation) return;
         if (this.devices.get(deviceId) !== watch) continue;
-        const projectFingerprint = JSON.stringify(this.source.projects());
+        const projectFingerprint = JSON.stringify(this.visibleProjects());
         const fingerprint = JSON.stringify([
           projectFingerprint,
           sessions.map(({ updatedAt: _updatedAt, ...session }) => session),

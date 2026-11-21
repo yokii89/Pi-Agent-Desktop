@@ -3,14 +3,7 @@ export const PROTOCOL_VERSION = 1;
 export const MAX_FRAME_BYTES = 64 * 1024;
 export const MAX_PROMPT_LENGTH = 16_000;
 export const MAX_REQUESTS = 64;
-export const READ_COMMANDS = [
-  "projects.list",
-  "sessions.list",
-  "sessions.history",
-  "sessions.history.sync",
-  "sessions.subscribe",
-  "requests.lookup",
-] as const satisfies readonly Command[];
+export const PROJECT_PAGE_SIZE = 20;
 
 export const COMMANDS = [
   "projects.list",

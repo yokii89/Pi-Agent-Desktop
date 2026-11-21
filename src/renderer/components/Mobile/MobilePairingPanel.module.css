@@ -691,22 +691,21 @@
   font-size: var(--font-size-sm);
 }
 
+.scopeList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.scopeOption {
+  min-height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+}
+
 .panel .projectLimit {
   margin-top: var(--spacing-sm);
-}
-
-.panel .baseline {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-xs);
-  margin-top: var(--spacing-sm);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  line-height: 1.7;
-}
-
-.baseline > svg {
-  margin-top: var(--spacing-xs);
 }
 
 .grantFooter {

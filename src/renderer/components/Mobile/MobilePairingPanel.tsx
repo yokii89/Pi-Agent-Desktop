@@ -60,9 +60,7 @@ export function MobilePairingPanel() {
           projects={snapshot.projects}
           busy={busy}
           connected={snapshot.connected}
-          onApprove={(claimId, projects, scopes) =>
-            void run((api) => api.approve(claimId, projects, scopes))
-          }
+          onApprove={(claimId) => void run((api) => api.approve(claimId))}
           onReject={() => void run((api) => api.reject())}
         >
           {securityNotice}

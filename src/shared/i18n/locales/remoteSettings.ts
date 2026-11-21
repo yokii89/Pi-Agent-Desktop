@@ -19,8 +19,8 @@ export const remoteSettingsMessages = defineMessages({
     "en-US": "Sign out of remote account",
   },
   "settings.remote.readonly": {
-    "zh-CN": "中转目前仅开放项目、会话与历史读取。",
-    "en-US": "The relay currently allows reading projects, sessions and history only.",
+    "zh-CN": "每台手机可访问这台电脑的全部已配置项目与支持的远程操作；每个请求仍由桌面校验。",
+    "en-US": "Each phone can access every configured project and supported action on this computer. The desktop checks every request.",
   },
   "settings.remote.origin": { "zh-CN": "中转地址（HTTPS）", "en-US": "Relay address (HTTPS)" },
   "settings.remote.trust": {
@@ -78,46 +78,45 @@ export const remoteSettingsMessages = defineMessages({
     "zh-CN": "双端域名与 8 位数字一致",
     "en-US": "The domain and all 8 digits match on both devices",
   },
-  "settings.remote.projects": { "zh-CN": "授权项目", "en-US": "Allowed projects" },
-  "settings.remote.selected": {
-    "zh-CN": "已选 {count} / {total}",
-    "en-US": "{count} / {total} selected",
+  "settings.remote.grantAllProjects": {
+    "zh-CN": "全部已配置项目",
+    "en-US": "All configured projects",
   },
-  "settings.remote.searchProjects": { "zh-CN": "搜索项目", "en-US": "Search projects" },
-  "settings.remote.noProjects": { "zh-CN": "暂无可授权项目", "en-US": "No projects available" },
-  "settings.remote.noMatches": { "zh-CN": "未找到相关项目", "en-US": "No matching projects" },
-  "settings.remote.projectLimit": {
-    "zh-CN": "选择 1–{max} 个项目",
-    "en-US": "Choose 1–{max} projects",
+  "settings.remote.grantProjectCount": {
+    "zh-CN": "当前 {count} 个项目",
+    "en-US": "{count} current projects",
   },
-  "settings.remote.permissions": { "zh-CN": "操作权限", "en-US": "Action permissions" },
-  "settings.remote.baseline": {
-    "zh-CN": "默认仅可查看所选项目、会话与历史。",
-    "en-US": "Read-only access to selected projects, sessions and history is included.",
+  "settings.remote.grantFutureProjects": {
+    "zh-CN": "包含以后新增的项目；项目移除或替换时授权会自动撤销。",
+    "en-US": "Includes projects added later. Access is revoked when an authorized project is removed or replaced.",
+  },
+  "settings.remote.grantAllActions": {
+    "zh-CN": "全部已实现的 v2 操作",
+    "en-US": "All implemented v2 actions",
+  },
+  "settings.remote.grantAllSummary": {
+    "zh-CN": "全部 {count} 个项目 · {permissions} 项远程操作",
+    "en-US": "All {count} projects · {permissions} remote actions",
+  },
+  "settings.remote.grantAllWarning": {
+    "zh-CN": "确认后，此手机可查看所有项目和会话、发送消息、停止任务、新建会话及处理待办交互。请仅批准你认可的设备。",
+    "en-US": "This phone can view all projects and sessions, send messages, stop tasks, create sessions, and handle pending interactions. Approve only a device you trust.",
   },
   "settings.remote.matchFirst": {
     "zh-CN": "请先核对域名与数字",
     "en-US": "Verify the domain and code",
   },
-  "settings.remote.selectFirst": {
-    "zh-CN": "请至少选择 1 个项目",
-    "en-US": "Choose at least one project",
+  "settings.remote.noProjects": { "zh-CN": "当前没有配置项目", "en-US": "No projects are configured" },
+  "settings.remote.approve": {
+    "zh-CN": "确认并开放全部项目与操作",
+    "en-US": "Approve all projects and supported actions",
   },
-  "settings.remote.readOnlySummary": {
-    "zh-CN": "{count} 个项目 · 仅查看",
-    "en-US": "{count} projects · Read only",
-  },
-  "settings.remote.approve": { "zh-CN": "确认配对", "en-US": "Confirm pairing" },
   "settings.remote.activation": { "zh-CN": "等待双端激活", "en-US": "Waiting for activation" },
   "settings.remote.expiredClaim": {
     "zh-CN": "配对请求已过期，请重新扫码。",
     "en-US": "This request expired. Scan a new invitation.",
   },
   "settings.remote.capabilities": { "zh-CN": "授权能力", "en-US": "Allowed capabilities" },
-  "settings.remote.readAccess": {
-    "zh-CN": "查看项目、会话与历史",
-    "en-US": "Read projects, sessions and history",
-  },
   "settings.remote.changePermissions": {
     "zh-CN": "调整权限需重新配对",
     "en-US": "Pair again to change permissions",

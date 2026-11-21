@@ -23,9 +23,9 @@ export const pairingMessages = {
   },
   "remote.title": { "zh-CN": "手机配对", "en-US": "Mobile pairing" },
   "remote.description": {
-    "zh-CN": "电脑始终保留项目与会话控制权；配对时选择允许手机读取的项目。",
+    "zh-CN": "电脑仍保留项目和会话控制权；桌面明确批准后，手机可访问全部已配置项目和支持的远程操作。",
     "en-US":
-      "Your computer remains authoritative. Choose which projects the phone may read when pairing.",
+      "Your computer remains authoritative. After desktop approval, the phone can access all configured projects and supported remote actions.",
   },
   "remote.origin": { "zh-CN": "中转 HTTPS origin", "en-US": "Relay HTTPS origin" },
   "remote.trust": {
@@ -54,18 +54,18 @@ export const pairingMessages = {
   },
   "remote.confirmation": { "zh-CN": "双端核对码", "en-US": "Comparison code" },
   "remote.confirmationHint": {
-    "zh-CN":
-      "请在两端核对域名与 8 位数字；一致后在电脑选择项目并同意。扫码和核对码本身不代表授权。",
+    "zh-CN": "请在两端核对域名与 8 位数字；一致后在电脑确认。该手机将获得电脑全部已配置项目及当前支持的全部远程操作访问权。",
     "en-US":
-      "Compare the domain and all 8 digits on both devices. Then choose projects and approve on your desktop. Scanning and the code alone do not authorize access.",
+      "Compare the domain and all 8 digits on both devices. Once they match, confirm on your desktop to grant access to every configured project and supported remote action on this computer.",
   },
   "remote.projects": {
-    "zh-CN": "允许访问的项目（最多 20 个）",
-    "en-US": "Projects allowed (up to 20)",
+    "zh-CN": "全部已配置项目（含以后新增项目）",
+    "en-US": "All configured projects, including future projects",
   },
+  "remote.allProjects": { "zh-CN": "全部项目", "en-US": "All projects" },
   "remote.capabilities": {
-    "zh-CN": "手机能力（单独授权）",
-    "en-US": "Phone capabilities (granted individually)",
+    "zh-CN": "当前支持的全部远程操作",
+    "en-US": "All currently supported remote actions",
   },
   "remote.scope.projects.read": { "zh-CN": "读取项目列表", "en-US": "Read project list" },
   "remote.scope.sessions.read": { "zh-CN": "读取会话与历史", "en-US": "Read sessions and history" },
@@ -81,8 +81,8 @@ export const pairingMessages = {
     "en-US": "Answer pending interactions",
   },
   "remote.approve": {
-    "zh-CN": "核对一致，授予所选能力",
-    "en-US": "Codes match: grant selected capabilities",
+    "zh-CN": "核对一致，开放全部项目和当前操作",
+    "en-US": "Codes match: open access to all projects and supported actions",
   },
   "remote.reject": { "zh-CN": "拒绝此设备", "en-US": "Reject device" },
   "remote.revoke": { "zh-CN": "撤销手机授权", "en-US": "Revoke phone access" },
@@ -114,9 +114,9 @@ export const pairingMessages = {
   "remote.cancel": { "zh-CN": "取消配对", "en-US": "Cancel pairing" },
   "remote.retry": { "zh-CN": "重新扫码", "en-US": "Scan again" },
   "remote.readOnly": {
-    "zh-CN": "手机只能使用电脑明确授权的能力；所有操作仍由电脑本地校验。",
+    "zh-CN": "手机可访问电脑的全部已配置项目与支持的远程操作；所有请求仍由电脑本地校验。",
     "en-US":
-      "The phone can use only capabilities explicitly granted by the desktop; every action is checked locally.",
+      "The phone can access all configured projects and supported remote actions; every request is still checked locally.",
   },
   "remote.noAnswerPermission": {
     "zh-CN": "当前设备没有回答交互的授权，请在电脑端检查设备权限。",

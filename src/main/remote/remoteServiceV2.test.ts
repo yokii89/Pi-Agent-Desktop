@@ -290,6 +290,23 @@ describe("desktop v2 service", () => {
       frame: { status: "completed", data: { projects: [{ id: "project" }] } },
     });
   });
+  it("syncs a locally revoked grant during the online reconciliation tick", async () => {
+    await connected();
+    const activeGrant = fixture.grant;
+    if (!activeGrant) throw new Error("Missing active grant");
+    fixture.grant = {
+      ...activeGrant,
+      state: "revoked",
+      grantVersion: 2,
+      revokedAt: new Date().toISOString(),
+      revocationReason: "project_configuration_changed",
+    };
+    await (service as unknown as { tick: () => Promise<void> }).tick();
+    expect(
+      vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes("/devices/phone/revoke")),
+    ).toBe(true);
+    expect(service.snapshot().revocationPending).toBe(false);
+  });
   it("closes on another account's context before exposing project data", async () => {
     const socket = await connected();
     socket.receive(route(`account-v1-${"b".repeat(64)}`));

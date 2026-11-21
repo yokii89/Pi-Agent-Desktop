@@ -13,7 +13,7 @@ export const LIMITS = {
   pollMs: 2_000,
   controlBytes: 4_096,
   businessBytes: 65_536,
-  projects: 20,
+  projects: 20, // Maximum size of an existing project allowlist.
   refreshMinMs: 60_000,
   refreshRotations: 12_000,
   terminalMs: 600_000,
@@ -54,10 +54,14 @@ export interface Binding {
   grantId: string;
   grantVersion: number;
 }
-export interface Grant extends Binding {
-  state: "prepared" | "active" | "revoked";
+interface GrantAccess extends Binding {
+  /** Full access follows the desktop's configured projects, not arbitrary paths. */
+  projectIds: ProjectAccess;
   scopes: Scope[];
-  projectIds: string[];
+}
+export type ProjectAccess = "all" | string[];
+export interface Grant extends GrantAccess {
+  state: "prepared" | "active" | "revoked";
   createdAt: string;
   expiresAt: string;
   revokedAt: string | null;
@@ -101,12 +105,10 @@ export interface PendingOperationRef {
   command: PendingWriteCommand;
   createdAt: number;
 }
-export interface MobileCredential extends Binding {
+export interface MobileCredential extends GrantAccess {
   version: 1;
   controlVersion: 2;
   accountId: string;
-  projectIds: string[];
-  scopes: Scope[];
   relayOrigin: string;
   securityProfile: typeof SECURITY_PROFILE;
   refreshToken: string;
@@ -254,6 +256,12 @@ export function projectIds(v: unknown): string[] {
   if (new Set(ids).size !== ids.length) fail("INVALID_PROJECTS");
   return ids;
 }
+export function parseProjectAccess(v: unknown): ProjectAccess {
+  return v === "all" ? v : projectIds(v);
+}
+export function allowsProject(access: ProjectAccess, projectId: string): boolean {
+  return access === "all" || access.includes(projectId);
+}
 export function parseJson(raw: string, max: number = LIMITS.controlBytes): unknown {
   if (byteLength(raw) > max) return fail("FRAME_TOO_LARGE");
   try {
@@ -366,7 +374,7 @@ export function parseGrant(v: unknown): Grant {
     ...parseBinding(r),
     state: r.state as Grant["state"],
     scopes,
-    projectIds: projectIds(r.projectIds),
+    projectIds: parseProjectAccess(r.projectIds),
     createdAt: timestamp(r.createdAt),
     expiresAt: timestamp(r.expiresAt),
     revokedAt: r.revokedAt === null ? null : timestamp(r.revokedAt),
@@ -490,7 +498,7 @@ export function parseMobileCredential(v: unknown): MobileCredential {
     ...parseBinding(r),
     controlVersion: CONTROL_VERSION,
     accountId: r.accountId,
-    projectIds: projectIds(r.projectIds),
+    projectIds: parseProjectAccess(r.projectIds),
     scopes: parseScopes(r.scopes),
     pendingOperations,
     state: r.state as "activating" | "active",
@@ -531,6 +539,17 @@ export function sameBinding(a: Binding, b: Binding): boolean {
     a.deviceId === b.deviceId &&
     a.grantId === b.grantId &&
     a.grantVersion === b.grantVersion
+  );
+}
+export function sameAuthorization(a: GrantAccess, b: GrantAccess): boolean {
+  const projects = b.projectIds;
+  return (
+    sameBinding(a, b) &&
+    a.scopes.length === b.scopes.length &&
+    a.scopes.every((scope) => b.scopes.includes(scope)) &&
+    (a.projectIds === "all" || projects === "all"
+      ? a.projectIds === projects
+      : a.projectIds.length === projects.length && a.projectIds.every((id) => projects.includes(id)))
   );
 }
 export function revoked(grant: Grant, now: number, reason: string): Grant {

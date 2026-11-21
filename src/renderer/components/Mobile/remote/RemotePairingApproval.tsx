@@ -1,6 +1,6 @@
-import { Check, DeviceMobile, Eye, Folder, MagnifyingGlass, X } from "@phosphor-icons/react";
+import { Check, DeviceMobile, Folder, X } from "@phosphor-icons/react";
 import { type ReactNode, useId, useState } from "react";
-import { type ClaimStatus, LIMITS, READ_SCOPES, type Scope } from "../../../../shared/remote";
+import { ALL_SCOPES, type ClaimStatus } from "../../../../shared/remote";
 import type { RemoteSnapshot } from "../../../../shared/remoteDesktop";
 import { useT } from "../../../hooks/useT";
 import { Button } from "../../ui/Button";
@@ -14,7 +14,7 @@ interface RemotePairingApprovalProps {
   busy: boolean;
   connected: boolean;
   children: ReactNode;
-  onApprove: (claimId: string, projects: string[], scopes: Scope[]) => void;
+  onApprove: (claimId: string) => void;
   onReject: () => void;
 }
 
@@ -32,30 +32,22 @@ export function RemotePairingApproval({
   const t = useT();
   const id = useId();
   const [matched, setMatched] = useState(false);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [query, setQuery] = useState("");
   const remaining = usePairingCountdown(claim.expiresAt);
-  const selectedIds = selected.filter((projectId) =>
-    projects.some((project) => project.id === projectId),
-  );
-  const needle = query.trim().toLocaleLowerCase();
-  const visibleProjects = projects.filter((project) =>
-    project.name.toLocaleLowerCase().includes(needle),
-  );
   const expired = remaining === 0;
   const code = claim.confirmationCode;
   const validCode = !!code && /^\d{8}$/.test(code);
   const disabled = busy || !connected || expired || !validCode;
-  const canApprove = !disabled && matched && selectedIds.length > 0;
+  const canApprove = !disabled && matched;
   const summary = expired
     ? t("settings.remote.expiredClaim")
     : !connected
       ? t("settings.remote.offlineTitle")
       : !matched
         ? t("settings.remote.matchFirst")
-        : selectedIds.length === 0
-          ? t("settings.remote.selectFirst")
-          : t("settings.remote.readOnlySummary", { count: selectedIds.length });
+        : t("settings.remote.grantAllSummary", {
+            count: projects.length,
+            permissions: ALL_SCOPES.length,
+          });
   return (
     <div className={styles.approval}>
       <div className={styles.scroll}>
@@ -94,71 +86,39 @@ export function RemotePairingApproval({
           <div className={styles.grantColumns}>
             <section aria-labelledby={`${id}-projects`}>
               <div className={styles.sectionHeading}>
-                <h3 id={`${id}-projects`}>{t("settings.remote.projects")}</h3>
+                <h3 id={`${id}-projects`}>{t("settings.remote.grantAllProjects")}</h3>
                 <span className={styles.hint}>
-                  {t("settings.remote.selected", {
-                    count: selectedIds.length,
-                    total: projects.length,
-                  })}
+                  {t("settings.remote.grantProjectCount", { count: projects.length })}
                 </span>
               </div>
-              <label className={styles.search}>
-                <MagnifyingGlass size={16} weight="regular" />
-                <input
-                  type="search"
-                  value={query}
-                  disabled={busy}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={t("settings.remote.searchProjects")}
-                  aria-label={t("settings.remote.searchProjects")}
-                />
-              </label>
+              <p className={styles.hint}>{t("settings.remote.grantFutureProjects")}</p>
               <div className={styles.projectList}>
-                {visibleProjects.map((project) => (
-                  <label className={styles.projectOption} key={project.id}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(project.id)}
-                      disabled={
-                        disabled ||
-                        (!selectedIds.includes(project.id) && selectedIds.length >= LIMITS.projects)
-                      }
-                      onChange={(event) =>
-                        setSelected(
-                          event.target.checked
-                            ? [...selectedIds, project.id]
-                            : selectedIds.filter((projectId) => projectId !== project.id),
-                        )
-                      }
-                    />
+                {projects.map((project) => (
+                  <div className={styles.projectOption} key={project.id}>
                     <Folder size={16} weight="regular" />
                     <span>{project.name}</span>
-                  </label>
+                  </div>
                 ))}
-                {visibleProjects.length === 0 && (
-                  <p className={styles.projectEmpty}>
-                    {t(
-                      projects.length === 0
-                        ? "settings.remote.noProjects"
-                        : "settings.remote.noMatches",
-                    )}
-                  </p>
+                {projects.length === 0 && (
+                  <p className={styles.projectEmpty}>{t("settings.remote.noProjects")}</p>
                 )}
               </div>
-              <p className={`${styles.hint} ${styles.projectLimit}`}>
-                {t("settings.remote.projectLimit", { max: LIMITS.projects })}
-              </p>
             </section>
             <section aria-labelledby={`${id}-permissions`}>
               <div className={styles.sectionHeading}>
-                <h3 id={`${id}-permissions`}>{t("settings.remote.permissions")}</h3>
+                <h3 id={`${id}-permissions`}>{t("settings.remote.grantAllActions")}</h3>
               </div>
-              <p className={styles.baseline}>
-                <Eye size={16} weight="regular" />
-                <span>{t("settings.remote.baseline")}</span>
-              </p>
+              <ul className={styles.factList}>
+                {ALL_SCOPES.map((scope) => (
+                  <li key={scope}>
+                    <Check size={16} weight="regular" />
+                    <span>{t(`remote.scope.${scope}`)}</span>
+                  </li>
+                ))}
+              </ul>
             </section>
           </div>
+          <p className={styles.hint}>{t("settings.remote.grantAllWarning")}</p>
           {children}
         </div>
       </div>
@@ -176,7 +136,7 @@ export function RemotePairingApproval({
             disabled={!canApprove}
             onClick={() => {
               if (canApprove && Date.now() < Date.parse(claim.expiresAt)) {
-                onApprove(claim.claimId, selectedIds, [...READ_SCOPES]);
+                onApprove(claim.claimId);
               }
             }}
           >

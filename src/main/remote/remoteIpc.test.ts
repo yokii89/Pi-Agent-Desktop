@@ -86,17 +86,13 @@ describe("remote IPC caller boundary", () => {
       data: { connected: false },
     });
   });
-  it("preserves the exact claim, projects and permissions for explicit approval", async () => {
-    const request = {
-      claimId: "claim-1",
-      projects: ["project-1"],
-      scopes: ["projects.read", "sessions.read"],
-    };
+  it("submits only the approved claim id; projects and scopes are not caller-selectable", async () => {
+    const request = { claimId: "claim-1" };
     expect(await f.handlers.get(REMOTE_IPC.approve)?.(event(), request)).toEqual({
       ok: true,
       data: { connected: true },
     });
-    expect(f.approve).toHaveBeenCalledWith(request.claimId, request.projects, request.scopes);
+    expect(f.approve).toHaveBeenCalledWith(request.claimId);
   });
   it("exposes cancellation and explicit reset through the trusted envelope", async () => {
     expect(await f.handlers.get(REMOTE_IPC.cancelLogin)?.(event())).toMatchObject({ ok: true });
@@ -119,10 +115,14 @@ describe("remote IPC caller boundary", () => {
     ).toMatchObject({ ok: false, error: "INVALID_FRAME" });
     expect(f.removeDesktop).not.toHaveBeenCalled();
   });
-  it("rejects the old approval payload without invoking the service", async () => {
-    expect(await f.handlers.get(REMOTE_IPC.approve)?.(event(), { id: "phone-1" })).toMatchObject({
-      ok: false,
-    });
+  it("rejects caller-selected project and scope fields", async () => {
+    expect(
+      await f.handlers.get(REMOTE_IPC.approve)?.(event(), {
+        claimId: "claim-1",
+        projects: ["project-1"],
+        scopes: ["projects.read", "sessions.read"],
+      }),
+    ).toMatchObject({ ok: false, error: "INVALID_FRAME" });
     expect(f.approve).not.toHaveBeenCalled();
   });
 });

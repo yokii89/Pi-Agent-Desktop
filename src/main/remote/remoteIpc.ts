@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { exact, id, projectIds, type Scope } from "../../shared/remote";
+import { exact, id } from "../../shared/remote";
 import {
   REMOTE_IPC,
   type RemoteAccountInput,
@@ -59,9 +59,8 @@ export function registerRemoteIpc(): void {
   });
   handle(REMOTE_IPC.invite, () => remoteService.invite());
   handle(REMOTE_IPC.approve, async (request) => {
-    const r = exact(request, ["claimId", "projects", "scopes"]);
-    if (!Array.isArray(r.projects) || !Array.isArray(r.scopes)) throw new Error("INVALID_FRAME");
-    return remoteService.approve(id(r.claimId), projectIds(r.projects), r.scopes as Scope[]);
+    const r = exact(request, ["claimId"]);
+    return remoteService.approve(id(r.claimId));
   });
   handle(REMOTE_IPC.reject, () => remoteService.reject());
   handle(REMOTE_IPC.revoke, () => remoteService.revoke());

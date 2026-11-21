@@ -22,7 +22,6 @@ import {
   relayPrincipal,
   requireRelayFeatures,
   revoked,
-  type Scope,
   SECURITY_PROFILE,
   sameBinding,
   secret,
@@ -202,7 +201,9 @@ export class RemoteService {
       qr: this.pairing?.qr ?? null,
       claim: this.pairing?.claim ?? null,
       grant,
-      revocationPending: this.pairing?.revocationPending ?? grant?.state === "revoked",
+      revocationPending: this.pairing
+        ? this.pairing.revocationPending || this.pairing.needsRevocationSync()
+        : grant?.state === "revoked",
       projects: getSettings().projects.map((p) => ({ id: p.id, name: p.name })),
       error: this.error ?? auth.error ?? storageError,
     };
@@ -815,7 +816,11 @@ export class RemoteService {
         this.socket?.close();
         return;
       }
-      if (pairing.grant?.state === "revoked" && pairing.revocationPending) await pairing.revoke();
+      if (
+        pairing.grant?.state === "revoked" &&
+        (pairing.revocationPending || pairing.needsRevocationSync())
+      )
+        await pairing.revoke();
       if (this.stopped || generation !== this.generation) return;
       await this.bridge.tick((context, frame) => this.deliver(context, frame));
       if (generation === this.generation) this.error = null;
@@ -833,9 +838,9 @@ export class RemoteService {
     await this.pairing.invite();
     return this.snapshot();
   }
-  async approve(claimId: string, projects: string[], scopes: Scope[]) {
+  async approve(claimId: string) {
     if (!this.ready || !this.pairing) fail("DESKTOP_OFFLINE");
-    await this.pairing.approve(claimId, projects, scopes);
+    await this.pairing.approve(claimId);
     return this.snapshot();
   }
   async reject() {

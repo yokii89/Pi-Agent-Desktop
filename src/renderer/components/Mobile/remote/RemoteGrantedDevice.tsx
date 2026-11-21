@@ -1,14 +1,5 @@
-import {
-  Check,
-  CheckCircle,
-  DeviceMobile,
-  Eye,
-  Folder,
-  LinkBreak,
-  PlugsConnected,
-} from "@phosphor-icons/react";
+import { CheckCircle, DeviceMobile, Folder, LinkBreak, PlugsConnected } from "@phosphor-icons/react";
 import type { Grant } from "../../../../shared/remote";
-import { READ_SCOPES } from "../../../../shared/remote";
 import type { RemoteSnapshot } from "../../../../shared/remoteDesktop";
 import { useT } from "../../../hooks/useT";
 import { Button } from "../../ui/Button";
@@ -26,15 +17,13 @@ interface RemoteGrantedDeviceProps {
 export function RemoteGrantedDevice({
   grant,
   deviceName,
-  projects,
+  projects: _configuredProjects,
   busy,
   onRevoke,
 }: RemoteGrantedDeviceProps) {
   const t = useT();
   const prepared = grant.state === "prepared";
-  const actions = grant.scopes.filter(
-    (scope) => !(READ_SCOPES as readonly string[]).includes(scope),
-  );
+  const projectAccess = grant.projectIds === "all" ? null : grant.projectIds;
   return (
     <section className={`${styles.card} ${styles.deviceCard}`}>
       <div className={styles.comparisonHead}>
@@ -59,27 +48,29 @@ export function RemoteGrantedDevice({
       <div className={styles.deviceFacts}>
         <section>
           <h4>
-            {t("settings.remote.projects")} · {grant.projectIds.length}
+            {t("settings.remote.grantAllProjects")} · {projectAccess === null ? t("remote.allProjects") : projectAccess.length}
           </h4>
           <ul className={styles.factList}>
-            {grant.projectIds.map((id) => (
-              <li key={id}>
+            {projectAccess === null ? (
+              <li>
                 <Folder size={16} weight="regular" />
-                <span>{projects.find((project) => project.id === id)?.name ?? id}</span>
+                <span>{t("settings.remote.grantFutureProjects")}</span>
               </li>
-            ))}
+            ) : (
+              projectAccess.map((id) => (
+                <li key={id}>
+                  <Folder size={16} weight="regular" />
+                  <span>{id}</span>
+                </li>
+              ))
+            )}
           </ul>
         </section>
         <section>
           <h4>{t("settings.remote.capabilities")}</h4>
           <ul className={styles.factList}>
-            <li>
-              <Eye size={16} weight="regular" />
-              <span>{t("settings.remote.readAccess")}</span>
-            </li>
-            {actions.map((scope) => (
+            {grant.scopes.map((scope) => (
               <li key={scope}>
-                <Check size={16} weight="regular" />
                 <span>{t(`remote.scope.${scope}`)}</span>
               </li>
             ))}

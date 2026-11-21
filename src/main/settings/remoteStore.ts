@@ -129,12 +129,15 @@ export function revokeRemoteForProjectChanges(
   if (!grant || grant.state === "revoked") return;
   const normalized = (value: string) =>
     process.platform === "win32" ? path.resolve(value).toLowerCase() : path.resolve(value);
+  const oldDirs = new Map(previous.map(({ id, dir }) => [id, dir]));
+  const newDirs = new Map(next.map(({ id, dir }) => [id, dir]));
+  const authorizedIds = grant.projectIds === "all" ? [...oldDirs.keys()] : grant.projectIds;
   if (
-    grant.projectIds.some((id) => {
-      const oldProject = previous.find((p) => p.id === id);
-      const newProject = next.find((p) => p.id === id);
+    authorizedIds.some((id) => {
+      const oldDir = oldDirs.get(id);
+      const newDir = newDirs.get(id);
       return (
-        !oldProject || !newProject || normalized(oldProject.dir) !== normalized(newProject.dir)
+        oldDir === undefined || newDir === undefined || normalized(oldDir) !== normalized(newDir)
       );
     })
   )

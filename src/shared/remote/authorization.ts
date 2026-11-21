@@ -1,4 +1,5 @@
-import { fail, type Grant, type RoutingContext, sameBinding } from "./contract";
+import type { Command } from "./business";
+import { allowsProject, fail, type Grant, type RoutingContext, type Scope, sameBinding } from "./contract";
 export const COMMAND_SCOPES = {
   "projects.list": "projects.read",
   "sessions.list": "sessions.read",
@@ -11,7 +12,7 @@ export const COMMAND_SCOPES = {
   "sessions.stop": "sessions.stop",
   "sessions.create": "sessions.create",
   "interactions.answer": "interactions.answer",
-} as const;
+} as const satisfies Record<Command, Scope>;
 /** Invoke before payload parsing/services and again immediately before each response/event. */
 export function authorize(
   grant: Grant | null,
@@ -33,7 +34,7 @@ export function authorize(
   if (!(grant.scopes as string[]).includes(scope)) fail("FORBIDDEN");
   if (
     projectId !== undefined &&
-    (!configuredProjects.includes(projectId) || !grant.projectIds.includes(projectId))
+    (!configuredProjects.includes(projectId) || !allowsProject(grant.projectIds, projectId))
   )
     fail("RESOURCE_UNAVAILABLE");
 }

@@ -1,4 +1,5 @@
 import {
+  ALL_SCOPES,
   type ClaimStatus,
   type ControlClient,
   exact,
@@ -9,20 +10,9 @@ import {
   parseClaim,
   parseGrant,
   parseQr,
-  projectIds,
-  READ_SCOPES,
   revoked,
-  type Scope,
-  sameBinding,
+  sameAuthorization,
 } from "../../shared/remote";
-
-function sameAuthorization(a: Grant, b: Grant): boolean {
-  return (
-    sameBinding(a, b) &&
-    JSON.stringify([...a.projectIds].sort()) === JSON.stringify([...b.projectIds].sort()) &&
-    JSON.stringify([...a.scopes].sort()) === JSON.stringify([...b.scopes].sort())
-  );
-}
 
 export interface DesktopGrantStore {
   read(): Grant | null;
@@ -33,6 +23,7 @@ export class DesktopPairing {
   claim: ClaimStatus | null = null;
   qr: PairingQr | null = null;
   revocationPending = false;
+  private syncedRevocationVersion: number | null = null;
   constructor(
     readonly client: ControlClient,
     private readonly store: DesktopGrantStore,
@@ -43,6 +34,14 @@ export class DesktopPairing {
   ) {}
   get grant(): Grant | null {
     return this.store.read();
+  }
+  needsRevocationSync(): boolean {
+    const grant = this.grant;
+    return grant?.state === "revoked" && this.syncedRevocationVersion !== grant.grantVersion;
+  }
+  private markRevocationSynced(): void {
+    const grant = this.grant;
+    this.syncedRevocationVersion = grant?.state === "revoked" ? grant.grantVersion : null;
   }
   private async call<T>(
     path: string,
@@ -101,12 +100,11 @@ export class DesktopPairing {
     )
       this.store.save(revoked(local, this.client.now(), "relay_revoked"));
     if (this.claim?.state === "activating") await this.activate(this.claim);
+    const current = this.grant;
+    if (current?.state === "revoked" && (!state.grant || state.grant.state === "revoked"))
+      this.markRevocationSynced();
   }
-  async approve(
-    claimId: string,
-    selected: string[],
-    scopes: Scope[] = ["projects.read", "sessions.read"],
-  ): Promise<void> {
+  async approve(claimId: string): Promise<void> {
     const claim = this.claim;
     if (
       !claim ||
@@ -115,21 +113,15 @@ export class DesktopPairing {
       this.client.now() >= Date.parse(claim.expiresAt)
     )
       fail("PAIRING_UNAVAILABLE");
-    const ids = projectIds(selected).sort();
-    const selectedScopes = [...new Set(scopes)].sort();
-    if (
-      selectedScopes.length !== READ_SCOPES.length ||
-      selectedScopes.some((scope) => !(READ_SCOPES as readonly string[]).includes(scope))
-    )
-      fail("FORBIDDEN");
-    if (ids.some((p) => !this.projects().includes(p))) fail("INVALID_PROJECTS");
+    const selectedScopes = [...ALL_SCOPES].sort();
     let grant = this.grant;
     if (grant && grant.state !== "revoked") {
+      const existing = grant;
       if (
-        grant.deviceId !== claim.deviceId ||
-        grant.state !== "prepared" ||
-        JSON.stringify(grant.projectIds) !== JSON.stringify(ids) ||
-        JSON.stringify([...grant.scopes].sort()) !== JSON.stringify(selectedScopes)
+        existing.deviceId !== claim.deviceId ||
+        existing.state !== "prepared" ||
+        existing.projectIds !== "all" ||
+        JSON.stringify([...existing.scopes].sort()) !== JSON.stringify(selectedScopes)
       )
         fail("IDEMPOTENCY_CONFLICT");
     } else {
@@ -141,8 +133,8 @@ export class DesktopPairing {
         deviceId: claim.deviceId,
         grantVersion: 1,
         state: "prepared",
-        scopes: selectedScopes as Scope[],
-        projectIds: ids,
+        scopes: selectedScopes,
+        projectIds: "all",
         createdAt: new Date(now).toISOString(),
         expiresAt: new Date(now + LIMITS.grantMs).toISOString(),
         revokedAt: null,
@@ -178,7 +170,7 @@ export class DesktopPairing {
       remote.state === "revoked" ||
       !remote.activationId ||
       this.client.now() >= Date.parse(local.activationExpiresAt) ||
-      local.projectIds.some((p) => !this.projects().includes(p))
+      (local.projectIds !== "all" && local.projectIds.some((p) => !this.projects().includes(p)))
     )
       fail("DEVICE_REVOKED");
     if (local.activationId && local.activationId !== remote.activationId)
@@ -222,6 +214,9 @@ export class DesktopPairing {
       (!remote || remote.state === "revoked" || !sameAuthorization(current, remote))
     )
       this.store.save(revoked(current, this.client.now(), "reconciliation"));
+    const updated = this.grant;
+    if (updated?.state === "revoked" && (!remote || remote.state === "revoked"))
+      this.markRevocationSynced();
     this.revocationPending = false;
   }
   async revoke(): Promise<void> {
@@ -237,5 +232,6 @@ export class DesktopPairing {
       (v) => exact(v, ["grant"]),
     );
     this.revocationPending = false;
+    this.syncedRevocationVersion = next.grantVersion;
   }
 }

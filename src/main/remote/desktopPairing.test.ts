@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  ALL_SCOPES,
   type ClaimStatus,
   ControlClient,
   ControlError,
@@ -59,6 +60,8 @@ function fixture(initial: Grant | null = baseGrant()) {
     } else if (route === `/claims/${claim.claimId}/approve`) {
       expect(saved?.state).toBe("prepared");
       data = { ...claim, state: "approved", grant: saved };
+    } else if (route === `/devices/${claim.deviceId}/revoke`) {
+      data = { grant: { ...saved, state: "revoked" } };
     } else throw new Error(`Unexpected route: ${route}`);
     return {
       status: 200,
@@ -113,7 +116,7 @@ describe("desktop pairing authorization", () => {
   it("rejects approval of a different claim than the one the desktop user confirmed", async () => {
     const f = fixture(null);
     f.claim({ ...baseClaim(), claimId: "new-claim", deviceId: "other-phone" });
-    await expect(f.pairing.approve("claim-1", ["allowed"])).rejects.toThrow("PAIRING_UNAVAILABLE");
+    await expect(f.pairing.approve("claim-1")).rejects.toThrow("PAIRING_UNAVAILABLE");
     expect(f.save).not.toHaveBeenCalled();
     expect(f.fetcher).not.toHaveBeenCalled();
   });
@@ -121,29 +124,27 @@ describe("desktop pairing authorization", () => {
   it("rejects an expired claim before saving an authorization", async () => {
     const f = fixture(null);
     f.claim({ ...baseClaim(), expiresAt: new Date(now).toISOString() });
-    await expect(f.pairing.approve("claim-1", ["allowed"])).rejects.toThrow("PAIRING_UNAVAILABLE");
+    f.claim({ ...baseClaim(), expiresAt: new Date(now).toISOString() });
+    await expect(f.pairing.approve("claim-1")).rejects.toThrow("PAIRING_UNAVAILABLE");
     expect(f.save).not.toHaveBeenCalled();
     expect(f.fetcher).not.toHaveBeenCalled();
   });
 
-  it("durably prepares the selected projects and deduplicated scopes before approval", async () => {
+  it("approves the full v2 project and action range after desktop confirmation", async () => {
     const f = fixture(null);
-    await f.pairing.approve("claim-1", ["other", "allowed"], [...READ_SCOPES, "projects.read"]);
+    await f.pairing.approve("claim-1");
     expect(f.saved()).toMatchObject({
       state: "prepared",
-      projectIds: ["allowed", "other"],
-      scopes: ["projects.read", "sessions.read"],
+      projectIds: "all",
+      scopes: [...ALL_SCOPES].sort(),
     });
     expect(f.pairing.claim?.state).toBe("approved");
     expect(f.fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects unsupported scopes and projects absent from configuration", async () => {
-    const f = fixture(null);
-    await expect(
-      f.pairing.approve("claim-1", ["allowed"], [...READ_SCOPES, "interactions.answer"]),
-    ).rejects.toThrow("FORBIDDEN");
-    await expect(f.pairing.approve("claim-1", ["missing"])).rejects.toThrow("INVALID_PROJECTS");
+  it("does not expand an interrupted previously restricted grant", async () => {
+    const f = fixture();
+    await expect(f.pairing.approve("claim-1")).rejects.toThrow("IDEMPOTENCY_CONFLICT");
     expect(f.save).not.toHaveBeenCalled();
     expect(f.fetcher).not.toHaveBeenCalled();
   });
@@ -153,7 +154,7 @@ describe("desktop pairing authorization", () => {
     f.save.mockImplementationOnce(() => {
       throw new ControlError("STATE_UNAVAILABLE");
     });
-    await expect(f.pairing.approve("claim-1", ["allowed"])).rejects.toThrow("STATE_UNAVAILABLE");
+    await expect(f.pairing.approve("claim-1")).rejects.toThrow("STATE_UNAVAILABLE");
     expect(f.fetcher).not.toHaveBeenCalled();
     expect(f.saved()).toBeNull();
   });
@@ -238,6 +239,25 @@ describe("desktop pairing authorization", () => {
     expect(f.pairing.revocationPending).toBe(true);
   });
 
+  it("syncs a locally revoked grant before clearing its pending state", async () => {
+    const local: Grant = { ...baseGrant(), state: "active", activationId: "activation-1" };
+    const f = fixture(local);
+    f.save({
+      ...local,
+      state: "revoked",
+      grantVersion: 2,
+      revokedAt: new Date(now).toISOString(),
+      revocationReason: "project_configuration_changed",
+    });
+    expect(f.pairing.needsRevocationSync()).toBe(true);
+    await f.pairing.revoke();
+    expect(f.pairing.needsRevocationSync()).toBe(false);
+    expect(f.pairing.revocationPending).toBe(false);
+    expect(f.fetcher).toHaveBeenCalledWith(
+      expect.stringContaining("/devices/phone-1/revoke"),
+      expect.anything(),
+    );
+  });
   it("invalidates an interrupted prepared grant before reconciling after restart", async () => {
     const f = fixture();
     await f.pairing.reconcile(true);

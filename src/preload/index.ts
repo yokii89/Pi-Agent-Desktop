@@ -206,8 +206,7 @@ contextBridge.exposeInMainWorld("pidesk", {
     connect: () => ipcRenderer.invoke(REMOTE_IPC.connect),
     disconnect: () => ipcRenderer.invoke(REMOTE_IPC.disconnect),
     invite: () => ipcRenderer.invoke(REMOTE_IPC.invite),
-    approve: (claimId, projects, scopes) =>
-      ipcRenderer.invoke(REMOTE_IPC.approve, { claimId, projects, scopes }),
+    approve: (claimId) => ipcRenderer.invoke(REMOTE_IPC.approve, { claimId }),
     reject: () => ipcRenderer.invoke(REMOTE_IPC.reject),
     revoke: () => ipcRenderer.invoke(REMOTE_IPC.revoke),
   } satisfies RemoteApi,
