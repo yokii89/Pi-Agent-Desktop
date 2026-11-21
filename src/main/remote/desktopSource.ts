@@ -14,6 +14,7 @@ import {
 } from "../session/piSession";
 import { ensureSessionReady, listRuntimeSnapshots } from "../session/runtimeCoordinator";
 import { encodeCwdToSessionDir, listSessions } from "../session/sessionHistory";
+import { SESSION_PREVIEW_MAX_LENGTH } from "../session/sessionMeta";
 import { getSettings } from "../settings/settings";
 import { completedHistory, EMPTY_TAIL, RemoteHistoryReader } from "./historySync";
 import { remoteInteractionAnswer } from "./interactionAnswer";
@@ -130,7 +131,10 @@ export class DesktopReadOnlySource implements ReadOnlySource {
                 ? "running"
                 : "idle",
           updatedAt: s.updatedAt,
-          preview: sanitizeRemoteText(s.firstUserMessage ?? "").slice(0, 256),
+          preview: sanitizeRemoteText(s.latestUserMessage ?? "").slice(
+            0,
+            SESSION_PREVIEW_MAX_LENGTH,
+          ),
         });
       }
     }
@@ -249,7 +253,10 @@ export class DesktopReadOnlySource implements ReadOnlySource {
       title: sessionTitle,
       status: "idle",
       updatedAt: summary?.updatedAt ?? Date.now(),
-      preview: sanitizeRemoteText(summary?.firstUserMessage ?? "").slice(0, 256),
+      preview: sanitizeRemoteText(summary?.latestUserMessage ?? "").slice(
+        0,
+        SESSION_PREVIEW_MAX_LENGTH,
+      ),
     };
   }
   answer(

@@ -45,6 +45,16 @@ function messageEntry(id: string, timestamp: string, role = "assistant"): string
   });
 }
 
+function userMessageEntry(id: string, content: unknown): string {
+  return JSON.stringify({
+    type: "message",
+    id,
+    parentId: "m1",
+    timestamp: "2026-10-26T00:02:00.000Z",
+    message: { role: "user", content },
+  });
+}
+
 describe("scanSessionFile", () => {
   it("提取头部、首条用户消息与最后一个会话名", async () => {
     const file = await writeSession([
@@ -60,8 +70,57 @@ describe("scanSessionFile", () => {
     expect(result.header?.id).toBe("sess-1");
     expect(result.header?.cwd).toBe("C:\\demo");
     expect(result.firstUserMessage).toBe("你好\n世界");
+    expect(result.latestUserMessage).toEqual({ found: true, value: "你好\n世界" });
     expect(result.sessionName).toEqual({ found: true, value: "第二个" });
     expect(result.scannedBytes).toBe((await fsp.stat(file)).size);
+  });
+
+  it("提取最新用户消息的文本块，但保留首条用户消息不变", async () => {
+    const latest = userMessageEntry("m3", [
+      { type: "text", text: "最新提示" },
+      { type: "image", data: "ignored" },
+      { type: "text", text: "词内容" },
+    ]);
+    const file = await writeSession([HEADER, USER, ASSISTANT, latest]);
+
+    const result = await scanSessionFile(file);
+
+    expect(result.firstUserMessage).toBe("你好\n世界");
+    expect(result.latestUserMessage).toEqual({ found: true, value: "最新提示\n词内容" });
+  });
+
+  it("忽略内容中伪造 role 标记的非用户消息", async () => {
+    const assistant = JSON.stringify({
+      type: "message",
+      id: "m3",
+      parentId: "m2",
+      timestamp: "2026-10-26T00:03:00.000Z",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: '包含字面量 "role":"user" 的回答' }],
+      },
+    });
+    const file = await writeSession([HEADER, USER, assistant]);
+
+    const result = await scanSessionFile(file);
+
+    expect(result.latestUserMessage).toEqual({ found: true, value: "你好\n世界" });
+  });
+
+  it("最新用户提示词有界截断，且后续无文本输入会清空旧摘要", async () => {
+    const longPrompt = userMessageEntry("m3", [{ type: "text", text: "字".repeat(400) }]);
+    const file = await writeSession([HEADER, USER, longPrompt]);
+    const full = await scanSessionFile(file);
+    expect(full.latestUserMessage.value).toBe("字".repeat(256));
+
+    const offset = full.scannedBytes;
+    await fsp.appendFile(
+      file,
+      `${userMessageEntry("m4", [{ type: "image", data: "image" }])}\n`,
+      "utf8",
+    );
+    const incremental = await scanSessionFile(file, offset);
+    expect(incremental.latestUserMessage).toEqual({ found: true, value: null });
   });
 
   it("没有 session_info 时不产生名字", async () => {
@@ -164,6 +223,21 @@ describe("scanSessionFile", () => {
     const second = await scanSessionFile(file, first.scannedBytes);
     expect(second.lastActivityAt).toBe(Date.parse("2026-10-26T00:02:00.000Z"));
     expect(second.firstUserMessage).toBeNull();
+    expect(second.latestUserMessage.found).toBe(false);
+  });
+
+  it("增量扫描只返回新增区间内最新的用户提示词", async () => {
+    const file = await writeSession([HEADER, USER]);
+    const first = await scanSessionFile(file);
+    expect(first.latestUserMessage).toEqual({ found: true, value: "你好\n世界" });
+
+    await fsp.appendFile(
+      file,
+      `${userMessageEntry("m2", [{ type: "text", text: "后续用户提示词" }])}\n`,
+      "utf8",
+    );
+    const next = await scanSessionFile(file, first.scannedBytes);
+    expect(next.latestUserMessage).toEqual({ found: true, value: "后续用户提示词" });
   });
 
   it("追加 session_info 不改 lastActivityAt（改名不算活跃）", async () => {

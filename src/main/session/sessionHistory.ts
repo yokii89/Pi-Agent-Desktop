@@ -25,6 +25,7 @@ export function encodeCwdToSessionDir(cwd: string): string {
 interface SessionMeta {
   header: SessionHeader | null;
   firstUserMessage: string | null;
+  latestUserMessage: string | null;
   sessionName: string | null;
   lastActivityAt: number | null;
 }
@@ -42,12 +43,13 @@ const metaCache = new Map<string, MetaCacheEntry>();
 const EMPTY_META: SessionMeta = {
   header: null,
   firstUserMessage: null,
+  latestUserMessage: null,
   sessionName: null,
   lastActivityAt: null,
 };
 
 /**
- * 解析 JSONL 元数据：头部 + 首条用户消息 + 最后一个 session_info 名字。
+ * 解析 JSONL 元数据：头部 + 用户消息 + 最后一个 session_info 名字。
  *
  * pi 自己的会话列表本来就是整文件读取（session-manager buildSessionInfo），
  * 这里首次遇到文件时也全量扫一次；之后按 mtime/size 缓存，只消费追加区间。
@@ -74,6 +76,9 @@ export async function getSessionMeta(file: string): Promise<SessionMeta> {
         size: stat.size,
         header: cached.header,
         firstUserMessage: cached.firstUserMessage,
+        latestUserMessage: scan.latestUserMessage.found
+          ? scan.latestUserMessage.value
+          : cached.latestUserMessage,
         sessionName: scan.sessionName.found ? scan.sessionName.value : cached.sessionName,
         lastActivityAt: scan.lastActivityAt ?? cached.lastActivityAt,
         scannedBytes: Math.max(cached.scannedBytes, scan.scannedBytes),
@@ -88,6 +93,7 @@ export async function getSessionMeta(file: string): Promise<SessionMeta> {
       size: stat.size,
       header: scan.header,
       firstUserMessage: scan.firstUserMessage,
+      latestUserMessage: scan.latestUserMessage.value,
       sessionName: scan.sessionName.found ? scan.sessionName.value : null,
       lastActivityAt: scan.lastActivityAt,
       scannedBytes: scan.scannedBytes,
@@ -148,6 +154,7 @@ async function toSummaries(files: { file: string; mtime: number }[]): Promise<Se
         startedAt: Number.isNaN(startedAt) ? 0 : startedAt,
         updatedAt: meta.lastActivityAt ?? mtime,
         firstUserMessage: meta.firstUserMessage,
+        latestUserMessage: meta.latestUserMessage,
         sessionName: meta.sessionName,
         cwd: meta.header?.cwd && meta.header.cwd.trim().length > 0 ? meta.header.cwd : null,
       };

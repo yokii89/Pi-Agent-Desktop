@@ -15,9 +15,16 @@ export interface SessionNameScan {
   value: string | null;
 }
 
+export interface UserMessageScan {
+  found: boolean;
+  value: string | null;
+}
+
 export interface SessionScanResult {
   header: SessionHeader | null;
   firstUserMessage: string | null;
+  /** 最新用户消息；增量扫描时只包含本次新增部分。 */
+  latestUserMessage: UserMessageScan;
   sessionName: SessionNameScan;
   /**
    * 本次扫描区间内最后一条 message 条目的时间（Unix ms）。
@@ -28,8 +35,9 @@ export interface SessionScanResult {
   scannedBytes: number;
 }
 
-/** 首条用户消息只在前 256KB 内查找（与旧解析口径一致）；会话名不受该上限限制。 */
+/** 首条用户消息只在前 256KB 内查找；最新提示词仅保留 256 个字符。 */
 export const SESSION_HEAD_SCAN_BYTES = 256 * 1024;
+export const SESSION_PREVIEW_MAX_LENGTH = 256;
 
 /**
  * 行内预筛针：先按字节找特征再解码，图片 / 大工具结果那种几 MB 的行
@@ -50,21 +58,33 @@ export function normalizeSessionName(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-export function extractUserText(content: unknown): string | null {
-  if (typeof content === "string") return content;
+export function extractUserText(
+  content: unknown,
+  maxLength = Number.POSITIVE_INFINITY,
+): string | null {
+  if (typeof content === "string") return content.slice(0, maxLength);
   if (Array.isArray(content)) {
     const parts: string[] = [];
+    let remaining = maxLength;
     for (const block of content) {
       if (
-        typeof block === "object" &&
-        block !== null &&
-        (block as { type?: string }).type === "text" &&
-        typeof (block as { text?: unknown }).text === "string"
-      ) {
-        parts.push((block as { text: string }).text);
+        typeof block !== "object" ||
+        block === null ||
+        (block as { type?: string }).type !== "text" ||
+        typeof (block as { text?: unknown }).text !== "string"
+      )
+        continue;
+      if (parts.length > 0) {
+        if (remaining <= 0) break;
+        parts.push("\n");
+        remaining--;
       }
+      const text = (block as { text: string }).text;
+      parts.push(text.slice(0, remaining));
+      remaining -= Math.min(text.length, remaining);
+      if (remaining <= 0) break;
     }
-    return parts.length > 0 ? parts.join("\n") : null;
+    return parts.length > 0 ? parts.join("") : null;
   }
   return null;
 }
@@ -82,10 +102,10 @@ function readEntryTimestamp(line: Buffer): string | null {
 }
 
 /**
- * 流式扫描 JSONL 元数据（header / 首条用户消息 / 会话名 / 最后消息时间）。
+ * 流式扫描 JSONL 元数据（header / 首条与最新用户消息 / 会话名 / 最后消息时间）。
  *
  * `startOffset > 0` 时只解析追加区间：header 与首条用户消息不重复提取，
- * sessionName 返回该区间内最后一次出现的值（found=false 表示区间内没有新名字）。
+ * latestUserMessage 返回该区间内最新用户提示词（found=false 表示未新增）。
  * 只消费到最后一个完整换行为止；写了一半的行留到下次扫描。
  *
  * 逐行迭代按「块 + carry」收集，跨块超长行只在拿到换行时 concat 一次，
@@ -95,6 +115,7 @@ export async function scanSessionFile(file: string, startOffset = 0): Promise<Se
   const offset = Math.max(0, startOffset);
   let header: SessionHeader | null = null;
   let firstUserMessage: string | null = null;
+  const latestUserMessageLine: { value: Buffer | null } = { value: null };
   let nameFound = false;
   let nameValue: string | null = null;
   let lastMessageTimestamp: string | null = null;
@@ -117,18 +138,16 @@ export async function scanSessionFile(file: string, startOffset = 0): Promise<Se
         }
       }
     }
-    if (
-      firstUserMessage === null &&
-      offset === 0 &&
-      lineStartAbs < SESSION_HEAD_SCAN_BYTES &&
-      line.includes(USER_ROLE_NEEDLE)
-    ) {
+    const userRoleAtStart = line.subarray(0, 512).includes(USER_ROLE_NEEDLE);
+    if (userRoleAtStart) {
       try {
         const entry = JSON.parse(line.toString("utf8")) as {
           message?: { role?: string; content?: unknown };
         };
         if (entry.message?.role === "user") {
-          firstUserMessage = extractUserText(entry.message.content);
+          if (firstUserMessage === null && offset === 0 && lineStartAbs < SESSION_HEAD_SCAN_BYTES)
+            firstUserMessage = extractUserText(entry.message.content);
+          latestUserMessageLine.value = line;
         }
       } catch {
         // 跳过无法解析的行
@@ -184,11 +203,29 @@ export async function scanSessionFile(file: string, startOffset = 0): Promise<Se
     }
   }
 
+  let latestUserMessage: SessionScanResult["latestUserMessage"] = { found: false, value: null };
+  const latestUserLine = latestUserMessageLine.value;
+  if (latestUserLine) {
+    try {
+      const entry = JSON.parse(latestUserLine.toString("utf8")) as {
+        message?: { role?: string; content?: unknown };
+      };
+      if (entry.message?.role === "user") {
+        latestUserMessage = {
+          found: true,
+          value: extractUserText(entry.message.content, SESSION_PREVIEW_MAX_LENGTH),
+        };
+      }
+    } catch {
+      // 跳过无法解析的行
+    }
+  }
   const parsedActivity = lastMessageTimestamp ? Date.parse(lastMessageTimestamp) : Number.NaN;
 
   return {
     header,
     firstUserMessage,
+    latestUserMessage,
     sessionName: { found: nameFound, value: nameValue },
     lastActivityAt: Number.isNaN(parsedActivity) ? null : parsedActivity,
     scannedBytes,

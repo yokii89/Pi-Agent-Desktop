@@ -1328,6 +1328,8 @@ export interface SessionSummary {
   updatedAt: number;
   /** 首条用户消息文本（渲染层自行截断）；尚无消息为 null。 */
   firstUserMessage: string | null;
+  /** 最新用户提示词（最多 256 字符；图片等非文本输入为 null）。 */
+  latestUserMessage?: string | null;
   /** pi 会话名（JSONL 最后一条 session_info）；未命名为 null。标题优先取它。 */
   sessionName: string | null;
   /** 会话工作目录（pi JSONL 头部 `cwd` 字段）；旧格式缺失时为 null。 */

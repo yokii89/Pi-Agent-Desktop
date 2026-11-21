@@ -64,6 +64,7 @@ const summary = () => ({
   cwd: "C:/projects/allowed",
   updatedAt: 1,
   firstUserMessage: "Hello",
+  latestUserMessage: "latest prompt",
 });
 beforeEach(() => {
   vi.resetAllMocks();
@@ -84,12 +85,25 @@ describe("desktop remote catalog integration", () => {
     expect(f.list).toHaveBeenCalledExactlyOnceWith("C:/projects/allowed");
     expect(sessions).toHaveLength(1);
     expect(sessions[0].id).toMatch(/^[a-f0-9]{64}$/);
+    expect(sessions[0].title).toBe("Hello");
+    expect(sessions[0].preview).toBe("latest prompt");
     expect(JSON.stringify(sessions)).not.toContain("C:/");
     expect(f.guard).toHaveBeenCalledWith(
       summary().file,
       path.join("C:/pi", "sessions", "--C--projects-allowed--"),
       path.join("C:/pi", "sessions"),
     );
+  });
+  it("uses the latest user prompt in the preview and sanitizes it for mobile", async () => {
+    f.list.mockResolvedValue([
+      { ...summary(), latestUserMessage: "查看 C:\\Users\\secret\\private.txt" },
+    ]);
+    const source = new DesktopReadOnlySource();
+
+    const [session] = await source.sessions(["allowed"]);
+
+    expect(session.title).toBe("Hello");
+    expect(session.preview).toBe("查看 [local path]");
   });
   it("maps runtime sessions to notifications only within their configured project scope", async () => {
     const source = new DesktopReadOnlySource();

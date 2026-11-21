@@ -102,7 +102,7 @@ describe("listAllSessions", () => {
 
     await fsp.appendFile(
       file,
-      `${message("m1", "2026-10-26T10:00:00.000Z", "追加")}\n${nameEntry("追加后", "2026-10-26T10:01:00.000Z")}\n`,
+      `${message("m1", "2026-10-26T10:00:00.000Z", "追加")}\n${message("m2", "2026-10-26T10:00:00.000Z", "追加后的用户提示", "user")}\n${nameEntry("追加后", "2026-10-26T10:01:00.000Z")}\n`,
       "utf8",
     );
     const second = await listAllSessions();
@@ -110,6 +110,7 @@ describe("listAllSessions", () => {
     expect(second[0].updatedAt).toBe(Date.parse("2026-10-26T10:00:00.000Z"));
     expect(second[0].sessionName).toBe("追加后");
     expect(second[0].firstUserMessage).toBeNull();
+    expect(second[0].latestUserMessage).toBe("追加后的用户提示");
   });
 });
 
