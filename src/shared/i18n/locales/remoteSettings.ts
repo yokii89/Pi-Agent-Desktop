@@ -20,7 +20,8 @@ export const remoteSettingsMessages = defineMessages({
   },
   "settings.remote.readonly": {
     "zh-CN": "每台手机可访问这台电脑的全部已配置项目与支持的远程操作；每个请求仍由桌面校验。",
-    "en-US": "Each phone can access every configured project and supported action on this computer. The desktop checks every request.",
+    "en-US":
+      "Each phone can access every configured project and supported action on this computer. The desktop checks every request.",
   },
   "settings.remote.origin": { "zh-CN": "中转地址（HTTPS）", "en-US": "Relay address (HTTPS)" },
   "settings.remote.trust": {
@@ -88,7 +89,8 @@ export const remoteSettingsMessages = defineMessages({
   },
   "settings.remote.grantFutureProjects": {
     "zh-CN": "包含以后新增的项目；项目移除或替换时授权会自动撤销。",
-    "en-US": "Includes projects added later. Access is revoked when an authorized project is removed or replaced.",
+    "en-US":
+      "Includes projects added later. Access is revoked when an authorized project is removed or replaced.",
   },
   "settings.remote.grantAllActions": {
     "zh-CN": "全部已实现的 v2 操作",
@@ -99,14 +101,19 @@ export const remoteSettingsMessages = defineMessages({
     "en-US": "All {count} projects · {permissions} remote actions",
   },
   "settings.remote.grantAllWarning": {
-    "zh-CN": "确认后，此手机可查看所有项目和会话、发送消息、停止任务、新建会话及处理待办交互。请仅批准你认可的设备。",
-    "en-US": "This phone can view all projects and sessions, send messages, stop tasks, create sessions, and handle pending interactions. Approve only a device you trust.",
+    "zh-CN":
+      "确认后，此手机可查看所有项目和会话、发送消息、停止任务、新建会话及处理待办交互。请仅批准你认可的设备。",
+    "en-US":
+      "This phone can view all projects and sessions, send messages, stop tasks, create sessions, and handle pending interactions. Approve only a device you trust.",
   },
   "settings.remote.matchFirst": {
     "zh-CN": "请先核对域名与数字",
     "en-US": "Verify the domain and code",
   },
-  "settings.remote.noProjects": { "zh-CN": "当前没有配置项目", "en-US": "No projects are configured" },
+  "settings.remote.noProjects": {
+    "zh-CN": "当前没有配置项目",
+    "en-US": "No projects are configured",
+  },
   "settings.remote.approve": {
     "zh-CN": "确认并开放全部项目与操作",
     "en-US": "Approve all projects and supported actions",

@@ -23,7 +23,8 @@ export const pairingMessages = {
   },
   "remote.title": { "zh-CN": "手机配对", "en-US": "Mobile pairing" },
   "remote.description": {
-    "zh-CN": "电脑仍保留项目和会话控制权；桌面明确批准后，手机可访问全部已配置项目和支持的远程操作。",
+    "zh-CN":
+      "电脑仍保留项目和会话控制权；桌面明确批准后，手机可访问全部已配置项目和支持的远程操作。",
     "en-US":
       "Your computer remains authoritative. After desktop approval, the phone can access all configured projects and supported remote actions.",
   },
@@ -54,7 +55,8 @@ export const pairingMessages = {
   },
   "remote.confirmation": { "zh-CN": "双端核对码", "en-US": "Comparison code" },
   "remote.confirmationHint": {
-    "zh-CN": "请在两端核对域名与 8 位数字；一致后在电脑确认。该手机将获得电脑全部已配置项目及当前支持的全部远程操作访问权。",
+    "zh-CN":
+      "请在两端核对域名与 8 位数字；一致后在电脑确认。该手机将获得电脑全部已配置项目及当前支持的全部远程操作访问权。",
     "en-US":
       "Compare the domain and all 8 digits on both devices. Once they match, confirm on your desktop to grant access to every configured project and supported remote action on this computer.",
   },

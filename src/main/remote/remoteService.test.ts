@@ -63,6 +63,7 @@ vi.mock("./desktopPairing", () => ({
     expireInvitation = () => {};
     poll = f.poll;
     reconcile = f.reconcile;
+    needsRevocationSync = () => false;
   },
 }));
 

@@ -1,5 +1,12 @@
 import type { Command } from "./business";
-import { allowsProject, fail, type Grant, type RoutingContext, type Scope, sameBinding } from "./contract";
+import {
+  allowsProject,
+  fail,
+  type Grant,
+  type RoutingContext,
+  type Scope,
+  sameBinding,
+} from "./contract";
 export const COMMAND_SCOPES = {
   "projects.list": "projects.read",
   "sessions.list": "sessions.read",

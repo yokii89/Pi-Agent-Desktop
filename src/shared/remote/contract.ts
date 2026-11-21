@@ -549,7 +549,8 @@ export function sameAuthorization(a: GrantAccess, b: GrantAccess): boolean {
     a.scopes.every((scope) => b.scopes.includes(scope)) &&
     (a.projectIds === "all" || projects === "all"
       ? a.projectIds === projects
-      : a.projectIds.length === projects.length && a.projectIds.every((id) => projects.includes(id)))
+      : a.projectIds.length === projects.length &&
+        a.projectIds.every((id) => projects.includes(id)))
   );
 }
 export function revoked(grant: Grant, now: number, reason: string): Grant {

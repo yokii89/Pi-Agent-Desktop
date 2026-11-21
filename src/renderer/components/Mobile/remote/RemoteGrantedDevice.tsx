@@ -1,4 +1,10 @@
-import { CheckCircle, DeviceMobile, Folder, LinkBreak, PlugsConnected } from "@phosphor-icons/react";
+import {
+  CheckCircle,
+  DeviceMobile,
+  Folder,
+  LinkBreak,
+  PlugsConnected,
+} from "@phosphor-icons/react";
 import type { Grant } from "../../../../shared/remote";
 import type { RemoteSnapshot } from "../../../../shared/remoteDesktop";
 import { useT } from "../../../hooks/useT";
@@ -48,7 +54,8 @@ export function RemoteGrantedDevice({
       <div className={styles.deviceFacts}>
         <section>
           <h4>
-            {t("settings.remote.grantAllProjects")} · {projectAccess === null ? t("remote.allProjects") : projectAccess.length}
+            {t("settings.remote.grantAllProjects")} ·{" "}
+            {projectAccess === null ? t("remote.allProjects") : projectAccess.length}
           </h4>
           <ul className={styles.factList}>
             {projectAccess === null ? (
