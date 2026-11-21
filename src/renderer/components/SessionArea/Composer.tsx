@@ -9,6 +9,7 @@ import {
 } from "react";
 import { t as translate } from "../../../shared/i18n";
 import { getFileIconUrl } from "../../fileIcons";
+import { useComposerPaste } from "../../hooks/useComposerPaste";
 import { useT } from "../../hooks/useT";
 import type { BrowserContextItem } from "../../services/browserService";
 import { type ComposerDraftPart, sameComposerContent } from "../../stores/composerDrafts";
@@ -93,7 +94,7 @@ interface ComposerProps {
   onSend: () => void;
   /** 粘贴/拖入的图片 Blob（docs/design/21）；由上层规范化后入附件条。 */
   onImages?: (files: Blob[], names?: string[]) => void;
-  /** 拖入的任意文件（docs/design/25）；上层按图片/路径附件分流。 */
+  /** 粘贴/拖入的任意文件（docs/design/25）；上层按图片/路径附件分流。 */
   onFiles?: (files: File[]) => void;
   /** 内容（文本或芯片）变化时回调，驱动发送键可用性。 */
   onContentChange?: (hasContent: boolean) => void;
@@ -198,6 +199,7 @@ export function Composer({
     null,
   );
   const [dragOver, setDragOver] = useState(false);
+  const { onContextMenu, onPaste } = useComposerPaste({ disabled, onFiles, onImages });
 
   const globeIconRef = useRef<HTMLSpanElement>(null);
   const linkifyTimerRef = useRef<number | null>(null);
@@ -751,28 +753,6 @@ export function Composer({
     }
   };
 
-  const onPaste = (event: React.ClipboardEvent<HTMLDivElement>): void => {
-    // 图片附件优先：截图粘贴不应被 text/plain 抢走（docs/design/21）
-    const imageFiles: File[] = [];
-    for (const item of Array.from(event.clipboardData.items ?? [])) {
-      if (item.kind !== "file") continue;
-      const file = item.getAsFile();
-      if (file?.type.startsWith("image/")) imageFiles.push(file);
-    }
-    if (imageFiles.length > 0 && onImages) {
-      event.preventDefault();
-      onImages(
-        imageFiles,
-        imageFiles.map((f) => f.name || t("session.image.clipboard")),
-      );
-      return;
-    }
-    event.preventDefault();
-    const text = event.clipboardData.getData("text/plain");
-    if (!text) return;
-    document.execCommand("insertText", false, text);
-  };
-
   const onDrop = (event: React.DragEvent<HTMLDivElement>): void => {
     setDragOver(false);
     const files = Array.from(event.dataTransfer?.files ?? []);
@@ -824,6 +804,7 @@ export function Composer({
         data-placeholder={placeholder || t("session.input.placeholder.composer")}
         suppressContentEditableWarning
         onKeyDown={onKeyDown}
+        onContextMenu={onContextMenu}
         onPaste={onPaste}
         onDrop={onDrop}
         onCompositionStart={() => {
@@ -847,7 +828,11 @@ export function Composer({
         }}
         onInput={(event) => {
           // 组合期的 input 不排 URL 装饰：compositionend 统一补排
-          if (!event.nativeEvent.isComposing) scheduleLinkify();
+          if (!event.nativeEvent.isComposing) {
+            // 程序化插入（含粘贴）可能直接提交组词而不派发 compositionend。
+            composingRef.current = false;
+            scheduleLinkify();
+          }
           const root = rootRef.current;
           if (root) {
             const { filePaths, itemIds } = readComposerDom(root);

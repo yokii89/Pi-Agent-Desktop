@@ -16,7 +16,7 @@ import { useComposerDraft } from "../../stores/useComposerDraft";
 import {
   createFileAttachmentId,
   MAX_ATTACH_FILES,
-  routeAttachFile,
+  routeAttachFiles,
   toDisplayPath,
 } from "../../utils/fileAttach";
 import { formatFileMentionPrompt } from "../../utils/fileMentionFormat";
@@ -592,53 +592,41 @@ export function TaskInput({
     [addImageAttachment, imageAttachments.length, showToast, t],
   );
 
-  /** + 菜单 / 拖入统一入口：图片走 docs/21，其余走路径引用（docs/design/25）。 */
+  /** + 菜单 / 粘贴 / 拖入统一入口：图片与路径附件分别应用各自的限额。 */
   const onAttachFiles = useCallback(
     (files: File[]): void => {
-      const images: File[] = [];
-      let fileCount = fileAttachments.length;
-      for (const file of files) {
-        const route = routeAttachFile(file);
-        if (route.kind === "reject") {
-          showToast(t(route.messageKey));
-          continue;
-        }
-        if (route.kind === "image") {
-          images.push(route.file);
-          continue;
-        }
-        if (fileCount >= MAX_ATTACH_FILES) {
-          showToast(t("session.input.maxFiles", { count: MAX_ATTACH_FILES }));
-          break;
-        }
-        // 与 @ 芯片 / 已挂附件同路径：一次表达，跳过后加
+      const draft = record.getSnapshot();
+      const batch = routeAttachFiles(
+        files,
+        [...draft.fileMentions, ...draft.fileAttachments].map((item) => item.path),
+        MAX_ATTACH_FILES - draft.fileAttachments.length,
+      );
+      for (const key of batch.rejectedMessageKeys) showToast(t(key));
+      let fileLimitReached = batch.fileLimitReached;
+      for (const file of batch.files) {
         if (
-          fileMentions.some((mention) => mention.path === route.path) ||
-          fileAttachments.some((entry) => entry.path === route.path)
+          !addFileAttachment({
+            id: createFileAttachmentId(file.path),
+            name: file.name,
+            path: file.path,
+            displayPath: toDisplayPath(file.path, cwd),
+            kind: "file",
+          })
         ) {
-          continue;
+          fileLimitReached = true;
         }
-        const ok = addFileAttachment({
-          id: createFileAttachmentId(route.path),
-          name: route.name,
-          path: route.path,
-          displayPath: toDisplayPath(route.path, cwd),
-          kind: "file",
-        });
-        if (!ok) {
-          showToast(t("session.input.maxFiles", { count: MAX_ATTACH_FILES }));
-          break;
-        }
-        fileCount += 1;
       }
-      if (images.length > 0) {
+      if (fileLimitReached) {
+        showToast(t("session.input.maxFiles", { count: MAX_ATTACH_FILES }));
+      }
+      if (batch.images.length > 0) {
         void onImages(
-          images,
-          images.map((file) => file.name),
+          batch.images,
+          batch.images.map((file) => file.name),
         );
       }
     },
-    [addFileAttachment, cwd, fileAttachments, fileMentions, onImages, showToast, t],
+    [addFileAttachment, cwd, record, onImages, showToast, t],
   );
 
   const removeStale = (): void => {

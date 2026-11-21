@@ -238,6 +238,8 @@ contextBridge.exposeInMainWorld("pidesk", {
   },
 
   clipboard: {
+    /** 向主窗口当前聚焦的编辑器派发原生 paste 事件，保留文字、图片和本地文件。 */
+    paste: (): Promise<IpcResult<null>> => ipcRenderer.invoke(CLIPBOARD_IPC.paste),
     /** 把 PNG dataURL 写入系统剪贴板（表格「复制为图片」）。 */
     writeImage: (dataUrl: string): Promise<IpcResult<null>> => {
       const request: ClipboardWriteImageRequest = { dataUrl };

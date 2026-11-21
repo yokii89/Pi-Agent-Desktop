@@ -5,6 +5,7 @@
 
 import { pideskApi } from "../services/pideskApi";
 import { fileMentionName } from "./fileMentionFormat";
+import { normalizePathKey } from "./fileOpen";
 
 /** 单条消息最多附带的非图片文件数。 */
 export const MAX_ATTACH_FILES = 16;
@@ -73,7 +74,7 @@ export function toDisplayPath(absPath: string, cwd: string | null): string {
   return fileMentionName(normalized);
 }
 
-/** 对话框 / 拖入文件 → 附件路由。 */
+/** 对话框 / 粘贴 / 拖入文件 → 附件路由。 */
 export function routeAttachFile(
   file: File,
   pathForFile: (file: File) => string = defaultPathForFile,
@@ -82,6 +83,47 @@ export function routeAttachFile(
   const path = localFilePath(file, pathForFile);
   if (!path) return { kind: "reject", messageKey: "session.file.noPath" };
   return { kind: "file", path, name: file.name || fileMentionName(path) };
+}
+
+export interface AttachBatchRoutes {
+  images: File[];
+  files: Extract<AttachRoute, { kind: "file" }>[];
+  rejectedMessageKeys: string[];
+  fileLimitReached: boolean;
+}
+
+/** 整批分流：去重先于限额，文件超限后仍继续收集图片。 */
+export function routeAttachFiles(
+  files: readonly File[],
+  attachedPaths: Iterable<string>,
+  remainingFileSlots: number,
+  pathForFile: (file: File) => string = defaultPathForFile,
+): AttachBatchRoutes {
+  const knownPaths = new Set(Array.from(attachedPaths, normalizePathKey));
+  const result: AttachBatchRoutes = {
+    images: [],
+    files: [],
+    rejectedMessageKeys: [],
+    fileLimitReached: false,
+  };
+  for (const file of files) {
+    const route = routeAttachFile(file, pathForFile);
+    if (route.kind === "reject") {
+      result.rejectedMessageKeys.push(route.messageKey);
+    } else if (route.kind === "image") {
+      result.images.push(route.file);
+    } else {
+      const key = normalizePathKey(route.path);
+      if (knownPaths.has(key)) continue;
+      if (result.files.length >= remainingFileSlots) {
+        result.fileLimitReached = true;
+        continue;
+      }
+      knownPaths.add(key);
+      result.files.push(route);
+    }
+  }
+  return result;
 }
 
 /** 附件 id（store 去重键之外的 React key）。 */

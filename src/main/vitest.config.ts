@@ -16,6 +16,7 @@ export default defineConfig({
       "wallpaper/**/*.test.ts",
       "notification/**/*.test.ts",
       "browser/**/*.test.ts",
+      "clipboard/**/*.test.ts",
       "session/**/*.test.ts",
       "proc/**/*.test.ts",
       "extension/**/*.test.ts",

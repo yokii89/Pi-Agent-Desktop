@@ -5,6 +5,7 @@ import {
   looksLikeImage,
   MAX_ATTACH_FILES,
   routeAttachFile,
+  routeAttachFiles,
   toDisplayPath,
 } from "./fileAttach";
 
@@ -53,6 +54,66 @@ describe("fileAttach routing", () => {
     expect(looksLikeImage(makeFile("blob", "image/webp"))).toBe(true);
     expect(looksLikeImage(makeFile("photo.webp", ""))).toBe(true);
     expect(looksLikeImage(makeFile("photo.txt", "text/plain"))).toBe(false);
+  });
+});
+
+describe("file attachment batches", () => {
+  const pathForFile = (file: File): string => `C:/files/${file.name}`;
+
+  it("keeps images after exceeding the independent file limit", () => {
+    const image = makeFile("photo.png", "image/png");
+    const batch = routeAttachFiles(
+      [makeFile("first.txt"), makeFile("overflow.txt"), image],
+      [],
+      1,
+      pathForFile,
+    );
+    expect(batch.files.map((file) => file.name)).toEqual(["first.txt"]);
+    expect(batch.images).toEqual([image]);
+    expect(batch.fileLimitReached).toBe(true);
+  });
+
+  it("deduplicates within one batch without dropping later files", () => {
+    const duplicate = makeFile("first.txt");
+    const batch = routeAttachFiles(
+      [duplicate, duplicate, makeFile("last.txt")],
+      [],
+      2,
+      pathForFile,
+    );
+    expect(batch.files.map((file) => file.name)).toEqual(["first.txt", "last.txt"]);
+    expect(batch.fileLimitReached).toBe(false);
+  });
+
+  it("recognizes existing mentions across Windows separators and casing", () => {
+    const batch = routeAttachFiles(
+      [makeFile("FIRST.txt"), makeFile("last.txt")],
+      ["c:\\FILES\\first.txt"],
+      1,
+      pathForFile,
+    );
+    expect(batch.files.map((file) => file.name)).toEqual(["last.txt"]);
+    expect(batch.fileLimitReached).toBe(false);
+  });
+
+  it("does not report a limit when a full draft only receives duplicate files", () => {
+    const batch = routeAttachFiles([makeFile("first.txt")], ["C:/files/first.txt"], 0, pathForFile);
+    expect(batch.files).toEqual([]);
+    expect(batch.fileLimitReached).toBe(false);
+  });
+
+  it("continues after a file has no local path", () => {
+    const image = makeFile("photo.png", "image/png");
+    const batch = routeAttachFiles(
+      [makeFile("missing.txt"), makeFile("last.txt"), image],
+      [],
+      1,
+      (file) => (file.name === "missing.txt" ? "" : pathForFile(file)),
+    );
+    expect(batch.rejectedMessageKeys).toEqual(["session.file.noPath"]);
+    expect(batch.files.map((file) => file.name)).toEqual(["last.txt"]);
+    expect(batch.images).toEqual([image]);
+    expect(batch.fileLimitReached).toBe(false);
   });
 });
 

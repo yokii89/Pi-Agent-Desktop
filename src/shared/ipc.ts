@@ -45,11 +45,12 @@ export const WINDOW_IPC = {
 } as const;
 
 /**
- * 系统剪贴板（docs/design/135）：渲染层把后台渲染好的 PNG dataURL 递过来写入剪贴板。
- * 写剪贴板必须走主进程（渲染层拿不到 Electron clipboard），文本仍走 navigator.clipboard。
+ * 系统剪贴板：PNG 写入与主窗口原生粘贴。
+ * 粘贴内容仅通过当前编辑器的 paste 事件交付，预加载不暴露剪贴板读取 API。
  */
 export const CLIPBOARD_IPC = {
   writeImage: "pidesk:clipboard:writeImage",
+  paste: "pidesk:clipboard:paste",
 } as const;
 
 /** 写入 clipboard.writeImage 的请求体：只接受 PNG dataURL。 */

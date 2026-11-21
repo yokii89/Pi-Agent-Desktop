@@ -57,6 +57,10 @@ export const sessionMessages = defineMessages({
   "session.input.stop": { "zh-CN": "停止", "en-US": "Stop" },
   "session.input.more": { "zh-CN": "更多", "en-US": "More" },
   "session.input.attach": { "zh-CN": "添加附件", "en-US": "Add attachment" },
+  "session.input.pasteFailed": {
+    "zh-CN": "粘贴失败，请重试或使用 Ctrl+V",
+    "en-US": "Couldn't paste. Try again or use Ctrl+V",
+  },
   "session.input.mention": {
     "zh-CN": "使用 @ 添加上下文",
     "en-US": "Use @ to add context",
