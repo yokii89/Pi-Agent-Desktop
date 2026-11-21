@@ -25,9 +25,18 @@ export interface SocketParseState {
   authenticated: boolean;
 }
 
+export interface PushNotification {
+  eventId: string;
+  desktopId: string;
+  sessionId: string;
+  title: string;
+  kind: "interaction" | "finished" | "failed";
+}
+
 export type ClientSocketFrame =
   | { controlVersion: 2; type: "authenticate"; accessToken: string }
   | { controlVersion: 2; type: "ack"; deliverySequence: number }
+  | { controlVersion: 2; type: "task_notification"; notification: PushNotification }
   | {
       controlVersion: 2;
       type: "reauthenticate";
@@ -106,6 +115,31 @@ function text(value: unknown): string {
   if (typeof value !== "string" || value.length < 1 || value.length > 8192) fail("AUTH_REQUIRED");
   return value;
 }
+function parseTaskNotification(value: unknown): PushNotification {
+  const notification = exact(value, ["eventId", "desktopId", "sessionId", "title", "kind"]);
+  const eventId = id(notification.eventId);
+  const desktopId = id(notification.desktopId);
+  const sessionId = id(notification.sessionId);
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(desktopId) ||
+    typeof notification.title !== "string" ||
+    !notification.title.trim() ||
+    notification.title.length > 128 ||
+    Array.from(notification.title).some((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 0x1f || code === 0x7f;
+    }) ||
+    !["interaction", "finished", "failed"].includes(String(notification.kind))
+  )
+    fail("INVALID_FRAME");
+  return {
+    eventId,
+    desktopId,
+    sessionId,
+    title: notification.title.trim(),
+    kind: notification.kind as PushNotification["kind"],
+  };
+}
 function principalWithAccount(value: unknown, role?: SocketRole): Record<string, unknown> {
   const raw = exact(value, ["accountId", ...PRINCIPAL_KEYS]);
   if (typeof raw.accountId !== "string" || !ACCOUNT_ID.test(raw.accountId)) fail("AUTH_REQUIRED");
@@ -141,6 +175,15 @@ export function parseClientSocketFrame(raw: string, state: SocketParseState): Cl
   if (value.type === "ack") {
     exact(value, ["controlVersion", "type", "deliverySequence"]);
     return { controlVersion: 2, type: "ack", deliverySequence: positive(value.deliverySequence) };
+  }
+  if (value.type === "task_notification") {
+    if (state.role !== "desktop") fail("FORBIDDEN");
+    exact(value, ["controlVersion", "type", "notification"]);
+    return {
+      controlVersion: 2,
+      type: "task_notification",
+      notification: parseTaskNotification(value.notification),
+    };
   }
   if (value.type === "reauthenticate") {
     exact(value, ["controlVersion", "type", "renewalId", "accessToken", "accountToken"]);

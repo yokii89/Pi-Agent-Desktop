@@ -91,6 +91,19 @@ describe("desktop remote catalog integration", () => {
       path.join("C:/pi", "sessions"),
     );
   });
+  it("maps runtime sessions to notifications only within their configured project scope", async () => {
+    const source = new DesktopReadOnlySource();
+    f.liveId.mockReturnValue("live-1");
+    await source.sessions(["allowed"]);
+    await expect(source.notificationSession("live-1", ["allowed"])).resolves.toEqual({
+      id: expect.any(String),
+      title: "Hello",
+      projectId: "allowed",
+    });
+    await expect(source.notificationSession("live-1", ["private"])).resolves.toBeNull();
+    f.projects = [{ id: "allowed", name: "Allowed", dir: "C:/projects/replaced" }];
+    await expect(source.notificationSession("live-1", ["allowed"])).resolves.toBeNull();
+  });
   it("shares the catalog scan between concurrent session and interaction reads only", async () => {
     const source = new DesktopReadOnlySource();
     const [sessions, interactions] = await Promise.all([

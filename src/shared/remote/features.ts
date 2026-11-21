@@ -13,6 +13,7 @@ export const RELAY_FEATURES = [
   "state-push-v1",
   "session-reauth-v1",
   "completed-history-v1",
+  "push-notifications-v1",
 ] as const;
 export type RelayFeature = (typeof RELAY_FEATURES)[number];
 export const RELAY_FEATURE_VALUE = RELAY_FEATURES.join(",");
@@ -49,9 +50,16 @@ export function relayFeatures(value: unknown): RelayFeature[] {
   });
 }
 
+export const REQUIRED_RELAY_FEATURES: readonly RelayFeature[] = [
+  "state-push-v1",
+  "session-reauth-v1",
+  "completed-history-v1",
+];
+
 export function requireRelayFeatures(value: unknown): void {
   const features = relayFeatures(value);
-  if (RELAY_FEATURES.some((feature) => !features.includes(feature))) fail("VERSION_MISMATCH");
+  if (REQUIRED_RELAY_FEATURES.some((feature) => !features.includes(feature)))
+    fail("VERSION_MISMATCH");
 }
 
 export type HistoryNotice =

@@ -37,6 +37,10 @@ const sessionDirectory = (cwd: string) => path.join(sessionRoot(), encodeCwdToSe
 /** Only sanitized public DTOs leave the desktop main process. */
 export class DesktopReadOnlySource implements ReadOnlySource {
   private refs = new Map<string, { file: string; projectId: string; root: string }>();
+  private readonly runtimeSessions = new Map<
+    string,
+    { id: string; title: string; projectId: string; root: string }
+  >();
   private readonly pendingSessions = new Map<string, Promise<RemoteSession[]>>();
   private readonly historyReader = new RemoteHistoryReader();
 
@@ -106,10 +110,19 @@ export class DesktopReadOnlySource implements ReadOnlySource {
         refs.set(id, { file: s.file, projectId: project.id, root: project.dir });
         const live = runtime.find((r) => r.sessionFile === s.file);
         const liveId = liveSessionIdForFile(s.file);
+        const title = sanitizeRemoteText(s.sessionName || s.firstUserMessage || "PiDesk").slice(
+          0,
+          256,
+        );
+        if (liveId) {
+          this.runtimeSessions.set(liveId, { id, title, projectId: project.id, root: project.dir });
+          if (this.runtimeSessions.size > 512)
+            this.runtimeSessions.delete(this.runtimeSessions.keys().next().value as string);
+        }
         result.push({
           id,
           projectId: project.id,
-          title: sanitizeRemoteText(s.sessionName || s.firstUserMessage || "PiDesk").slice(0, 256),
+          title,
           status:
             liveId && pendingUiRequests(liveId).length > 0
               ? "waiting"
@@ -129,6 +142,25 @@ export class DesktopReadOnlySource implements ReadOnlySource {
       if (!getSettings().projects.some((p) => p.id === ref.projectId && p.dir === ref.root))
         this.refs.delete(id);
     return result.filter((session) => this.refs.has(session.id));
+  }
+  async notificationSession(
+    runtimeSessionId: string,
+    projectIds: string[],
+  ): Promise<{ id: string; title: string; projectId: string } | null> {
+    let session = this.runtimeSessions.get(runtimeSessionId);
+    if (!session) {
+      await this.sessions(projectIds);
+      session = this.runtimeSessions.get(runtimeSessionId);
+    }
+    if (
+      !session ||
+      !projectIds.includes(session.projectId) ||
+      !getSettings().projects.some(
+        (project) => project.id === session.projectId && project.dir === session.root,
+      )
+    )
+      return null;
+    return { id: session.id, title: session.title, projectId: session.projectId };
   }
   private ref(session: RemoteSession): { file: string; projectId: string; root: string } {
     const ref = this.refs.get(session.id);
@@ -204,10 +236,17 @@ export class DesktopReadOnlySource implements ReadOnlySource {
     this.refs.set(id, { file, projectId, root: project.dir });
     const sessions = await listSessions(project.dir);
     const summary = sessions.find((item) => item.file === file);
+    const sessionTitle = sanitizeRemoteText(summary?.sessionName || title).slice(0, 256);
+    this.runtimeSessions.set(started.sessionId, {
+      id,
+      title: sessionTitle,
+      projectId,
+      root: project.dir,
+    });
     return {
       id,
       projectId,
-      title: sanitizeRemoteText(summary?.sessionName || title).slice(0, 256),
+      title: sessionTitle,
       status: "idle",
       updatedAt: summary?.updatedAt ?? Date.now(),
       preview: sanitizeRemoteText(summary?.firstUserMessage ?? "").slice(0, 256),

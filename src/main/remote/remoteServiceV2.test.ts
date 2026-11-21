@@ -1,11 +1,22 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { SessionPushMessage } from "../../shared/ipc";
 import { type Grant, RELAY_FEATURES } from "../../shared/remote";
 
 const fixture = vi.hoisted(() => ({
   owner: `account-v1-${"a".repeat(64)}`,
   desktop: "00000000-0000-4000-8000-000000000001",
   grant: null as Grant | null,
+  sessions: [] as {
+    id: string;
+    projectId: string;
+    title: string;
+    status: "running" | "waiting" | "idle";
+    updatedAt: number;
+    preview: string;
+  }[],
+  interactions: [] as { id: string; sessionId: string }[],
+  eventListeners: new Set<(event: SessionPushMessage) => void>(),
 }));
 
 vi.mock("./desktopAuth", () => ({
@@ -55,7 +66,10 @@ vi.mock("../settings/settings", () => ({
 }));
 vi.mock("../session/idleReclaim", () => ({ setRemoteViewing: () => () => {} }));
 vi.mock("../session/sessionEvents", () => ({
-  subscribeSessionEvents: () => () => {},
+  subscribeSessionEvents: (listener: (event: SessionPushMessage) => void) => {
+    fixture.eventListeners.add(listener);
+    return () => fixture.eventListeners.delete(listener);
+  },
   subscribeSessionUiEvents: () => () => {},
 }));
 vi.mock("./desktopSource", () => ({
@@ -63,6 +77,10 @@ vi.mock("./desktopSource", () => ({
     projects = () => [
       { id: "project", name: "Project", description: { "zh-CN": "", "en-US": "" } },
     ];
+    observe = () => true;
+    sessions = async () => fixture.sessions;
+    interactions = async () => fixture.interactions;
+    notificationSession = async () => ({ id: "session-id", title: "Task", projectId: "project" });
   },
 }));
 vi.mock("./relaySocket", () => ({
@@ -99,6 +117,9 @@ const accountToken = "header.payload.signature";
 beforeEach(() => {
   vi.stubGlobal("WebSocket", { OPEN: 1 });
   FakeSocket.instances = [];
+  fixture.sessions = [];
+  fixture.interactions = [];
+  fixture.eventListeners.clear();
   const now = Date.now();
   fixture.grant = {
     relayInstanceId: "relay",
@@ -107,7 +128,7 @@ beforeEach(() => {
     grantId: "grant",
     grantVersion: 1,
     state: "active",
-    scopes: ["projects.read", "sessions.read"],
+    scopes: ["projects.read", "sessions.read", "interactions.read"],
     projectIds: ["project"],
     createdAt: new Date(now).toISOString(),
     expiresAt: new Date(now + 300_000).toISOString(),
@@ -306,6 +327,83 @@ describe("desktop v2 service", () => {
       vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes("/devices/phone/revoke")),
     ).toBe(true);
     expect(service.snapshot().revocationPending).toBe(false);
+  });
+  it("sends finished and failed notifications for observed session completions", async () => {
+    const socket = await connected();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    fixture.sessions = [
+      {
+        id: "session-id",
+        projectId: "project",
+        title: "Task",
+        status: "idle",
+        updatedAt: Date.now(),
+        preview: "",
+      },
+    ];
+    const dispatchNotifications = () =>
+      (
+        service as unknown as { dispatchTaskNotifications: () => Promise<void> }
+      ).dispatchTaskNotifications();
+    await dispatchNotifications();
+    fixture.sessions[0].title = `Task\n${"😀".repeat(100)}`;
+    fixture.interactions = [{ id: "interaction-id", sessionId: "session-id" }];
+    await dispatchNotifications();
+    const interactionFrame = socket.send.mock.calls
+      .map(([raw]) => JSON.parse(raw))
+      .find(
+        (frame) => frame.type === "task_notification" && frame.notification.kind === "interaction",
+      );
+    const sentTitle = String(interactionFrame?.notification.title ?? "");
+    expect(sentTitle).toHaveLength(127);
+    expect(
+      Array.from(sentTitle).some((character) => {
+        const code = character.charCodeAt(0);
+        return code <= 0x1f || code === 0x7f;
+      }),
+    ).toBe(false);
+    fixture.interactions = [];
+    await dispatchNotifications();
+    const publish = (kind: "start" | "finished" | "failed") => {
+      const payload =
+        kind === "start"
+          ? { type: "agent_start" as const }
+          : kind === "failed"
+            ? { type: "agent_settled" as const, aborted: true }
+            : { type: "agent_settled" as const };
+      for (const listener of fixture.eventListeners)
+        listener({ sessionId: "runtime-session-id", type: "event", payload });
+    };
+    fixture.sessions[0].status = "running";
+    publish("start");
+    await dispatchNotifications();
+    fixture.sessions[0].status = "idle";
+    publish("finished");
+    await dispatchNotifications();
+    await vi.waitFor(() =>
+      expect(
+        socket.send.mock.calls.some(
+          ([raw]) =>
+            JSON.parse(raw).type === "task_notification" &&
+            JSON.parse(raw).notification.kind === "finished",
+        ),
+      ).toBe(true),
+    );
+    fixture.sessions[0].status = "running";
+    publish("start");
+    await dispatchNotifications();
+    fixture.sessions[0].status = "idle";
+    publish("failed");
+    await dispatchNotifications();
+    await vi.waitFor(() =>
+      expect(
+        socket.send.mock.calls.some(
+          ([raw]) =>
+            JSON.parse(raw).type === "task_notification" &&
+            JSON.parse(raw).notification.kind === "failed",
+        ),
+      ).toBe(true),
+    );
   });
   it("closes on another account's context before exposing project data", async () => {
     const socket = await connected();

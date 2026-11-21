@@ -33,7 +33,7 @@ export function controlPath(path: string, desktop?: string): string {
   }
   if (
     !desktop ||
-    !/^(?:\/(?:state|reconcile|activation-ack|pairings)|\/auth\/(?:desktop-access|refresh)|\/pairings\/[A-Za-z0-9_-]{1,128}\/claim|\/claims\/[A-Za-z0-9_-]{1,128}(?:\/(?:approve|reject|cancel|redeem))?|\/devices\/[A-Za-z0-9_-]{1,128}\/(?:activate|revoke))$/.test(
+    !/^(?:\/(?:state|reconcile|activation-ack|pairings)|\/auth\/(?:desktop-access|refresh)|\/pairings\/[A-Za-z0-9_-]{1,128}\/claim|\/claims\/[A-Za-z0-9_-]{1,128}(?:\/(?:approve|reject|cancel|redeem))?|\/devices\/[A-Za-z0-9_-]{1,128}\/(?:activate|revoke)|\/devices\/self\/push-token)$/.test(
       path,
     )
   )

@@ -47,6 +47,9 @@ describe("v2 client boundary", () => {
   });
   it("only accepts v2 paths and valid desktop identities", () => {
     expect(controlPath("/reconcile", desktop)).toBe(`/v2/desktops/${desktop}/reconcile`);
+    expect(controlPath("/devices/self/push-token", desktop)).toBe(
+      `/v2/desktops/${desktop}/devices/self/push-token`,
+    );
     for (const path of [
       "/v1/desktops/enroll",
       "/v1/unknown",

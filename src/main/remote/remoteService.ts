@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { SessionPushMessage, SessionUiPush } from "../../shared/ipc";
 import {
   ConnectionRenewal,
   type ControlClient,
@@ -13,6 +14,7 @@ import {
   id,
   LIMITS,
   origin,
+  type PushNotification,
   parseMeta,
   parseRelaySocketFrame,
   RELAY_TIMING,
@@ -67,6 +69,26 @@ import { RemoteOperationLedger } from "./operationLedger";
 import { ReadOnlyBridge } from "./readOnlyBridge";
 import { relaySocket } from "./relaySocket";
 
+interface NotificationSnapshot {
+  sessions: Map<string, { status: "running" | "waiting" | "idle"; title: string }>;
+  interactions: Map<string, string>;
+}
+
+function notificationTitle(value: string): string {
+  const cleaned = Array.from(value, (character) => {
+    const code = character.charCodeAt(0);
+    return code <= 0x1f || code === 0x7f ? " " : character;
+  })
+    .join("")
+    .trim();
+  let result = "";
+  for (const character of cleaned) {
+    if (result.length + character.length > 128) break;
+    result += character;
+  }
+  return result || "PiDesk";
+}
+
 function remoteError(cause: unknown, fallback = "CONTROL_FAILED"): string {
   if (cause instanceof ControlError) return cause.code;
   const code = desktopAuthError(cause, fallback);
@@ -114,6 +136,7 @@ export class RemoteService {
   private startup = true;
   private error: string | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private eventTimer: ReturnType<typeof setTimeout> | null = null;
   private ticking = false;
   private connecting = false;
   private reconnectAttempts = 0;
@@ -132,21 +155,209 @@ export class RemoteService {
   );
   private renewal: ConnectionRenewal | null = null;
   private stateRevision = -1;
-  private eventTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly notificationOutcomes = new Map<
+    string,
+    {
+      kind: "finished" | "failed";
+      session: Promise<{ id: string; title: string; projectId: string } | null>;
+    }
+  >();
+  private notificationSnapshot: NotificationSnapshot | null = null;
+  private pushNotificationsSupported = false;
   private readonly releaseViewing = setRemoteViewing(
     (sessionId) =>
       this.ready && this.source.isViewingLive(sessionId, (id) => this.bridge.isViewing(id)),
   );
   private readonly unsubscribe = subscribeSessionEvents((event) => {
+    this.observeNotificationOutcome(event);
     if (this.source.observe(event)) this.scheduleEventTick();
   });
-  private readonly unsubscribeUi = subscribeSessionUiEvents(() => this.scheduleEventTick());
+  private readonly unsubscribeUi = subscribeSessionUiEvents((event) => {
+    this.observeUiNotification(event);
+    this.scheduleEventTick();
+  });
+  private observeNotificationOutcome(event: SessionPushMessage): void {
+    const updates =
+      event.type === "event" ? [event.payload] : event.type === "eventBatch" ? event.payload : [];
+    const kind =
+      event.type === "exit" && event.payload !== 0
+        ? "failed"
+        : updates.some(
+              (item) =>
+                (item.type === "agent_settled" && item.aborted === true) ||
+                (item.type === "auto_retry_end" && item.success === false),
+            )
+          ? "failed"
+          : updates.some((item) => item.type === "agent_settled")
+            ? "finished"
+            : null;
+    if (!kind) return;
+    const grant = loadRemoteGrant();
+    if (grant?.state !== "active") return;
+    const projectIds =
+      grant.projectIds === "all"
+        ? this.source.projects().map((project) => project.id)
+        : grant.projectIds;
+    const previous = this.notificationOutcomes.get(event.sessionId);
+    if (previous?.kind === "failed" && kind === "finished") return;
+    const session = this.source
+      .notificationSession(event.sessionId, projectIds)
+      .then((value) =>
+        value &&
+        getSettings().projects.some(
+          (project) => project.id === value.projectId && projectIds.includes(project.id),
+        )
+          ? value
+          : null,
+      );
+    this.notificationOutcomes.set(event.sessionId, { kind, session });
+    if (this.notificationOutcomes.size > 100)
+      this.notificationOutcomes.delete(this.notificationOutcomes.keys().next().value as string);
+  }
+  private observeUiNotification(_event: SessionUiPush): void {
+    // The authoritative pending interaction list is read together with the next desktop tick.
+  }
   private scheduleEventTick(): void {
     if (!this.ready || this.eventTimer) return;
     this.eventTimer = setTimeout(() => {
       this.eventTimer = null;
-      if (this.ready) void this.bridge.tick((context, frame) => this.deliver(context, frame));
+      if (this.ready)
+        void this.bridge
+          .tick((context, frame) => this.deliver(context, frame))
+          .then(
+            () => this.dispatchTaskNotifications(),
+            () => this.dispatchTaskNotifications(),
+          );
     }, 250);
+  }
+  private async dispatchTaskNotifications(): Promise<void> {
+    const grant = loadRemoteGrant();
+    const socket = this.socket;
+    const generation = this.generation;
+    if (
+      !this.ready ||
+      !this.pushNotificationsSupported ||
+      !socket ||
+      socket.readyState !== WebSocket.OPEN ||
+      grant?.state !== "active"
+    )
+      return;
+    try {
+      const projectIds =
+        grant.projectIds === "all"
+          ? this.source.projects().map((project) => project.id)
+          : grant.projectIds;
+      const sessions = await this.source.sessions(projectIds);
+      const interactions = grant.scopes.includes("interactions.read")
+        ? await this.source.interactions(projectIds)
+        : [];
+      const next: NotificationSnapshot = {
+        sessions: new Map(
+          sessions.map((session) => [session.id, { status: session.status, title: session.title }]),
+        ),
+        interactions: new Map(
+          interactions.map((interaction) => [interaction.id, interaction.sessionId]),
+        ),
+      };
+      const outcomes = await Promise.all(
+        [...this.notificationOutcomes].map(async ([runtimeSessionId, outcome]) => {
+          let session = await outcome.session.catch(() => null);
+          if (!session)
+            session = await this.source
+              .notificationSession(runtimeSessionId, projectIds)
+              .catch(() => null);
+          return { runtimeSessionId, outcome: session, kind: outcome.kind };
+        }),
+      );
+      if (
+        !this.ready ||
+        this.generation !== generation ||
+        this.socket !== socket ||
+        loadRemoteGrant()?.state !== "active"
+      )
+        return;
+      const previous = this.notificationSnapshot;
+      this.notificationSnapshot = next;
+      const outcomesBySession = new Map<string, "finished" | "failed">();
+      for (const item of outcomes) {
+        if (item.outcome) outcomesBySession.set(item.outcome.id, item.kind);
+      }
+      for (const interaction of interactions) {
+        if (previous?.interactions.has(interaction.id)) continue;
+        const session = next.sessions.get(interaction.sessionId);
+        if (session)
+          this.sendTaskNotification(
+            {
+              eventId: randomUUID(),
+              desktopId: grant.desktopId,
+              sessionId: interaction.sessionId,
+              title: notificationTitle(session.title),
+              kind: "interaction",
+            },
+            grant,
+            generation,
+          );
+      }
+      for (const [sessionId, session] of next.sessions) {
+        const old = previous?.sessions.get(sessionId);
+        const completed = !!old && old.status !== "idle" && session.status === "idle";
+        const pendingOutcome = outcomesBySession.get(sessionId);
+        const settledWhileOffline =
+          !previous && session.status === "idle" && pendingOutcome !== undefined;
+        if (
+          (!completed && !settledWhileOffline && pendingOutcome === undefined) ||
+          [...next.interactions.values()].includes(sessionId)
+        )
+          continue;
+        const kind = pendingOutcome ?? "finished";
+        for (const item of outcomes)
+          if (item.outcome?.id === sessionId)
+            this.notificationOutcomes.delete(item.runtimeSessionId);
+        this.sendTaskNotification(
+          {
+            eventId: randomUUID(),
+            desktopId: grant.desktopId,
+            sessionId,
+            title: notificationTitle(session.title),
+            kind,
+          },
+          grant,
+          generation,
+        );
+      }
+    } catch {
+      // Task notifications are best-effort; the desktop remains authoritative.
+    }
+  }
+  private sendTaskNotification(
+    notification: PushNotification,
+    expectedGrant: NonNullable<ReturnType<typeof loadRemoteGrant>>,
+    generation: number,
+  ): void {
+    const socket = this.socket;
+    const currentGrant = loadRemoteGrant();
+    if (
+      !this.ready ||
+      this.generation !== generation ||
+      !this.pushNotificationsSupported ||
+      !socket ||
+      socket.readyState !== WebSocket.OPEN ||
+      currentGrant?.state !== "active" ||
+      currentGrant.desktopId !== expectedGrant.desktopId ||
+      currentGrant.grantId !== expectedGrant.grantId ||
+      currentGrant.grantVersion !== expectedGrant.grantVersion
+    )
+      return;
+    try {
+      socket.send(
+        encodeClientSocketFrame(
+          { controlVersion: 2, type: "task_notification", notification },
+          { role: "desktop", authenticated: true },
+        ),
+      );
+    } catch {
+      // Notification delivery is deliberately best-effort.
+    }
   }
   snapshot(): RemoteSnapshot {
     this.pairing?.expireInvitation();
@@ -617,6 +828,8 @@ export class RemoteService {
               )
                 fail("AUTH_REQUIRED");
               requireRelayFeatures(r.features);
+              this.pushNotificationsSupported =
+                r.features?.includes("push-notifications-v1") === true;
               authenticated = true;
               const renewal = new ConnectionRenewal(
                 {
@@ -667,6 +880,7 @@ export class RemoteService {
               this.reconnectAttempts = 0;
               this.error = null;
               this.schedule();
+              this.scheduleEventTick();
               return;
             }
             if (!this.ready) return;
@@ -869,6 +1083,9 @@ export class RemoteService {
     this.stopped = true;
     this.generation++;
     this.ready = false;
+    this.pushNotificationsSupported = false;
+    this.notificationSnapshot = null;
+    this.notificationOutcomes.clear();
     this.starting = false;
     this.connecting = false;
     this.ticking = false;

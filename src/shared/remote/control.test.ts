@@ -6,6 +6,7 @@ import {
   parseClientSocketFrame,
   parseRelaySocketFrame,
 } from "./control";
+import { requireRelayFeatures } from "./features";
 
 const accountId = `account-v1-${"a".repeat(64)}`;
 const principal = {
@@ -46,6 +47,15 @@ const client = (
 ) => parseClientSocketFrame(JSON.stringify(frame), { role, authenticated });
 
 describe("shared v2 WebSocket control protocol", () => {
+  it("keeps push notifications optional for older compatible relays", () => {
+    const required = ["state-push-v1", "session-reauth-v1", "completed-history-v1"];
+    expect(() => requireRelayFeatures(required)).not.toThrow();
+    expect(() => requireRelayFeatures([...required, "push-notifications-v1"])).not.toThrow();
+    expect(() =>
+      requireRelayFeatures(["state-push-v1", "session-reauth-v1", "push-notifications-v1"]),
+    ).toThrow("VERSION_MISMATCH");
+  });
+
   it("parses strict pre-authentication and role-specific client frames", () => {
     expect(
       client(
@@ -73,6 +83,26 @@ describe("shared v2 WebSocket control protocol", () => {
     expect(() =>
       client({ controlVersion: 2, type: "deliver", context, frame: response }, "mobile"),
     ).toThrow("FORBIDDEN");
+  });
+
+  it("accepts task notifications only from an authenticated desktop", () => {
+    const notification = {
+      eventId: "event-1",
+      desktopId: "00000000-0000-4000-8000-000000000001",
+      sessionId: "session-1",
+      title: "Build task",
+      kind: "finished",
+    };
+    const frame = { controlVersion: 2, type: "task_notification", notification };
+    expect(client(frame, "desktop")).toMatchObject({ type: "task_notification", notification });
+    expect(() => client(frame, "mobile")).toThrow("FORBIDDEN");
+    expect(() =>
+      client(
+        { ...frame, notification: { ...notification, title: " \n ", kind: "unknown" } },
+        "desktop",
+      ),
+    ).toThrow("INVALID_FRAME");
+    expect(() => client(frame, "desktop", false)).toThrow();
   });
 
   it("parses relay handshake, pairing/status events and routed business frames", () => {
