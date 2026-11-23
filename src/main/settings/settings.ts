@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import { normalizeAccentColor } from "../../shared/accentColor";
+import { normalizeAppIconId } from "../../shared/appIcon";
 import { normalizeFontMonoPreset, normalizeFontUiPreset } from "../../shared/fontPresets";
 import { normalizeLocalePreference, resolveLocale, setI18nLocale } from "../../shared/i18n";
 import { normalizeInputBuddy } from "../../shared/inputBuddy";
@@ -154,6 +155,7 @@ export function getSettings(): PideskSettings {
     questionRailStyle: normalizeRailStyle(loaded.questionRailStyle),
     // 手改设置文件时把非法主题色回退默认，避免渲染层拿着脏值写 CSS 变量
     accentColor: normalizeAccentColor(loaded.accentColor),
+    appIcon: normalizeAppIconId(loaded.appIcon),
     // 壁纸路径 / 遮罩强度同样归一：不支持的文件类型与非法强度都回退默认（docs/design/111）
     wallpaperPath: normalizeWallpaperPath(loaded.wallpaperPath),
     wallpaperDim: clampWallpaperDim(loaded.wallpaperDim),
@@ -194,6 +196,7 @@ export function updateSettings(patch: Partial<PideskSettings>): PideskSettings {
   next.thinkingAnimation = normalizeThinkingAnimation(next.thinkingAnimation);
   next.inputEffect = normalizeInputEffect(next.inputEffect);
   next.accentColor = normalizeAccentColor(next.accentColor);
+  next.appIcon = normalizeAppIconId(next.appIcon);
   next.wallpaperPath = normalizeWallpaperPath(next.wallpaperPath);
   next.wallpaperDim = clampWallpaperDim(next.wallpaperDim);
   next.navWidth = clampNavWidth(next.navWidth);

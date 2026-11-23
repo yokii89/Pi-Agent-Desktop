@@ -8,10 +8,10 @@ directories:
   output: release
 files:
   - dist/**/*
-  # 需与 createMainWindow.ts 的 resolveAppIcon() 查找路径一致；
-  # 窗口/任务栏/安装包图标的实际来源是上面的 icon 字段（由 electron-builder 编译进 EXE 资源）。
+  # electron-builder 使用经典 build/icon.ico 嵌入安装 EXE；运行时可选变体由 build/app-icons 提供。
   - build/icon.ico
   - build/icon.png
+  - "build/app-icons/{classic,blue,green,pink,yellow}.{ico,png}"
   # 打包进 asar 的 node_modules 仅限主进程运行时依赖（package.json "dependencies"，当前仅
   # electron-updater / node-pty 及其传递依赖）；渲染层依赖已被 vite 打进 dist，
   # 一律放 devDependencies，electron-builder 默认不打包它们。
@@ -23,11 +23,13 @@ files:
   - "!**/*.pdb"
   - "!**/node_modules/node-pty/prebuilds/{darwin-*,win32-arm64}/**"
   - "!**/node_modules/node-pty/{build,deps,third_party,src,scripts}/**"
-# node-pty 的 prebuilds 含 .node / winpty.dll / winpty-agent.exe / conpty/OpenConsole.exe 等 PE 文件：
-# Windows 无法从 asar 归档内加载原生模块、也无法拉起归档内的 agent 进程，必须解包成真实文件。
-# 仅解包 prebuilds（Electron 会把归档内已解包路径的 dlopen / 子进程启动透明重定向到 app.asar.unpacked）；
-# node-pty 的 JS 仍留在 asar。整包解包（旧配置）会把 ~55MB 的 pdb 与非目标平台文件也摊到磁盘上。
+# 运行时 Windows 任务栏与系统通知图标需要真实磁盘路径：解包内置变体 ICO / PNG；其余应用资源仍留在 asar。
+# node-pty 的 prebuilds 含 PE 文件：Windows 无法从 asar 加载原生模块、也无法拉起归档内 agent 进程，必须解包。
+# Electron 会把归档内已解包路径的 dlopen / 子进程启动透明重定向到 app.asar.unpacked；
+# node-pty 的 JS 仍留在 asar。整包解包会把 ~55MB 的 pdb 与非目标平台文件也摊到磁盘上。
 asarUnpack:
+  - "build/app-icons/*.ico"
+  - "build/app-icons/*.png"
   - "**/node_modules/node-pty/prebuilds/**"
 # node-pty 1.1.0 自带的 prebuilds 是 N-API（跨 Node / Electron ABI 通用，打包前由 scripts/package.mjs 预检在位），
 # 不需要 electron-builder 再按 Electron ABI 重编 node-gyp——那一步在 pnpm 布局下既慢又容易失败。

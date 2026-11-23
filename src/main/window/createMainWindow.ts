@@ -1,6 +1,6 @@
 import path from "node:path";
 import { app, BrowserWindow } from "electron";
-import { resolveAppIconPath, resolveTaskbarIconPath } from "../appIcon";
+import { resolveAppIconPath, resolveTaskbarIconPath, syncDesktopAppIcon } from "../appIcon";
 import { attachClosePrompt } from "./closePrompt";
 import { attachWindowZoom } from "./windowZoom";
 
@@ -69,6 +69,7 @@ export function createMainWindow(): BrowserWindow {
       appId: APP_USER_MODEL_ID,
       ...(taskbarIconPath ? { appIconPath: taskbarIconPath } : {}),
     });
+    syncDesktopAppIcon();
   }
 
   win.once("ready-to-show", () => win.show());

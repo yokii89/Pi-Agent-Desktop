@@ -17,6 +17,7 @@ function fakeSettings(): PideskSettings {
     terminalTabCompletion: "cycle",
     theme: "dark",
     accentColor: null,
+    appIcon: "classic",
     wallpaperPath: null,
     wallpaperDim: 70,
     uiZoom: 1,
@@ -75,6 +76,7 @@ describe("settingsSync whitelist", () => {
     // 壁纸路径 / 遮罩都是本机素材的附属状态，同样不进 Gist
     expect(picked).not.toHaveProperty("wallpaperPath");
     expect(picked).not.toHaveProperty("wallpaperDim");
+    expect(picked).not.toHaveProperty("appIcon");
     expect(picked.splashTextZh).toBe("求知 · 探索");
     expect(picked.theme).toBe("dark");
     // 侧栏宽度是用户偏好（docs/design/137）：跨端同步，不是本机机器状态

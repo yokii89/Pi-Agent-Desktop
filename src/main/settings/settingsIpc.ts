@@ -1,5 +1,6 @@
 import { ipcMain } from "electron";
 import { normalizeAccentColor } from "../../shared/accentColor";
+import { isAppIconId } from "../../shared/appIcon";
 import { isFontMonoPreset, isFontUiPreset } from "../../shared/fontPresets";
 import { isLocalePreference } from "../../shared/i18n";
 import { isInputBuddyKind } from "../../shared/inputBuddy";
@@ -173,6 +174,9 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         // system（跟随系统）与 null（恢复默认）都是合法值；非法 hex 归一为 null，
         // 否则渲染层回写时永远清不掉旧值
         clean.accentColor = normalizeAccentColor(value);
+        break;
+      case "appIcon":
+        if (isAppIconId(value)) clean.appIcon = value;
         break;
       case "wallpaperPath":
         // null（移除壁纸）是合法值；不支持的扩展名归一为 null，避免写进打不开的路径

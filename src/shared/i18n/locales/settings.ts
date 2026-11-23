@@ -574,9 +574,52 @@ export const settingsMessages = defineMessages({
   },
 
   "settings.personalization.hint": {
-    "zh-CN": "调整界面字体、思考动画、背景壁纸与会话区阅读密度；改动立即生效并写入本机设置。",
+    "zh-CN":
+      "调整界面字体、思考动画、背景壁纸与会话区阅读密度；图标更换在下次启动后生效，其余改动立即生效并保存到本机。",
     "en-US":
-      "Tune UI fonts, the thinking animation, background wallpaper, and reading density in the session stream. Changes apply immediately and are saved.",
+      "Tune UI fonts, the thinking animation, wallpaper and session reading density. Icon changes take effect on the next launch; other changes apply immediately and are saved on this device.",
+  },
+  "settings.personalization.group.appIcon": {
+    "zh-CN": "应用图标",
+    "en-US": "App icon",
+  },
+  "settings.personalization.appIcon": {
+    "zh-CN": "PiDesk 图标",
+    "en-US": "PiDesk icon",
+  },
+  "settings.personalization.appIcon.description": {
+    "zh-CN":
+      "选择图标，保存后下次启动应用到主窗口、任务栏与托盘；安装版同时更新已有的 PiDesk 桌面快捷方式（需有写入权限）。",
+    "en-US":
+      "Choose an icon for the main window, taskbar and tray on next launch. Installed builds also update existing PiDesk desktop shortcuts when writable.",
+  },
+  "settings.personalization.appIcon.saved": {
+    "zh-CN": "图标已保存，下次启动 PiDesk 后生效。",
+    "en-US": "Icon saved. It will apply the next time PiDesk starts.",
+  },
+  "settings.personalization.appIcon.saveFailed": {
+    "zh-CN": "图标设置保存失败，请重试。",
+    "en-US": "Couldn't save the icon choice. Please try again.",
+  },
+  "settings.personalization.appIcon.option.classic": {
+    "zh-CN": "经典粉",
+    "en-US": "Classic",
+  },
+  "settings.personalization.appIcon.option.blue": {
+    "zh-CN": "湛蓝气泡",
+    "en-US": "Bubble blue",
+  },
+  "settings.personalization.appIcon.option.green": {
+    "zh-CN": "薄荷花园",
+    "en-US": "Mint garden",
+  },
+  "settings.personalization.appIcon.option.pink": {
+    "zh-CN": "霓虹藤蔓",
+    "en-US": "Neon vine",
+  },
+  "settings.personalization.appIcon.option.yellow": {
+    "zh-CN": "柠檬涂鸦",
+    "en-US": "Lemon doodle",
   },
   "settings.personalization.group.wallpaper": {
     "zh-CN": "壁纸",

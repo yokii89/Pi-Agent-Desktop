@@ -60,6 +60,15 @@ function preflight() {
   if (!existsSync(path.join(projectRoot, "build", "icon.png"))) {
     fail("缺少 build/icon.png，请先运行 pnpm run gen:app-icon（见 build/README.md）");
   }
+  for (const id of ["classic", "blue", "green", "pink", "yellow"]) {
+    for (const extension of ["ico", "png"]) {
+      if (!existsSync(path.join(projectRoot, "build", "app-icons", `${id}.${extension}`))) {
+        fail(
+          `缺少 build/app-icons/${id}.${extension}，请先运行 pnpm run gen:app-icon（见 build/README.md）`,
+        );
+      }
+    }
+  }
   // node-pty 的 win32 prebuilds 是 N-API（跨 Node/Electron ABI 通用），electron-builder.yml
   // 因此关掉了重建步骤；这里兜底确认它们真的在位，缺失时让 pnpm install 重跑而不是打出一个起不来的包。
   const prebuildsDir = path.join(projectRoot, "node_modules", "node-pty", "prebuilds", "win32-x64");

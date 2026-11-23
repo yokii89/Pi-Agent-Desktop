@@ -7,6 +7,7 @@ import { useT } from "../../hooks/useT";
 import { useUiStore } from "../../stores/uiStore";
 import { Segmented } from "../ui/Segmented";
 import { Select } from "../ui/Select";
+import { AppIconSettings } from "./AppIconSettings";
 import { BuddySwatch } from "./BuddySwatch";
 import { InputEffectSettings } from "./InputEffectSettings";
 import { RailStyleSwatch } from "./RailStyleSwatch";
@@ -47,6 +48,15 @@ export function PersonalizationPanel() {
       <p className={styles.panelHint}>{t("settings.personalization.hint")}</p>
 
       <WallpaperSettings />
+
+      <SettingsSection title={t("settings.personalization.group.appIcon")}>
+        <SettingRow
+          stack
+          label={t("settings.personalization.appIcon")}
+          description={t("settings.personalization.appIcon.description")}
+          control={<AppIconSettings />}
+        />
+      </SettingsSection>
 
       <SettingsSection title={t("settings.personalization.group.font")}>
         <SettingRow

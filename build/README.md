@@ -2,7 +2,7 @@
 
 ## icon.ico / icon.png
 
-应用图标的**栅格产物**，源文件是 PNG 母版：`src/renderer/assets/app-icon/app-icon.png`。
+应用安装包使用的经典图标栅格产物，源文件是 PNG 母版：`src/renderer/assets/app-icon/app-icon.png`。其他可选图标见下方「内置应用图标变体」。
 
 | 文件 | 用途 |
 |------|------|
@@ -12,6 +12,15 @@
 **为什么必须有 ICO**：Windows 任务栏、Alt+Tab、资源管理器都是原生图层，取图时按场景向系统要
 不同尺寸（16/32/48…）。只提供单尺寸 PNG 时，小尺寸档会被降采样得模糊，或直接判为不合格而
 回退到宿主进程（开发态即 `electron.exe`）的默认图标 —— **表现为任务栏始终是 Electron 原子图标**。
+
+## 内置应用图标变体
+
+`src/renderer/assets/app-icon/` 存放五款 1024×1024 PNG 图标母版。设置 → 个性化提供经典粉、湛蓝气泡、薄荷花园、霓虹藤蔓和柠檬涂鸦五款图标。
+
+- `build/app-icons/<id>.png`：各款 1024×1024 PNG，用于 Windows 系统通知图标。
+- `build/app-icons/<id>.ico`：各款 16/24/32/48/64/128/256 多尺寸 Windows ICO，用于窗口、任务栏和托盘。
+- 修改任一 PNG 母版后运行 `pnpm run gen:app-icon` 更新以上资源；发布打包会收录这些图标，并将 PNG / ICO 解包到真实文件路径供 Windows 系统调用。
+- 用户偏好保存在本机 `settings.json`，不跟随账号同步。更换图标需要重启应用；安装版启动时同时更新用户桌面及公共桌面上已有、可写且指向本次安装的 `PiDesk.lnk`，保留启动参数等属性。开发版不修改桌面快捷方式。
 
 ## installerSidebar.bmp / installerHeader.bmp / uninstallerSidebar.bmp
 
@@ -45,8 +54,7 @@ pnpm run gen:app-icon
 pnpm run gen:installer-art
 ```
 
-- `scripts/generate-app-icon.mjs` 把 PNG 母版拷贝为 `build/icon.png`，
-  再用 Electron `nativeImage` 缩放并打包成多尺寸 ICO。
+- `scripts/generate-app-icon.mjs` 使用 Electron `nativeImage` 缩放各款 PNG 母版，并生成 `build/app-icons/` 下的 1024×1024 PNG 与多尺寸 ICO。
 - `scripts/generate-installer-art.ps1` 用 GDI+（零新增依赖）按脚本内登记的色板 / 文案
   重画三张 BMP；改美术先改脚本常量再运行。
 

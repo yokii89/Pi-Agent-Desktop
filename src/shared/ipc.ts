@@ -4,6 +4,7 @@
  */
 
 import type { AccentColorPreference } from "./accentColor";
+import type { AppIconId } from "./appIcon";
 import type { SessionStartReason } from "./contribution";
 import type { MediaKind } from "./fileKinds";
 import type { FontMonoPreset, FontUiPreset } from "./fontPresets";
@@ -158,6 +159,8 @@ export interface PideskSettings {
   theme: ThemeId;
   /** 主题色：null = 应用默认，system = 跟随本机系统强调色，#RRGGBB = 固定颜色。 */
   accentColor: AccentColorPreference;
+  /** 启动时应用的内置窗口与任务栏图标；设备本地偏好。 */
+  appIcon: AppIconId;
   /**
    * 本地背景壁纸的绝对路径；null = 使用主题纯色背景（docs/design/111）。
    * 图片 / 视频由扩展名判定，素材只留在本机、不进设置同步。

@@ -1,55 +1,116 @@
 import fs from "node:fs";
 import path from "node:path";
-import { app, nativeImage } from "electron";
+import { app, nativeImage, shell } from "electron";
+import { type AppIconId, DEFAULT_APP_ICON_ID, normalizeAppIconId } from "../shared/appIcon";
+import { getSettings } from "./settings/settings";
+import { updateAppIconShortcuts } from "./window/appIconShortcut";
 
-/**
- * 应用图标资产解析（`build/icon.ico` / `build/icon.png`）。
- *
- * 打包态两个文件由 electron-builder `files` 收录；开发态落在仓库 `build/`。
- * 窗口/任务栏/托盘优先多尺寸 ICO；系统 toast 图片层优先 PNG（WinRT toast 对 PNG 更稳）。
- * 两个候选都缺失时返回 undefined，调用方回退到 EXE 内置图标或不展示。
- */
-function findBuildIcon(order: readonly ("icon.ico" | "icon.png")[]): string | undefined {
-  const buildDir = path.join(app.getAppPath(), "build");
-  for (const name of order) {
-    const candidate = path.join(buildDir, name);
-    try {
-      if (fs.statSync(candidate).isFile()) return candidate;
-    } catch {
-      // 试下一个候选
-    }
+let activeIconId: AppIconId | null = null;
+
+/** 进程内图标在启动时固定；设置页选择的新图标在下次启动读取。 */
+function getActiveIconId(): AppIconId {
+  if (activeIconId === null) {
+    activeIconId = normalizeAppIconId(getSettings().appIcon);
   }
-  return undefined;
+  return activeIconId;
 }
 
-/** 窗口 / 任务栏图标路径：优先 ICO（原生多尺寸）。 */
+function findFile(file: string): string | undefined {
+  const candidate = path.join(app.getAppPath(), "build", "app-icons", file);
+  try {
+    return fs.statSync(candidate).isFile() ? candidate : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function findUnpackedFile(file: string): string | undefined {
+  const candidate = path.join(
+    process.resourcesPath,
+    "app.asar.unpacked",
+    "build",
+    "app-icons",
+    file,
+  );
+  try {
+    return fs.statSync(candidate).isFile() ? candidate : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 应用级图标资源：每个内置 PNG 母版预先生成多尺寸 ICO。 */
 export function resolveAppIconPath(): string | undefined {
-  return findBuildIcon(["icon.ico", "icon.png"]);
+  return (
+    findFile(`${getActiveIconId()}.ico`) ??
+    findFile(`${DEFAULT_APP_ICON_ID}.ico`) ??
+    path.join(app.getAppPath(), "build", "icon.ico")
+  );
 }
 
 /**
- * Windows 任务栏使用的原生图标路径。
- *
- * 打包后的 icon.ico 位于 app.asar，窗口能通过 Electron 读取，但 Windows 原生
- * AppUserModel 接口需要真实文件路径；最终 EXE 已由 electron-builder 嵌入同一图标。
+ * Windows 任务栏需要真实磁盘路径；打包资源从 app.asar.unpacked 读取，
+ * 开发态则使用仓库 build 目录。若定制资源缺失，回退到程序 EXE 的嵌入图标。
  */
 export function resolveTaskbarIconPath(): string | undefined {
-  if (process.platform === "win32" && app.isPackaged) return process.execPath;
+  if (process.platform !== "win32") return resolveAppIconPath();
+  if (process.platform === "win32" && app.isPackaged) {
+    return (
+      findUnpackedFile(`${getActiveIconId()}.ico`) ??
+      findUnpackedFile(`${DEFAULT_APP_ICON_ID}.ico`) ??
+      process.execPath
+    );
+  }
   return resolveAppIconPath();
 }
 
-/**
- * 系统 toast 图标路径：优先 PNG。
- * Electron 会把它写成 toast 的 `appLogoOverride`，不传则 Windows 只回 AUMID、无应用图。
- */
+/** 系统 toast 图标：优先当前内置 PNG；Electron 会按需缩放。 */
 export function resolveNotificationIconPath(): string | undefined {
-  return findBuildIcon(["icon.png", "icon.ico"]);
+  if (process.platform === "win32" && app.isPackaged) {
+    return (
+      findUnpackedFile(`${getActiveIconId()}.png`) ??
+      findUnpackedFile(`${DEFAULT_APP_ICON_ID}.png`) ??
+      findFile(`${DEFAULT_APP_ICON_ID}.png`)
+    );
+  }
+  return (
+    findFile(`${getActiveIconId()}.png`) ??
+    findFile(`${DEFAULT_APP_ICON_ID}.png`) ??
+    path.join(app.getAppPath(), "build", "icon.png")
+  );
 }
 
-/** 托盘图标：与窗口同源，加载失败返回 undefined（调用方选择不建托盘）。 */
+/** 托盘图标：与窗口、任务栏使用同一内置变体。 */
 export function resolveAppIconImage(): Electron.NativeImage | undefined {
   const file = resolveAppIconPath();
   if (!file) return undefined;
   const image = nativeImage.createFromPath(file);
   return image.isEmpty() ? undefined : image;
+}
+
+/** 安装版启动时对齐已有桌面快捷方式；开发进程不修改安装版入口。 */
+export function syncDesktopAppIcon(): void {
+  if (process.platform !== "win32" || !app.isPackaged) return;
+  try {
+    const iconPath = resolveTaskbarIconPath();
+    if (!iconPath) return;
+    const shortcuts = [path.join(app.getPath("desktop"), "PiDesk.lnk")];
+    const publicDirectory = process.env.PUBLIC;
+    if (publicDirectory && path.isAbsolute(publicDirectory)) {
+      shortcuts.push(path.join(publicDirectory, "Desktop", "PiDesk.lnk"));
+    }
+    const failed = updateAppIconShortcuts(shortcuts, process.execPath, iconPath, {
+      exists: fs.existsSync,
+      read: (file) => shell.readShortcutLink(file),
+      update: (file, icon) =>
+        shell.writeShortcutLink(file, "update", {
+          target: process.execPath,
+          icon,
+          iconIndex: 0,
+        }),
+    });
+    if (failed.length > 0) console.warn("[app-icon] 桌面快捷方式图标未更新", failed);
+  } catch (error) {
+    console.warn("[app-icon] 桌面快捷方式图标未更新", error);
+  }
 }

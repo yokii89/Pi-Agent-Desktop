@@ -109,6 +109,8 @@ const NAV_GROUPS: NavGroup[] = [
           "样式",
           "壁纸",
           "背景",
+          "图标",
+          "应用图标",
           "思考动画",
           "thinking",
           "animation",
@@ -119,6 +121,8 @@ const NAV_GROUPS: NavGroup[] = [
           "navigator",
           "wallpaper",
           "background",
+          "app icon",
+          "icon",
         ],
       },
       {

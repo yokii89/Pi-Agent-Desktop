@@ -1,3 +1,4 @@
+import { DEFAULT_APP_ICON_ID } from "../../shared/appIcon";
 import { DEFAULT_FONT_MONO_PRESET, DEFAULT_FONT_UI_PRESET } from "../../shared/fontPresets";
 import { DEFAULT_INPUT_BUDDY } from "../../shared/inputBuddy";
 import { DEFAULT_INPUT_EFFECT } from "../../shared/inputEffect";
@@ -41,6 +42,7 @@ export const DEFAULT_SETTINGS: PideskSettings = {
   theme: "dark",
   // 主题色偏好；null = 应用默认蓝，system = 跟随系统，hex = 固定颜色
   accentColor: null,
+  appIcon: DEFAULT_APP_ICON_ID,
   // 本地背景壁纸（docs/design/111）；null = 主题纯色背景
   wallpaperPath: null,
   wallpaperDim: DEFAULT_WALLPAPER_DIM,
@@ -151,6 +153,7 @@ export const SETTABLE_KEYS = [
   "terminalTabCompletion",
   "theme",
   "accentColor",
+  "appIcon",
   "wallpaperPath",
   "wallpaperDim",
   "locale",
