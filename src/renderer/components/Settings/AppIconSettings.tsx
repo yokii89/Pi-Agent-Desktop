@@ -2,11 +2,12 @@ import { Check } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import type { AppIconId } from "../../../shared/appIcon";
 import { APP_ICON_IDS, DEFAULT_APP_ICON_ID } from "../../../shared/appIcon";
-import classicPreview from "../../assets/app-icon/app-icon.png";
-import bluePreview from "../../assets/app-icon/P-icon-blue.png";
-import greenPreview from "../../assets/app-icon/P-icon-green.png";
-import pinkPreview from "../../assets/app-icon/P-icon-pink.png";
-import yellowPreview from "../../assets/app-icon/P-icon-yellow.png";
+import bluePreview from "../../assets/app-icon/preview/blue.png";
+// 设置页只展示 52px 方块：用 128px 缩略图（pnpm run gen:app-icon 生成），别把 1024 母版打进包
+import classicPreview from "../../assets/app-icon/preview/classic.png";
+import greenPreview from "../../assets/app-icon/preview/green.png";
+import pinkPreview from "../../assets/app-icon/preview/pink.png";
+import yellowPreview from "../../assets/app-icon/preview/yellow.png";
 import { useT } from "../../hooks/useT";
 import { settingsService } from "../../services/settingsService";
 import { useUiStore } from "../../stores/uiStore";
@@ -20,7 +21,7 @@ const ICON_PREVIEWS: Record<AppIconId, string> = {
   yellow: yellowPreview,
 };
 
-/** 内置应用图标选择；只保存选择，窗口 / 任务栏在下次启动时应用。 */
+/** 内置应用图标选择：保存即就地应用（窗口 / 任务栏 / 托盘 / 快捷方式），无需重启。 */
 export function AppIconSettings() {
   const t = useT();
   const { showToast } = useUiStore();
@@ -48,16 +49,22 @@ export function AppIconSettings() {
     if (!ready || saving.current || icon === selected) return;
     saving.current = true;
     setBusy(true);
-    const saved = await settingsService.set({ appIcon: icon });
+    const result = await settingsService.applyAppIcon(icon);
     saving.current = false;
     if (!mounted.current) return;
     setBusy(false);
-    if (!saved) {
+    if (!result) {
       showToast(t("settings.personalization.appIcon.saveFailed"));
       return;
     }
-    setSelected(saved.appIcon);
-    showToast(t("settings.personalization.appIcon.saved"));
+    setSelected(result.settings.appIcon);
+    showToast(
+      t(
+        result.shortcutUpdateFailed
+          ? "settings.personalization.appIcon.savedShortcutFailed"
+          : "settings.personalization.appIcon.saved",
+      ),
+    );
   }
 
   return (

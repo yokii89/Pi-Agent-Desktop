@@ -57,14 +57,20 @@
   pointer-events: none;
 }
 
+/* 英文名（Lemon doodle / Mint garden）在 88px 方块里单行放不下：
+   固定预留两行高度再折行，五个方块的图标才能横向对齐；超长仍按省略号收尾。 */
 .label {
+  display: -webkit-box;
+  min-height: 2.5em;
   max-width: 100%;
   overflow: hidden;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .check {

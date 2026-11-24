@@ -19,8 +19,10 @@
 
 - `build/app-icons/<id>.png`：各款 1024×1024 PNG，用于 Windows 系统通知图标。
 - `build/app-icons/<id>.ico`：各款 16/24/32/48/64/128/256 多尺寸 Windows ICO，用于窗口、任务栏和托盘。
+- `src/renderer/assets/app-icon/preview/<id>.png`：各款 128×128 缩略图，仅供设置页 52px 方块展示。**不要**在渲染层直接引用 1024 母版（五张共约 2MB）。
 - 修改任一 PNG 母版后运行 `pnpm run gen:app-icon` 更新以上资源；发布打包会收录这些图标，并将 PNG / ICO 解包到真实文件路径供 Windows 系统调用。
-- 用户偏好保存在本机 `settings.json`，不跟随账号同步。更换图标需要重启应用；安装版启动时同时更新用户桌面及公共桌面上已有、可写且指向本次安装的 `PiDesk.lnk`，保留启动参数等属性。开发版不修改桌面快捷方式。
+- 用户偏好保存在本机 `settings.json`，不跟随账号同步。设置页切换后经 `APP_ICON_IPC.apply` 就地重设窗口 / 任务栏 / 托盘图标并刷新后续系统通知，**不需要重启**；安装版同时更新用户桌面、公共桌面、用户开始菜单与所有用户开始菜单中已有、可写且指向本次安装的 `PiDesk.lnk`，保留启动参数等属性。开发版不修改快捷方式。
+- `PiDesk.exe` 自身的文件图标由 electron-builder 在构建期嵌入，等于经典款，不随设置变化。
 
 ## installerSidebar.bmp / installerHeader.bmp / uninstallerSidebar.bmp
 

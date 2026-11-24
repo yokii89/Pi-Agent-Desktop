@@ -574,10 +574,9 @@ export const settingsMessages = defineMessages({
   },
 
   "settings.personalization.hint": {
-    "zh-CN":
-      "调整界面字体、思考动画、背景壁纸与会话区阅读密度；图标更换在下次启动后生效，其余改动立即生效并保存到本机。",
+    "zh-CN": "调整界面字体、思考动画、背景壁纸与会话区阅读密度；所有改动立即生效并保存到本机。",
     "en-US":
-      "Tune UI fonts, the thinking animation, wallpaper and session reading density. Icon changes take effect on the next launch; other changes apply immediately and are saved on this device.",
+      "Tune UI fonts, the thinking animation, wallpaper and session reading density. Every change applies immediately and is saved on this device.",
   },
   "settings.personalization.group.appIcon": {
     "zh-CN": "应用图标",
@@ -589,13 +588,18 @@ export const settingsMessages = defineMessages({
   },
   "settings.personalization.appIcon.description": {
     "zh-CN":
-      "选择图标，保存后下次启动应用到主窗口、任务栏与托盘；安装版同时更新已有的 PiDesk 桌面快捷方式（需有写入权限）。",
+      "选择后立即应用到主窗口、任务栏与托盘；安装版同时更新已有的桌面与开始菜单快捷方式（需有写入权限）。资源管理器里的 PiDesk.exe 文件图标由安装包决定，不随设置变化。",
     "en-US":
-      "Choose an icon for the main window, taskbar and tray on next launch. Installed builds also update existing PiDesk desktop shortcuts when writable.",
+      "Applies to the main window, taskbar and tray right away. Installed builds also refresh existing desktop and Start menu shortcuts when writable. The PiDesk.exe file icon belongs to the installer and does not change with this setting.",
   },
   "settings.personalization.appIcon.saved": {
-    "zh-CN": "图标已保存，下次启动 PiDesk 后生效。",
-    "en-US": "Icon saved. It will apply the next time PiDesk starts.",
+    "zh-CN": "图标已应用。",
+    "en-US": "Icon applied.",
+  },
+  "settings.personalization.appIcon.savedShortcutFailed": {
+    "zh-CN": "图标已应用，但桌面或开始菜单快捷方式未能更新（可能缺少写入权限）。",
+    "en-US":
+      "Icon applied, but the desktop or Start menu shortcut couldn't be updated (write permission may be missing).",
   },
   "settings.personalization.appIcon.saveFailed": {
     "zh-CN": "图标设置保存失败，请重试。",

@@ -14,7 +14,7 @@ function distPath(...segments: string[]): string {
  * 安装版与 electron-builder.yml 的 appId 一致；开发态独立，避免通知快捷方式与安装版互相覆盖。
  * 必须在 app.whenReady() 之前调用。
  */
-const APP_USER_MODEL_ID = app.isPackaged ? "dev.pidesk.app" : "dev.pidesk.app.development";
+export const APP_USER_MODEL_ID = app.isPackaged ? "dev.pidesk.app" : "dev.pidesk.app.development";
 
 function applyAppUserModelId(): void {
   // 仅 Windows 需要；其他平台调用无害但无意义，显式判断意图更清晰

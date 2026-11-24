@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import type { AppIconId } from "../shared/appIcon";
 import type {
   ActivateContributionRequest,
   ActivateContributionResult,
@@ -21,6 +22,7 @@ import type {
 } from "../shared/github";
 import { GITHUB_IPC } from "../shared/github";
 import type {
+  ApplyAppIconResult,
   BrowserBoundsRequest,
   BrowserCloseInstanceRequest,
   BrowserInstanceInfo,
@@ -136,6 +138,7 @@ import type {
   TerminalPushMessage,
 } from "../shared/ipc";
 import {
+  APP_ICON_IPC,
   AUTH_IPC,
   BROWSER_IPC,
   CLIPBOARD_IPC,
@@ -288,6 +291,9 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** 合并更新设置，返回更新后的完整设置。 */
     set: (patch: Partial<PideskSettings>): Promise<IpcResult<PideskSettings>> =>
       ipcRenderer.invoke(SETTINGS_IPC.set, patch),
+    /** 切换应用图标：落盘并就地应用到窗口 / 任务栏 / 托盘 / 快捷方式。 */
+    applyAppIcon: (id: AppIconId): Promise<IpcResult<ApplyAppIconResult>> =>
+      ipcRenderer.invoke(APP_ICON_IPC.apply, id),
   },
 
   theme: {

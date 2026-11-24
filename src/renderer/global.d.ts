@@ -18,6 +18,7 @@ import type {
   GitHubSyncResult,
 } from "../shared/github";
 import type {
+  ApplyAppIconResult,
   BrowserBoundsRequest,
   BrowserCloseInstanceRequest,
   BrowserInstanceInfo,
@@ -188,6 +189,8 @@ export interface PideskGlobalApi {
   settings: {
     get(): Promise<IpcResult<PideskSettings>>;
     set(patch: Partial<PideskSettings>): Promise<IpcResult<PideskSettings>>;
+    /** 切换应用图标：落盘并就地应用到窗口 / 任务栏 / 托盘 / 快捷方式。 */
+    applyAppIcon(id: AppIconId): Promise<IpcResult<ApplyAppIconResult>>;
   };
   theme: {
     /** 读取本机强调色；不支持或读取失败时返回 null。 */

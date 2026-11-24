@@ -6,6 +6,7 @@ import { isLocalePreference } from "../../shared/i18n";
 import { isInputBuddyKind } from "../../shared/inputBuddy";
 import { isInputEffect } from "../../shared/inputEffect";
 import type {
+  ApplyAppIconResult,
   BrowserRecentUrl,
   IpcResult,
   PideskProject,
@@ -15,6 +16,7 @@ import type {
   ThemeId,
 } from "../../shared/ipc";
 import {
+  APP_ICON_IPC,
   SESSION_STREAM_FONT_MAX_PX,
   SESSION_STREAM_FONT_MIN_PX,
   SETTINGS_IPC,
@@ -37,6 +39,7 @@ import { isThinkingAnimation } from "../../shared/thinkingAnimation";
 import { clampWallpaperDim, normalizeWallpaperPath } from "../../shared/wallpaper";
 import { envelope } from "../ipc/envelope";
 import { onPrefetchSettingChanged } from "../session/speculativePrefetch";
+import { applyAppIcon } from "../window/appIconApply";
 import { applyTrayEnabled } from "../window/tray";
 import {
   clampSessionStreamFontPx,
@@ -324,14 +327,28 @@ export function registerSettingsIpc(): void {
     SETTINGS_IPC.set,
     (_event, patch: unknown): IpcResult<PideskSettings> =>
       envelope(() => {
+        const previousIcon = getSettings().appIcon;
         const next = updateSettings(sanitizePatch(patch));
         // 托盘是主进程副作用：设置写穿后立即对齐，避免重启才生效
         applyTrayEnabled(next.showInTray);
+        // 任何写入方（含设置页以外的调用）改了图标都要就地换图，否则界面与设置不一致
+        if (next.appIcon !== previousIcon) applyAppIcon(next.appIcon);
         // speculative 预热开关：关闭时回收无用 speculative 实例
         if ("sessionPrefetchEnabled" in (patch as object)) {
           onPrefetchSettingChanged(next.sessionPrefetchEnabled === true);
         }
         return next;
+      }),
+  );
+
+  ipcMain.handle(
+    APP_ICON_IPC.apply,
+    (_event, value: unknown): IpcResult<ApplyAppIconResult> =>
+      envelope(() => {
+        if (!isAppIconId(value)) throw new Error("INVALID_APP_ICON");
+        const settings = updateSettings({ appIcon: value });
+        const outcome = applyAppIcon(settings.appIcon);
+        return { settings, shortcutUpdateFailed: outcome.shortcutUpdateFailed };
       }),
   );
 }

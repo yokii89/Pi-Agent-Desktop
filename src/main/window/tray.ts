@@ -64,6 +64,13 @@ function destroyTray(): void {
   tray = null;
 }
 
+/** 图标变体切换后就地换图；托盘未创建（设置关闭）或已销毁时静默跳过。 */
+export function refreshTrayIcon(): void {
+  if (!tray || tray.isDestroyed()) return;
+  const icon = resolveAppIconImage();
+  if (icon) tray.setImage(icon);
+}
+
 /** 按设置同步托盘显隐；重复调用幂等。 */
 export function applyTrayEnabled(enabled: boolean): void {
   if (enabled) {

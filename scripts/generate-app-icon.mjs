@@ -1,6 +1,7 @@
 /**
- * 生成应用图标资源（build/icon.png、build/icon.ico 与 build/app-icons/*）。
+ * 生成应用图标资源（build/icon.png、build/icon.ico、build/app-icons/* 与设置页缩略图）。
  * 各款 PNG 母版由 Electron nativeImage 缩放并输出多尺寸 ICO；不增加依赖。
+ * 设置页 52px 的预览只用 128px 缩略图，避免把 1024 母版打进渲染层。
  * 仅在图标美术变更时手动运行：pnpm run gen:app-icon。
  */
 import { spawn } from "node:child_process";
@@ -15,6 +16,9 @@ const sourceDir = path.join(projectRoot, "src/renderer/assets/app-icon");
 const sourcePng = path.join(sourceDir, "app-icon.png");
 const buildDir = path.join(projectRoot, "build");
 const iconsDir = path.join(buildDir, "app-icons");
+/** 设置页预览缩略图（随渲染层打包）：52px 展示，2x 屏用 128px 足够。 */
+const previewDir = path.join(sourceDir, "preview");
+const PREVIEW_SIDE = 128;
 const pngOut = path.join(buildDir, "icon.png");
 const icoOut = path.join(buildDir, "icon.ico");
 const SIZES_FILE = path.join(iconsDir, ".sizes.json");
@@ -68,6 +72,8 @@ app.disableHardwareAcceleration();
 
 const sources = JSON.parse(process.env.ICON_SOURCES);
 const outDir = process.env.OUT_DIR;
+const previewDir = process.env.PREVIEW_DIR;
+const previewSide = Number(process.env.PREVIEW_SIDE);
 const sizes = JSON.parse(process.env.SIZES);
 
 app.whenReady().then(() => {
@@ -78,6 +84,10 @@ app.whenReady().then(() => {
       if (image.isEmpty()) throw new Error("无法渲染图标：" + source.id);
       const master = image.resize({ width: 1024, height: 1024, quality: "best" });
       fs.writeFileSync(path.join(outDir, source.id + ".png"), master.toPNG());
+      fs.writeFileSync(
+        path.join(previewDir, source.id + ".png"),
+        master.resize({ width: previewSide, height: previewSide, quality: "best" }).toPNG(),
+      );
       output.push({
         id: source.id,
         entries: sizes.map(size => ({
@@ -107,6 +117,8 @@ app.whenReady().then(() => {
             ...childEnv,
             ICON_SOURCES: JSON.stringify(ICON_SOURCES),
             OUT_DIR: iconsDir,
+            PREVIEW_DIR: previewDir,
+            PREVIEW_SIDE: String(PREVIEW_SIDE),
             SIZES: JSON.stringify(ICO_SIZES),
           },
           stdio: "inherit",
@@ -131,6 +143,7 @@ app.whenReady().then(() => {
 async function main() {
   await mkdir(buildDir, { recursive: true });
   await mkdir(iconsDir, { recursive: true });
+  await mkdir(previewDir, { recursive: true });
   for (const source of ICON_SOURCES) await stat(source.path);
 
   console.log("[app-icon] 缩放 PNG 母版并生成 ICO…");
@@ -151,6 +164,9 @@ async function main() {
     `[app-icon] 完成：${MASTER_SIZE}×${MASTER_SIZE} PNG，ICO 尺寸 ${ICO_SIZES.join("/")}`,
   );
   console.log(`[app-icon] 输出：${path.relative(projectRoot, iconsDir)}`);
+  console.log(
+    `[app-icon] 设置页缩略图：${path.relative(projectRoot, previewDir)}（${PREVIEW_SIDE}×${PREVIEW_SIDE}）`,
+  );
 }
 
 main().catch((error) => {

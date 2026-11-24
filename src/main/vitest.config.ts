@@ -10,6 +10,8 @@ export default defineConfig({
   root,
   test: {
     include: [
+      // 主进程根目录下的纯逻辑（如 appIconPaths）
+      "*.test.ts",
       "view/**/*.test.ts",
       "remote/**/*.test.ts",
       "window/**/*.test.ts",

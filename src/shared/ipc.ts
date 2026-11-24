@@ -297,6 +297,17 @@ export const SETTINGS_IPC = {
   set: "pidesk:settings:set",
 } as const;
 
+/** 应用图标切换：落盘 + 就地应用（窗口 / 任务栏 / 托盘 / 快捷方式），一次往返完成。 */
+export const APP_ICON_IPC = {
+  apply: "pidesk:settings:applyAppIcon",
+} as const;
+
+export interface ApplyAppIconResult {
+  settings: PideskSettings;
+  /** 桌面 / 开始菜单快捷方式未能更新（多为缺写权限）；具体路径只留在主进程日志。 */
+  shortcutUpdateFailed: boolean;
+}
+
 /** 本机系统强调色只在运行时读取/推送，实际色值不进入用户设置。 */
 export const THEME_IPC = {
   getSystemAccentColor: "pidesk:theme:getSystemAccentColor",
