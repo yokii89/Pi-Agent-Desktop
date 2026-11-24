@@ -1,4 +1,6 @@
+import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { PiPackageResourceKind, PiPackageSourceKind } from "../../shared/ipc";
 
 /**
@@ -21,6 +23,32 @@ export interface ParsedPackageSource {
 const NPM_PREFIX = /^npm:/i;
 const GIT_PREFIX = /^git:/i;
 const PROTOCOL_URL = /^(https?|ssh|git):\/\//i;
+
+/** Mirror pi's local-path normalization before resolving against a settings file. */
+function normalizeLocalSourcePath(input: string): string {
+  let normalized = input;
+  if (
+    process.platform === "win32" &&
+    normalized.startsWith("/") &&
+    !normalized.startsWith("//") &&
+    !normalized.includes("\\")
+  ) {
+    const match = normalized.match(/^\/(?:mnt\/|cygdrive\/)?([a-z])(?:\/(.*))?$/i);
+    if (match) {
+      const suffix = match[2]?.replaceAll("/", "\\");
+      normalized = `${match[1]?.toUpperCase()}:\\${suffix ?? ""}`;
+    }
+  }
+  if (normalized === "~") return os.homedir();
+  if (
+    normalized.startsWith("~/") ||
+    (process.platform === "win32" && normalized.startsWith("~\\"))
+  ) {
+    return path.join(os.homedir(), normalized.slice(2));
+  }
+  if (/^file:\/\//.test(normalized)) return fileURLToPath(normalized);
+  return normalized;
+}
 
 /** 去掉 `npm:@foo/bar@1.2.3` / `git:host/repo@v1` 的版本段。 */
 function stripRef(spec: string): string {
@@ -80,8 +108,11 @@ export function parsePackageSource(input: string): ParsedPackageSource {
     return { kind: "git", name: identity, identity, pinned: hasRef(raw), raw };
   }
 
-  // 本地绝对 / 相对路径
-  const local = path.isAbsolute(raw) ? path.normalize(raw) : raw;
+  // Local paths follow pi's expand-tilde, file-URL, and Windows shell-path rules.
+  const normalizedLocal = normalizeLocalSourcePath(raw);
+  const local = path.isAbsolute(normalizedLocal)
+    ? path.normalize(normalizedLocal)
+    : normalizedLocal;
   const name = path.basename(local) || local;
   return { kind: "local", name, identity: local, pinned: false, raw };
 }
@@ -91,19 +122,22 @@ export function parsePackageSource(input: string): ParsedPackageSource {
  * - npm user → `<agentDir>/npm/<name>`（scoped 为 `npm/@scope/name`）
  * - git user → `<agentDir>/git/<host>/<path>`
  * - project 在对应目录下用 `<cwd>/.pi/{npm,git}`
- * - local → 原路径（normalize 后）
+ * - local 相对路径以所属 settings.json 的目录为基准
  */
 export function resolveInstallPath(
   parsed: ParsedPackageSource,
   options: { agentDir: string; local: boolean; cwd: string | null },
 ): string | null {
   if (parsed.kind === "local") {
-    const p = parsed.identity;
-    return path.isAbsolute(p)
-      ? path.normalize(p)
-      : options.cwd
-        ? path.resolve(options.cwd, p)
-        : null;
+    const sourcePath = parsed.identity;
+    if (path.isAbsolute(sourcePath)) return path.normalize(sourcePath);
+
+    const settingsDir = options.local
+      ? options.cwd
+        ? path.join(options.cwd, ".pi")
+        : null
+      : options.agentDir;
+    return settingsDir ? path.resolve(settingsDir, sourcePath) : null;
   }
   const root = options.local
     ? options.cwd
