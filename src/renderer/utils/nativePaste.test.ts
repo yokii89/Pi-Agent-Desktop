@@ -9,6 +9,13 @@ class PasteDocument extends EventTarget {
   activeElement: PasteTarget | null = null;
   focused = true;
   frames: { contentDocument: PasteDocument | null }[] = [];
+  /** claimEditorFocus 在窗口未激活时会逐帧重试；测试里用宏任务模拟一帧。 */
+  defaultView = {
+    requestAnimationFrame: (callback: () => void): number => {
+      setTimeout(callback, 0);
+      return 1;
+    },
+  };
 
   hasFocus(): boolean {
     return this.focused;
@@ -31,6 +38,10 @@ class PasteTarget {
   isContentEditable = true;
 
   constructor(readonly ownerDocument: PasteDocument) {}
+
+  focus(): void {
+    this.ownerDocument.activeElement = this;
+  }
 
   asElement(): HTMLElement {
     return this as unknown as HTMLElement;
@@ -126,7 +137,8 @@ describe("native paste ownership", () => {
     );
     const first = pasteIntoElement(root.asElement());
     const second = pasteIntoElement(root.asElement());
-    await Promise.resolve();
+    // 焦点确认本身是异步的（可能等窗口激活），多让一拍再断言
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(mocks.paste).toHaveBeenCalledTimes(1);
     expect(doc.paste(root).defaultPrevented).toBe(false);
     finish();
@@ -141,5 +153,33 @@ describe("native paste ownership", () => {
     expect(doc.paste(other).defaultPrevented).toBe(false);
     await pasteIntoElement(root.asElement());
     expect(mocks.paste).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits for a right-click that also activates the window", async () => {
+    const { doc, root } = setup();
+    // 右键同时承担激活窗口：contextmenu 已派发，但文档还没聚焦、焦点也不在编辑器上
+    doc.focused = false;
+    doc.activeElement = null;
+    let delivered: Event | undefined;
+    mocks.paste.mockImplementation(async () => {
+      delivered = doc.paste(root);
+    });
+    // 激活在下一帧完成
+    const activate = root.focus.bind(root);
+    root.focus = () => {
+      activate();
+      doc.focused = true;
+    };
+    await pasteIntoElement(root.asElement());
+    expect(delivered).toBeDefined();
+    expect(delivered?.defaultPrevented).toBe(false);
+  });
+
+  it("reports a paste that never got a focused window", async () => {
+    const { doc, root } = setup();
+    doc.focused = false;
+    doc.activeElement = null;
+    await expect(pasteIntoElement(root.asElement())).rejects.toThrow("PASTE_WINDOW_NOT_FOCUSED");
+    expect(mocks.paste).not.toHaveBeenCalled();
   });
 });

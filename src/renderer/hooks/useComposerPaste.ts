@@ -20,20 +20,8 @@ export function useComposerPaste({ disabled, onFiles, onImages }: ComposerPasteO
     const root = event.currentTarget;
     if (disabled || !root.isContentEditable) return;
 
-    const selection = window.getSelection();
-    const hasSelection =
-      selection &&
-      selection.rangeCount > 0 &&
-      root.contains(selection.getRangeAt(0).commonAncestorContainer);
-    root.focus();
-    if (selection && !hasSelection) {
-      const range = document.createRange();
-      range.selectNodeContents(root);
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-    // 交给 Electron 派发可信 paste，保留 File 的磁盘路径和截图二进制数据。
+    // 焦点与光标交给 pasteIntoElement：右键可能同时承担激活窗口，这里不能假定编辑器已聚焦
+    // （开发态 DevTools 持有焦点、从别的程序切回来时都会踩到），否则原生 paste 被静默丢弃。
     void pasteIntoElement(root).catch(() => {
       if (root.isConnected && root.isContentEditable) showToast(t("session.input.pasteFailed"));
     });
