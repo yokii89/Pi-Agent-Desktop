@@ -101,6 +101,34 @@ describe("sessionBuckets dual index", () => {
 });
 
 describe("queue delivery diff (docs/design/73)", () => {
+  it("keeps image attachments aligned while removing, moving and converting queued messages", () => {
+    const a = { type: "image" as const, data: "AAAA", mimeType: "image/png" };
+    const b = { ...a, data: "BBBB" };
+    const queue = {
+      steering: ["A", "B"],
+      followUp: [""],
+      imageAttachments: { steering: [[a], [b]], followUp: [[a, b]] },
+    };
+    expect(removeQueueItem(queue, "followUp", 0, "")).toMatchObject({
+      removed: "",
+      removedImages: [a, b],
+      imageAttachments: { steering: [[a], [b]], followUp: [] },
+    });
+    expect(moveQueueItem(queue, "steer", 0, 1, "A")).toMatchObject({
+      steering: ["B", "A"],
+      imageAttachments: { steering: [[b], [a]], followUp: [[a, b]] },
+    });
+    expect(convertQueueItem(queue, "followUp", 0, "")).toMatchObject({
+      removed: null,
+      steering: ["A", "B", ""],
+      followUp: [],
+      imageAttachments: { steering: [[a], [b], [a, b]], followUp: [] },
+    });
+    expect(queue.imageAttachments.followUp).toEqual([[a, b]]);
+    const converted = convertQueueItem(queue, "followUp", 0, "");
+    expect(converted).not.toHaveProperty("removedImages");
+  });
+
   it("takes delivered items from the head FIFO per kind", () => {
     expect(
       deliveredQueueTexts(
@@ -144,7 +172,7 @@ describe("queue delivery diff (docs/design/73)", () => {
   it("converts a follow-up to steering by appending to the steering queue", () => {
     expect(convertQueueItem({ steering: ["A"], followUp: ["C", "D"] }, "followUp", 0, "C")).toEqual(
       {
-        removed: "C",
+        removed: null,
         steering: ["A", "C"],
         followUp: ["D"],
       },
@@ -153,7 +181,7 @@ describe("queue delivery diff (docs/design/73)", () => {
 
   it("converts a steering item back to the follow-up tail", () => {
     expect(convertQueueItem({ steering: ["A", "B"], followUp: ["C"] }, "steer", 0, "A")).toEqual({
-      removed: "A",
+      removed: null,
       steering: ["B"],
       followUp: ["C", "A"],
     });

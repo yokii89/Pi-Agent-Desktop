@@ -58,6 +58,25 @@ function saveAttachments(store: ComposerDraftStore, key: string): ComposerDraft 
 }
 
 describe("composer drafts", () => {
+  it("restores image-only and mixed queued inputs to the owning draft without losing existing attachments", () => {
+    const store = new ComposerDraftStore();
+    const draft = store.bind("session:images");
+    saveAttachments(store, "session:images");
+    const image = { type: "image" as const, data: "AAAA", mimeType: "image/png" };
+    draft.restoreQueue({
+      steering: [""],
+      followUp: ["describe"],
+      imageAttachments: { steering: [[image]], followUp: [[{ ...image, data: "BBBB" }]] },
+    });
+    expect(draft.getSnapshot().imageAttachments.map((item) => item.data)).toEqual([
+      "AA==",
+      "AAAA",
+      "BBBB",
+    ]);
+    expect(draft.getSnapshot().edits).toEqual([{ kind: "text", text: "describe" }]);
+    expect(store.bind("session:other").getSnapshot().imageAttachments).toEqual([]);
+  });
+
   it("keeps home and session drafts separate across navigation and project changes", () => {
     const store = new ComposerDraftStore();
     const home = composerDraftKey(null, "C:/project");

@@ -4,7 +4,7 @@ import {
   AGENT_RUNTIME_PROTOCOL_VERSION,
   parseAgentRuntimeRequest,
 } from "../shared/agentRuntimeProtocol.js";
-import { boundedJson } from "../shared/durableProtocol.js";
+import { boundedJson, DURABLE_RUNTIME_MESSAGE_MAX_BYTES } from "../shared/durableProtocol.js";
 import { DesktopRuntime } from "./desktopRuntime.js";
 import { runDurableSqliteSmokeTest } from "./sqliteSmokeTest.js";
 
@@ -37,7 +37,7 @@ let shuttingDown = false;
 const runtime = new DesktopRuntime((update) => {
   // Strip optional undefined fields at the private JSON DTO boundary.
   const wire: unknown = JSON.parse(JSON.stringify({ type: "update", update }));
-  if (!boundedJson(wire)) {
+  if (!boundedJson(wire, DURABLE_RUNTIME_MESSAGE_MAX_BYTES)) {
     channel?.postMessage({
       type: "update",
       update: {
@@ -95,7 +95,8 @@ async function handleRequest(value: unknown): Promise<void> {
         const wire: unknown = JSON.parse(
           JSON.stringify({ type: "response", id: request.id, ok: true, result: result ?? null }),
         );
-        if (!boundedJson(wire)) throw new Error("Durable response exceeds the protocol limit.");
+        if (!boundedJson(wire, DURABLE_RUNTIME_MESSAGE_MAX_BYTES))
+          throw new Error("Durable response exceeds the protocol limit.");
         port.postMessage(wire);
       } catch (error) {
         sendError(request.id, error);

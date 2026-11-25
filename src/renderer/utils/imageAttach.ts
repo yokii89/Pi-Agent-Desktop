@@ -4,14 +4,15 @@
  */
 
 import { t } from "../../shared/i18n";
+import { MAX_IMAGE_ATTACHMENTS, MAX_IMAGE_INPUT_BYTES } from "../../shared/imageInput";
 import type { PiImageContent } from "../../shared/ipc";
 
 /** 单条消息最多附图张数。 */
-export const MAX_ATTACH_IMAGES = 8;
+export const MAX_ATTACH_IMAGES = MAX_IMAGE_ATTACHMENTS;
 /** 长边上限（对齐 pi images.autoResize 默认 2000）。 */
 export const MAX_IMAGE_EDGE = 2000;
-/** 处理后单张字节上限（JSONL 单行 8MB 内留余量）。 */
-export const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+/** 处理后单张字节上限。 */
+export const MAX_IMAGE_BYTES = MAX_IMAGE_INPUT_BYTES;
 
 /** 输入栏待发附件（composerStore 持有）。 */
 export interface ComposerImageAttachment {
@@ -82,6 +83,22 @@ export function toPiImageContent(attachment: ComposerImageAttachment): PiImageCo
     type: "image",
     data: attachment.data,
     mimeType: attachment.mimeType,
+  };
+}
+
+/** Restore an already processed attachment; dimensions are unknown until preview decodes it. */
+export function restoredComposerImage(image: PiImageContent): ComposerImageAttachment {
+  const extension = image.mimeType === "image/jpeg" ? "jpg" : image.mimeType.slice("image/".length);
+  const padding = image.data.endsWith("==") ? 2 : image.data.endsWith("=") ? 1 : 0;
+  return {
+    id: crypto.randomUUID(),
+    name: `image.${extension}`,
+    mimeType: image.mimeType,
+    width: 0,
+    height: 0,
+    byteLength: (image.data.length / 4) * 3 - padding,
+    previewUrl: toDataUrl(image.mimeType, image.data),
+    data: image.data,
   };
 }
 

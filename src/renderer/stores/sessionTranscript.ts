@@ -444,9 +444,15 @@ function applyEvent(entries: SessionEntry[], event: PiAgentEvent): SessionEntry[
             ? { ...entry, id: identity, optimistic: undefined }
             : entry,
         );
+      const images = imagesFromMessageContent(event.message.content);
       return [
         ...entries,
-        { kind: "user", id: identity, text: extractText(event.message.content) ?? "" },
+        {
+          kind: "user",
+          id: identity,
+          text: extractText(event.message.content) ?? "",
+          ...(images.length ? { images } : {}),
+        },
       ];
     }
     case "durable_projection": {

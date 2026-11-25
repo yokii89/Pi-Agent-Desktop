@@ -9,7 +9,10 @@ import {
   type DurableResourceSpec,
   isDurableResourceSpec,
 } from "./durableResources";
-import type { IpcResult } from "./ipc";
+import { parseImageInputContents } from "./imageInput";
+import type { IpcResult, PiImageContent } from "./ipc";
+
+export const DURABLE_RUNTIME_MESSAGE_MAX_BYTES = 66 * 1024 * 1024;
 
 export interface DurableDesktopApi {
   model(): Promise<IpcResult<DurableModelConfig | null>>;
@@ -68,6 +71,7 @@ export type DurableCommand =
       requestId: string;
       text: string;
       mode: "steer" | "followUp" | "reject";
+      images?: readonly PiImageContent[];
     }
   | { op: "continue"; sessionId: string; requestId: string }
   | { op: "write"; sessionId: string; requestId: string; kind: string; data: string }
@@ -168,7 +172,9 @@ export function parseRuntimeModel(value: unknown): RuntimeModelConfig | null {
 }
 
 export function parseDurableCommand(value: unknown): DurableCommand | null {
-  if (!record(value) || !boundedJson(value, 512 * 1024)) return null;
+  if (!record(value)) return null;
+  const maxBytes = value.op === "submit" ? DURABLE_RUNTIME_MESSAGE_MAX_BYTES : 512 * 1024;
+  if (!boundedJson(value, maxBytes)) return null;
   if (value.op === "initialize") {
     const model = value.model === undefined ? undefined : parseRuntimeModel(value.model);
     return boundedText(value.storageRoot, 32_768) && model !== null
@@ -219,18 +225,25 @@ export function parseDurableCommand(value: unknown): DurableCommand | null {
     case "closeIdle":
     case "snapshot":
       return { op: value.op, sessionId };
-    case "submit":
-      return boundedText(value.requestId, 128) &&
-        boundedText(value.text, 256_000) &&
-        ["steer", "followUp", "reject"].includes(String(value.mode))
-        ? {
-            op: "submit",
-            sessionId,
-            requestId: value.requestId,
-            text: value.text,
-            mode: value.mode as "steer" | "followUp" | "reject",
-          }
-        : null;
+    case "submit": {
+      const images = value.images === undefined ? [] : parseImageInputContents(value.images);
+      if (
+        !boundedText(value.requestId, 128) ||
+        !boundedText(value.text, 256_000, true) ||
+        !["steer", "followUp", "reject"].includes(String(value.mode)) ||
+        images === null ||
+        (!value.text.trim() && images.length === 0)
+      )
+        return null;
+      return {
+        op: "submit",
+        sessionId,
+        requestId: value.requestId,
+        text: value.text,
+        mode: value.mode as "steer" | "followUp" | "reject",
+        ...(images.length ? { images } : {}),
+      };
+    }
     case "continue":
       return boundedText(value.requestId, 128)
         ? { op: "continue", sessionId, requestId: value.requestId }
@@ -408,7 +421,7 @@ function validLive(value: unknown): boolean {
 export function parseRuntimeUpdate(value: unknown): RuntimeSessionUpdate | null {
   if (
     !record(value) ||
-    !boundedJson(value) ||
+    !boundedJson(value, DURABLE_RUNTIME_MESSAGE_MAX_BYTES) ||
     typeof value.sessionId !== "string" ||
     !DURABLE_SESSION_ID.test(value.sessionId)
   )

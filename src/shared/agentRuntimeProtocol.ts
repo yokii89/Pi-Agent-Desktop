@@ -1,6 +1,7 @@
 import {
   boundedJson,
   boundedText,
+  DURABLE_RUNTIME_MESSAGE_MAX_BYTES,
   type DurableCommand,
   parseDurableCommand,
   parseRuntimeUpdate,
@@ -8,7 +9,7 @@ import {
   record,
 } from "./durableProtocol";
 
-export const AGENT_RUNTIME_PROTOCOL_VERSION = 4;
+export const AGENT_RUNTIME_PROTOCOL_VERSION = 5;
 
 export type AgentRuntimeRequest =
   | { id: string; type: "smoke-test"; storageRoot: string }
@@ -46,7 +47,7 @@ export function parseAgentRuntimeMessage(value: unknown): AgentRuntimeMessage | 
     return update ? { type: "update", update } : null;
   }
   if (value.type === "response" && boundedText(value.id, 128)) {
-    if (value.ok === true && boundedJson(value.result))
+    if (value.ok === true && boundedJson(value.result, DURABLE_RUNTIME_MESSAGE_MAX_BYTES))
       return { type: "response", id: value.id, ok: true, result: value.result };
     if (value.ok === false && boundedText(value.error, 2000, true))
       return { type: "response", id: value.id, ok: false, error: value.error };

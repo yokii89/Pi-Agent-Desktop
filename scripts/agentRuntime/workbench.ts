@@ -7,6 +7,7 @@ import path from "node:path";
 import { app, type BrowserWindow } from "electron";
 import type { RuntimeModelConfig } from "../../src/shared/durableProtocol";
 import type { PideskSettings, SessionPushMessage, SessionSummary } from "../../src/shared/ipc";
+import { checkImageWorkbench } from "./imageWorkbench";
 import { checkP2Workbench } from "./p2Workbench";
 import { checkP3ResourcesWorkbench } from "./p3ResourcesWorkbench";
 import { checkP3Workbench } from "./p3Workbench";
@@ -335,6 +336,7 @@ export async function checkWorkbench(
       ),
     };
     result.p2 = await checkP2Workbench(window, reportPath);
+    result.images = await checkImageWorkbench(window, reportPath);
     result.p3 = await checkP3Workbench(window, reportPath);
     result.p3Resources = await checkP3ResourcesWorkbench(window, reportPath);
     const liveAuth = process.env.PIDESK_RUNTIME_CHECK_LIVE_AUTH;

@@ -68,9 +68,22 @@ export const sessionMessages = defineMessages({
   "session.durable.modelTitle": { "zh-CN": "内置会话模型", "en-US": "Built-in session model" },
   "session.durable.modelDescription": {
     "zh-CN":
-      "配置 OpenAI 或兼容供应商。保存后供新会话使用；已打开的会话保留原模型选择。当前支持文本与内置文件、命令工具。",
+      "配置 OpenAI 或兼容供应商。保存后供新会话使用；已打开的会话保留原模型选择。支持文本、图片附件和内置文件、命令工具；图片需要供应商的模型支持视觉输入。",
     "en-US":
-      "Configure OpenAI or a compatible provider for new sessions. Open sessions keep their model selection. Text input and built-in file and command tools are supported.",
+      "Configure OpenAI or a compatible provider for new sessions. Open sessions keep their model selection. Text, image attachments and built-in file and command tools are supported. Images require a model that supports vision.",
+  },
+  "session.durable.inputTooLong": {
+    "zh-CN": "输入不能超过 256000 个字符。",
+    "en-US": "Input must not exceed 256000 characters.",
+  },
+  "session.durable.invalidImages": {
+    "zh-CN": "图片附件无效或超过上限：最多 8 张，每张不超过 6 MiB，支持 PNG、JPEG、GIF 和 WebP。",
+    "en-US":
+      "Invalid image attachments. Attach up to 8 PNG, JPEG, GIF or WebP images, at most 6 MiB each.",
+  },
+  "session.durable.emptyInput": {
+    "zh-CN": "请输入文字或添加图片。",
+    "en-US": "Enter text or attach an image.",
   },
   "session.durable.endpoint": { "zh-CN": "接口地址", "en-US": "Base URL" },
   "session.durable.api": { "zh-CN": "接口类型", "en-US": "API type" },

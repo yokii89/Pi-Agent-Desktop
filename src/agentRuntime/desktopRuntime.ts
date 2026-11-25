@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { EntryId, SubmissionId } from "@earendil-works/pi-durable";
+import type { EntryId, SubmissionId, UserInput } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { DURABLE_COMMAND_ENTRY, durableExtensionError } from "../shared/durableExtension.js";
 import {
@@ -82,10 +82,13 @@ export class DesktopRuntime {
         try {
           const text = await slot.host.expand(command.requestId, command.text);
           if (slot.closing) throw durableExtensionError("closed", id);
+          const content: UserInput = command.images?.length
+            ? [...(text ? [{ type: "text" as const, text }] : []), ...command.images]
+            : text;
           const result = await service.submit(id, {
             type: "input",
             requestId: command.requestId,
-            content: text,
+            content,
             ...(text === command.text
               ? {}
               : { entry: { kind: DURABLE_COMMAND_ENTRY, data: { input: command.text } } }),

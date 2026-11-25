@@ -1,7 +1,7 @@
-import type { PromptDisposition } from "../../shared/ipc";
+import type { PiImageContent, PiQueuedMessages, PromptDisposition } from "../../shared/ipc";
 import type { BrowserContextItem } from "../services/browserService";
 import type { ComposerFileAttachment } from "../utils/fileAttach";
-import type { ComposerImageAttachment } from "../utils/imageAttach";
+import { type ComposerImageAttachment, restoredComposerImage } from "../utils/imageAttach";
 import type { FileMention } from "./composerStore";
 
 /** 只保存可编辑内容的语义数据，恢复时重新创建芯片，不保存 HTML 或 DOM。 */
@@ -123,6 +123,23 @@ export class ComposerDraftHandle {
           }
         : draft,
     );
+  }
+
+  /** Restore withdrawn input without dropping attachments during queue edits or stop. */
+  restoreInput(text: string, images: readonly PiImageContent[] = []): void {
+    this.enqueue({ kind: "text", text });
+    if (images.length)
+      this.update((draft) => ({
+        ...draft,
+        imageAttachments: [...draft.imageAttachments, ...images.map(restoredComposerImage)],
+      }));
+  }
+
+  /** Restore each withdrawn queue item to this draft, preserving attachment order. */
+  restoreQueue(queue: PiQueuedMessages): void {
+    for (const kind of ["steering", "followUp"] as const)
+      for (const [index, text] of queue[kind].entries())
+        this.restoreInput(text, queue.imageAttachments?.[kind][index]);
   }
 
   enqueue(edit: ComposerDraftEdit): void {

@@ -14,9 +14,17 @@ export function durableDisplayMessages(entry: EntryRecord): readonly Message[] {
       ? entry.data.input
       : undefined;
   if (typeof input !== "string") return entry.model ?? [];
-  return (entry.model ?? []).map((message) =>
-    message.role === "user" ? { ...message, content: input } : message,
-  );
+  return (entry.model ?? []).map((message) => {
+    if (message.role !== "user") return message;
+    const images =
+      typeof message.content === "string"
+        ? []
+        : message.content.filter((block) => block.type === "image");
+    return {
+      ...message,
+      content: images.length ? [{ type: "text" as const, text: input }, ...images] : input,
+    };
+  });
 }
 
 export const DURABLE_EXTENSION_ID = /^[a-z][a-z0-9-]{0,63}$/;

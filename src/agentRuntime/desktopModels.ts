@@ -27,7 +27,7 @@ export function desktopModels() {
               contextWindow: catalog.contextWindow,
               maxTokens: catalog.maxTokens,
               reasoning: catalog.reasoning,
-              input: ["text"],
+              input: ["text", "image"],
               cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
             },
           ],

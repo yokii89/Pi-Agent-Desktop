@@ -343,6 +343,31 @@ describe("user image attachments (docs/design/21)", () => {
       images: [{ src: "data:image/webp;base64,CCCC", mimeType: "image/webp" }],
     });
   });
+
+  it("keeps images when a queued Durable user message is projected", () => {
+    const entries = sessionEntriesReducer([], {
+      type: "event",
+      event: {
+        type: "durable_user",
+        entryId: 7,
+        message: {
+          role: "user",
+          content: [
+            { type: "text", text: "Describe this" },
+            { type: "image", data: "AAAA", mimeType: "image/png" },
+          ],
+        },
+      },
+    });
+    expect(entries).toMatchObject([
+      {
+        kind: "user",
+        id: "durable-user-7",
+        text: "Describe this",
+        images: [{ src: "data:image/png;base64,AAAA", mimeType: "image/png" }],
+      },
+    ]);
+  });
 });
 
 /**

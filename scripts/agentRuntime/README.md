@@ -11,6 +11,7 @@
 - `development-fault.png` / `packaged-fault.png`：生成过程中 utility process 被终止后的实际界面。
 - `development-p3-native.png` / `packaged-p3-native.png`：原生扩展命令与工具执行界面。
 - `development-p3-resources.png` / `packaged-p3-resources.png`：从补全菜单选择并发送技能/提示模板后的实际界面，对应报告 `workbench.p3Resources`。
+- `development-images-{queue,stopped,restored}.png` / `packaged-images-{queue,stopped,restored}.png`：图片排队、停止取回及 SQLite 重开后的实际界面，对应报告 `workbench.images`。
 - `public-provider.json` / `public-provider.png`：显式运行公网验证时保存的结果；后续本地验证不会覆盖它们。
 - `workbench-failure.png` / `workbench-failure.txt`：仅在工作台验收失败时输出，便于定位界面问题。
 
@@ -26,10 +27,12 @@
 - 工作台检查通过真实编辑器输入、发送按钮和侧栏历史按钮，走 preload → 主窗口 IPC → MessagePort → `DesktopRuntime` → SQLite → 投影 → renderer 的完整链路。
 - 本地 OpenAI 兼容 SSE 服务返回一次 `read` 调用，实际读取验收工作区的 `fixture.txt`，收到工具结果后再返回最终回答。确认用户消息不重复。
 - renderer reload 后重新打开历史，以及关闭会话后重新打开 SQLite，均恢复回答且不增加模型请求、不重放完成事件。
+- 从编辑器粘贴 PNG/JPEG，发送图文混合及纯图片消息；检查生产 OpenAI 兼容传输中的实际 `image_url` 数据。通过托盘编辑、键盘重排、转换类型和删除，确认图片顺序与归属正确；停止后完整恢复草稿文字和图片，再发送并关闭重开 SQLite，确认 7 张历史图片可解码且不新增模型请求。
 - 生成过程中通过捕获的专属 `UtilityProcess` 对象强制终止写者，确认在途请求被拒绝、会话只推送一次 error 和 exit、界面显示 Interrupted 和错误提示、发送按钮退出 Stop 状态。
 - 重新从侧栏打开会话，启动新 utility process，恢复持久任务并完成回答；先前保存的回答仍在，用户消息没有重复。
 - 真实补全菜单中的原生扩展命令、原生工具执行、原始命令历史、未知命令拒绝与 SQLite 重开。
 - 包内技能与本地提示模板的补全和展开、带引号参数、用户原始命令展示；关闭重开后确认更新的 AGENTS.md、技能正文和命令目录。
+- 旧 JSONL 历史保持只读，IPC 按 100 条分页，界面自动组装全部 205 条验收记录，首尾消息和原文件保持一致。
 - 正常关闭 runtime，确认关闭后拒绝再次启动；打包态断言应用路径位于 `app.asar` 内。
 
 默认检查只请求本机临时模型服务。每次 Electron 运行使用独立 userData、home、agent 目录、验收项目和数据库；utility process 沿用生产的空环境变量配置。工作台沿用现有历史目录发现逻辑，但测试会话写入独立 profile，不修改日常会话、资源或模型配置。

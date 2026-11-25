@@ -289,7 +289,7 @@ export async function checkP2Workbench(
     await until(
       () =>
         evaluate<boolean>(
-          "document.body.innerText.includes('Legacy history is read-only.') && document.querySelectorAll('[data-kind=\"user\"]').length===100",
+          "document.body.innerText.includes('Legacy history is read-only.') && document.querySelectorAll('[data-kind=\"user\"]').length===205",
         ),
       "legacy read-only UI",
     );
@@ -297,16 +297,17 @@ export async function checkP2Workbench(
       await evaluate<boolean>("!!document.querySelector('[contenteditable=\"true\"]')"),
       false,
     );
-    for (const count of [200, 205]) {
-      await evaluate(
-        "Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Load earlier history').click()",
-      );
-      await until(
-        () =>
-          evaluate<boolean>(`document.querySelectorAll('[data-kind="user"]').length===${count}`),
-        "legacy earlier page",
-      );
-    }
+    // The renderer automatically assembles all bounded pages before displaying history.
+    assert.equal(
+      await evaluate<string>("document.querySelector('[data-kind=\"user\"]').textContent"),
+      "P2_OLD_0",
+    );
+    assert.equal(
+      await evaluate<string>(
+        "Array.from(document.querySelectorAll('[data-kind=\"user\"]')).at(-1).textContent",
+      ),
+      "P2_OLD_204",
+    );
     await screenshot("legacy");
     const saveDialog = dialog.showSaveDialog;
     try {

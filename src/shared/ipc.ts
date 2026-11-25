@@ -1101,15 +1101,17 @@ export type QueueIntent = "steer" | "followUp";
 /** prompt 受理结果：started=开新一轮；queued=已排队；handled=扩展命令/输入处理器消费。 */
 export type PromptDisposition = "started" | "queued" | "handled";
 
-/** pi 队列全量快照（`queue_update` / `clear_queue` 的数据体；只含文本）。 */
+/** pi 队列全量快照；clear_queue 另携带与文本逐项对齐的图片，供取回与重排。 */
 export interface PiQueuedMessages {
   steering: string[];
   followUp: string[];
+  /** Withdrawn Durable attachments, aligned with the returned text arrays for safe editing/requeueing. */
+  imageAttachments?: { steering: PiImageContent[][]; followUp: PiImageContent[][] };
 }
 
 export interface SessionPromptRequest extends SessionProcessRequest {
   text: string;
-  /** 可选图片附件（RPC `prompt.images`）；缺省或空表示纯文本。 */
+  /** 可选图片附件（base64 无 data: 前缀），随文本一起持久化并发送给模型。 */
   images?: PiImageContent[];
   /**
    * 运行中发送一律带意图（空闲时 pi 忽略该字段）；同时兜住

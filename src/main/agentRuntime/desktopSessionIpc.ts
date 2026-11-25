@@ -5,6 +5,8 @@ import {
   parseDurableCommand,
   record,
 } from "../../shared/durableProtocol";
+import { t } from "../../shared/i18n";
+import { parseImageInputContents } from "../../shared/imageInput";
 import { isThinkingLevelId, PI_IPC, SESSION_IPC, type SessionStartRequest } from "../../shared/ipc";
 import { sessionRefFromKey } from "../../shared/sessionRef";
 import { envelopeAsync } from "../ipc/envelope";
@@ -56,10 +58,12 @@ export function registerDurableSessionIpc(): void {
     return desktopSessions.start(request as SessionStartRequest);
   });
   handle(SESSION_IPC.prompt, (request) => {
-    if (!boundedText(request.text, 256_000) || !request.text.trim())
-      throw new Error("Input must not be empty or exceed 256000 characters.");
-    if (request.images !== undefined && (!Array.isArray(request.images) || request.images.length))
-      throw new Error("This desktop model currently supports text input only.");
+    if (!boundedText(request.text, 256_000, true))
+      throw new Error(t("session.durable.inputTooLong"));
+    const images = request.images === undefined ? [] : parseImageInputContents(request.images);
+    if (images === null) throw new Error(t("session.durable.invalidImages"));
+    if (!request.text.trim() && images.length === 0)
+      throw new Error(t("session.durable.emptyInput"));
     if (
       request.streamingBehavior !== undefined &&
       !["steer", "followUp"].includes(String(request.streamingBehavior))
@@ -69,6 +73,8 @@ export function registerDurableSessionIpc(): void {
       id(request.sessionId),
       request.text,
       request.streamingBehavior as "steer" | "followUp" | undefined,
+      undefined,
+      images.length ? images : undefined,
     );
   });
   handle(SESSION_IPC.clearQueue, (request) => desktopSessions.clearQueue(id(request.sessionId)));
@@ -127,7 +133,7 @@ export function registerDurableSessionIpc(): void {
             label: model.modelId,
             contextWindow: model.contextWindow,
             maxTokens: model.maxTokens,
-            input: ["text"],
+            input: ["text", "image"],
             availableThinkingLevels: model.reasoning
               ? ["off", "minimal", "low", "medium", "high", "xhigh"]
               : ["off"],

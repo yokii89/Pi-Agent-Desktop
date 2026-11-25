@@ -10,9 +10,11 @@ import {
   DURABLE_COMMAND_CATALOG_LIMIT,
   isDurableCommandMetadata,
 } from "../../shared/durableResources";
+import { parseImageInputContents } from "../../shared/imageInput";
 import type {
   PiAgentEvent,
   PiChatMessage,
+  PiImageContent,
   PiModelState,
   PiQueuedMessages,
   PiSlashCommand,
@@ -256,6 +258,7 @@ class DesktopSessions {
     text: string,
     mode: "steer" | "followUp" | "reject" = "followUp",
     requestId: string = randomUUID(),
+    images?: readonly PiImageContent[],
   ): Promise<"started" | "queued"> {
     const attachment = this.require(id);
     if (!readDurableModel())
@@ -266,6 +269,7 @@ class DesktopSessions {
       requestId,
       text,
       mode,
+      ...(images?.length ? { images } : {}),
     });
     if (!record(result) || !["started", "queued"].includes(String(result.disposition)))
       throw new Error("Invalid Durable admission response.");
@@ -288,6 +292,10 @@ class DesktopSessions {
     const attachment = this.require(id);
     const items = attachment.view?.docs["pi.inbox"]?.items;
     const removed: PiQueuedMessages = { steering: [], followUp: [] };
+    const imageAttachments: NonNullable<PiQueuedMessages["imageAttachments"]> = {
+      steering: [],
+      followUp: [],
+    };
     if (!Array.isArray(items)) return removed;
     // Exact submission IDs are withdrawn. Items already placed are not returned as withdrawn text.
     for (const item of items) {
@@ -302,9 +310,22 @@ class DesktopSessions {
         sessionId: attachment.storedId,
         submissionId: item.id,
       });
-      if (status === "aborted")
-        removed[item.mode === "steer" ? "steering" : "followUp"].push(inputText(item.content));
+      if (status === "aborted") {
+        const kind = item.mode === "steer" ? "steering" : "followUp";
+        removed[kind].push(inputText(item.content));
+        imageAttachments[kind].push(
+          Array.isArray(item.content)
+            ? (parseImageInputContents(
+                item.content.filter((block) => record(block) && block.type === "image"),
+              ) ?? [])
+            : [],
+        );
+      }
     }
+    if (
+      [...imageAttachments.steering, ...imageAttachments.followUp].some((images) => images.length)
+    )
+      removed.imageAttachments = imageAttachments;
     return removed;
   }
 
@@ -441,7 +462,7 @@ class DesktopSessions {
       availableThinkingLevels: config?.reasoning
         ? ["off", "minimal", "low", "medium", "high", "xhigh"]
         : ["off"],
-      modelInput: ["text"],
+      modelInput: ["text", "image"],
       contextWindow: config?.contextWindow ?? null,
       autoCompactionEnabled: true,
     };

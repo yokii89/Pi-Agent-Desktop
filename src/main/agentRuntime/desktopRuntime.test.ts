@@ -6,7 +6,11 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DesktopRuntime } from "../../agentRuntime/desktopRuntime";
 import { type SessionEntry, sessionEntriesReducer } from "../../renderer/stores/sessionTranscript";
-import { parseRuntimeUpdate, type RuntimeSessionUpdate } from "../../shared/durableProtocol";
+import {
+  parseDurableCommand,
+  parseRuntimeUpdate,
+  type RuntimeSessionUpdate,
+} from "../../shared/durableProtocol";
 import { DurableProjection } from "./durableProjection";
 
 const cleanup: (() => Promise<void>)[] = [];
@@ -102,6 +106,69 @@ async function fixture(
 }
 
 describe("desktop production provider, DTO and transcript integration", () => {
+  it("sends text and image-only submissions to the provider and restores their images from SQLite", async () => {
+    const f = await fixture((response) => {
+      chunk(response, { role: "assistant", content: "Images received." });
+      chunk(response, {}, "stop");
+      finish(response);
+    });
+    const images = [
+      { type: "image", data: "iVBORw0KGgo=", mimeType: "image/png" },
+      { type: "image", data: "/9j/4AAQ", mimeType: "image/jpeg" },
+    ] as const;
+    for (const [index, text] of ["Describe both images", ""].entries()) {
+      const command = parseDurableCommand({
+        op: "submit",
+        sessionId: f.sessionId,
+        requestId: `images-${index}`,
+        text,
+        images,
+        mode: "followUp",
+      });
+      if (!command) throw new Error("Image command did not pass validation.");
+      const admission = await f.runtime.execute(command);
+      expect(await f.runtime.execute(command)).toEqual(admission);
+      await until(
+        () =>
+          f.entries().filter((entry) => entry.kind === "run" && entry.status === "completed")
+            .length ===
+          index + 1,
+      );
+      const request = f.requests.at(-1);
+      if (!request) throw new Error("No image request reached the provider.");
+      const users = (request.messages as { role: string; content: unknown }[]).filter(
+        (message) => message.role === "user",
+      );
+      expect(users.at(-1)?.content).toEqual([
+        ...(text ? [{ type: "text", text }] : []),
+        ...images.map((image) => ({
+          type: "image_url",
+          image_url: { url: `data:${image.mimeType};base64,${image.data}` },
+        })),
+      ]);
+    }
+    const expected = images.map((image) => ({
+      src: `data:${image.mimeType};base64,${image.data}`,
+      mimeType: image.mimeType,
+    }));
+    expect(f.entries().filter((entry) => entry.kind === "user")).toMatchObject([
+      { text: "Describe both images", images: expected },
+      { text: "", images: expected },
+    ]);
+    await f.runtime.execute({ op: "close", sessionId: f.sessionId });
+    await f.runtime.execute({
+      op: "open",
+      sessionId: f.sessionId,
+      cwd: f.directory,
+      create: false,
+    });
+    expect(f.entries().filter((entry) => entry.kind === "user")).toMatchObject([
+      { text: "Describe both images", images: expected },
+      { text: "", images: expected },
+    ]);
+    expect(f.requests).toHaveLength(2);
+  });
+
   it("streams through OpenAI transport, executes a real read tool, deduplicates usage and reopens SQLite by UUID", async () => {
     let call = 0;
     const f = await fixture((response) => {
@@ -224,6 +291,7 @@ describe("desktop production provider, DTO and transcript integration", () => {
       sessionId: f.sessionId,
       requestId: randomUUID(),
       text: "/skill:review changes",
+      images: [{ type: "image", data: "AAAA", mimeType: "image/png" }],
       mode: "followUp",
     } as const;
     const admission = await f.runtime.execute(command);
@@ -238,7 +306,10 @@ describe("desktop production provider, DTO and transcript integration", () => {
     expect(JSON.stringify(f.requests[0])).toContain("INSTRUCTIONS_ONE");
     expect(JSON.stringify(f.requests[0])).toContain("RESOURCE_BODY_ONE");
     expect(f.entries().filter((entry) => entry.kind === "user")).toMatchObject([
-      { text: command.text },
+      {
+        text: command.text,
+        images: [{ src: "data:image/png;base64,AAAA", mimeType: "image/png" }],
+      },
     ]);
     await f.runtime.execute({ op: "close", sessionId: f.sessionId });
     await writeFile(file, "---\nname: review\ndescription: Updated review\n---\nRESOURCE_BODY_TWO");

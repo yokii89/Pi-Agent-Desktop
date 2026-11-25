@@ -290,7 +290,7 @@ export const QueueTray = memo(function QueueTray() {
                   )}
                 </span>
                 <span className={styles.text} title={item.text}>
-                  {item.text}
+                  {item.text || t("session.image.copyOne")}
                 </span>
                 <div className={styles.actions}>
                   <button

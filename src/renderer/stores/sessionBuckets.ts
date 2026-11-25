@@ -7,6 +7,7 @@ import type {
   PiChatMessage,
   PiContextBreakdownSlice,
   PiContextUsage,
+  PiImageContent,
   PiQueuedMessages,
   QueueIntent,
   SessionId,
@@ -147,18 +148,34 @@ function queueAt(
   return list[index] === expected ? list[index] : null;
 }
 
+function copyQueue(cleared: PiQueuedMessages): PiQueuedMessages {
+  return {
+    steering: [...cleared.steering],
+    followUp: [...cleared.followUp],
+    ...(cleared.imageAttachments
+      ? {
+          imageAttachments: {
+            steering: [...cleared.imageAttachments.steering],
+            followUp: [...cleared.imageAttachments.followUp],
+          },
+        }
+      : {}),
+  };
+}
+
 /** 移除一条（编辑取回 / 删除），其余顺序不变。 */
 export function removeQueueItem(
   cleared: PiQueuedMessages,
   kind: QueueIntent,
   index: number,
   expected: string,
-): { removed: string; steering: string[]; followUp: string[] } | null {
+): (PiQueuedMessages & { removed: string; removedImages?: PiImageContent[] }) | null {
   if (queueAt(cleared, kind, index, expected) === null) return null;
-  const steering = [...cleared.steering];
-  const followUp = [...cleared.followUp];
-  (kind === "steer" ? steering : followUp).splice(index, 1);
-  return { removed: expected, steering, followUp };
+  const next = copyQueue(cleared);
+  const key = kind === "steer" ? "steering" : "followUp";
+  next[key].splice(index, 1);
+  const removedImages = next.imageAttachments?.[key].splice(index, 1)[0];
+  return { ...next, removed: expected, ...(removedImages?.length ? { removedImages } : {}) };
 }
 
 /** 插话 ⇄ 稍后：从原队列移除，追加到目标队列末尾（display 顺序 = steering → followUp）。 */
@@ -167,12 +184,15 @@ export function convertQueueItem(
   kind: QueueIntent,
   index: number,
   expected: string,
-): { removed: string; steering: string[]; followUp: string[] } | null {
-  const removed = removeQueueItem(cleared, kind, index, expected);
-  if (!removed) return null;
-  if (kind === "steer") removed.followUp.push(expected);
-  else removed.steering.push(expected);
-  return { removed: expected, steering: removed.steering, followUp: removed.followUp };
+): (PiQueuedMessages & { removed: null }) | null {
+  const result = removeQueueItem(cleared, kind, index, expected);
+  if (!result) return null;
+  const { removed, removedImages, ...next } = result;
+  const destination = kind === "steer" ? "followUp" : "steering";
+  next[destination].push(removed);
+  next.imageAttachments?.[destination].push(removedImages ?? []);
+  // Converted input is already in the new queue; failed requeue recovery must not restore it twice.
+  return { ...next, removed: null };
 }
 
 /** 同一种类内拖动 / 键盘换位；`to` 是移除后的最终下标。跨种类换位走 convertQueueItem。 */
@@ -182,18 +202,20 @@ export function moveQueueItem(
   from: number,
   to: number,
   expected: string,
-): { steering: string[]; followUp: string[] } | null {
+): PiQueuedMessages | null {
   const list = kind === "steer" ? cleared.steering : cleared.followUp;
   if (queueAt(cleared, kind, from, expected) === null) return null;
-  if (to < 0 || to >= list.length || to === from) {
-    return { steering: [...cleared.steering], followUp: [...cleared.followUp] };
+  const next = copyQueue(cleared);
+  if (to < 0 || to >= list.length || to === from) return next;
+  const key = kind === "steer" ? "steering" : "followUp";
+  const [item] = next[key].splice(from, 1);
+  next[key].splice(to, 0, item);
+  const images = next.imageAttachments?.[key];
+  if (images) {
+    const [attachment] = images.splice(from, 1);
+    images.splice(to, 0, attachment);
   }
-  const steering = [...cleared.steering];
-  const followUp = [...cleared.followUp];
-  const target = kind === "steer" ? steering : followUp;
-  const [item] = target.splice(from, 1);
-  target.splice(to, 0, item);
-  return { steering, followUp };
+  return next;
 }
 
 export function createBucketsState(): SessionBucketsState {
@@ -258,10 +280,27 @@ export function applyEntries(
             item &&
             typeof item === "object" &&
             !Array.isArray(item) &&
-            (item.mode === "steer" || item.mode === "followUp") &&
-            typeof item.content === "string"
-          )
-            queue[item.mode === "steer" ? "steering" : "followUp"].push(item.content);
+            (item.mode === "steer" || item.mode === "followUp")
+          ) {
+            const text =
+              typeof item.content === "string"
+                ? item.content
+                : Array.isArray(item.content)
+                  ? item.content
+                      .flatMap((block) =>
+                        typeof block === "object" &&
+                        block !== null &&
+                        "type" in block &&
+                        block.type === "text" &&
+                        "text" in block &&
+                        typeof block.text === "string"
+                          ? [block.text]
+                          : [],
+                      )
+                      .join("\n")
+                  : "";
+            queue[item.mode === "steer" ? "steering" : "followUp"].push(text);
+          }
         }
       return patchBucket(next, sessionId, {
         entries,
