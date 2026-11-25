@@ -1,5 +1,5 @@
 import { Check, Code, Folder, FolderOpen } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { WorkdirOpenTarget } from "../../../shared/ipc";
 import { getNamedIconUrl } from "../../fileIcons/resolve";
 import { useResolvedTheme } from "../../hooks/useResolvedTheme";
@@ -57,14 +57,19 @@ export function WorkdirChip({ dir }: WorkdirChipProps) {
   const t = useT();
   const { showToast } = useUiStore();
   const [target, setTarget] = useState<WorkdirOpenTarget>("explorer");
+  const [ready, setReady] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const openingRef = useRef(false);
 
-  // 水合默认打开方式（设备本地偏好）；水合前先按 explorer 渲染，勾选晚一拍无碍
+  // 首次点击要使用已保存的打开方式，因此读取完成前暂不允许操作。
   useEffect(() => {
     let alive = true;
     void settingsService.get().then((settings) => {
-      if (alive && settings) {
+      if (!alive) return;
+      if (settings) {
         setTarget(settings.workdirOpenTarget === "vscode" ? "vscode" : "explorer");
       }
+      setReady(true);
     });
     return () => {
       alive = false;
@@ -72,15 +77,24 @@ export function WorkdirChip({ dir }: WorkdirChipProps) {
   }, []);
 
   const open = (next: WorkdirOpenTarget): void => {
+    // 锁持续到偏好写入结束，防止旧调用覆盖后续选择或重复启动应用。
+    if (!ready || openingRef.current) return;
+    openingRef.current = true;
+    setOpening(true);
     const previous = target;
-    setTarget(next); // 乐观更新：菜单收起时勾选已就位，失败再回退
+    setTarget(next);
     void (next === "vscode" ? fsService.openInVsCode(dir) : fsService.openPath(dir))
-      .then(() => {
-        void settingsService.set({ workdirOpenTarget: next });
+      .then(async () => {
+        const saved = await settingsService.set({ workdirOpenTarget: next });
+        if (!saved) showToast(t("session.workspace.openTargetSaveFailed"));
       })
       .catch((err: unknown) => {
         setTarget(previous);
         showToast(err instanceof Error ? err.message : t("session.workspace.openFailed"));
+      })
+      .finally(() => {
+        openingRef.current = false;
+        setOpening(false);
       });
   };
 
@@ -90,12 +104,19 @@ export function WorkdirChip({ dir }: WorkdirChipProps) {
         type="button"
         className={styles.main}
         aria-label={t("session.workspace.openWorkdir")}
+        disabled={!ready || opening}
         onClick={() => open(target)}
       >
         <BrandIcon
-          asset="file-explorer"
+          asset={target === "vscode" ? "vscode" : "file-explorer"}
           size={13}
-          fallback={<Folder size={13} weight="regular" />}
+          fallback={
+            target === "vscode" ? (
+              <Code size={13} weight="regular" />
+            ) : (
+              <Folder size={13} weight="regular" />
+            )
+          }
         />
         <span className={styles.chipLabel}>{basename(dir)}</span>
       </button>
@@ -110,6 +131,7 @@ export function WorkdirChip({ dir }: WorkdirChipProps) {
             className={[styles.chevron, menuOpen ? styles.chevronOpen : ""].join(" ")}
             aria-label={t("session.workspace.openWith")}
             aria-haspopup="menu"
+            disabled={!ready || opening}
             onClick={onClick}
           >
             <GlideChevron size={12} />
@@ -119,6 +141,7 @@ export function WorkdirChip({ dir }: WorkdirChipProps) {
           {
             key: "explorer",
             label: t("session.workspace.openInExplorer"),
+            disabled: !ready || opening,
             icon: (
               <BrandIcon
                 asset="file-explorer"
@@ -132,6 +155,7 @@ export function WorkdirChip({ dir }: WorkdirChipProps) {
           {
             key: "vscode",
             label: t("session.workspace.openInVsCode"),
+            disabled: !ready || opening,
             icon: <BrandIcon asset="vscode" fallback={<Code size={16} weight="regular" />} />,
             selected: target === "vscode",
             badge: target === "vscode" ? <Check size={16} weight="regular" /> : undefined,

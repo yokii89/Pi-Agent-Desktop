@@ -943,6 +943,26 @@ export const sessionMessages = defineMessages({
     "zh-CN": "打开失败",
     "en-US": "Failed to open",
   },
+  "session.workspace.openTargetSaveFailed": {
+    "zh-CN": "已打开，但未能保存默认打开方式",
+    "en-US": "Opened successfully, but the default opening app could not be saved",
+  },
+  "session.workspace.pathUnavailable": {
+    "zh-CN": "路径不存在或已被移动",
+    "en-US": "The path does not exist or has been moved",
+  },
+  "session.workspace.notDirectory": {
+    "zh-CN": "工作目录不是文件夹",
+    "en-US": "The working directory is not a folder",
+  },
+  "session.workspace.vsCodeNotFound": {
+    "zh-CN": "未检测到 VS Code，请确认已安装并在安装时勾选了「添加到 PATH」",
+    "en-US": "VS Code was not found. Make sure it is installed with Add to PATH enabled",
+  },
+  "session.workspace.vsCodeLaunchFailed": {
+    "zh-CN": "无法启动 VS Code，请检查安装是否正常",
+    "en-US": "Could not start VS Code. Check that it is installed correctly",
+  },
   "session.workspace.remote": {
     "zh-CN": "远程连接",
     "en-US": "Remote connection",

@@ -16,7 +16,6 @@ import { envelope, envelopeAsync } from "../ipc/envelope";
 import {
   listDirectory,
   openDirectory,
-  openInVsCode,
   pickFile,
   readFile,
   revealInExplorer,
@@ -26,6 +25,7 @@ import {
 } from "./fsService";
 import { readPreviewImage } from "./imagePreview";
 import { readPreviewMedia } from "./mediaPreview";
+import { openInVsCode } from "./openInVsCode";
 import { unwatchDirectory, watchDirectory } from "./watcher";
 
 /** 注册文件系统 IPC（docs/design/03 §5 / §8）。 */
