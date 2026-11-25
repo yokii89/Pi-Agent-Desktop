@@ -71,6 +71,10 @@ export const sessionMessages = defineMessages({
   },
   "session.input.running": { "zh-CN": "pi 运行中", "en-US": "pi is running" },
 
+  "session.input.targetDraftOccupied": {
+    "zh-CN": "目标会话已有未发送草稿，请先处理后重试",
+    "en-US": "The target session has an unsent draft. Resolve it before trying again.",
+  },
   "session.queue.clearFailed": {
     "zh-CN": "清空队列失败",
     "en-US": "Couldn't clear the queue",

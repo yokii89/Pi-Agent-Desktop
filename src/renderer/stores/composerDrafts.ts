@@ -186,15 +186,16 @@ export class ComposerDraftStore {
   }
 
   /** 首页启动成功或临时桶换权威 id 时，迁移同一草稿对象；失败不迁移首页。 */
-  move(from: string, to: string, expected?: ComposerDraftHandle): void {
-    if (from === to) return;
+  move(from: string, to: string, expected?: ComposerDraftHandle): boolean {
+    if (from === to) return true;
     const source = this.drafts.get(from);
-    if (!source || (expected && source !== expected)) return;
+    if (!source || (expected && source !== expected)) return false;
     const target = this.drafts.get(to);
-    if (target && target.getSnapshot() !== EMPTY_DRAFT) return;
+    if (target && target.getSnapshot() !== EMPTY_DRAFT) return false;
     this.drafts.set(to, source);
     this.drafts.delete(from);
     this.notify();
+    return true;
   }
 
   submit(key: string, send: () => Promise<PromptDisposition | null>): Promise<boolean> {

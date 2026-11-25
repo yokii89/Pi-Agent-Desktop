@@ -1527,6 +1527,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const thinkingLevelAtSend = getComposerThinkingLevel();
 
       let targetId = activeKeyRef.current;
+      const cwdAtSend = cwdRef.current ?? null;
       const sourceBucket = targetId ? bucketsStateRef.current.buckets.get(targetId) : undefined;
       const sourceKey = composerDraftKey(targetId, cwdRef.current ?? null, sourceBucket?.phase);
       const sourceDraft = drafts.bind(sourceKey);
@@ -1549,6 +1550,38 @@ export function SessionProvider({ children }: { children: ReactNode }) {
        * 由 streamingBehavior 交 pi 自己判断「开新一轮」还是「排队」，避免 agent_end 竞态。
        */
       const queueing = bucket?.processAlive === true && bucket.phase === "running";
+      let sid = targetId as SessionId;
+      const targetDraftKey = composerDraftKey(sid, null);
+      if (fromHome) {
+        // 提交后立即把首页草稿和 active 会话迁到目标桶；冷启动期间直接显示对话。
+        if (!drafts.move(sourceKey, targetDraftKey, sourceDraft)) {
+          showToast(t("session.input.targetDraftOccupied"));
+          return null;
+        }
+        setState((prev) => {
+          let next = ensureBucket(prev, sid);
+          next = patchBucket(next, sid, { cwd: cwdRef.current, phase: "running" });
+          return setActiveKey(next, sid);
+        });
+        bindActive(sid);
+      }
+      if (!queueing) {
+        setState((prev) => {
+          let next = applyEntries(prev, sid, {
+            type: "userMessage",
+            text: trimmed,
+            items,
+            images: displayImages.length > 0 ? displayImages : undefined,
+            optimistic: true,
+          });
+          next = patchBucket(next, sid, { phase: "running" });
+          const current = next.buckets.get(sid);
+          if (current && !current.sessionFile) {
+            next = indexFileOnly(next, sid, pendingFileKey(sid));
+          }
+          return next;
+        });
+      }
       // 同步乐观行（发送瞬间上侧栏，不等 setState 提交）：无 file 桶的 start 恒返回
       // bucketId（无 file 不可能 reuse），先于 start 插入才不会被主进程 start 内的
       // 模型对齐 RPC 拖延；已有真实 JSONL 的会话磁盘行已覆盖，不插 pending。
@@ -1580,10 +1613,45 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           }
         }
         if (!started) {
-          dropPendingSummary(targetId);
+          if (fromHome) {
+            const restoredHomeDraft = drafts.move(targetDraftKey, sourceKey, sourceDraft);
+            if (restoredHomeDraft) {
+              dropPendingSummary(targetId);
+              setState((prev) => {
+                const buckets = new Map(prev.buckets);
+                buckets.delete(sid);
+                const fileIndex = new Map(prev.fileIndex);
+                fileIndex.delete(pendingFileKey(sid));
+                const next = { ...prev, buckets, fileIndex };
+                return next.activeKey === sid ? setActiveKey(next, null) : next;
+              });
+              if (activeKeyRef.current === sid) bindActive(null);
+            } else {
+              // 首页已被下一项新任务占用：保留失败桶和它的草稿，让侧栏仍可重新打开。
+              setState((prev) => {
+                if (!prev.buckets.has(sid)) return prev;
+                let next = applyEntries(prev, sid, { type: "discardOptimisticUser" });
+                next = patchBucket(next, sid, { phase: "idle", startPending: false });
+                return next;
+              });
+            }
+          } else {
+            dropPendingSummary(targetId);
+            setState((prev) => {
+              if (!prev.buckets.has(sid)) return prev;
+              let next = applyEntries(prev, sid, { type: "discardOptimisticUser" });
+              next = patchBucket(next, sid, { phase: bucket?.phase ?? "idle" });
+              return next;
+            });
+          }
           return null;
         }
         targetId = started;
+        sid = started;
+        if (fromHome && (cwdRef.current ?? null) !== cwdAtSend) {
+          setState((prev) => (prev.activeKey === sid ? setActiveKey(prev, null) : prev));
+          if (activeKeyRef.current === sid) bindActive(null);
+        }
         // 冷启动成功后补应用输入栏思考档位（§3.5）：spawn 参数不带 thinking，
         // 冷态改档位只写了本地 composerStore；不补发则实际跑 pi 默认档位。
         // 先于 prompt 发起即可保序，不阻塞发送；pi 可能按模型能力 clamp，回执后拉一次真值。
@@ -1595,36 +1663,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         bindActive(targetId);
       }
 
-      // 预启动仍属于首页；真正提交后才迁移到会话，启动失败则首页草稿原样保留。
-      if (fromHome) drafts.move(sourceKey, composerDraftKey(targetId, null), sourceDraft);
+      // 会话与用户气泡已乐观呈现；pi 启动成功后再提交提示，失败时撤回临时会话并恢复草稿。
       const promptText =
         items.length > 0
           ? buildPageContext({ text: trimmed, items, consoleErrors: context?.consoleErrors ?? [] })
           : trimmed;
-      if (!queueing) {
-        setState((prev) => {
-          let next = applyEntries(prev, targetId as SessionId, {
-            type: "userMessage",
-            text: trimmed,
-            items,
-            images: displayImages.length > 0 ? displayImages : undefined,
-            optimistic: true,
-          });
-          next = patchBucket(next, targetId as SessionId, { phase: "running" });
-          // 未落盘：只登记 fileIndex 供 running/点击，sessionFile 仍留给真实 JSONL
-          const b = next.buckets.get(targetId as SessionId);
-          if (b && !b.sessionFile) {
-            next = indexFileOnly(
-              next,
-              targetId as SessionId,
-              pendingFileKey(targetId as SessionId),
-            );
-          }
-          return next;
-        });
-      }
       scheduleClaim(targetId);
-      const sid = targetId as SessionId;
       try {
         const disposition = await sessionService.prompt(
           promptText,

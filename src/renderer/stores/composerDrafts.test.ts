@@ -181,6 +181,18 @@ describe("composer drafts", () => {
     expect(store.get("session:real")).toBe(newer);
   });
 
+  it("keeps both drafts reachable when a failed home send cannot reclaim the occupied home key", () => {
+    const store = new ComposerDraftStore();
+    const original = save(store, "home:C:/project", "first task");
+    const originalHandle = store.bind("home:C:/project");
+    expect(store.move("home:C:/project", "session:first", originalHandle)).toBe(true);
+
+    const nextTask = save(store, "home:C:/project", "next task");
+    expect(store.move("session:first", "home:C:/project", originalHandle)).toBe(false);
+    expect(store.get("home:C:/project")).toBe(nextTask);
+    expect(store.get("session:first")).toBe(original);
+  });
+
   it("keeps snapshot identity stable until content changes and supports unsubscription", () => {
     const store = new ComposerDraftStore();
     const listener = vi.fn();
