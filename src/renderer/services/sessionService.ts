@@ -17,6 +17,7 @@ import type {
   SessionTranscriptPayload,
   ThinkingLevelId,
 } from "../../shared/ipc";
+import { sessionRefFromKey } from "../../shared/sessionRef";
 import { isModeTransitioning } from "../stores/modeTransitionBarrier";
 import { unwrap } from "./ipc";
 import { pideskApi } from "./pideskApi";
@@ -69,7 +70,8 @@ export const sessionService = {
   async start(req: SessionStartRequest): Promise<SessionId> {
     const api = pideskApi();
     if (!api) return req.sessionId ?? `sess_local_${Date.now()}`;
-    return unwrap(api.session.start(req));
+    const ref = req.ref ?? (req.sessionFile ? sessionRefFromKey(req.sessionFile) : undefined);
+    return unwrap(api.session.start({ ...req, ref, sessionFile: undefined }));
   },
 
   /**
@@ -168,10 +170,10 @@ export const sessionService = {
   },
 
   /** 读取会话 JSONL 转为消息数组（磁盘优先展示，不依赖 pi 进程）。 */
-  readTranscript(file: string): Promise<SessionTranscriptPayload> {
+  readTranscript(file: string, before?: number): Promise<SessionTranscriptPayload> {
     const api = pideskApi();
     if (!api) return Promise.reject(new Error("preload 未就绪"));
-    return unwrap(api.session.readTranscript(file));
+    return unwrap(api.session.readTranscript(file, before));
   },
 
   /** 导出会话记录为 Markdown 文件（系统保存对话框；取消返回 null）。 */
@@ -208,8 +210,8 @@ export const sessionService = {
   getModelState(sessionId?: SessionId): Promise<PiModelState | null> {
     const api = pideskApi();
     const id = sessionId ?? currentSessionId;
-    if (!api || !id) return Promise.resolve(null);
-    return unwrap(api.session.getModelState(id)).catch(() => null);
+    if (!api) return Promise.resolve(null);
+    return unwrap(api.session.getModelState(id ?? undefined)).catch(() => null);
   },
 
   /** 切换模型；无存活会话实例时仅落盘 pi 默认模型（新会话生效），并广播其它存活实例。 */

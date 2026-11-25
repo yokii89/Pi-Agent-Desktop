@@ -30,14 +30,15 @@ vi.mock("electron", () => ({
 vi.mock("./backgroundJobs", () => ({ hasLiveBackgroundJobs: fake.background }));
 vi.mock("../view/viewHost", () => ({ hasSessionModal: (id: string) => fake.modal.has(id) }));
 vi.mock("../settings/settings", () => ({ getSettings: () => fake.settings }));
-vi.mock("./piSession", () => ({
+vi.mock("./sessionRuntime", () => ({
   hasSession: (id: string) => fake.alive.has(id),
   getSessionProcessToken: (id: string) => (fake.alive.has(id) ? fake.tokens.get(id) : null),
   hasPendingSessionRequests: (id: string) => fake.pendingRpc.has(id),
   fetchSessionState: fake.probe,
-  disposeSession: (id: string) => {
+  disposeIdle: async (id: string) => {
     fake.disposed.push(id);
     fake.alive.delete(id);
+    return "ended";
   },
   waitForSessionDisposal: fake.disposal,
 }));

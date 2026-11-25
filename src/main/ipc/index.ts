@@ -1,4 +1,5 @@
 import type { IpcResult } from "../../shared/ipc";
+import { registerDurableSessionIpc } from "../agentRuntime/desktopSessionIpc";
 import { registerBrowserIpc } from "../browser/browserIpc";
 import { registerClipboardIpc } from "../clipboard/clipboardIpc";
 import { registerCatalogIpc } from "../extension/catalogIpc";
@@ -17,7 +18,6 @@ import { registerRemoteIpc } from "../remote/remoteIpc";
 import { registerSchedulerIpc } from "../scheduler/schedulerIpc";
 import { registerPrefetchIpc } from "../session/prefetchIpc";
 import { registerRuntimeIpc } from "../session/runtimeIpc";
-import { registerSessionIpc } from "../session/sessionIpc";
 import { registerSessionUiIpc } from "../session/sessionUiIpc";
 import { registerSettingsIpc } from "../settings/settingsIpc";
 import { registerTerminalIpc } from "../terminal/terminalIpc";
@@ -40,7 +40,7 @@ export function registerIpc(): void {
     registerNotificationIpc,
     registerProjectIpc,
     registerRemoteIpc,
-    registerSessionIpc,
+    registerDurableSessionIpc,
     registerSessionUiIpc,
     registerProcIpc,
     registerRuntimeIpc,

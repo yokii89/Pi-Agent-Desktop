@@ -13,6 +13,7 @@ import type {
   WorkerAcquireResult,
 } from "../shared/contribution";
 import { CATALOG_IPC, PREFETCH_IPC, RUNTIME_IPC, WORKER_IPC } from "../shared/contribution";
+import { DURABLE_IPC, type DurableDesktopApi } from "../shared/durableProtocol";
 import type {
   GitHubAuthState,
   GitHubDeviceStart,
@@ -405,6 +406,17 @@ contextBridge.exposeInMainWorld("pidesk", {
       ipcRenderer.invoke(MODEL_OVERRIDES_IPC.set, req),
   },
 
+  durable: {
+    model: () => ipcRenderer.invoke(DURABLE_IPC.model),
+    saveModel: (config) => ipcRenderer.invoke(DURABLE_IPC.saveModel, config),
+    history: (sessionId, before) => ipcRenderer.invoke(DURABLE_IPC.history, { sessionId, before }),
+    continue: (sessionId, requestId) =>
+      ipcRenderer.invoke(DURABLE_IPC.continue, { sessionId, requestId }),
+    compact: (sessionId, instructions) =>
+      ipcRenderer.invoke(DURABLE_IPC.compact, { sessionId, instructions }),
+    withdraw: (sessionId, submissionId) =>
+      ipcRenderer.invoke(DURABLE_IPC.withdraw, { sessionId, submissionId }),
+  } satisfies DurableDesktopApi,
   session: {
     /**
      * 启动 pi RPC 进程。
@@ -443,8 +455,8 @@ contextBridge.exposeInMainWorld("pidesk", {
     rename: (req: SessionRenameRequest): Promise<IpcResult<SessionRenameResult>> =>
       ipcRenderer.invoke(SESSION_IPC.rename, req),
     /** 读取会话 JSONL 转为消息数组（磁盘优先展示，不依赖 pi 进程）。 */
-    readTranscript: (file: string): Promise<IpcResult<SessionTranscriptPayload>> =>
-      ipcRenderer.invoke(SESSION_IPC.readTranscript, { file }),
+    readTranscript: (file: string, before?: number): Promise<IpcResult<SessionTranscriptPayload>> =>
+      ipcRenderer.invoke(SESSION_IPC.readTranscript, { file, before }),
     /** 导出会话记录为 Markdown 文件（系统保存对话框；取消返回 null）。 */
     exportMarkdown: (req: SessionExportRequest): Promise<IpcResult<{ path: string } | null>> =>
       ipcRenderer.invoke(SESSION_IPC.exportMarkdown, req),
@@ -458,7 +470,7 @@ contextBridge.exposeInMainWorld("pidesk", {
     setThinkingLevel: (req: SessionSetThinkingLevelRequest): Promise<IpcResult<null>> =>
       ipcRenderer.invoke(SESSION_IPC.setThinkingLevel, req),
     /** 读取目标会话的模型与思考档位（未启动时回退 pi 配置，不读其它实例）。 */
-    getModelState: (sessionId: SessionId): Promise<IpcResult<PiModelState>> =>
+    getModelState: (sessionId?: SessionId): Promise<IpcResult<PiModelState>> =>
       ipcRenderer.invoke(SESSION_IPC.getModelState, { sessionId }),
     /** 切换模型（目标会话存活时 RPC set_model；无会话则只落盘 pi 默认模型，仍广播其它存活实例）。 */
     setModel: (req: SessionSetModelRequest): Promise<IpcResult<PiModelOption>> =>

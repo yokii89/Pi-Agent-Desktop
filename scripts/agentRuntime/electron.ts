@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { realpathSync } from "node:fs";
+import { mkdtempSync, realpathSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { app } from "electron";
+import { app, utilityProcess } from "electron";
+import { checkWorkbench } from "./workbench";
 
 interface RuntimeManager {
   startAgentRuntime(): Promise<{ nodeVersion: string }>;
@@ -24,13 +25,14 @@ const configuredReportPath = process.env.PIDESK_RUNTIME_CHECK_REPORT;
 if (!configuredReportPath) throw new Error("Missing runtime check report path.");
 const reportPath: string = configuredReportPath;
 // Use an isolated profile: verification must never open the user's application settings or sessions.
-app.setPath("userData", path.join(path.dirname(reportPath), "profile"));
+app.setPath("userData", mkdtempSync(path.join(path.dirname(reportPath), "profile-")));
+process.env.PI_CODING_AGENT_DIR = path.join(app.getPath("userData"), "legacy-agent");
 
 const hostRequire = createRequire(__filename);
 const timeout = setTimeout(() => {
   console.error("Electron Durable verification timed out.");
   app.exit(1);
-}, 150_000);
+}, 300_000);
 
 async function main(): Promise<void> {
   await app.whenReady();
@@ -54,6 +56,13 @@ async function main(): Promise<void> {
     .root.lookupType("Integrity");
   assert.equal(message.decode(message.encode({ text: "PiDesk" }).finish()).text, "PiDesk");
 
+  const originalFork = utilityProcess.fork;
+  let writer: Electron.UtilityProcess | undefined;
+  utilityProcess.fork = (...args: Parameters<typeof utilityProcess.fork>) => {
+    const child = originalFork(...args);
+    if (args[2]?.serviceName === "PiDesk Durable Agent Runtime") writer = child;
+    return child;
+  };
   const manager = hostRequire(
     path.join(app.getAppPath(), "dist/main/agentRuntime/agentRuntimeManager.js"),
   ) as RuntimeManager;
@@ -67,25 +76,29 @@ async function main(): Promise<void> {
     assert.equal(result.reply, "PiDesk Durable SQLite round-trip passed.");
     assert(Number.isSafeInteger(result.conversationId));
     if (app.isPackaged) assert(app.getAppPath().endsWith("app.asar"));
+    const workbench = await checkWorkbench(reportPath, () => writer);
     await manager.disposeAgentRuntime();
     await assert.rejects(manager.startAgentRuntime(), /closing/);
-    await writeFile(
-      reportPath,
-      `${JSON.stringify(
-        {
-          packaged: app.isPackaged,
-          appPath: app.getAppPath(),
-          electron: process.versions.electron,
-          utilityNode: first.nodeVersion,
-          dependencies: { googleGenaiImport: "passed", protobufRoundTrip: "passed" },
-          ...result,
-          shutdown: "passed",
-        },
-        null,
-        2,
-      )}\n`,
-    );
+    const report = `${JSON.stringify(
+      {
+        packaged: app.isPackaged,
+        appPath: app.getAppPath(),
+        electron: process.versions.electron,
+        utilityNode: first.nodeVersion,
+        dependencies: { googleGenaiImport: "passed", protobufRoundTrip: "passed" },
+        ...result,
+        workbench,
+        shutdown: "passed",
+      },
+      null,
+      2,
+    )}\n`;
+    await writeFile(reportPath, report);
+    if (workbench.publicProvider) {
+      await writeFile(path.join(path.dirname(reportPath), "public-provider.json"), report);
+    }
   } finally {
+    utilityProcess.fork = originalFork;
     await manager.disposeAgentRuntime();
   }
 }

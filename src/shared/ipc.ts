@@ -6,6 +6,7 @@
 import type { AccentColorPreference } from "./accentColor";
 import type { AppIconId } from "./appIcon";
 import type { SessionStartReason } from "./contribution";
+import type { DurableProjectionAction } from "./durableSession";
 import type { MediaKind } from "./fileKinds";
 import type { FontMonoPreset, FontUiPreset } from "./fontPresets";
 import type { LocalePreference } from "./i18n";
@@ -14,6 +15,7 @@ import type { InputEffect } from "./inputEffect";
 import type { NotificationSettings } from "./notification";
 import type { OfficePreviewFormat, OfficePreviewIssue } from "./officePreview";
 import type { RailStyle } from "./railStyles";
+import type { SessionRef } from "./sessionRef";
 import type { ShortcutsMap } from "./shortcuts";
 import type { SplashFontPreset } from "./splash";
 import type { ThinkingAnimation } from "./thinkingAnimation";
@@ -519,8 +521,9 @@ export interface SessionTranscriptPayload {
   messages: PiChatMessage[];
   /** 会话头 startedAt（Unix ms）；缺失时为 null。 */
   startedAt: number | null;
-  /** 因软上限截断了更早的消息。 */
   truncated: boolean;
+  /** Exclusive message cursor for older legacy history; null marks the beginning. */
+  nextBefore?: number | null;
 }
 
 /** 导出会话记录请求（Markdown / HTML 共用）；title 仅用于默认文件名（经净化）。 */
@@ -1048,6 +1051,8 @@ export interface McpMarketSearchResult {
 }
 
 export interface SessionStartRequest {
+  /** Stable stored identity. Missing means create a new Durable session. */
+  ref?: SessionRef;
   /** 可选：渲染层预生成的运行时实例 id；缺省主进程生成。同 id 再 start 会替换该实例。 */
   sessionId?: SessionId;
   /** pi 工作目录（项目目录）；缺省时落到用户主目录。 */
@@ -1231,6 +1236,12 @@ export interface PiUsage {
 
 /** pi RPC 事件（主进程白名单转发的子集；未列出的事件丢弃）。 */
 export type PiAgentEvent =
+  | {
+      type: "durable_projection";
+      ref: SessionRef;
+      action: Exclude<DurableProjectionAction, { type: "events" }>;
+    }
+  | { type: "durable_user"; entryId: number; message: PiChatMessage }
   | { type: "agent_start" }
   /** willRetry=true 表示还有自动重试/压缩续跑，run 不应视为终态。 */
   | { type: "agent_end"; willRetry?: boolean }
@@ -1330,7 +1341,9 @@ export type SessionDisposeIdleResult = "ended" | "busy" | "not-running";
 
 /** 会话历史条目（pi JSONL 会话文件的摘要）。 */
 export interface SessionSummary {
-  /** 会话 JSONL 文件绝对路径（恢复会话用）。 */
+  /** Stable identity; old JSONL readers may omit it during P2 migration. */
+  ref?: SessionRef;
+  /** Sidebar compatibility key (durable:<UUID>) or legacy JSONL path. Never use without dispatching SessionRef. */
   file: string;
   /**
    * pi JSONL 头部 id（历史命名域）。

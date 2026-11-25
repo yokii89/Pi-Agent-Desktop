@@ -12,20 +12,20 @@ import { hasSessionModal } from "../view/viewHost";
 import { hasLiveBackgroundJobs } from "./backgroundJobs";
 import { pendingUiCount } from "./extensionUi";
 import {
-  disposeSession,
-  fetchSessionState,
-  getSessionProcessToken,
-  hasPendingSessionRequests,
-  hasSession,
-  waitForSessionDisposal,
-} from "./piSession";
-import {
   deferRuntimeIdleReclaim,
   getWatchedSession,
   listIdleReclaimCandidates,
   noteRuntimeTouched,
   noteWatchedSession,
 } from "./runtimeCoordinator";
+import {
+  disposeIdle,
+  fetchSessionState,
+  getSessionProcessToken,
+  hasPendingSessionRequests,
+  hasSession,
+  waitForSessionDisposal,
+} from "./sessionRuntime";
 
 const MAX_RECLAIMS_PER_SCAN = 2;
 const STATE_PROBE_TIMEOUT_MS = 5000;
@@ -206,9 +206,10 @@ async function scan(now: number, scanEpoch: number): Promise<ScanResult> {
         continue;
       }
       // 最后一次同步核对与 dispose 之间没有 await，不能插入新的 IPC / stdout 事件。
-      disposeSession(sessionId);
-      result.reclaimed.push(sessionId);
-      stats.reclaimed += 1;
+      if ((await disposeIdle(sessionId)) === "ended") {
+        result.reclaimed.push(sessionId);
+        stats.reclaimed += 1;
+      } else result.unsure.push(sessionId);
     } catch {
       deferRuntimeIdleReclaim(sessionId);
       result.unsure.push(sessionId);

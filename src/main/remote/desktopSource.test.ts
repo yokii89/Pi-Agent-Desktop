@@ -13,6 +13,19 @@ const f = vi.hoisted(() => ({
   liveId: vi.fn(),
   hasSession: vi.fn(),
 }));
+vi.mock("../session/sessionRuntime", () => ({
+  liveSessionIdForFile: f.liveId,
+  hasSession: f.hasSession,
+}));
+vi.mock("../agentRuntime/desktopSessions", () => ({ desktopSessions: {} }));
+vi.mock("../session/sessionRepository", () => ({
+  sessionRepository: {
+    list: f.list,
+    executable: async () => {
+      throw new Error("Legacy JSONL sessions are read-only.");
+    },
+  },
+}));
 vi.mock("../settings/settings", () => ({ getSettings: () => ({ projects: f.projects }) }));
 vi.mock("../session/piInfo", () => ({ getPiAgentDir: () => "C:/pi" }));
 vi.mock("../session/sessionHistory", () => ({

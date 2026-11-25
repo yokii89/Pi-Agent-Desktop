@@ -28,13 +28,8 @@ import {
   type SchedulerSnapshot,
   sanitizeSchedulerTaskInput,
 } from "../../shared/scheduler";
+import { desktopSessions } from "../agentRuntime/desktopSessions";
 import { setScheduledOccupancy } from "../session/idleReclaim";
-import {
-  applyDefaultModelToSession,
-  disposeSession,
-  hasSession,
-  promptSession,
-} from "../session/piSession";
 import {
   ensureSessionReady,
   getRuntimeSessionFile,
@@ -42,6 +37,8 @@ import {
   hasModeTransition,
   onRuntimeActivity,
 } from "../session/runtimeCoordinator";
+import { sessionRepository } from "../session/sessionRepository";
+import { disposeSession, hasSession } from "../session/sessionRuntime";
 import {
   loadScheduledTasks,
   saveScheduledTasks,
@@ -51,8 +48,6 @@ import { getMainWindow } from "../window/createMainWindow";
 
 /** 派发判定余量：到期判定允许 500ms 提前量，避免定时器整数毫秒截断造成空转一轮。 */
 const DUE_TOLERANCE_MS = 500;
-/** prompt 接受超时：pi 正常毫秒级应答；超时按派发失败落账，不永久占住派发槽。 */
-const PROMPT_TIMEOUT_MS = 60_000;
 
 interface InFlightEntry {
   runId: string;
@@ -61,6 +56,7 @@ interface InFlightEntry {
   sessionFile: string | null;
   /** true = 本调度器新建的会话（下一轮触发时回收其进程）；绑定会话永不回收。 */
   spawned: boolean;
+  admitted: boolean;
 }
 
 let initialized = false;
@@ -181,47 +177,39 @@ async function dispatchRun(
       if (!fs.existsSync(task.cwd)) {
         throw new Error(`工作目录不存在：${task.cwd}`);
       }
-      if (task.sessionFile && !fs.existsSync(task.sessionFile)) {
-        throw new Error(`绑定的会话文件不存在：${task.sessionFile}`);
-      }
+      if (task.sessionFile) await sessionRepository.executable(task.sessionFile, task.cwd);
       const { sessionId } = await ensureSessionReady({
         cwd: task.cwd,
         ...(task.sessionFile ? { sessionFile: task.sessionFile } : {}),
         reason: "scheduled",
       });
-      // 与 SESSION_IPC.start 同款对齐：冷启动模型表未就绪时重试；失败不阻塞派发
-      try {
-        await applyDefaultModelToSession(sessionId, { retries: 1, delayMs: 200 });
-      } catch {
-        // 模型对齐失败不取消本次运行
-      }
-      await promptSession(sessionId, task.prompt, { timeoutMs: PROMPT_TIMEOUT_MS });
-      if (prev?.spawned && hasSession(prev.sessionId)) {
-        // 新建会话型任务：回收上一轮的空闲进程，并行会话名额不被定时任务吃满；
-        // JSONL 历史保留，用户再打开时按文件重新拉起
-        try {
-          disposeSession(prev.sessionId);
-        } catch {
-          // 已退出时忽略
-        }
-      }
-      const spawnedFile = getRuntimeSessionFile(sessionId);
+      // Register before admission: a fast settled/exit can arrive before submit returns.
       run.sessionId = sessionId;
-      run.sessionFile = task.sessionFile ?? spawnedFile ?? undefined;
-      inFlight.set(task.id, {
+      run.sessionFile = task.sessionFile ?? getRuntimeSessionFile(sessionId) ?? undefined;
+      const entry: InFlightEntry = {
         runId: run.id,
         sessionId,
         sessionFile: run.sessionFile ?? null,
         spawned: task.sessionFile === null,
-      });
+        admitted: false,
+      };
+      inFlight.set(task.id, entry);
+      appendRun(run);
+      await desktopSessions.submit(sessionId, task.prompt, "reject", run.id);
+      entry.admitted = true;
+      if (getRuntimeState(sessionId) === "idle") handleRuntimeActivity(sessionId, "idle");
+      if (prev?.spawned && prev.sessionId !== sessionId && hasSession(prev.sessionId)) {
+        await disposeSession(prev.sessionId);
+      }
       task.lastRunAt = now;
       task.runCount += 1;
       task.updatedAt = now;
-      appendRun(run);
     } catch (error) {
       run.status = "failed";
       run.error = error instanceof Error ? error.message : String(error);
-      appendRun(run);
+      run.finishedAt = Date.now();
+      if (inFlight.get(task.id)?.runId === run.id) inFlight.delete(task.id);
+      if (!snapshot.runs.some((item) => item.id === run.id)) appendRun(run);
     }
     commit();
   } finally {
@@ -304,9 +292,19 @@ function armTimer(): void {
 
 function handleRuntimeActivity(sessionId: string, activity: "busy" | "idle" | "exit"): void {
   if (activity === "exit") {
+    let changed = false;
     for (const [taskId, entry] of [...inFlight]) {
-      if (entry.sessionId === sessionId) inFlight.delete(taskId);
+      if (entry.sessionId !== sessionId) continue;
+      const run = snapshot.runs.find((item) => item.id === entry.runId);
+      if (run?.status === "dispatched" && run.finishedAt === undefined) {
+        run.status = "failed";
+        run.error = "Session exited before settlement.";
+        run.finishedAt = Date.now();
+        changed = true;
+      }
+      inFlight.delete(taskId);
     }
+    if (changed) commit();
     return;
   }
   // idle 只在会话级收口点（agent_settled）发出，回填完成时刻即以此为准
@@ -314,10 +312,15 @@ function handleRuntimeActivity(sessionId: string, activity: "busy" | "idle" | "e
   const now = Date.now();
   let dirty = false;
   for (const entry of inFlight.values()) {
-    if (entry.sessionId !== sessionId) continue;
+    if (entry.sessionId !== sessionId || !entry.admitted) continue;
     const run = snapshot.runs.find((item) => item.id === entry.runId);
     if (run && run.status === "dispatched" && run.finishedAt === undefined) {
       run.finishedAt = now;
+      const error = desktopSessions.settlementError(sessionId);
+      if (error) {
+        run.status = "failed";
+        run.error = error;
+      }
       dirty = true;
     }
   }
@@ -339,9 +342,8 @@ function assertTargetsExist(cwd: string, sessionFile: string | null): void {
   if (!fs.existsSync(cwd)) {
     throw new Error(`工作目录不存在：${cwd}`);
   }
-  if (sessionFile && !fs.existsSync(sessionFile)) {
-    throw new Error(`绑定的会话文件不存在：${sessionFile}`);
-  }
+  if (sessionFile && !sessionFile.startsWith("durable:"))
+    throw new Error("Legacy JSONL sessions are read-only.");
 }
 
 export function createScheduledTask(raw: unknown): ScheduledTask {
@@ -445,8 +447,8 @@ export function initTaskScheduler(): void {
   initialized = true;
   snapshot = loadScheduledTasks();
   inFlight.clear();
-  misfireScan(Date.now());
   offActivity = onRuntimeActivity(handleRuntimeActivity);
+  misfireScan(Date.now());
   // 空闲回收（docs/design/138）：定时任务正在使用的会话不按空闲回收，
   // 否则下一轮触发还要重付一次 ~5.5s 冷启动（docs/design/44）。
   // 派发进行中（尚未入 inFlight）的会话必然是 starting/busy，回收策略层已排除。

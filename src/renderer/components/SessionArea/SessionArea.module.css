@@ -72,3 +72,10 @@
   width: min(100%, var(--session-input-column));
   min-width: 0;
 }
+
+.readOnly {
+  color: var(--color-text-muted);
+  background: var(--color-bg-surface);
+  padding: var(--spacing-md);
+  font-size: var(--font-size-sm);
+}

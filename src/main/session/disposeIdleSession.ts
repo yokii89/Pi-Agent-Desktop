@@ -1,13 +1,13 @@
 import type { SessionDisposeIdleResult, SessionId } from "../../shared/ipc";
 import { hasSessionModal } from "../view/viewHost";
 import { pendingUiCount } from "./extensionUi";
+import { getRuntimeState, hasModeTransition } from "./runtimeCoordinator";
 import {
-  disposeSession,
+  disposeIdle,
   fetchSessionState,
   getSessionProcessToken,
   hasPendingSessionRequests,
-} from "./piSession";
-import { getRuntimeState, hasModeTransition } from "./runtimeCoordinator";
+} from "./sessionRuntime";
 
 const STATE_PROBE_TIMEOUT_MS = 5000;
 
@@ -44,6 +44,5 @@ export async function disposeIdleSession(sessionId: SessionId): Promise<SessionD
   }
 
   // 最后复核与关停间不让出事件循环；期间新 prompt 或模式事务不能插入。
-  disposeSession(sessionId);
-  return "ended";
+  return disposeIdle(sessionId);
 }

@@ -4,6 +4,8 @@ import {
   AGENT_RUNTIME_PROTOCOL_VERSION,
   parseAgentRuntimeRequest,
 } from "../shared/agentRuntimeProtocol.js";
+import { boundedJson } from "../shared/durableProtocol.js";
+import { DesktopRuntime } from "./desktopRuntime.js";
 import { runDurableSqliteSmokeTest } from "./sqliteSmokeTest.js";
 
 interface RuntimePort {
@@ -32,6 +34,23 @@ if (!parentPort)
 let channel: RuntimePort | null = null;
 let runningSmokeTest = false;
 let shuttingDown = false;
+const runtime = new DesktopRuntime((update) => {
+  // Strip optional undefined fields at the private JSON DTO boundary.
+  const wire: unknown = JSON.parse(JSON.stringify({ type: "update", update }));
+  if (!boundedJson(wire)) {
+    channel?.postMessage({
+      type: "update",
+      update: {
+        type: "error",
+        sessionId: update.sessionId,
+        error: "Durable update exceeds the protocol limit.",
+      },
+    });
+    return;
+  }
+  channel?.postMessage(wire);
+});
+const active = new Set<Promise<void>>();
 
 function sendError(id: string, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
@@ -53,11 +72,41 @@ async function handleRequest(value: unknown): Promise<void> {
       return;
     }
     shuttingDown = true;
+    try {
+      await Promise.allSettled([...active]);
+      await runtime.dispose();
+    } catch (error) {
+      shuttingDown = false;
+      sendError(request.id, error);
+      return;
+    }
     port.postMessage({ type: "stopped", id: request.id });
     setTimeout(() => {
       port.close();
       process.exit(0);
     }, 10);
+    return;
+  }
+
+  if (request.type === "command") {
+    const operation = (async () => {
+      try {
+        const result = await runtime.execute(request.command);
+        const wire: unknown = JSON.parse(
+          JSON.stringify({ type: "response", id: request.id, ok: true, result: result ?? null }),
+        );
+        if (!boundedJson(wire)) throw new Error("Durable response exceeds the protocol limit.");
+        port.postMessage(wire);
+      } catch (error) {
+        sendError(request.id, error);
+      }
+    })();
+    active.add(operation);
+    try {
+      await operation;
+    } finally {
+      active.delete(operation);
+    }
     return;
   }
 

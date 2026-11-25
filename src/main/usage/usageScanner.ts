@@ -5,6 +5,8 @@ import { createInterface } from "node:readline";
 import type { UsageGranularity, UsageQuery, UsageReport } from "../../shared/usage";
 import { resolveUsageProject, sanitizePiUsage } from "../../shared/usage";
 import { collectSessionFiles } from "../session/sessionHistory";
+import { sessionRepository } from "../session/sessionRepository";
+import { durableCatalog } from "../settings/durableStore";
 import {
   type AggregateUsageOptions,
   aggregateUsage,
@@ -154,6 +156,28 @@ export async function queryUsageReport(raw: unknown): Promise<UsageReport> {
   );
 
   const fileUsages = results.filter((item): item is FileUsage => item !== null);
+  for (const summary of durableCatalog()) {
+    if (!summary.ref || (since !== null && summary.updatedAt < since)) continue;
+    const transcript = await sessionRepository.transcript(summary.ref);
+    const entries = transcript.messages.flatMap((message): UsageEntry[] => {
+      if (message.role !== "assistant") return [];
+      const usage = sanitizePiUsage(message.usage);
+      if (!usage) return [];
+      return [
+        {
+          ts: toUnixMs((message as { timestamp?: unknown }).timestamp) ?? summary.updatedAt,
+          usage,
+          provider: message.provider ?? null,
+          model: message.model ?? null,
+        },
+      ];
+    });
+    fileUsages.push({
+      file: summary.file,
+      project: resolveUsageProject(summary.cwd, "Durable"),
+      entries,
+    });
+  }
   const options: AggregateUsageOptions = { granularity, project };
   return aggregateUsage(fileUsages, since, Date.now(), options);
 }

@@ -1,4 +1,4 @@
-import { mkdir, realpath } from "node:fs/promises";
+import { access, mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type {
@@ -48,6 +48,7 @@ export interface DurableSessionOptions {
   sessionId: string;
   cwd: string;
   /** Applied only when creating the root. Later changes go through configure(). */
+  create?: boolean;
   agent?: AgentChange;
 }
 
@@ -84,7 +85,7 @@ export class DurableSessions {
       cwd,
       accepting: true,
       operations: new Set(),
-      opening: this.create(sessionId, cwd, request.agent),
+      opening: this.create(sessionId, cwd, request.agent, request.create),
     };
     this.sessions.set(sessionId, slot);
     try {
@@ -174,6 +175,32 @@ export class DurableSessions {
     });
   }
 
+  /** Read an authoritative attachment snapshot without creating another writer or resuming twice. */
+  snapshot(sessionId: string): Promise<ConversationView> {
+    return this.run(sessionId, async (session) => {
+      const watch = await session.conversation.watch(context, {
+        min: PAGE_SIZE,
+        max: PAGE_SIZE * 2,
+      });
+      try {
+        return watch.value;
+      } finally {
+        await watch.stop();
+      }
+    });
+  }
+
+  /** Atomically verify ownership settlement before retiring this writer. */
+  async closeIdle(sessionId: string): Promise<boolean> {
+    const slot = this.sessions.get(sessionId.toLowerCase());
+    if (!slot?.accepting) return false;
+    const session = await slot.opening;
+    if (!slot.accepting || slot.operations.size || session.epoch !== session.settledEpoch)
+      return false;
+    await this.close(sessionId);
+    return true;
+  }
+
   /** Stop admissions, drain already admitted operations and callbacks, then flush and close SQLite. */
   close(sessionId: string): Promise<void> {
     const key = sessionId.toLowerCase();
@@ -206,8 +233,14 @@ export class DurableSessions {
     return shutdown;
   }
 
-  private async create(sessionId: string, cwd: string, agent?: AgentChange): Promise<OpenSession> {
+  private async create(
+    sessionId: string,
+    cwd: string,
+    agent?: AgentChange,
+    create?: boolean,
+  ): Promise<OpenSession> {
     const directory = path.join(this.storageRoot, sessionId);
+    if (create === false) await access(path.join(directory, "session.sqlite"));
     await mkdir(directory, { recursive: true });
     const canonical = await realpath(directory);
     const writerKey = process.platform === "win32" ? canonical.toLowerCase() : canonical;

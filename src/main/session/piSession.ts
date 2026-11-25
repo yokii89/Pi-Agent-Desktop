@@ -447,7 +447,13 @@ export async function waitForSessionDisposal(sessionId: SessionId): Promise<void
   await disposalPromises.get(sessionId);
 }
 
+/** Retired executor: retained protocol helpers cannot launch or mutate legacy history. */
+function rejectLegacyExecution(): void {
+  throw new Error("Legacy JSONL sessions are read-only. Use the Durable session service.");
+}
+
 export function startSession(req: SessionStartRequest): Promise<SessionId> {
+  rejectLegacyExecution();
   const id = req.sessionId;
   if (!id) return startSessionOnce(req);
   const existing = startsById.get(id);
@@ -574,6 +580,7 @@ function request(
   fields: Record<string, unknown> = {},
   timeoutMs?: number,
 ): Promise<unknown> {
+  if (!command.startsWith("get_")) rejectLegacyExecution();
   const inst = getLiveInstance(sessionId);
   if (!inst?.child) {
     return Promise.reject(new Error("pi 会话未启动"));

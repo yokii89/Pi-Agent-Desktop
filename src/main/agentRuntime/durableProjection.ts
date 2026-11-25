@@ -1,17 +1,13 @@
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
-import type { EntryRecord, LiveState } from "@earendil-works/pi-durable";
-import type { DurableSessionUpdate } from "../../shared/durableSession";
+import type { LiveState } from "@earendil-works/pi-durable";
+import { DESKTOP_RETRY_ATTEMPTS } from "../../shared/durableProtocol";
+import type { DurableProjectionAction, DurableSessionUpdate } from "../../shared/durableSession";
+
+export type { DurableProjectionAction } from "../../shared/durableSession";
+
 import type { PiAgentEvent, PiChatMessage, PiStreamDelta } from "../../shared/ipc";
 
 type View = Extract<DurableSessionUpdate, { type: "snapshot" }>["view"];
-
-/** These hydration/reconcile actions must be wired before the Durable projection can drive the renderer. */
-export type DurableProjectionAction =
-  | { type: "hydrate"; view: View }
-  | { type: "events"; events: PiAgentEvent[] }
-  | { type: "reconcile"; identity: string; message: PiChatMessage }
-  | { type: "entry"; entry: EntryRecord }
-  | { type: "error"; error: string };
 
 interface PartialAnswer {
   identity: string;
@@ -26,6 +22,9 @@ export class DurableProjection {
   private partial?: PartialAnswer;
   private running = false;
   private queue = "";
+  private retry = "";
+  private compaction = "";
+  private failure = "";
   private readonly calls = new Map<string, { name: string; args: unknown }>();
   private readonly started = new Set<string>();
   private readonly ended = new Set<string>();
@@ -106,8 +105,7 @@ export class DurableProjection {
             this.partial = undefined;
           } else if (message.role === "user") {
             this.startRun(events);
-            events.push({ type: "message_start", message: chat(message) });
-            events.push({ type: "message_end", message: chat(message) });
+            events.push({ type: "durable_user", entryId: entry.id, message: chat(message) });
           }
         }
       }
@@ -159,6 +157,34 @@ export class DurableProjection {
           });
         }
       }
+      for (const nested of live.nestedTools ?? []) {
+        if (!this.started.has(nested.callId)) {
+          this.started.add(nested.callId);
+          events.push({
+            type: "tool_execution_start",
+            toolCallId: nested.callId,
+            toolName: nested.name,
+            args: nested.arguments,
+            parentToolCallId: nested.parentCallId,
+          });
+        }
+        if (nested.status === "done" && !this.ended.has(nested.callId)) {
+          this.ended.add(nested.callId);
+          events.push({
+            type: "tool_execution_end",
+            toolCallId: nested.callId,
+            toolName: nested.name,
+            parentToolCallId: nested.parentCallId,
+            isError: nested.summary?.isError,
+            durationMs: nested.summary?.durationMs,
+            result: {
+              content: [{ type: "text", text: nested.output ?? nested.summary?.error ?? "" }],
+              details: nested.details,
+            },
+          });
+        }
+      }
+      this.projectStatus(live, events);
       this.projectQueue(update.view, events);
       if (update.type === "settled" && this.running) {
         this.running = false;
@@ -169,6 +195,43 @@ export class DurableProjection {
     }
     flush();
     return actions;
+  }
+
+  private projectStatus(live: LiveState, events: PiAgentEvent[]): void {
+    const retry = live.generation?.retry;
+    const key = retry ? JSON.stringify([live.run?.taskId, live.generation?.attempt, retry]) : "";
+    if (key !== this.retry) {
+      if (retry)
+        events.push({
+          type: "auto_retry_start",
+          attempt: (live.generation?.attempt ?? 0) + 1,
+          maxAttempts: DESKTOP_RETRY_ATTEMPTS,
+          errorMessage: retry.error,
+        });
+      else if (this.retry) events.push({ type: "auto_retry_end", success: !live.runFailure });
+      this.retry = key;
+    }
+    const compaction = JSON.stringify(live.compactions?.map((item) => item.taskId) ?? []);
+    if (compaction !== this.compaction) {
+      if (live.compactions?.length)
+        events.push({ type: "compaction_start", reason: live.compactions[0].trigger });
+      else if (this.compaction && this.compaction !== "[]")
+        events.push({ type: "compaction_end", errorMessage: live.compactionFailure?.error });
+      this.compaction = compaction;
+    }
+    const failure = JSON.stringify(live.runFailure ?? null);
+    if (
+      failure !== this.failure &&
+      live.runFailure &&
+      !["aborted", "nothing_to_answer"].includes(live.runFailure.reason)
+    ) {
+      events.push({
+        type: "durable_projection",
+        ref: { kind: "durable", id: this.sessionId },
+        action: { type: "error", error: live.runFailure.detail ?? live.runFailure.reason },
+      });
+    }
+    this.failure = failure;
   }
 
   private startRun(events: PiAgentEvent[]): void {

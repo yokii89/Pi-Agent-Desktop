@@ -23,8 +23,9 @@ vi.mock("../extension/contributionCatalog", () => ({
     ],
   }),
 }));
-vi.mock("../session/piSession", () => ({
+vi.mock("../session/sessionRuntime", () => ({
   hasSession: () => fake.alive,
+  getSessionPid: () => (fake.alive ? 1234 : null),
   startSession: fake.start,
   fetchSessionState: async () => ({}),
   disposeSession: fake.dispose,

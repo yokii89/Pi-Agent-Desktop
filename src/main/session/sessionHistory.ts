@@ -252,6 +252,9 @@ export async function listAllSessions(): Promise<SessionSummary[]> {
   const known = new Set(summaries.map((session) => session.file));
   const missing: { file: string; mtime: number }[] = [];
   const stale: string[] = [];
+  for (const file of files) {
+    if (file.startsWith("durable:")) known.add(file);
+  }
   await Promise.all(
     files.map(async (file) => {
       if (known.has(file)) return;

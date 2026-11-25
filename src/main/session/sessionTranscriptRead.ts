@@ -142,8 +142,19 @@ function mapDiskMessage(raw: unknown): PiChatMessage | null {
  * 读取会话 JSONL 转为消息数组（磁盘优先展示，不依赖 pi 进程）。
  * 流式按行读，避免超大会话整文件进内存；mtime/size 未变时走 LRU 缓存。
  */
-export async function readSessionTranscript(file: string): Promise<SessionTranscriptPayload> {
+export async function readSessionTranscript(
+  file: string,
+  page?: { before?: number; limit: number },
+): Promise<SessionTranscriptPayload> {
   const resolved = assertSessionFile(file);
+  const limit = page?.limit ?? MAX_MESSAGES;
+  if (
+    !Number.isSafeInteger(limit) ||
+    limit < 1 ||
+    limit > MAX_MESSAGES ||
+    (page?.before !== undefined && (!Number.isSafeInteger(page.before) || page.before < 1))
+  )
+    throw new Error("Invalid legacy history cursor.");
 
   let stat: fs.Stats;
   try {
@@ -153,7 +164,7 @@ export async function readSessionTranscript(file: string): Promise<SessionTransc
   }
 
   const cached = transcriptCache.get(resolved);
-  if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+  if (!page && cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
     touchCache(resolved, cached);
     return {
       messages: cached.messages,
@@ -165,6 +176,14 @@ export async function readSessionTranscript(file: string): Promise<SessionTransc
   const messages: PiChatMessage[] = [];
   let startedAt: number | null = null;
   let truncated = false;
+  let seen = 0;
+  let eligible = 0;
+  const append = (message: PiChatMessage) => {
+    if (seen++ >= (page?.before ?? Number.POSITIVE_INFINITY)) return;
+    eligible++;
+    messages.push(message);
+    if (messages.length > limit * 2) messages.splice(0, messages.length - limit);
+  };
 
   const stream = await (async () => {
     const handle = await fsp.open(resolved, "r");
@@ -196,23 +215,27 @@ export async function readSessionTranscript(file: string): Promise<SessionTransc
       }
       if (record.type === "custom_message") {
         const custom = mapDiskCustomMessage(parsed as Record<string, unknown>);
-        if (custom) messages.push(custom);
+        if (custom) append(custom);
         continue;
       }
       if (record.type !== "message") continue;
       const message = mapDiskMessage(record.message);
-      if (message) messages.push(message);
+      if (message) append(message);
     }
   } finally {
     rl.close();
     stream.destroy();
   }
 
-  if (messages.length > MAX_MESSAGES) {
-    // 保留最近的消息，保证 IPC 载荷可控
-    messages.splice(0, messages.length - MAX_MESSAGES);
-    truncated = true;
-  }
+  if (messages.length > limit) messages.splice(0, messages.length - limit);
+  truncated = eligible > messages.length;
+  if (page)
+    return {
+      messages,
+      startedAt,
+      truncated,
+      nextBefore: truncated ? eligible - messages.length : null,
+    };
 
   const entry: TranscriptCacheEntry = {
     mtimeMs: stat.mtimeMs,

@@ -1,6 +1,36 @@
 import { defineMessages } from "../types";
 
 export const sessionMessages = defineMessages({
+  "session.legacy.readOnly": {
+    "zh-CN": "旧会话只读：可查看、复制和导出。请新建会话继续任务。",
+    "en-US":
+      "Legacy history is read-only. You can view, copy and export it. Start a new task to continue.",
+  },
+  "session.durable.modelTitle": { "zh-CN": "内置会话模型", "en-US": "Built-in session model" },
+  "session.durable.modelDescription": {
+    "zh-CN":
+      "配置 OpenAI 或兼容供应商。保存后供新会话使用；已打开的会话保留原模型选择。当前支持文本与内置文件、命令工具。",
+    "en-US":
+      "Configure OpenAI or a compatible provider for new sessions. Open sessions keep their model selection. Text input and built-in file and command tools are supported.",
+  },
+  "session.durable.endpoint": { "zh-CN": "接口地址", "en-US": "Base URL" },
+  "session.durable.api": { "zh-CN": "接口类型", "en-US": "API type" },
+  "session.durable.modelId": { "zh-CN": "模型 ID", "en-US": "Model ID" },
+  "session.durable.apiKey": { "zh-CN": "API 密钥", "en-US": "API key" },
+  "session.durable.keySaved": {
+    "zh-CN": "已安全保存；留空保留现有密钥。",
+    "en-US": "Saved securely. Leave blank to keep the current key.",
+  },
+  "session.durable.contextWindow": { "zh-CN": "上下文窗口", "en-US": "Context window" },
+  "session.durable.maxTokens": { "zh-CN": "最大输出 token", "en-US": "Maximum output tokens" },
+  "session.durable.reasoning": { "zh-CN": "推理档位支持", "en-US": "Reasoning level support" },
+  "session.durable.reasoningOff": { "zh-CN": "不支持", "en-US": "Unsupported" },
+  "session.durable.reasoningOn": { "zh-CN": "支持", "en-US": "Supported" },
+  "session.durable.saveModel": { "zh-CN": "保存模型配置", "en-US": "Save model configuration" },
+  "session.durable.modelSaved": { "zh-CN": "模型配置已保存", "en-US": "Model configuration saved" },
+  "session.durable.loadEarlier": { "zh-CN": "加载更早记录", "en-US": "Load earlier history" },
+  "session.durable.loading": { "zh-CN": "正在加载…", "en-US": "Loading…" },
+  "session.durable.compact": { "zh-CN": "压缩上下文", "en-US": "Compact context" },
   "session.restoring": {
     "zh-CN": "正在恢复会话…",
     "en-US": "Restoring session…",

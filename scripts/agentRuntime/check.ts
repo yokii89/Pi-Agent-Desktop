@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
@@ -12,6 +12,8 @@ const output = path.join(projectRoot, "temp/agent-runtime-check");
 const hostOutput = path.join(projectRoot, "dist/runtimeCheck");
 const tsc = require.resolve("typescript/bin/tsc");
 const electron = require("electron") as string;
+const live = process.argv.includes("--live");
+const hostEntry = path.join(hostOutput, "scripts/agentRuntime/electron.js");
 assert(existsSync(electron), "Electron binary missing; rerun its installation script.");
 
 function run(command: string, args: string[], extraEnv: NodeJS.ProcessEnv = {}): Promise<void> {
@@ -30,14 +32,22 @@ function run(command: string, args: string[], extraEnv: NodeJS.ProcessEnv = {}):
 
 await mkdir(output, { recursive: true });
 try {
-  await run(process.execPath, [tsc, "-p", "tsconfig.main.json"]);
-  await run(process.execPath, [path.join(projectRoot, "scripts/buildRuntime.ts")]);
+  if (!process.argv.includes("--reuse-build")) {
+    await run(process.execPath, [tsc, "-p", "tsconfig.main.json"]);
+    await run(process.execPath, [path.join(projectRoot, "scripts/buildRuntime.ts")]);
+    await run(process.execPath, [
+      path.join(path.dirname(require.resolve("vite/package.json")), "bin/vite.js"),
+      "build",
+    ]);
+  }
   await run(process.execPath, [
     tsc,
     "--module",
     "commonjs",
     "--target",
     "ES2022",
+    "--rootDir",
+    projectRoot,
     "--outDir",
     hostOutput,
     "--strict",
@@ -52,7 +62,7 @@ try {
   await mkdir(developmentRoot, { recursive: true });
   await writeFile(
     path.join(developmentRoot, "package.json"),
-    JSON.stringify({ name: "pidesk-runtime-check", main: path.join(hostOutput, "electron.js") }),
+    JSON.stringify({ name: "pidesk-runtime-check", main: hostEntry }),
   );
   for (const directory of ["dist", "node_modules"]) {
     const link = path.join(developmentRoot, directory);
@@ -62,6 +72,7 @@ try {
   await rm(developmentReport, { force: true });
   await run(electron, [developmentRoot], {
     PIDESK_RUNTIME_CHECK_REPORT: developmentReport,
+    PIDESK_RUNTIME_CHECK_LIVE_AUTH: live ? path.join(homedir(), ".pi/agent/auth.json") : "",
   });
   console.log("Electron utility process verification:", await readFile(developmentReport, "utf8"));
 
@@ -77,13 +88,14 @@ try {
     "--dir",
     "--publish=never",
     `-c.directories.output=${packageOutput}`,
-    "-c.extraMetadata.main=dist/runtimeCheck/electron.js",
+    "-c.extraMetadata.main=dist/runtimeCheck/scripts/agentRuntime/electron.js",
     `-c.electronDist=${path.dirname(electron)}`,
   ]);
   const packagedReport = path.join(output, "packaged.json");
   await rm(packagedReport, { force: true });
   await run(path.join(packageOutput, "win-unpacked/PiDesk.exe"), [], {
     PIDESK_RUNTIME_CHECK_REPORT: packagedReport,
+    PIDESK_RUNTIME_CHECK_LIVE_AUTH: "",
   });
   const report = JSON.parse(await readFile(packagedReport, "utf8")) as { packaged?: boolean };
   assert.equal(report.packaged, true);

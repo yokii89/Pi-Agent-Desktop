@@ -25,8 +25,10 @@ import type {
   SessionSummary,
 } from "../../shared/ipc";
 import { isThinkingLevelId } from "../../shared/ipc";
+import { sessionRefFromKey, sessionRefKey } from "../../shared/sessionRef";
 import type { BrowserConsoleError, BrowserContextItem } from "../services/browserService";
-import { piService } from "../services/piService";
+import { unwrap } from "../services/ipc";
+import { pideskApi } from "../services/pideskApi";
 import { procService } from "../services/procService";
 import { sessionService } from "../services/sessionService";
 import { settingsService } from "../services/settingsService";
@@ -153,6 +155,10 @@ interface SessionMetaValue {
    * 冷桶借用同 cwd 存活实例或命中 cwd 级缓存，零 spawn；都未命中才 ensureSession。
    */
   getSlashCommands: () => Promise<PiSlashCommand[]>;
+  historyAvailable: boolean;
+  historyLoading: boolean;
+  loadEarlierHistory: () => Promise<void>;
+  compactSession: () => Promise<void>;
   /** 新建任务：新建空桶并设为 active，**不杀**其它会话进程（Ctrl+N）。 */
   newSession: () => void;
   togglePin: (file: string) => void;
@@ -415,7 +421,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [modelProvider, setModelProvider] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
   const [modelInput, setModelInput] = useState<PiModelInputModality[] | null>(null);
-  const [piReady, setPiReady] = useState(false);
+  const piReady = true;
   const [switchingToFile, setSwitchingToFile] = useState<string | null>(null);
 
   const bucketsStateRef = useRef(bucketsState);
@@ -748,16 +754,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       return;
     }
-    const info = await piService.info();
-    if (seq !== modelStateSeqRef.current || !info) return;
-    setPiReady(info.version !== null);
-    if (info.model) {
-      const prefix = info.provider ? `${info.provider}/` : "";
-      const suffix = info.thinkingLevel ? `:${info.thinkingLevel}` : "";
-      setModelLabel(`${prefix}${info.model}${suffix}`);
-      setModelProvider(info.provider);
-      setModelId(info.model);
-    }
+    setModelLabel("Durable");
+    setModelProvider(null);
+    setModelId(null);
   }, [setState, syncThinkingState]);
 
   const contextUsageRefresh = useMemo(
@@ -1030,7 +1029,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           // 同一快照重复推送：不动 state，也就不触发一次全量渲染
           if (sameQueue(bucket.queue, nextQueue)) return prev;
           let next = prev;
-          if (!bucket.queueClearing) {
+          if (!bucket.queueClearing && bucket.ref?.kind !== "durable") {
             // 交付的排队消息落成普通用户气泡；文本取服务端（与写进 JSONL 的展开文本一致）
             for (const text of deliveredQueueTexts(bucket.queue, nextQueue)) {
               next = applyEntries(next, sessionId, { type: "userMessage", text });
@@ -1042,6 +1041,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       if (message.type === "event") {
+        if (
+          message.payload.type === "durable_projection" &&
+          message.payload.action.type === "hydrate"
+        ) {
+          const file = sessionRefKey(message.payload.ref);
+          sessionIdByFileRef.current.set(file, sessionId);
+          pendingRowsRef.current.delete(sessionId);
+        }
         applySideEffects(sessionId, message.payload);
         setState((prev) =>
           applyEntries(prev, sessionId, { type: "event", event: message.payload }),
@@ -1148,6 +1155,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const st = bucketsStateRef.current;
       if (id) {
         const bucket = st.buckets.get(id);
+        if (
+          bucket?.sessionFile &&
+          !isPendingFile(bucket.sessionFile) &&
+          sessionRefFromKey(bucket.sessionFile).kind === "legacy-jsonl"
+        )
+          return null;
         if (bucket?.processAlive) return id;
         const started = await startBucket(id, {
           sessionFile: bucket?.sessionFile ?? undefined,
@@ -1529,6 +1542,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       let targetId = activeKeyRef.current;
       const cwdAtSend = cwdRef.current ?? null;
       const sourceBucket = targetId ? bucketsStateRef.current.buckets.get(targetId) : undefined;
+      if (
+        sourceBucket?.sessionFile &&
+        !isPendingFile(sourceBucket.sessionFile) &&
+        sessionRefFromKey(sourceBucket.sessionFile).kind === "legacy-jsonl"
+      ) {
+        showToast(t("session.legacy.readOnly"));
+        return null;
+      }
       const sourceKey = composerDraftKey(targetId, cwdRef.current ?? null, sourceBucket?.phase);
       const sourceDraft = drafts.bind(sourceKey);
       const fromHome = targetId === null || sourceBucket?.phase === "empty";
@@ -1682,7 +1703,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             // 本地以为空闲、pi 实际在流式：撤掉乐观气泡，排队项由 queue_update 接管
             return applyEntries(prev, sid, { type: "discardOptimisticUser" });
           }
-          if (disposition === "started" && queueing) {
+          if (
+            disposition === "started" &&
+            queueing &&
+            prev.buckets.get(sid)?.ref?.kind !== "durable"
+          ) {
             // 本地以为在跑、pi 实际已结束：补插用户气泡（response 先于 agent_start）
             let next = applyEntries(prev, sid, {
               type: "userMessage",
@@ -1990,7 +2015,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return null;
   }, [entries]);
 
-  const canRetryLastUser = lastUserPayload !== null && phase !== "running";
+  const canRetryLastUser =
+    !(
+      activeSessionFile &&
+      !isPendingFile(activeSessionFile) &&
+      sessionRefFromKey(activeSessionFile).kind === "legacy-jsonl"
+    ) &&
+    lastUserPayload !== null &&
+    phase !== "running" &&
+    (activeBucket?.ref?.kind !== "durable" ||
+      entries.findLast((entry) => entry.kind === "run")?.status !== "completed");
 
   // 最新用户消息走 ref：entries 每帧变化会让闭包里的对象换身份，
   // 若作为 useCallback 依赖，meta context 就会跟着流式 delta 每帧重算。
@@ -2000,12 +2034,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const retryLastUserMessage = useCallback(async (): Promise<void> => {
     const payload = lastUserPayloadRef.current;
     if (!payload || phase === "running") return;
+    const currentId = activeKeyRef.current;
+    const bucket = currentId ? bucketsStateRef.current.buckets.get(currentId) : undefined;
+    if (bucket?.ref?.kind === "durable") {
+      try {
+        const sessionId = await ensureSession("manual");
+        const api = pideskApi();
+        if (sessionId && api) await unwrap(api.durable.continue(sessionId, crypto.randomUUID()));
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error));
+      }
+      return;
+    }
     const displayImages = payload.images ?? [];
     const images = displayImages.map(piImageFromDisplay);
     await send(payload.text, {
       ...(images.length > 0 ? { images, displayImages } : {}),
     });
-  }, [phase, send]);
+  }, [phase, send, ensureSession, showToast]);
 
   /** 历史召回读数：只读 ref，零依赖，因此 meta context 的身份不随流式 delta 变化。 */
   const readUserHistory = useCallback((): string[] => {
@@ -2048,6 +2094,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           rematerializeSidebar();
           return;
         }
+      }
+
+      if (file.startsWith("durable:")) {
+        const ref = sessionRefFromKey(file);
+        const current = bucketsStateRef.current;
+        const openId = current.fileIndex.get(file) ?? newLocalSessionId();
+        setState((prev) =>
+          setActiveKey(
+            patchBucket(prev, openId, {
+              sessionFile: file,
+              ref,
+              cwd: cwd ?? prev.buckets.get(openId)?.cwd ?? null,
+              switching: true,
+              phase: "idle",
+            }),
+            openId,
+          ),
+        );
+        bindActive(openId);
+        navigate("session");
+        const started = await startBucket(openId, {
+          sessionFile: file,
+          cwd,
+          makeActive: true,
+          reason: "manual",
+        });
+        setState((prev) => patchBucket(prev, started ?? openId, { switching: false }));
+        void refreshSessions();
+        return;
       }
 
       const st = bucketsStateRef.current;
@@ -2200,14 +2275,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       await sessionService
         .readTranscript(file)
-        .then(({ messages }) => {
+        .then(({ messages, nextBefore }) => {
           if (!isCurrentOpen()) return;
           if (isStale()) return;
           // 竞态守卫（§3.3）：用户抢在落桶前发送时合并落桶，
           // 不走整体替换清掉乐观插入的用户消息
           setState((prev) => loadMessagesIntoBucket(prev, openId, messages, startedAt));
           setState((prev) =>
-            patchBucket(prev, openId, { transcriptReady: true, switching: false, phase: "idle" }),
+            patchBucket(prev, openId, {
+              transcriptReady: true,
+              switching: false,
+              phase: "idle",
+              ref: sessionRefFromKey(file),
+              historyBefore: nextBefore ?? undefined,
+              historyDone: !nextBefore,
+            }),
           );
         })
         .catch(() => {});
@@ -2222,7 +2304,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         void refreshSessions();
       }
     },
-    [bindActive, navigate, refreshModelState, refreshSessions, rematerializeSidebar, setState],
+    [
+      bindActive,
+      navigate,
+      refreshModelState,
+      refreshSessions,
+      rematerializeSidebar,
+      setState,
+      startBucket,
+    ],
   );
 
   // 读 ref 而非 bucketsState：buckets 每帧都是新 Map，作为依赖会让 meta context
@@ -2239,9 +2329,76 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return st.fileIndex.get(file) ?? sessionIdByFileRef.current.get(file) ?? null;
   }, []);
 
+  const loadEarlierHistory = useCallback(async (): Promise<void> => {
+    const sessionId = activeKeyRef.current;
+    const bucket = sessionId ? bucketsStateRef.current.buckets.get(sessionId) : undefined;
+    const api = pideskApi();
+    if (
+      !sessionId ||
+      !bucket ||
+      (bucket.ref?.kind === "durable" && !bucket.processAlive) ||
+      bucket.historyLoading ||
+      bucket.historyDone ||
+      !bucket.historyBefore ||
+      !api
+    )
+      return;
+    const before = bucket.historyBefore;
+    setState((prev) => patchBucket(prev, sessionId, { historyLoading: true }));
+    try {
+      if (bucket.ref?.kind === "legacy-jsonl" && bucket.sessionFile) {
+        const page = await sessionService.readTranscript(bucket.sessionFile, before);
+        setState((prev) => {
+          if (prev.buckets.get(sessionId)?.historyBefore !== before) return prev;
+          const next = applyEntries(prev, sessionId, {
+            type: "prependLegacy",
+            messages: page.messages,
+          });
+          return patchBucket(next, sessionId, {
+            historyBefore: page.nextBefore ?? undefined,
+            historyDone: !page.nextBefore,
+          });
+        });
+        return;
+      }
+      const page = await unwrap(api.durable.history(sessionId, before));
+      setState((prev) => {
+        const current = prev.buckets.get(sessionId);
+        if (current?.historyBefore !== before) return prev;
+        const next = applyEntries(prev, sessionId, {
+          type: "prependDurable",
+          entries: [...page].reverse(),
+        });
+        return patchBucket(next, sessionId, {
+          historyBefore: page.at(-1)?.id ?? before,
+          historyDone: page.length < 100,
+        });
+      });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    } finally {
+      setState((prev) => patchBucket(prev, sessionId, { historyLoading: false }));
+    }
+  }, [setState, showToast]);
+
+  const compactSession = useCallback(async (): Promise<void> => {
+    const sessionId = activeKeyRef.current;
+    const api = pideskApi();
+    if (!sessionId || !api) return;
+    try {
+      await unwrap(api.durable.compact(sessionId));
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    }
+  }, [showToast]);
+
   const metaValue = useMemo<SessionMetaValue>(
     () => ({
       phase,
+      historyAvailable: activeBucket?.historyDone === false,
+      historyLoading: activeBucket?.historyLoading === true,
+      loadEarlierHistory,
+      compactSession,
       activeSessionId: bucketsState.activeKey,
       allSessions,
       activeSessionFile,
@@ -2322,7 +2479,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       activeBucket?.contextOtherPercent,
       activeBucket?.contextWindow,
       activeBucket?.autoCompactionEnabled,
-      piReady,
+      activeBucket?.historyDone,
+      activeBucket?.historyLoading,
+      loadEarlierHistory,
+      compactSession,
       sessionWorkingDir,
       firstUserText,
       readLastUserText,

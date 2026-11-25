@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, shell } from "electron";
 import { t } from "../shared/i18n";
-import { browserWindowOpenResponse, isBrowserContents } from "./browser/browserPolicy";
 import { disposeAgentRuntime, startAgentRuntime } from "./agentRuntime/agentRuntimeManager";
+import { browserWindowOpenResponse, isBrowserContents } from "./browser/browserPolicy";
 import { registerBrowserLifecycle } from "./browser/browserView";
 import { disposeExtensionWorker } from "./extension/extensionWorkerManager";
 import { registerWatcherLifecycle } from "./fs/watcher";
@@ -21,7 +21,6 @@ import { disposeIdleReclaim, initIdleReclaim } from "./session/idleReclaim";
 import { detectPiExecutablePath } from "./session/piLauncher";
 import { disposeAllSessions } from "./session/piSession";
 import { warmPiShellCache } from "./session/piShell";
-import { migrateLegacySessionTitles } from "./session/sessionNameMigration";
 import { getSettings, updateSettings } from "./settings/settings";
 import { registerTerminalLifecycle } from "./terminal/terminal";
 import { disposeUpdater, scheduleStartupCheck } from "./updater/updaterService";
@@ -96,12 +95,6 @@ app.whenReady().then(async () => {
   registerWallpaperProtocol();
   registerImagePreviewProtocol();
   registerMediaPreviewProtocol();
-  // 旧 settings.sessionTitles → pi session_info：先于窗口，首屏列表就带名字
-  try {
-    await migrateLegacySessionTitles();
-  } catch (err) {
-    console.warn("[session-name] 旧标题迁移未完成", err);
-  }
   createMainWindow();
   void startAgentRuntime().catch((error: unknown) => {
     console.error("[agent-runtime] Durable utility process failed to start", error);
@@ -126,6 +119,9 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
   });
 });
+
+let durableShutdownStarted = false;
+let durableShutdownFinished = false;
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
@@ -172,12 +168,22 @@ app.on("before-quit", (event) => {
   app.quit();
 });
 
+app.on("before-quit", (event) => {
+  if (event.defaultPrevented || durableShutdownFinished) return;
+  event.preventDefault();
+  if (durableShutdownStarted) return;
+  durableShutdownStarted = true;
+  void disposeAgentRuntime().finally(() => {
+    durableShutdownFinished = true;
+    app.quit();
+  });
+});
+
 app.on("will-quit", () => {
   disposeTray();
   disposeTaskScheduler();
   disposeIdleReclaim();
   remoteService.dispose();
-  disposeAgentRuntime();
   disposeUpdater();
   // 检查器浮窗：退出前强制销毁，避免残留独立窗
   disposeInspectorWindow();

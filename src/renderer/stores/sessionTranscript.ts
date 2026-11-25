@@ -1,3 +1,5 @@
+import type { ConversationView, EntryRecord, LiveState } from "@earendil-works/pi-durable";
+import { DESKTOP_RETRY_ATTEMPTS } from "../../shared/durableProtocol";
 import { t } from "../../shared/i18n";
 import type {
   PiAgentEvent,
@@ -219,6 +221,8 @@ export type SessionEntry =
 
 export type SessionAction =
   | { type: "clear" }
+  | { type: "prependDurable"; entries: readonly EntryRecord[] }
+  | { type: "prependLegacy"; messages: PiChatMessage[] }
   | {
       type: "userMessage";
       text: string;
@@ -247,6 +251,116 @@ export type SessionAction =
       sessionStartedAt?: number;
     };
 
+function durableMessages(records: readonly EntryRecord[]): PiChatMessage[] {
+  return records.flatMap((entry): PiChatMessage[] => {
+    if (entry.model?.length)
+      return entry.model
+        .filter((message) => message.role !== "system")
+        .map((message) => ({
+          ...message,
+          content:
+            typeof message.content === "string"
+              ? [{ type: "text", text: message.content }]
+              : [...message.content],
+        })) as PiChatMessage[];
+    if (["pi.system", "pi.user", "pi.assistant", "pi.tool-result"].includes(entry.kind)) return [];
+    return [
+      {
+        role: "custom",
+        customType: entry.kind,
+        content: [
+          {
+            type: "text",
+            text: typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data ?? {}),
+          },
+        ],
+        display: true,
+      },
+    ];
+  });
+}
+
+function durableSavedEntries(records: readonly EntryRecord[]): SessionEntry[] {
+  const result = entriesFromMessages(durableMessages(records));
+  const users = records.filter((entry) => entry.model?.some((message) => message.role === "user"));
+  let userIndex = 0;
+  return result.map((entry) =>
+    entry.kind === "user" && users[userIndex]
+      ? { ...entry, id: `durable-user-${users[userIndex++].id}` }
+      : entry,
+  );
+}
+
+/** Hydration replaces stored usage and partial state; it never replays completion events. */
+function hydrateDurable(previous: SessionEntry[], view: ConversationView): SessionEntry[] {
+  let entries = durableSavedEntries(view.entries);
+  // A newly opened empty database must not erase the user's in-flight optimistic bubble.
+  const optimistic = previous.filter((entry) => entry.kind === "user" && entry.optimistic);
+  if (optimistic.length && !view.entries.some((entry) => entry.kind === "pi.user"))
+    entries.push(...optimistic);
+  const live = (view.docs["pi.live"] ?? {}) as LiveState;
+  if (live.run) {
+    const lastUser = entries.findLastIndex((entry) => entry.kind === "user");
+    const runIndex = entries.findLastIndex((entry) => entry.kind === "run");
+    if (runIndex > lastUser)
+      entries = entries.map((entry, index) =>
+        index === runIndex && entry.kind === "run"
+          ? { ...entry, synthetic: false, status: "running", endedAt: null }
+          : entry,
+      );
+    else entries = openRun(entries);
+    const partial = live.generation?.message;
+    if (partial)
+      entries.push({
+        kind: "assistant",
+        id: `durable-live-${view.conversation.id}:${live.run.taskId}:${live.generation?.attempt}`,
+        blocks: blocksFromContent(partial.content, null).map((block) =>
+          block.kind === "text" || block.kind === "thinking"
+            ? { ...block, streaming: true }
+            : block,
+        ),
+        at: null,
+      });
+    for (const tool of live.tools ?? []) {
+      if (tool.status === "pending" || tool.status === "done") continue;
+      entries = applyEvent(entries, {
+        type: "tool_execution_start",
+        toolCallId: tool.callId,
+        toolName: tool.name,
+      });
+      if (tool.output || tool.details)
+        entries = applyEvent(entries, {
+          type: "tool_execution_update",
+          toolCallId: tool.callId,
+          partialResult: {
+            content: [{ type: "text", text: tool.output ?? "" }],
+            details: tool.details,
+          },
+        });
+    }
+    if (live.generation?.retry)
+      entries = applyEvent(entries, {
+        type: "auto_retry_start",
+        attempt: live.generation.attempt + 1,
+        maxAttempts: DESKTOP_RETRY_ATTEMPTS,
+        errorMessage: live.generation.retry.error,
+      });
+  }
+  if (live.compactions?.length)
+    entries = applyEvent(entries, {
+      type: "compaction_start",
+      reason: live.compactions[0].trigger,
+    });
+  if (live.compactionFailure)
+    entries = applyEvent(entries, {
+      type: "compaction_end",
+      errorMessage: live.compactionFailure.error,
+    });
+  if (live.runFailure && !["aborted", "nothing_to_answer"].includes(live.runFailure.reason))
+    entries = appendProcessError(entries, live.runFailure.detail ?? live.runFailure.reason);
+  return entries;
+}
+
 let uidCounter = 0;
 
 function uid(): string {
@@ -260,6 +374,10 @@ export function sessionEntriesReducer(
   action: SessionAction,
 ): SessionEntry[] {
   switch (action.type) {
+    case "prependLegacy":
+      return [...entriesFromMessages(action.messages), ...state];
+    case "prependDurable":
+      return [...durableSavedEntries(action.entries), ...state];
     case "clear":
       return [];
     case "userMessage":
@@ -318,6 +436,72 @@ export function sessionEntriesReducer(
 
 function applyEvent(entries: SessionEntry[], event: PiAgentEvent): SessionEntry[] {
   switch (event.type) {
+    case "durable_user": {
+      const identity = `durable-user-${event.entryId}`;
+      if (entries.some((entry) => entry.id === identity)) return entries;
+      const optimistic = entries.findIndex((entry) => entry.kind === "user" && entry.optimistic);
+      if (optimistic >= 0)
+        return entries.map((entry, index) =>
+          index === optimistic && entry.kind === "user"
+            ? { ...entry, id: identity, optimistic: undefined }
+            : entry,
+        );
+      return [
+        ...entries,
+        { kind: "user", id: identity, text: extractText(event.message.content) ?? "" },
+      ];
+    }
+    case "durable_projection": {
+      const action = event.action;
+      if (action.type === "hydrate") return hydrateDurable(entries, action.view);
+      if (action.type === "reconcile") {
+        const blocks = blocksFromContent(action.message.content, null).map((block) =>
+          block.kind === "text" || block.kind === "thinking"
+            ? { ...block, streaming: true }
+            : block,
+        );
+        const index = entries.findLastIndex(
+          (entry) => entry.kind === "assistant" && entry.at == null,
+        );
+        const replacement: AssistantEntry = {
+          kind: "assistant",
+          id: `durable-live-${action.identity}`,
+          blocks,
+          at: null,
+        };
+        return index < 0
+          ? [...entries, replacement]
+          : entries.map((entry, position) => (position === index ? replacement : entry));
+      }
+      if (action.type === "entry") {
+        const id = `durable-entry-${action.entry.id}`;
+        if (entries.some((entry) => entry.id === id)) return entries;
+        return [
+          ...entries,
+          {
+            kind: "custom",
+            id,
+            customType: action.entry.kind,
+            text:
+              typeof action.entry.data === "string"
+                ? action.entry.data
+                : JSON.stringify(action.entry.data ?? {}),
+            at: Date.now(),
+          },
+        ];
+      }
+      if (action.type === "error")
+        return finalizeRun(
+          upsertRunErrorCard(
+            recordStopReason(entries, "error", action.error),
+            t("session.error.processTitle"),
+            action.error,
+            "llm",
+          ),
+          "failed",
+        );
+      return entries;
+    }
     case "agent_start":
       return openRun(entries);
     case "agent_end":

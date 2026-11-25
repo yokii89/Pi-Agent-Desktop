@@ -2,6 +2,7 @@
  * 渲染层多会话桶状态（纯逻辑）：双索引 sessionId + sessionFile（决策 #5）。
  * sessionEntriesReducer 保持纯函数；本模块只做外层按 sessionId 分发。
  */
+
 import type {
   PiChatMessage,
   PiContextBreakdownSlice,
@@ -10,6 +11,8 @@ import type {
   QueueIntent,
   SessionId,
 } from "../../shared/ipc";
+import type { SessionRef } from "../../shared/sessionRef";
+import { sessionRefKey } from "../../shared/sessionRef";
 import { normalizeCwdKey } from "../services/slashCommandCache";
 import { type SessionEntry, sessionEntriesReducer } from "./sessionTranscript";
 
@@ -37,6 +40,10 @@ export function attentionKindForStopReason(
 
 export interface SessionBucket {
   sessionId: SessionId;
+  ref?: SessionRef;
+  historyBefore?: number;
+  historyDone?: boolean;
+  historyLoading?: boolean;
   phase: SessionPhase;
   entries: SessionEntry[];
   processAlive: boolean;
@@ -85,6 +92,10 @@ export function emptyBucket(
 ): SessionBucket {
   return {
     sessionId,
+    ref: patch?.ref,
+    historyBefore: patch?.historyBefore,
+    historyDone: patch?.historyDone,
+    historyLoading: patch?.historyLoading,
     phase: patch?.phase ?? "empty",
     entries: patch?.entries ?? [],
     processAlive: patch?.processAlive ?? false,
@@ -241,6 +252,37 @@ export function applyEntries(
   const bucket = next.buckets.get(sessionId);
   if (!bucket) return next;
   const entries = sessionEntriesReducer(bucket.entries, action);
+  if (action.type === "event" && action.event.type === "durable_projection") {
+    const projection = action.event.action;
+    if (projection.type === "hydrate") {
+      const live = projection.view.docs["pi.live"];
+      const items = projection.view.docs["pi.inbox"]?.items;
+      const queue: PiQueuedMessages = { steering: [], followUp: [] };
+      if (Array.isArray(items))
+        for (const item of items) {
+          if (
+            item &&
+            typeof item === "object" &&
+            !Array.isArray(item) &&
+            (item.mode === "steer" || item.mode === "followUp") &&
+            typeof item.content === "string"
+          )
+            queue[item.mode === "steer" ? "steering" : "followUp"].push(item.content);
+        }
+      return patchBucket(next, sessionId, {
+        entries,
+        ref: action.event.ref,
+        sessionFile: sessionRefKey(action.event.ref),
+        processAlive: true,
+        transcriptReady: true,
+        switching: false,
+        phase: live?.run || bucket.startPending ? "running" : entries.length ? "idle" : "empty",
+        historyBefore: projection.view.entries[0]?.id,
+        historyDone: projection.view.before === undefined,
+        queue,
+      });
+    }
+  }
   return patchBucket(next, sessionId, { entries });
 }
 

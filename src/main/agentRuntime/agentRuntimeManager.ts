@@ -8,6 +8,11 @@ import {
   type AgentRuntimeRequest,
   parseAgentRuntimeMessage,
 } from "../../shared/agentRuntimeProtocol";
+import {
+  type DurableCommand,
+  parseDurableCommand,
+  type RuntimeSessionUpdate,
+} from "../../shared/durableProtocol";
 
 const READY_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -36,7 +41,31 @@ function supportsDurableNodeVersion(version: string): boolean {
   return major > 22 || (major === 22 && minor >= 19);
 }
 
-class AgentRuntimeManager {
+export class AgentRuntimeManager {
+  private readonly updateListeners = new Set<(update: RuntimeSessionUpdate) => void>();
+  private readonly faultListeners = new Set<(error: Error) => void>();
+
+  subscribe(
+    update: (value: RuntimeSessionUpdate) => void,
+    fault: (error: Error) => void,
+  ): () => void {
+    this.updateListeners.add(update);
+    this.faultListeners.add(fault);
+    return () => {
+      this.updateListeners.delete(update);
+      this.faultListeners.delete(fault);
+    };
+  }
+
+  request(command: DurableCommand): Promise<unknown> {
+    const validated = parseDurableCommand(JSON.parse(JSON.stringify(command)));
+    if (!validated) return Promise.reject(new Error("Invalid or oversized Durable command."));
+    return this.sendRequest(
+      { id: randomUUID(), type: "command", command: validated },
+      REQUEST_TIMEOUT_MS,
+    );
+  }
+
   private child: Electron.UtilityProcess | null = null;
   private port: Electron.MessagePortMain | null = null;
   private starting: Promise<RuntimeReady> | null = null;
@@ -47,9 +76,16 @@ class AgentRuntimeManager {
   private readonly pending = new Map<string, PendingRequest>();
   private smokeTest: Promise<{ conversationId: number; reply: string }> | null = null;
   private closing = false;
+  private retiring?: Promise<void>;
+
+  /** Shared utility PID; ending one attachment never terminates the utility process. */
+  pid(): number | null {
+    return this.child?.pid ?? null;
+  }
 
   start(): Promise<RuntimeReady> {
     if (this.closing) return Promise.reject(new Error("Durable runtime is closing."));
+    if (this.retiring) return this.retiring.then(() => this.start());
     if (this.child && this.port && this.ready && !this.starting) {
       return Promise.resolve(this.ready);
     }
@@ -169,6 +205,7 @@ class AgentRuntimeManager {
           this.reset(
             child,
             new Error(`Durable utility process exited (${code}). ${startupError.trim()}`),
+            true,
           );
         }
       });
@@ -218,6 +255,15 @@ class AgentRuntimeManager {
       return;
     }
 
+    if (message.type === "update") {
+      try {
+        for (const listener of this.updateListeners) listener(message.update);
+      } catch {
+        this.reset(child, new Error("Could not apply a Durable runtime update."));
+      }
+      return;
+    }
+
     if (message.type === "protocol-error") {
       this.reset(child, new Error(message.error));
       return;
@@ -249,11 +295,16 @@ class AgentRuntimeManager {
     return new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(request.id);
-        reject(new Error("Timed out waiting for a Durable runtime response."));
+        const error = new Error(
+          "Timed out waiting for a Durable runtime response. Reopen the session to reconcile saved work.",
+        );
+        reject(error);
+        // A timed-out admission may have committed. Retire the writer before allowing a new attachment.
+        this.reset(child, error);
       }, timeoutMs);
       this.pending.set(request.id, { resolve, reject, timer });
       try {
-        port.postMessage(request);
+        port.postMessage(JSON.parse(JSON.stringify(request)));
       } catch (error) {
         clearTimeout(timer);
         this.pending.delete(request.id);
@@ -262,8 +313,27 @@ class AgentRuntimeManager {
     });
   }
 
-  private reset(child: Electron.UtilityProcess, error: Error): void {
+  private reset(child: Electron.UtilityProcess, error: Error, exited = false): void {
     if (this.child !== child) return;
+    // A killed process still owns its SQLite handles until exit. Never overlap generations.
+    if (!exited) {
+      const retirement = new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(
+          () =>
+            reject(
+              new Error("Durable writer did not exit. Restart PiDesk before reopening sessions."),
+            ),
+          10_000,
+        );
+        child.once("exit", () => {
+          clearTimeout(timer);
+          if (this.retiring === retirement) this.retiring = undefined;
+          resolve();
+        });
+      });
+      this.retiring = retirement;
+      void retirement.catch(() => undefined);
+    }
     this.child = null;
     this.ready = null;
     this.port?.close();
@@ -278,11 +348,13 @@ class AgentRuntimeManager {
       pending.reject(error);
     }
     this.pending.clear();
-    child.kill();
+    for (const listener of this.faultListeners) listener(error);
+    if (!exited) child.kill();
   }
 }
 
-const manager = new AgentRuntimeManager();
+export const agentRuntimeManager = new AgentRuntimeManager();
+const manager = agentRuntimeManager;
 
 /** Start the isolated runtime after Electron is ready. The legacy session engine remains active during migration. */
 export function startAgentRuntime(): Promise<RuntimeReady> {

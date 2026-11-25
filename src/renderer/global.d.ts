@@ -10,6 +10,7 @@ import type {
   SessionRuntimeSnapshot,
   WorkerAcquireResult,
 } from "../shared/contribution";
+import type { DurableDesktopApi } from "../shared/durableProtocol";
 import type {
   GitHubAuthState,
   GitHubDeviceStart,
@@ -265,6 +266,7 @@ export interface PideskGlobalApi {
     /** 写入一条覆盖补丁（字段 null = 删除回到默认）并重载存活会话。 */
     set(req: PiModelOverrideSetRequest): Promise<IpcResult<PiModelOverrideSetResult>>;
   };
+  durable: DurableDesktopApi;
   session: {
     start(req: SessionStartRequest): Promise<IpcResult<SessionId>>;
     prompt(req: SessionPromptRequest): Promise<IpcResult<PromptDisposition>>;
@@ -281,14 +283,14 @@ export interface PideskGlobalApi {
     /** 重命名会话（写入 pi session_info；空名清除）。 */
     rename(req: SessionRenameRequest): Promise<IpcResult<SessionRenameResult>>;
     /** 读取会话 JSONL 转为消息数组（磁盘优先展示，不依赖 pi 进程）。 */
-    readTranscript(file: string): Promise<IpcResult<SessionTranscriptPayload>>;
+    readTranscript(file: string, before?: number): Promise<IpcResult<SessionTranscriptPayload>>;
     /** 导出会话记录为 Markdown 文件（系统保存对话框；取消返回 null）。 */
     exportMarkdown(req: SessionExportRequest): Promise<IpcResult<{ path: string } | null>>;
     /** 导出会话记录为 HTML 文件（pi 原生导出；系统保存对话框；取消返回 null）。 */
     exportHtml(req: SessionExportRequest): Promise<IpcResult<{ path: string } | null>>;
     getCommands(sessionId: SessionId): Promise<IpcResult<PiSlashCommand[]>>;
     setThinkingLevel(req: SessionSetThinkingLevelRequest): Promise<IpcResult<null>>;
-    getModelState(sessionId: SessionId): Promise<IpcResult<PiModelState>>;
+    getModelState(sessionId?: SessionId): Promise<IpcResult<PiModelState>>;
     setModel(req: SessionSetModelRequest): Promise<IpcResult<PiModelOption>>;
     getModels(req?: SessionGetModelsRequest): Promise<IpcResult<PiModelOption[]>>;
     setDefaultModel(req: { provider: string; modelId: string }): Promise<IpcResult<null>>;

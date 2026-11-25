@@ -7,7 +7,7 @@ const fake = vi.hoisted(() => ({
   dispose: vi.fn(),
   fingerprint: new Map<string, string>(),
 }));
-vi.mock("./piSession", () => ({
+vi.mock("./sessionRuntime", () => ({
   hasSession: (id: string) => fake.alive.has(id),
   getSessionPid: (id: string) => (fake.alive.has(id) ? 1234 : null),
   startSession: fake.start,

@@ -15,6 +15,7 @@ import type {
 } from "../../shared/contribution";
 import { RUNTIME_IPC, RUNTIME_READY_TIMEOUT_MS } from "../../shared/contribution";
 import type { SessionStartRequest } from "../../shared/ipc";
+import { sessionRefFromKey } from "../../shared/sessionRef";
 import { getCatalogSnapshot } from "../extension/contributionCatalog";
 import { getMainWindow } from "../window/createMainWindow";
 import {
@@ -24,7 +25,7 @@ import {
   hasSession,
   startSession,
   waitForSessionDisposal,
-} from "./piSession";
+} from "./sessionRuntime";
 import {
   canReclaimSpeculative,
   canSupersedeSpeculative,
@@ -512,6 +513,8 @@ function listIdleCandidateIds(): SessionId[] {
 export async function ensureSessionReady(
   req: CoordinatorStartRequest,
 ): Promise<{ sessionId: SessionId; reused: boolean }> {
+  const ref = req.ref ?? (req.sessionFile ? sessionRefFromKey(req.sessionFile) : undefined);
+  if (ref?.kind === "legacy-jsonl") throw new Error("Legacy JSONL sessions are read-only.");
   const reason = req.reason ?? "manual";
   const startedAtMs = Date.now();
   const isExplicitUser = !isSpeculativeCreatedBy(reason);
@@ -575,6 +578,7 @@ export async function ensureSessionReady(
       sessionId: req.sessionId,
       cwd: req.cwd,
       sessionFile: req.sessionFile,
+      ref: req.ref,
       reason,
     });
   } catch (err) {
@@ -634,7 +638,7 @@ export async function ensureSessionReady(
     const code = (err as { code?: SessionRuntimeErrorCode }).code;
     if (!reused) {
       try {
-        disposeSession(sessionId);
+        await disposeSession(sessionId);
       } catch {
         // dispose 失败不影响错误上抛
       }
@@ -686,7 +690,7 @@ export function reclaimSpeculativeSessions(): SessionId[] {
       continue;
     }
     try {
-      disposeSession(rec.sessionId);
+      void disposeSession(rec.sessionId).catch(() => undefined);
     } catch {
       // ignore
     }
@@ -725,7 +729,7 @@ export function reclaimStaleSpeculativeSessions(keep: {
       canSupersedeSpeculative({ ...base, state: rec.state });
     if (!stale) continue;
     try {
-      disposeSession(rec.sessionId);
+      void disposeSession(rec.sessionId).catch(() => undefined);
     } catch {
       // ignore
     }

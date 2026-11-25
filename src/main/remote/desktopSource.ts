@@ -1,24 +1,21 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import type { SessionPushMessage } from "../../shared/ipc";
+import { sessionRefFromKey, sessionRefKey } from "../../shared/sessionRef";
+import { desktopSessions } from "../agentRuntime/desktopSessions";
 import { pendingUiRequests } from "../session/extensionUi";
 import { getPiAgentDir } from "../session/piInfo";
-import {
-  abortSession,
-  fetchSessionState,
-  hasSession,
-  liveSessionIdForFile,
-  promptSession,
-  respondSessionUi,
-  setSessionName,
-} from "../session/piSession";
+import { respondSessionUi } from "../session/piSession";
 import { ensureSessionReady, listRuntimeSnapshots } from "../session/runtimeCoordinator";
-import { encodeCwdToSessionDir, listSessions } from "../session/sessionHistory";
+import { encodeCwdToSessionDir } from "../session/sessionHistory";
 import { SESSION_PREVIEW_MAX_LENGTH } from "../session/sessionMeta";
+import { sessionRepository } from "../session/sessionRepository";
+import { hasSession, liveSessionIdForFile } from "../session/sessionRuntime";
 import { getSettings } from "../settings/settings";
+import { durableRemoteHistory } from "./durableHistory";
 import { completedHistory, EMPTY_TAIL, RemoteHistoryReader } from "./historySync";
 import { remoteInteractionAnswer } from "./interactionAnswer";
-import { remoteSessionFile } from "./readAdapter";
+import { REMOTE_HISTORY_BYTES, remoteSessionFile } from "./readAdapter";
 import type {
   ReadOnlySource,
   RemoteInteraction,
@@ -57,6 +54,7 @@ export class DesktopReadOnlySource implements ReadOnlySource {
         "message_end",
         "tool_execution_start",
         "tool_execution_end",
+        "durable_projection",
         "session_name_changed",
       ].includes(update.type),
     );
@@ -64,7 +62,13 @@ export class DesktopReadOnlySource implements ReadOnlySource {
 
   async history(session: RemoteSession) {
     const ref = this.ref(session);
-    const view = await this.historyReader.read(ref.file, sessionDirectory(ref.root), sessionRoot());
+    const stored = sessionRefFromKey(ref.file);
+    const view =
+      stored.kind === "durable"
+        ? durableRemoteHistory(ref.file, (await sessionRepository.transcript(stored)).messages)
+        : await this.historyReader.read(ref.file, sessionDirectory(ref.root), sessionRoot());
+    if (Buffer.byteLength(JSON.stringify(view.messages)) > REMOTE_HISTORY_BYTES)
+      throw new Error("RESOURCE_UNAVAILABLE");
     this.ref(session);
     const busy = listRuntimeSnapshots().some(
       (runtime) => runtime.sessionFile === ref.file && runtime.state === "busy",
@@ -96,12 +100,13 @@ export class DesktopReadOnlySource implements ReadOnlySource {
     const refs = new Map<string, { file: string; projectId: string; root: string }>();
     const runtime = listRuntimeSnapshots();
     for (const project of projects) {
-      for (const s of await listSessions(project.dir)) {
+      for (const s of await sessionRepository.list(project.dir)) {
         const normalize = (value: string) =>
           process.platform === "win32" ? path.resolve(value).toLowerCase() : path.resolve(value);
         if (!s.cwd || normalize(s.cwd) !== normalize(project.dir)) continue;
         try {
-          await remoteSessionFile(s.file, sessionDirectory(project.dir), sessionRoot());
+          if (sessionRefFromKey(s.file).kind === "legacy-jsonl")
+            await remoteSessionFile(s.file, sessionDirectory(project.dir), sessionRoot());
         } catch {
           continue;
         }
@@ -211,19 +216,22 @@ export class DesktopReadOnlySource implements ReadOnlySource {
   }
   async send(session: RemoteSession, message: string): Promise<{ disposition: string }> {
     const ref = this.ref(session);
+    await sessionRepository.executable(ref.file, ref.root);
     const { sessionId } = await ensureSessionReady({
       sessionFile: ref.file,
       cwd: ref.root,
       reason: "send",
     });
-    const disposition = await promptSession(sessionId, message, { streamingBehavior: "followUp" });
+    this.ref(session);
+    const disposition = await desktopSessions.submit(sessionId, message, "followUp");
     return { disposition };
   }
   async stop(session: RemoteSession): Promise<{ requested: boolean }> {
     const ref = this.ref(session);
     const liveId = liveSessionIdForFile(ref.file);
     if (!liveId || !hasSession(liveId)) throw new Error("RESOURCE_UNAVAILABLE");
-    await abortSession(liveId);
+    const attachment = desktopSessions.require(liveId);
+    await desktopSessions.command(liveId, { op: "abort", sessionId: attachment.storedId });
     return { requested: true };
   }
   async create(projectId: string, title: string, creationKey: string): Promise<RemoteSession> {
@@ -231,14 +239,12 @@ export class DesktopReadOnlySource implements ReadOnlySource {
     if (!project) throw new Error("RESOURCE_UNAVAILABLE");
     const sessionId = idForCreate(creationKey);
     const started = await ensureSessionReady({ sessionId, cwd: project.dir, reason: "manual" });
-    await setSessionName(started.sessionId, title);
-    const state = await fetchSessionState(started.sessionId);
-    const file =
-      state && typeof state === "object" ? (state as { sessionFile?: unknown }).sessionFile : null;
-    if (typeof file !== "string" || !file) throw new Error("STATE_UNAVAILABLE");
+    const attachment = desktopSessions.require(started.sessionId);
+    const file = sessionRefKey({ kind: "durable", id: attachment.storedId });
+    sessionRepository.rename({ kind: "durable", id: attachment.storedId }, title);
     const id = publicId(projectId, file);
     this.refs.set(id, { file, projectId, root: project.dir });
-    const sessions = await listSessions(project.dir);
+    const sessions = await sessionRepository.list(project.dir);
     const summary = sessions.find((item) => item.file === file);
     const sessionTitle = sanitizeRemoteText(summary?.sessionName || title).slice(0, 256);
     this.runtimeSessions.set(started.sessionId, {

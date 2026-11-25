@@ -13,11 +13,11 @@ const fake = vi.hoisted(() => ({
 
 vi.mock("../view/viewHost", () => ({ hasSessionModal: () => fake.modal }));
 vi.mock("./extensionUi", () => ({ pendingUiCount: () => fake.pendingUi }));
-vi.mock("./piSession", () => ({
+vi.mock("./sessionRuntime", () => ({
   getSessionProcessToken: () => fake.token,
   hasPendingSessionRequests: () => fake.pendingRpc,
   fetchSessionState: fake.fetchState,
-  disposeSession: fake.dispose,
+  disposeIdle: fake.dispose,
 }));
 vi.mock("./runtimeCoordinator", () => ({
   getRuntimeState: () => fake.runtime,
@@ -37,6 +37,7 @@ beforeEach(() => {
   fake.pendingUi = 0;
   fake.modal = false;
   fake.fetchState.mockResolvedValue(IDLE);
+  fake.dispose.mockResolvedValue("ended");
 });
 
 describe("手动关闭空闲会话", () => {

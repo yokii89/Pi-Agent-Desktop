@@ -169,12 +169,14 @@ describe("Durable session ownership and persistence", () => {
         (u) => u.type === "settled" && u.view.entries.some((e) => e.kind === "pi.assistant"),
       ),
     ).toHaveLength(0);
+    expect(await f.service.closeIdle(f.sessionId)).toBe(false);
     held.release();
     await until(() =>
       f.updates.some(
         (u) => u.type === "settled" && u.view.entries.some((e) => e.kind === "pi.assistant"),
       ),
     );
+    expect(await f.service.closeIdle(f.sessionId)).toBe(true);
   });
 
   it("closes admissions immediately, drains pending opens and writes, and keeps committed data", async () => {

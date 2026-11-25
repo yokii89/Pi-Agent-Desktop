@@ -6,6 +6,8 @@
  * 执行结果在会话流里，运行台账只记录派发/跳过/失败到派发为止的事实。
  */
 
+import { sessionRefFromKey } from "./sessionRef";
+
 /** IPC channel 常量（AGENTS.md 命名 `pidesk:<域>:<动作>`）。 */
 export const SCHEDULER_IPC = {
   /** 读取全量快照（任务 + 运行台账）。 */
@@ -284,7 +286,8 @@ export function sanitizeSchedulerTaskInput(raw: unknown): SchedulerTaskInput {
   let sessionFile: string | null = null;
   if (typeof record.sessionFile === "string" && record.sessionFile.trim()) {
     const file = record.sessionFile.trim();
-    if (!isAbsolutePath(file)) throw new Error("会话文件路径无效");
+    const ref = sessionRefFromKey(file);
+    if (ref.kind === "legacy-jsonl" && !isAbsolutePath(file)) throw new Error("会话文件路径无效");
     sessionFile = file;
   }
   const rule = normalizeScheduleRule(record.rule);

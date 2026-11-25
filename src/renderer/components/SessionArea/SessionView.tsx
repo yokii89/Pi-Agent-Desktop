@@ -19,6 +19,7 @@ import {
 } from "../../stores/sessionTranscript";
 import { useUiStore } from "../../stores/uiStore";
 import { StreamMount } from "../ExtensionView/StreamMount";
+import { Button } from "../ui/Button";
 import { AgentRunHeader } from "./AgentRunHeader";
 import { AssistantFooter } from "./AssistantFooter";
 import { AssistantMessage } from "./AssistantMessage";
@@ -107,8 +108,20 @@ function coalesceAssistantRuns(entries: SessionEntry[]): RenderUnit[] {
 export function SessionView() {
   const t = useT();
   const entries = useSessionEntries();
-  const { switchingTo, transcriptReady, processAlive, activeSessionId, phase, startPending, stop } =
-    useSessionMeta();
+  const {
+    switchingTo,
+    transcriptReady,
+    processAlive,
+    activeSessionId,
+    phase,
+    startPending,
+    stop,
+    historyAvailable,
+    historyLoading,
+    loadEarlierHistory,
+    compactSession,
+    activeSessionFile,
+  } = useSessionMeta();
   const { streams, hasBlockingViewFor } = useExtensionViewStore();
   const { quoteComposer } = useComposerStore();
   const { showToast, settingsOpen } = useUiStore();
@@ -124,7 +137,12 @@ export function SessionView() {
   // 引用落点在输入栏：仅输入栏整体锁定（切换中 / 阻断浮层）时置灰；
   // running 期间输入栏可编辑草稿，引用照常可用（docs/design/12 P1-1）
   const hasBlockingView = hasBlockingViewFor(activeSessionId);
-  const quoteDisabled = switchingTo !== null || hasBlockingView;
+  const quoteDisabled =
+    switchingTo !== null ||
+    hasBlockingView ||
+    (!!activeSessionFile &&
+      !activeSessionFile.startsWith("durable:") &&
+      !activeSessionFile.startsWith("pending:"));
   const quoteDisabledHint =
     switchingTo !== null
       ? t("session.restoringShort")
@@ -308,6 +326,16 @@ export function SessionView() {
             </div>
           ) : (
             <>
+              {historyAvailable && (
+                <Button disabled={historyLoading} onClick={() => void loadEarlierHistory()}>
+                  {t(historyLoading ? "session.durable.loading" : "session.durable.loadEarlier")}
+                </Button>
+              )}
+              {activeSessionFile?.startsWith("durable:") && processAlive && phase !== "running" && (
+                <Button onClick={() => void compactSession()}>
+                  {t("session.durable.compact")}
+                </Button>
+              )}
               {renderUnits.map((unit, index) => {
                 if (unit.type === "assistant") {
                   // 本轮以编辑汇总卡收尾：页脚顺延到卡片下方（卡片是回复的一部分）

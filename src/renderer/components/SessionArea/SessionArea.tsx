@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useInputClearance } from "../../hooks/useInputClearance";
+import { useT } from "../../hooks/useT";
 import { composerDraftKey } from "../../stores/composerDrafts";
 import { useProjectStore } from "../../stores/projectStore";
 import { useSessionMeta } from "../../stores/sessionStore";
@@ -19,7 +20,12 @@ import { WelcomeSplash } from "./WelcomeSplash";
  * 终端面板展开时输入区贴住面板边框（.inputFlush），收起时留一档窗口底距。
  */
 export function SessionArea() {
-  const { phase, activeSessionId } = useSessionMeta();
+  const { phase, activeSessionId, activeSessionFile } = useSessionMeta();
+  const t = useT();
+  const readOnly =
+    !!activeSessionFile &&
+    !activeSessionFile.startsWith("durable:") &&
+    !activeSessionFile.startsWith("pending:");
   const { currentProject } = useProjectStore();
   const draftKey = composerDraftKey(activeSessionId, currentProject?.dir ?? null, phase);
   const [workspaceFocusSeq, setWorkspaceFocusSeq] = useState(0);
@@ -56,16 +62,24 @@ export function SessionArea() {
           <SessionView />
           <div className={styles.dockedInput} data-panel-geo="monitor-input">
             <div className={styles.inputStack} ref={inputStackRef}>
-              <WidgetMountAbove />
-              <QueueTray />
-              <TaskInput
-                key={draftKey}
-                draftKey={draftKey}
-                variant="session"
-                workspaceFocusSeq={workspaceFocusSeq}
-                onWorkspaceSelected={requestWorkspaceFocus}
-              />
-              <WidgetMountBelow />
+              {readOnly ? (
+                <p className={styles.readOnly} data-selectable-text="">
+                  {t("session.legacy.readOnly")}
+                </p>
+              ) : (
+                <>
+                  <WidgetMountAbove />
+                  <QueueTray />
+                  <TaskInput
+                    key={draftKey}
+                    draftKey={draftKey}
+                    variant="session"
+                    workspaceFocusSeq={workspaceFocusSeq}
+                    onWorkspaceSelected={requestWorkspaceFocus}
+                  />
+                  <WidgetMountBelow />
+                </>
+              )}
             </div>
           </div>
         </div>

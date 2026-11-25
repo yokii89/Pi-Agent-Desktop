@@ -3,7 +3,7 @@ import { t } from "../../shared/i18n";
 import { WINDOW_IPC } from "../../shared/ipc";
 import type { WindowCloseRequest } from "../../shared/windowClose";
 import { procService } from "../proc/procService";
-import { listLiveSessions } from "../session/piSession";
+import { listLiveSessionSnapshots } from "../session/runtimeCoordinator";
 import { getSettings, updateSettings } from "../settings/settings";
 import { liveTerminalCount } from "../terminal/terminal";
 import { ClosePromptProtocol } from "./closePromptProtocol";
@@ -42,7 +42,7 @@ export function attachClosePrompt(win: BrowserWindow): void {
     request: (id) => {
       const snapshot: WindowCloseRequest = {
         id,
-        sessions: listLiveSessions().length,
+        sessions: listLiveSessionSnapshots().length,
         terminals: liveTerminalCount(),
         procs: procService.listAllAlive().length,
         trayAvailable: ensureTrayForHide(),
