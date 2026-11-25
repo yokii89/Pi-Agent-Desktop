@@ -8,7 +8,7 @@ import {
   record,
 } from "./durableProtocol";
 
-export const AGENT_RUNTIME_PROTOCOL_VERSION = 3;
+export const AGENT_RUNTIME_PROTOCOL_VERSION = 4;
 
 export type AgentRuntimeRequest =
   | { id: string; type: "smoke-test"; storageRoot: string }

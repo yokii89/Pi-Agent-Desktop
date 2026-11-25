@@ -23,6 +23,7 @@ import {
   packageKeyIdentity,
   parsePideskManifest,
 } from "./contributionSchema";
+import { inspectDurablePackages } from "./durableExtensions";
 import { listPackageEntries } from "./packageStore";
 
 interface CatalogCacheEntry {
@@ -150,7 +151,10 @@ export function buildCatalogSnapshot(
   }
 
   const entries: ExtensionContribution[] = [];
-  const diagnostics: ContributionDiagnostic[] = [];
+  const diagnostics: ContributionDiagnostic[] = [
+    ...inspectDurablePackages(snapshot.user, "user").diagnostics,
+    ...inspectDurablePackages(snapshot.project, "project").diagnostics,
+  ];
   const seenKeys = new Set<string>();
 
   for (const input of inputs) {

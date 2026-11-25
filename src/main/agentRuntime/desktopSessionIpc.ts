@@ -112,7 +112,7 @@ export function registerDurableSessionIpc(): void {
       throw new Error("Invalid session name.");
     return { name: desktopSessions.rename(request.file, request.name) };
   });
-  handle(SESSION_IPC.getCommands, () => []);
+  handle(SESSION_IPC.getCommands, (request) => desktopSessions.commands(id(request.sessionId)));
   handle(SESSION_IPC.getModelState, (request) =>
     desktopSessions.modelState(request.sessionId === undefined ? undefined : id(request.sessionId)),
   );

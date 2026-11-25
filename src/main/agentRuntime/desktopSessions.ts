@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import type { ConversationView, EntryRecord } from "@earendil-works/pi-durable";
 import { shell } from "electron";
+import { DURABLE_COMMAND_NAME, durableDisplayMessages } from "../../shared/durableExtension";
 import type { DurableCommand, RuntimeSessionUpdate } from "../../shared/durableProtocol";
 import { record, validEntries } from "../../shared/durableProtocol";
 import type {
@@ -10,12 +11,14 @@ import type {
   PiChatMessage,
   PiModelState,
   PiQueuedMessages,
+  PiSlashCommand,
   SessionId,
   SessionPushMessage,
   SessionStartRequest,
 } from "../../shared/ipc";
 import { SESSION_IPC } from "../../shared/ipc";
 import { DURABLE_SESSION_ID, sessionRefFromKey, sessionRefKey } from "../../shared/sessionRef";
+import { discoverDurableExtensions } from "../extension/durableExtensions";
 import {
   markRuntimeActivity,
   markRuntimeExit,
@@ -175,7 +178,14 @@ class DesktopSessions {
           sessionName: null,
         });
       }
-      await agentRuntimeManager.request({ op: "open", sessionId: storedId, cwd, create: !known });
+      const extensions = discoverDurableExtensions(cwd);
+      await agentRuntimeManager.request({
+        op: "open",
+        sessionId: storedId,
+        cwd,
+        create: !known,
+        extensions,
+      });
       markRuntimeReady(id);
       if (!attachment.settled) markRuntimeActivity(id, "busy");
       return id;
@@ -203,6 +213,7 @@ class DesktopSessions {
     if (!("sessionId" in command) || command.sessionId !== attachment.storedId)
       throw new Error("Session identity mismatch.");
     const working = ["submit", "continue", "compact", "abort", "write"].includes(command.op);
+    const wasSettled = attachment.settled;
     attachment.pending++;
     if (working) {
       attachment.epoch++;
@@ -210,8 +221,19 @@ class DesktopSessions {
       markRuntimeUsedByUser(id);
       markRuntimeActivity(id, "busy");
     }
+    const epoch = attachment.epoch;
     try {
       return await agentRuntimeManager.request(command);
+    } catch (error) {
+      // A rejected command expansion admitted no work and will not produce a settled update.
+      if (
+        working &&
+        wasSettled &&
+        attachment.epoch === epoch &&
+        !attachment.view?.docs["pi.live"]?.run
+      )
+        attachment.settled = true;
+      throw error;
     } finally {
       attachment.pending--;
       if (working && attachment.settled) markRuntimeActivity(id, "idle");
@@ -237,6 +259,26 @@ class DesktopSessions {
     if (!record(result) || !["started", "queued"].includes(String(result.disposition)))
       throw new Error("Invalid Durable admission response.");
     return result.disposition as "started" | "queued";
+  }
+
+  async commands(id: string): Promise<PiSlashCommand[]> {
+    const attachment = this.require(id);
+    const value = await this.command(id, { op: "commands", sessionId: attachment.storedId });
+    if (
+      !Array.isArray(value) ||
+      value.length > 4096 ||
+      !value.every(
+        (item) =>
+          record(item) &&
+          typeof item.name === "string" &&
+          DURABLE_COMMAND_NAME.test(item.name) &&
+          item.source === "extension" &&
+          typeof item.description === "string" &&
+          item.description.length <= 400,
+      )
+    )
+      throw new Error("Invalid native command catalog.");
+    return value as PiSlashCommand[];
   }
 
   async clearQueue(id: string): Promise<PiQueuedMessages> {
@@ -451,7 +493,7 @@ class DesktopSessions {
       const entries = update.type === "entries" ? update.entries : update.view.entries;
       const summary = durableCatalog().find((item) => item.id === update.sessionId);
       const users = entries
-        .flatMap((entry) => entry.model ?? [])
+        .flatMap((entry) => [...durableDisplayMessages(entry)])
         .filter((message) => message.role === "user");
       if (summary && (users.length || update.type === "entries"))
         saveDurableSummary({

@@ -8,6 +8,7 @@ import { app, type BrowserWindow } from "electron";
 import type { RuntimeModelConfig } from "../../src/shared/durableProtocol";
 import type { PideskSettings, SessionPushMessage, SessionSummary } from "../../src/shared/ipc";
 import { checkP2Workbench } from "./p2Workbench";
+import { checkP3Workbench } from "./p3Workbench";
 
 interface HostManager {
   request(command: { op: "snapshot"; sessionId: string }): Promise<unknown>;
@@ -333,6 +334,7 @@ export async function checkWorkbench(
       ),
     };
     result.p2 = await checkP2Workbench(window, reportPath);
+    result.p3 = await checkP3Workbench(window, reportPath);
     const liveAuth = process.env.PIDESK_RUNTIME_CHECK_LIVE_AUTH;
     if (liveAuth) {
       // Explicit --live authorization only. Read credentials in main and never serialize them to logs or reports.

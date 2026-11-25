@@ -9,6 +9,8 @@ const sharedDir = fileURLToPath(new URL("../shared", import.meta.url)).replace(/
 export default defineConfig({
   root,
   test: {
+    // Generated extension packages must use Node's actual ESM loader, including Windows file URLs.
+    server: { deps: { external: [/pidesk-native-host-[^/\\]+[/\\][^/\\]+\.mjs$/] } },
     include: [
       // 主进程根目录下的纯逻辑（如 appIconPaths）
       "*.test.ts",

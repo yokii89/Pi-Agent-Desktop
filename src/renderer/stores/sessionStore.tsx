@@ -1150,7 +1150,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   /** 预热：active 已有进程直接 true；否则冷启动 active（无 file 的新桶）。 */
   const ensureSession = useCallback(
-    async (reason: SessionStartReason = "slash-command"): Promise<SessionId | null> => {
+    async (
+      reason: SessionStartReason = "slash-command",
+      makeActive = true,
+    ): Promise<SessionId | null> => {
       const id = activeKeyRef.current;
       const st = bucketsStateRef.current;
       if (id) {
@@ -1165,14 +1168,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const started = await startBucket(id, {
           sessionFile: bucket?.sessionFile ?? undefined,
           cwd: bucket?.cwd ?? cwdRef.current,
-          makeActive: true,
+          makeActive,
           reason,
         });
         return started;
       }
-      const newId =
-        takePendingNewChat(pendingNewChatRef, cwdRef.current ?? null) ?? newLocalSessionId();
-      const started = await startBucket(newId, { cwd: cwdRef.current, makeActive: true, reason });
+      const cwd = cwdRef.current ?? null;
+      // Command discovery keeps the home composer mounted and leaves its draft for send to claim.
+      const pending = pendingNewChatRef.current;
+      const newId = makeActive
+        ? (takePendingNewChat(pendingNewChatRef, cwd) ?? newLocalSessionId())
+        : pending?.cwd === cwd
+          ? pending.id
+          : newLocalSessionId();
+      if (!makeActive) pendingNewChatRef.current = { cwd, id: newId };
+      const started = await startBucket(newId, { cwd: cwdRef.current, makeActive, reason });
       return started;
     },
     [startBucket],
@@ -1207,9 +1217,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
     const cached = readSlashCommandCache(cwd);
     if (cached) return cached;
-    const ok = await ensureSession();
+    const ok = await ensureSession("slash-command", false);
     if (!ok) return [];
-    const list = await sessionService.getCommands();
+    const list = await sessionService.getCommands(ok);
     writeSlashCommandCache(cwd, list);
     return list;
   }, [ensureSession]);

@@ -13,6 +13,7 @@ import {
   parseDurableCommand,
   type RuntimeSessionUpdate,
 } from "../../shared/durableProtocol";
+import { localizeRuntimeError } from "./runtimeError";
 
 const READY_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -279,7 +280,7 @@ export class AgentRuntimeManager {
       } else if (message.ok) {
         pending.resolve(message.result);
       } else {
-        pending.reject(new Error(message.error));
+        pending.reject(new Error(localizeRuntimeError(message.error)));
       }
     }
   }

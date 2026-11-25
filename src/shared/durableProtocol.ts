@@ -1,4 +1,9 @@
 import type { EntryRecord } from "@earendil-works/pi-durable";
+import {
+  DURABLE_EXTENSION_LIMIT,
+  type DurableExtensionSpec,
+  isDurableExtensionSpec,
+} from "./durableExtension";
 import type { IpcResult } from "./ipc";
 
 export interface DurableDesktopApi {
@@ -43,7 +48,14 @@ export type RuntimeModelConfig = Omit<DurableModelConfig, "hasKey"> & { apiKey: 
 export type DurableCommand =
   | { op: "initialize"; storageRoot: string; model?: RuntimeModelConfig }
   | { op: "model"; model: RuntimeModelConfig }
-  | { op: "open"; sessionId: string; cwd: string; create: boolean }
+  | {
+      op: "open";
+      sessionId: string;
+      cwd: string;
+      create: boolean;
+      extensions?: readonly DurableExtensionSpec[];
+    }
+  | { op: "commands"; sessionId: string }
   | {
       op: "submit";
       sessionId: string;
@@ -164,10 +176,28 @@ export function parseDurableCommand(value: unknown): DurableCommand | null {
   if (typeof value.sessionId !== "string" || !DURABLE_SESSION_ID.test(value.sessionId)) return null;
   const sessionId = value.sessionId.toLowerCase();
   switch (value.op) {
-    case "open":
+    case "open": {
+      if (
+        value.extensions !== undefined &&
+        (!Array.isArray(value.extensions) ||
+          value.extensions.length > DURABLE_EXTENSION_LIMIT ||
+          !value.extensions.every(isDurableExtensionSpec))
+      )
+        return null;
       return boundedText(value.cwd, 32_768) && typeof value.create === "boolean"
-        ? { op: "open", sessionId, cwd: value.cwd, create: value.create }
+        ? {
+            op: "open",
+            sessionId,
+            cwd: value.cwd,
+            create: value.create,
+            ...(value.extensions === undefined
+              ? {}
+              : { extensions: value.extensions as DurableExtensionSpec[] }),
+          }
         : null;
+    }
+    case "commands":
+      return { op: "commands", sessionId };
     case "abort":
     case "close":
     case "closeIdle":

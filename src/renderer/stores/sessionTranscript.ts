@@ -1,4 +1,5 @@
 import type { ConversationView, EntryRecord, LiveState } from "@earendil-works/pi-durable";
+import { durableDisplayMessages } from "../../shared/durableExtension";
 import { DESKTOP_RETRY_ATTEMPTS } from "../../shared/durableProtocol";
 import { t } from "../../shared/i18n";
 import type {
@@ -254,7 +255,7 @@ export type SessionAction =
 function durableMessages(records: readonly EntryRecord[]): PiChatMessage[] {
   return records.flatMap((entry): PiChatMessage[] => {
     if (entry.model?.length)
-      return entry.model
+      return durableDisplayMessages(entry)
         .filter((message) => message.role !== "system")
         .map((message) => ({
           ...message,
@@ -296,7 +297,10 @@ function hydrateDurable(previous: SessionEntry[], view: ConversationView): Sessi
   let entries = durableSavedEntries(view.entries);
   // A newly opened empty database must not erase the user's in-flight optimistic bubble.
   const optimistic = previous.filter((entry) => entry.kind === "user" && entry.optimistic);
-  if (optimistic.length && !view.entries.some((entry) => entry.kind === "pi.user"))
+  if (
+    optimistic.length &&
+    !view.entries.some((entry) => entry.model?.some((message) => message.role === "user"))
+  )
     entries.push(...optimistic);
   const live = (view.docs["pi.live"] ?? {}) as LiveState;
   if (live.run) {

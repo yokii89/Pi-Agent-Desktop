@@ -193,6 +193,17 @@ describe("Durable application lifecycle and stored history", () => {
     expect(await sessionRepository.list(f.root)).toHaveLength(2);
   });
 
+  it("restores idle after an input is rejected before Durable admission", async () => {
+    const id = await open();
+    f.request.mockRejectedValueOnce(new Error("Unknown native command."));
+    await expect(desktopSessions.submit(id, "/missing-native")).rejects.toThrow(
+      "Unknown native command",
+    );
+    expect(getRuntimeState(id)).toBe("idle");
+    expect(desktopSessions.busy(id)).toBe(false);
+    expect(await disposeIdleSession(id)).toBe("ended");
+  });
+
   it("keeps busy through execution and rejects idle close until the real settled event", async () => {
     const id = await open();
     let release!: () => void;

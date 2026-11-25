@@ -191,6 +191,22 @@ function readPackageResources(root: string): {
   };
 
   for (const kind of RESOURCE_KINDS) collectList(kind);
+  // The compiled desktop entry has its own toggle, including packages with a separate CLI entry.
+  const pidesk = pkg?.pidesk as { runtime?: { entry?: unknown } } | undefined;
+  const desktopEntry = pidesk?.runtime?.entry;
+  if (typeof desktopEntry === "string" && /\.(?:js|mjs)$/.test(desktopEntry)) {
+    const absolute = path.resolve(root, desktopEntry);
+    const relative = path.relative(root, absolute);
+    if (
+      relative &&
+      relative !== ".." &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative) &&
+      !resourceItems.extensions.some((item) => item.path === absolute)
+    ) {
+      pushItem(resourceItems, "extensions", root, absolute);
+    }
+  }
 
   const resources: PiPackageResourceCounts = {
     extensions: resourceItems.extensions.length,

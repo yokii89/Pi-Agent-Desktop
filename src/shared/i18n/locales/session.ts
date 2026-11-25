@@ -6,6 +6,48 @@ export const sessionMessages = defineMessages({
     "en-US":
       "Legacy history is read-only. You can view, copy and export it. Start a new task to continue.",
   },
+  "session.durable.extensionLegacy": {
+    "zh-CN": "{name} 尚未提供 Durable 原生入口，当前会话不会加载此扩展。",
+    "en-US": "{name} has no Durable entry and will not be loaded into this session.",
+  },
+  "session.durable.extensionInvalid": {
+    "zh-CN": "{name} 的 Durable 清单、版本或入口无效。请修复或停用该入口后重开会话。",
+    "en-US":
+      "The Durable manifest, version or entry for {name} is invalid. Fix or disable the entry before reopening the session.",
+  },
+  "session.durable.extensionConflict": {
+    "zh-CN": "Durable 扩展 ID 重复或数量超过上限，请检查用户与项目扩展。",
+    "en-US":
+      "Duplicate Durable extension IDs or too many extensions. Check user and project packages.",
+  },
+  "session.durable.extensionLoad": {
+    "zh-CN": "无法加载原生扩展 {name}，请检查已编译入口及其依赖。",
+    "en-US": "Could not load native extension {name}. Check its compiled entry and dependencies.",
+  },
+  "session.durable.extensionCapability": {
+    "zh-CN": "原生扩展 {name} 使用了未声明或尚未支持的能力。",
+    "en-US": "Native extension {name} uses an undeclared or unsupported capability.",
+  },
+  "session.durable.extensionDuplicate": {
+    "zh-CN": "原生扩展或命令名称冲突：{name}。",
+    "en-US": "Conflicting native extension or command name: {name}.",
+  },
+  "session.durable.extensionClosed": {
+    "zh-CN": "扩展宿主已关闭，请重新打开会话。",
+    "en-US": "The extension host is closed. Reopen the session.",
+  },
+  "session.durable.extensionUnknownCommand": {
+    "zh-CN": "当前会话没有可用命令 /{name}。",
+    "en-US": "Command /{name} is unavailable in this session.",
+  },
+  "session.durable.extensionCommandFailed": {
+    "zh-CN": "命令 /{name} 未能生成有效提示，请检查扩展。",
+    "en-US": "Command /{name} could not produce a valid prompt. Check the extension.",
+  },
+  "session.durable.extensionDisposeFailed": {
+    "zh-CN": "扩展 {name} 未能释放资源，请重试关闭会话。",
+    "en-US": "Extension {name} could not release its resources. Retry closing the session.",
+  },
   "session.durable.modelTitle": { "zh-CN": "内置会话模型", "en-US": "Built-in session model" },
   "session.durable.modelDescription": {
     "zh-CN":

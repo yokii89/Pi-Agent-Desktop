@@ -1,5 +1,6 @@
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 import type { LiveState } from "@earendil-works/pi-durable";
+import { DURABLE_COMMAND_ENTRY, durableDisplayMessages } from "../../shared/durableExtension";
 import { DESKTOP_RETRY_ATTEMPTS } from "../../shared/durableProtocol";
 import type { DurableProjectionAction, DurableSessionUpdate } from "../../shared/durableSession";
 
@@ -67,12 +68,20 @@ export class DurableProjection {
           throw new Error("Durable entry conversation mismatch.");
         if (entry.id <= this.lastEntry) continue;
         this.lastEntry = entry.id;
-        if (!["pi.user", "pi.assistant", "pi.tool-result", "pi.system"].includes(entry.kind)) {
+        if (
+          ![
+            "pi.user",
+            "pi.assistant",
+            "pi.tool-result",
+            "pi.system",
+            DURABLE_COMMAND_ENTRY,
+          ].includes(entry.kind)
+        ) {
           flush();
           actions.push({ type: "entry", entry });
           continue;
         }
-        for (const message of entry.model ?? []) {
+        for (const message of durableDisplayMessages(entry)) {
           this.rememberCalls(message);
           if (message.role === "system") continue;
           if (message.role === "toolResult") {

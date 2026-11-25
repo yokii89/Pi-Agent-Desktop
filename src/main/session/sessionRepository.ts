@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { EntryRecord } from "@earendil-works/pi-durable";
+import { durableDisplayMessages } from "../../shared/durableExtension";
 import type { PiChatMessage, SessionSummary, SessionTranscriptPayload } from "../../shared/ipc";
 import { type SessionRef, sessionRefFromKey, sessionRefKey } from "../../shared/sessionRef";
 import { desktopSessions } from "../agentRuntime/desktopSessions";
@@ -109,7 +110,7 @@ export class SessionRepository {
 
 /** Convert only saved model messages; custom entries remain available through entries(). */
 export function entryMessages(entry: EntryRecord): PiChatMessage[] {
-  return (entry.model ?? [])
+  return durableDisplayMessages(entry)
     .filter((message) => message.role !== "system")
     .map(
       (message) =>
