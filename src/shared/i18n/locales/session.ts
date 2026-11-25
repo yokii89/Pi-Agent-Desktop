@@ -87,8 +87,6 @@ export const sessionMessages = defineMessages({
   "session.durable.reasoningOn": { "zh-CN": "支持", "en-US": "Supported" },
   "session.durable.saveModel": { "zh-CN": "保存模型配置", "en-US": "Save model configuration" },
   "session.durable.modelSaved": { "zh-CN": "模型配置已保存", "en-US": "Model configuration saved" },
-  "session.durable.loadEarlier": { "zh-CN": "加载更早记录", "en-US": "Load earlier history" },
-  "session.durable.loading": { "zh-CN": "正在加载…", "en-US": "Loading…" },
   "session.durable.compact": { "zh-CN": "压缩上下文", "en-US": "Compact context" },
   "session.restoring": {
     "zh-CN": "正在恢复会话…",

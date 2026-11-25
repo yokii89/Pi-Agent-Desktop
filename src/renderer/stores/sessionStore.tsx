@@ -155,9 +155,6 @@ interface SessionMetaValue {
    * 冷桶借用同 cwd 存活实例或命中 cwd 级缓存，零 spawn；都未命中才 ensureSession。
    */
   getSlashCommands: () => Promise<PiSlashCommand[]>;
-  historyAvailable: boolean;
-  historyLoading: boolean;
-  loadEarlierHistory: () => Promise<void>;
   compactSession: () => Promise<void>;
   /** 新建任务：新建空桶并设为 active，**不杀**其它会话进程（Ctrl+N）。 */
   newSession: () => void;
@@ -2285,7 +2282,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       await sessionService
         .readTranscript(file)
-        .then(({ messages, nextBefore }) => {
+        .then(({ messages }) => {
           if (!isCurrentOpen()) return;
           if (isStale()) return;
           // 竞态守卫（§3.3）：用户抢在落桶前发送时合并落桶，
@@ -2297,8 +2294,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               switching: false,
               phase: "idle",
               ref: sessionRefFromKey(file),
-              historyBefore: nextBefore ?? undefined,
-              historyDone: !nextBefore,
             }),
           );
         })
@@ -2339,58 +2334,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return st.fileIndex.get(file) ?? sessionIdByFileRef.current.get(file) ?? null;
   }, []);
 
-  const loadEarlierHistory = useCallback(async (): Promise<void> => {
-    const sessionId = activeKeyRef.current;
-    const bucket = sessionId ? bucketsStateRef.current.buckets.get(sessionId) : undefined;
-    const api = pideskApi();
-    if (
-      !sessionId ||
-      !bucket ||
-      (bucket.ref?.kind === "durable" && !bucket.processAlive) ||
-      bucket.historyLoading ||
-      bucket.historyDone ||
-      !bucket.historyBefore ||
-      !api
-    )
-      return;
-    const before = bucket.historyBefore;
-    setState((prev) => patchBucket(prev, sessionId, { historyLoading: true }));
-    try {
-      if (bucket.ref?.kind === "legacy-jsonl" && bucket.sessionFile) {
-        const page = await sessionService.readTranscript(bucket.sessionFile, before);
-        setState((prev) => {
-          if (prev.buckets.get(sessionId)?.historyBefore !== before) return prev;
-          const next = applyEntries(prev, sessionId, {
-            type: "prependLegacy",
-            messages: page.messages,
-          });
-          return patchBucket(next, sessionId, {
-            historyBefore: page.nextBefore ?? undefined,
-            historyDone: !page.nextBefore,
-          });
-        });
-        return;
-      }
-      const page = await unwrap(api.durable.history(sessionId, before));
-      setState((prev) => {
-        const current = prev.buckets.get(sessionId);
-        if (current?.historyBefore !== before) return prev;
-        const next = applyEntries(prev, sessionId, {
-          type: "prependDurable",
-          entries: [...page].reverse(),
-        });
-        return patchBucket(next, sessionId, {
-          historyBefore: page.at(-1)?.id ?? before,
-          historyDone: page.length < 100,
-        });
-      });
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error));
-    } finally {
-      setState((prev) => patchBucket(prev, sessionId, { historyLoading: false }));
-    }
-  }, [setState, showToast]);
-
   const compactSession = useCallback(async (): Promise<void> => {
     const sessionId = activeKeyRef.current;
     const api = pideskApi();
@@ -2405,9 +2348,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const metaValue = useMemo<SessionMetaValue>(
     () => ({
       phase,
-      historyAvailable: activeBucket?.historyDone === false,
-      historyLoading: activeBucket?.historyLoading === true,
-      loadEarlierHistory,
       compactSession,
       activeSessionId: bucketsState.activeKey,
       allSessions,
@@ -2489,9 +2429,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       activeBucket?.contextOtherPercent,
       activeBucket?.contextWindow,
       activeBucket?.autoCompactionEnabled,
-      activeBucket?.historyDone,
-      activeBucket?.historyLoading,
-      loadEarlierHistory,
       compactSession,
       sessionWorkingDir,
       firstUserText,

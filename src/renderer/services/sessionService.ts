@@ -21,6 +21,7 @@ import { sessionRefFromKey } from "../../shared/sessionRef";
 import { isModeTransitioning } from "../stores/modeTransitionBarrier";
 import { unwrap } from "./ipc";
 import { pideskApi } from "./pideskApi";
+import { createSessionHistoryHydrator, readCompleteTranscript } from "./sessionHistory";
 
 let pushListenersBound = false;
 const pushListeners = new Set<(message: SessionPushMessage) => void>();
@@ -40,9 +41,14 @@ function ensureBound(): void {
   const api = pideskApi();
   if (pushListenersBound || !api) return;
   pushListenersBound = true;
-  api.session.onOutput((message) => {
-    for (const listener of pushListeners) listener(message);
-  });
+  api.session.onOutput(
+    createSessionHistoryHydrator(
+      (sessionId, before) => unwrap(api.durable.history(sessionId, before)),
+      (message) => {
+        for (const listener of pushListeners) listener(message);
+      },
+    ),
+  );
 }
 
 /**
@@ -169,11 +175,11 @@ export const sessionService = {
     return result.name;
   },
 
-  /** 读取会话 JSONL 转为消息数组（磁盘优先展示，不依赖 pi 进程）。 */
-  readTranscript(file: string, before?: number): Promise<SessionTranscriptPayload> {
+  /** 自动读取完整会话历史，不依赖 pi 进程。 */
+  readTranscript(file: string): Promise<SessionTranscriptPayload> {
     const api = pideskApi();
     if (!api) return Promise.reject(new Error("preload 未就绪"));
-    return unwrap(api.session.readTranscript(file, before));
+    return readCompleteTranscript((before) => unwrap(api.session.readTranscript(file, before)));
   },
 
   /** 导出会话记录为 Markdown 文件（系统保存对话框；取消返回 null）。 */

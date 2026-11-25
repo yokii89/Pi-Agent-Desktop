@@ -116,9 +116,6 @@ export function SessionView() {
     phase,
     startPending,
     stop,
-    historyAvailable,
-    historyLoading,
-    loadEarlierHistory,
     compactSession,
     activeSessionFile,
   } = useSessionMeta();
@@ -326,11 +323,6 @@ export function SessionView() {
             </div>
           ) : (
             <>
-              {historyAvailable && (
-                <Button disabled={historyLoading} onClick={() => void loadEarlierHistory()}>
-                  {t(historyLoading ? "session.durable.loading" : "session.durable.loadEarlier")}
-                </Button>
-              )}
               {activeSessionFile?.startsWith("durable:") && processAlive && phase !== "running" && (
                 <Button onClick={() => void compactSession()}>
                   {t("session.durable.compact")}

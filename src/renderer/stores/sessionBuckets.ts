@@ -41,9 +41,6 @@ export function attentionKindForStopReason(
 export interface SessionBucket {
   sessionId: SessionId;
   ref?: SessionRef;
-  historyBefore?: number;
-  historyDone?: boolean;
-  historyLoading?: boolean;
   phase: SessionPhase;
   entries: SessionEntry[];
   processAlive: boolean;
@@ -93,9 +90,6 @@ export function emptyBucket(
   return {
     sessionId,
     ref: patch?.ref,
-    historyBefore: patch?.historyBefore,
-    historyDone: patch?.historyDone,
-    historyLoading: patch?.historyLoading,
     phase: patch?.phase ?? "empty",
     entries: patch?.entries ?? [],
     processAlive: patch?.processAlive ?? false,
@@ -277,8 +271,6 @@ export function applyEntries(
         transcriptReady: true,
         switching: false,
         phase: live?.run || bucket.startPending ? "running" : entries.length ? "idle" : "empty",
-        historyBefore: projection.view.entries[0]?.id,
-        historyDone: projection.view.before === undefined,
         queue,
       });
     }

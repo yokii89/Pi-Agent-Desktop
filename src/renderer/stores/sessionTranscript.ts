@@ -222,8 +222,6 @@ export type SessionEntry =
 
 export type SessionAction =
   | { type: "clear" }
-  | { type: "prependDurable"; entries: readonly EntryRecord[] }
-  | { type: "prependLegacy"; messages: PiChatMessage[] }
   | {
       type: "userMessage";
       text: string;
@@ -378,10 +376,6 @@ export function sessionEntriesReducer(
   action: SessionAction,
 ): SessionEntry[] {
   switch (action.type) {
-    case "prependLegacy":
-      return [...entriesFromMessages(action.messages), ...state];
-    case "prependDurable":
-      return [...durableSavedEntries(action.entries), ...state];
     case "clear":
       return [];
     case "userMessage":
