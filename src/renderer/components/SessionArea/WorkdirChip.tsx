@@ -1,5 +1,5 @@
 import { Check, Code, Folder, FolderOpen } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkdirOpenTarget } from "../../../shared/ipc";
 import { getNamedIconUrl } from "../../fileIcons/resolve";
 import { useResolvedTheme } from "../../hooks/useResolvedTheme";
@@ -57,45 +57,87 @@ export function WorkdirChip({ dir }: WorkdirChipProps) {
   const t = useT();
   const { showToast } = useUiStore();
   const [target, setTarget] = useState<WorkdirOpenTarget>("explorer");
+  const [busy, setBusy] = useState(false);
+  const targetRef = useRef<WorkdirOpenTarget | null>(null);
+  const busyRef = useRef(false);
+  const mountedRef = useRef(false);
+  const settingsReady = useRef<Promise<WorkdirOpenTarget> | null>(null);
 
-  // 水合默认打开方式（设备本地偏好）；水合前先按 explorer 渲染，勾选晚一拍无碍
+  const readDefault = useCallback((): Promise<WorkdirOpenTarget> => {
+    settingsReady.current ??= settingsService
+      .get()
+      .then((settings) => (settings?.workdirOpenTarget === "vscode" ? "vscode" : "explorer"));
+    return settingsReady.current;
+  }, []);
+
   useEffect(() => {
+    mountedRef.current = true;
     let alive = true;
-    void settingsService.get().then((settings) => {
-      if (alive && settings) {
-        setTarget(settings.workdirOpenTarget === "vscode" ? "vscode" : "explorer");
+    void readDefault().then((saved) => {
+      if (alive && targetRef.current === null) {
+        targetRef.current = saved;
+        setTarget(saved);
       }
     });
     return () => {
       alive = false;
+      mountedRef.current = false;
     };
-  }, []);
+  }, [readDefault]);
 
-  const open = (next: WorkdirOpenTarget): void => {
-    const previous = target;
-    setTarget(next); // 乐观更新：菜单收起时勾选已就位，失败再回退
-    void (next === "vscode" ? fsService.openInVsCode(dir) : fsService.openPath(dir))
-      .then(() => {
-        void settingsService.set({ workdirOpenTarget: next });
-      })
-      .catch((err: unknown) => {
-        setTarget(previous);
-        showToast(err instanceof Error ? err.message : t("session.workspace.openFailed"));
-      });
+  const open = async (requested?: WorkdirOpenTarget): Promise<void> => {
+    // The ref also blocks clicks arriving before React paints the disabled buttons.
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    let previous: WorkdirOpenTarget = targetRef.current ?? "explorer";
+    let opened = false;
+    try {
+      const saved = await readDefault();
+      previous = targetRef.current ?? saved;
+      const next = requested ?? previous;
+      targetRef.current = next;
+      if (mountedRef.current) setTarget(next);
+      await (next === "vscode" ? fsService.openInVsCode(dir) : fsService.openPath(dir));
+      opened = true;
+      const settings = await settingsService.set({ workdirOpenTarget: next });
+      if (!settings) showToast(t("session.workspace.saveDefaultFailed"));
+    } catch (error) {
+      if (!opened) {
+        targetRef.current = previous;
+        if (mountedRef.current) setTarget(previous);
+      }
+      showToast(
+        opened
+          ? t("session.workspace.saveDefaultFailed")
+          : error instanceof Error
+            ? error.message
+            : t("session.workspace.openFailed"),
+      );
+    } finally {
+      busyRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
   };
 
   return (
-    <span className={styles.chip} title={dir}>
+    <span className={styles.chip} title={dir} aria-busy={busy}>
       <button
         type="button"
         className={styles.main}
         aria-label={t("session.workspace.openWorkdir")}
-        onClick={() => open(target)}
+        disabled={busy}
+        onClick={() => void open()}
       >
         <BrandIcon
-          asset="file-explorer"
-          size={13}
-          fallback={<Folder size={13} weight="regular" />}
+          asset={target === "vscode" ? "vscode" : "file-explorer"}
+          fallback={
+            target === "vscode" ? (
+              <Code size={16} weight="regular" />
+            ) : (
+              <Folder size={16} weight="regular" />
+            )
+          }
         />
         <span className={styles.chipLabel}>{basename(dir)}</span>
       </button>
@@ -110,6 +152,7 @@ export function WorkdirChip({ dir }: WorkdirChipProps) {
             className={[styles.chevron, menuOpen ? styles.chevronOpen : ""].join(" ")}
             aria-label={t("session.workspace.openWith")}
             aria-haspopup="menu"
+            disabled={busy}
             onClick={onClick}
           >
             <GlideChevron size={12} />
@@ -118,6 +161,7 @@ export function WorkdirChip({ dir }: WorkdirChipProps) {
         items={[
           {
             key: "explorer",
+            disabled: busy,
             label: t("session.workspace.openInExplorer"),
             icon: (
               <BrandIcon
@@ -127,15 +171,16 @@ export function WorkdirChip({ dir }: WorkdirChipProps) {
             ),
             selected: target === "explorer",
             badge: target === "explorer" ? <Check size={16} weight="regular" /> : undefined,
-            onSelect: () => open("explorer"),
+            onSelect: () => void open("explorer"),
           },
           {
             key: "vscode",
+            disabled: busy,
             label: t("session.workspace.openInVsCode"),
             icon: <BrandIcon asset="vscode" fallback={<Code size={16} weight="regular" />} />,
             selected: target === "vscode",
             badge: target === "vscode" ? <Check size={16} weight="regular" /> : undefined,
-            onSelect: () => open("vscode"),
+            onSelect: () => void open("vscode"),
           },
         ]}
       />
