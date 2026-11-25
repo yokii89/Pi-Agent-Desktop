@@ -1,8 +1,12 @@
 allowBuilds:
+  # 发布包已包含运行时代码；preinstall 只输出 no-op，无需执行。
+  '@google/genai': false
   electron: true
   electron-winstaller: true
   esbuild: true
   node-pty: true
+  # 已核对 scripts/postinstall.js：仅检查依赖版本兼容性，不编译或下载文件。
+  protobufjs: true
 # @lobehub/icons 只深引 Mono/Color 单图标组件，不需要 @lobehub/ui / lucide-react 这两个重量级 peer；
 # 标记为 optional，避免重新生成 lock 时把 200+ 个 peer 依赖一起拉进来。
 packageExtensions:

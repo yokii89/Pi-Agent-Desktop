@@ -102,6 +102,9 @@ async function main() {
   log("编译主进程 / 预加载（tsc）");
   await run(tscBin, ["-p", "tsconfig.main.json"]);
 
+  log("编译 Durable ESM runtime（NodeNext）");
+  await run(path.join(projectRoot, "scripts", "buildRuntime.ts"), []);
+
   log("构建渲染层（vite build）");
   await run(viteBin, ["build"]);
 

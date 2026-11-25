@@ -11,10 +11,13 @@
     "dev": "node scripts/dev.mjs",
     "dev:renderer": "vite",
     "build:renderer": "vite build",
-    "build": "tsc -p tsconfig.main.json && vite build",
-    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.main.json && pnpm run build:agent-runtime && vite build",
+    "build:agent-runtime": "node scripts/buildRuntime.ts",
+    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.runtime.json --noEmit && tsc -p tsconfig.json --noEmit",
     "lint": "biome check .",
     "format": "biome format --write .",
+    "test:agent-runtime": "pnpm run build:agent-runtime && node dist/agentRuntime/agentRuntime/sqliteSmokeTestCli.js",
+    "check:agent-runtime": "node scripts/agentRuntime/check.ts",
     "test:view": "node scripts/sync-view-sdk-types.mjs --check && pnpm run build:view-sdk && vitest run --config packages/view-sdk/vitest.config.ts && vitest run --config src/main/vitest.config.ts && vitest run --config src/renderer/vitest.config.ts",
     "sync:view-types": "node scripts/sync-view-sdk-types.mjs",
     "check:view-types": "node scripts/sync-view-sdk-types.mjs --check",
@@ -34,6 +37,9 @@
     "check:sdk-consumer": "node scripts/check-sdk-consumer.mjs"
   },
   "dependencies": {
+    "@earendil-works/chord": "1.6.0",
+    "@earendil-works/pi-ai": "1.6.0",
+    "@earendil-works/pi-durable": "1.6.0",
     "electron-updater": "^6.8.9",
     "node-pty": "^1.1.0",
     "ws": "^8.23.0"

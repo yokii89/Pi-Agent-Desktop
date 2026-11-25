@@ -13,6 +13,7 @@ export default defineConfig({
       // 主进程根目录下的纯逻辑（如 appIconPaths）
       "*.test.ts",
       "view/**/*.test.ts",
+      "agentRuntime/**/*.test.ts",
       "remote/**/*.test.ts",
       "window/**/*.test.ts",
       "wallpaper/**/*.test.ts",

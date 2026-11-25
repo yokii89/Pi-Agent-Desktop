@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": false,
+    "sourceMap": true,
+    "outDir": "dist/agentRuntime",
+    "rootDir": "src",
+    "noEmitOnError": true
+  },
+  "include": ["src/agentRuntime/**/*.ts", "src/shared/agentRuntimeProtocol.ts"],
+  "exclude": ["src/agentRuntime/**/*.test.ts"]
+}

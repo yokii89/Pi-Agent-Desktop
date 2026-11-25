@@ -3,6 +3,7 @@ import path from "node:path";
 import { app, BrowserWindow, dialog, shell } from "electron";
 import { t } from "../shared/i18n";
 import { browserWindowOpenResponse, isBrowserContents } from "./browser/browserPolicy";
+import { disposeAgentRuntime, startAgentRuntime } from "./agentRuntime/agentRuntimeManager";
 import { registerBrowserLifecycle } from "./browser/browserView";
 import { disposeExtensionWorker } from "./extension/extensionWorkerManager";
 import { registerWatcherLifecycle } from "./fs/watcher";
@@ -102,6 +103,9 @@ app.whenReady().then(async () => {
     console.warn("[session-name] 旧标题迁移未完成", err);
   }
   createMainWindow();
+  void startAgentRuntime().catch((error: unknown) => {
+    console.error("[agent-runtime] Durable utility process failed to start", error);
+  });
   bootstrapEnvironmentProbe();
   bootstrapResidualNotice();
   // 上次运行留下的后台进程先验存活收进待认领池，用户打开对应会话时才成行（docs/design/133 §3）
@@ -173,6 +177,7 @@ app.on("will-quit", () => {
   disposeTaskScheduler();
   disposeIdleReclaim();
   remoteService.dispose();
+  disposeAgentRuntime();
   disposeUpdater();
   // 检查器浮窗：退出前强制销毁，避免残留独立窗
   disposeInspectorWindow();

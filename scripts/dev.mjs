@@ -7,11 +7,11 @@
  * 因此这里用 Node 内置能力自行编排，零新增依赖。
  *
  * 链路：
- * 1. 先跑一次 tsc 编译主进程/预加载；失败直接退出，避免拉起一个连 preload 都没有的空壳窗口
+ * 1. 先编译主进程、预加载和独立 ESM agent runtime；失败直接退出，避免拉起不完整的应用
  * 2. 用 Vite 的 Node API 启动 dev server，拿 resolvedUrls 里的真实地址
  *    （首选端口见 vite.config.ts server.port；被占用时 Vite 会自增，所以不写死）
  * 3. 以 PIDESK_DEV_SERVER_URL 拉起 Electron，主进程据此 loadURL 而非 loadFile
- * 4. 监听 src/main、src/preload、src/shared：事件先与 mtime 基线比对，确认真有源码变更
+ * 4. 监听 src/main、src/preload、src/shared、src/agentRuntime：事件先与 mtime 基线比对，确认真有源码变更
  *    才重新 tsc → 重启 Electron（Windows 递归 watch 会无写入误报，直接重启会杀掉运行中的会话）
  * 5. 不监听 src/renderer：Vite 原生 HMR 已覆盖，改组件/样式只热替换模块，不重启窗口
  * 6. 过滤 Electron stderr 里 DevTools 自身的报错（见 devtools-noise-filter.mjs），
@@ -36,9 +36,11 @@ const projectRoot = path.resolve(import.meta.dirname, "..");
 const electronBin = require("electron");
 /** 用 process.execPath 跑 tsc，规避 Windows 上 .cmd 需要 shell 的问题。 */
 const tscBin = path.join(path.dirname(require.resolve("typescript/package.json")), "bin", "tsc");
+/** Runtime compilation also writes its ESM package marker into dist/agentRuntime. */
+const runtimeBuildScript = path.join(projectRoot, "scripts", "buildRuntime.ts");
 
 /** 需要「改了就重启 Electron」的源码目录，路径相对 projectRoot。 */
-const MAIN_WATCH_DIRS = ["src/main", "src/preload", "src/shared"];
+const MAIN_WATCH_DIRS = ["src/main", "src/preload", "src/shared", "src/agentRuntime"];
 /**
  * 透传给 Electron 的额外参数，如 `pnpm dev -- --inspect=9229`。
  * 必须滤掉裸分隔符 `--`：实测 pnpm v12 会把它本身也传下来，而 Chromium 遇到裸 `--`
@@ -83,13 +85,25 @@ let recompileQueued = false;
 
 const log = (message) => console.log(`\u001b[36m[dev]\u001b[0m ${message}`);
 
-/** 运行一次主进程/预加载的类型编译，返回是否成功。 */
-function compileMain() {
+function compileProject(configPath) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [tscBin, "-p", "tsconfig.main.json"], {
+    const child = spawn(process.execPath, [tscBin, "-p", configPath], {
       cwd: projectRoot,
       stdio: "inherit",
     });
+    child.on("error", () => resolve(false));
+    child.on("exit", (code) => resolve(code === 0));
+  });
+}
+
+async function compileMain() {
+  if (!(await compileProject("tsconfig.main.json"))) return false;
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [runtimeBuildScript], {
+      cwd: projectRoot,
+      stdio: "inherit",
+    });
+    child.on("error", () => resolve(false));
     child.on("exit", (code) => resolve(code === 0));
   });
 }
@@ -253,9 +267,9 @@ async function shutdown(code) {
 }
 
 async function main() {
-  log("编译主进程 / 预加载…");
+  log("编译主进程 / 预加载 / agent runtime…");
   if (!(await compileMain())) {
-    console.error("[dev] 主进程编译失败，请先修掉上面的类型错误");
+    console.error("[dev] 主进程或 agent runtime 编译失败，请先修掉上面的类型错误");
     process.exit(1);
   }
 

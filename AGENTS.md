@@ -63,11 +63,13 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 | 样式 | CSS / CSS Modules | 暂不引入 Tailwind 等框架，如需变更先在本文件登记 |
 | 代码质量 | Biome | 格式化 + Lint 一体，配置沿用 pi 仓库的 `biome.json`，禁止再引入 ESLint/Prettier |
 | 测试 | vitest | 仅用于 `packages/view-sdk` 与可纯测的主进程协议逻辑（如 `viewHostProtocol`）；不引入渲染层测试框架 |
-| pi 会话集成 | pi `--mode rpc`（JSONL over stdio） | 中央会话区唯一方案：主进程以子进程驱动 pi RPC，渲染层**完全自研 UI**（见下文"中央会话区规范"）；禁止内嵌 pi TUI |
-| 独立终端 | node-pty + @xterm/xterm | 仅用于中央工作区底部的终端面板（Bottom Panel）；禁止用于 pi 会话 |
+| agent runtime | 内置 `@earendil-works/pi-durable`（Durable migration P0–P5） | 新会话目标为 Durable；迁移期间旧 pi RPC 仅作尚未替换功能的过渡实现，不能据此新增依赖旧执行器的能力。完成切换后不得保留第二套执行引擎 |
+| 独立终端 | node-pty + @xterm/xterm | 仅用于中央工作区底部的终端面板（Bottom Panel）；禁止用于 agent 会话 |
 | 打包 | electron-builder | 仅针对 Windows：NSIS 安装包，配置进仓库（编排脚本 `scripts/package.mjs`，CI 分发见 `.github/workflows/release.yml`） |
 
 任何新增依赖（运行时或开发时）必须先在此处登记用途，再安装。
+
+- `@earendil-works/pi-durable`、`@earendil-works/pi-ai`、`@earendil-works/chord`（runtime，内置 agent utility process）：三者固定 `1.6.0`；Durable 及其精确版本依赖由独立 ESM runtime 构建承载，不能随意升级。pi-ai 提供模型与 faux model 验证，Chord 提供 Durable Context / SQLite 底层。该运行时要求 Node ≥ 22.19；Electron 内的实际 Node、SQLite、恢复和安装包验证未通过前不得宣称可独立运行。
 
 - `qrcode`、`@types/qrcode`（devDep，渲染层构建期）：手机配对邀请二维码本地生成；二维码秘密只在内存，不进入 URL、日志、剪贴板或持久设置。
 - `src/shared/remote/` 作为 `@pidesk/remote-protocol` 零依赖源码包供相邻 Pi-Mobile 工程链接；桌面继续相对导入并由现有 tsc 编译，无新增主进程外部依赖。
@@ -78,12 +80,7 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 
 - @codemirror/legacy-modes（devDep，渲染层构建期打包）：为专用 CodeMirror 语言包未覆盖的文件提供 StreamLanguage 模式；首次打开对应文件的源码视图时按需加载，读写模式共用。
 
-**依赖分类契约（安装包体积基线，2026-11-08 瘦身确立）**：`dependencies` 只放**主进程运行时需要
-node_modules 解析**的包（当前为 `electron-updater` / `node-pty` / `ws`——主进程走 tsc 编译不打包）；
-渲染层依赖（react、gsap、mermaid、shiki、@phosphor-icons/react、@lobehub/icons、@xterm/* 等）一律
-`devDependencies`——它们已被 vite 打进 `dist/`，electron-builder 只打包 `dependencies`，放错分类
-会把整包源码塞进 asar（曾致安装包虚胖 ~70MB）。新增主进程外部依赖 → 进 `dependencies` 并补登记；
-新增渲染层依赖 → 进 `devDependencies`。
+**依赖分类契约（安装包体积基线，2026-11-08 瘦身确立）**：`dependencies` 放主进程与内置 agent utility process 运行时需要解析的包（当前包含 `electron-updater` / `node-pty` / `ws` 与精确版本的 `@earendil-works/pi-durable`、`@earendil-works/pi-ai`、`@earendil-works/chord`——主进程 / runtime 分开编译）；渲染层依赖（react、gsap、mermaid、shiki、@phosphor-icons/react、@lobehub/icons、@xterm/* 等）一律放 `devDependencies`——它们已被 vite 打进 `dist/`，electron-builder 只打包 `dependencies`。新增 runtime 外部依赖 → `dependencies` 并补登记；新增渲染层依赖 → `devDependencies`。
 
 已登记依赖补充说明：
 
