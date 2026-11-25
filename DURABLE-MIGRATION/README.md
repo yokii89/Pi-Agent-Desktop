@@ -2,12 +2,13 @@
 
 本目录集中存放 PiDesk 内置 Durable 的方案、接口设计、扩展适配和验证记录。
 
-工作分支：`trans-to-durable`。当前已加入 P0 的独立运行时与验证入口，业务会话尚未切换。
+工作分支：`trans-to-durable`。P0 的独立运行时已通过开发态与打包态验证；P1 已实现内部会话服务与事件投影基础，默认业务会话尚未切换。
 
 ## 文档索引
 
 - [迁移总方案](./DURABLE-MIGRATION.md)：目标架构、现有功能对照、扩展适配、存储与旧历史、手机同步、分阶段实施及验收标准。
 - [P0 Electron 验证记录](./P0-VERIFICATION.md)：依赖脚本策略、本机 Electron 恢复、utility process 与打包态 SQLite 实测结果。
+- [P1 会话服务与投影基础](./P1-SESSION-FOUNDATION.md)：内部契约、SQLite 写者与生命周期、历史补齐、完成边界、已验证范围和前端接入待办。
 - [验证命令说明](../scripts/agentRuntime/README.md)：`pnpm check:agent-runtime` 的执行方式、覆盖范围与报告位置。
 
 ## 已确认的迁移边界

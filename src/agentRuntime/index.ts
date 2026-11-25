@@ -65,14 +65,14 @@ async function handleRequest(value: unknown): Promise<void> {
     sendError(request.id, new Error("A Durable SQLite smoke test is already running."));
     return;
   }
-  if (!path.isAbsolute(request.databasePath)) {
-    sendError(request.id, new Error("The smoke-test database path must be absolute."));
+  if (!path.isAbsolute(request.storageRoot)) {
+    sendError(request.id, new Error("The smoke-test storage root must be absolute."));
     return;
   }
 
   runningSmokeTest = true;
   try {
-    const result = await runDurableSqliteSmokeTest(request.databasePath);
+    const result = await runDurableSqliteSmokeTest(request.storageRoot);
     port.postMessage({ type: "response", id: request.id, ok: true, result });
   } catch (error) {
     sendError(request.id, error);

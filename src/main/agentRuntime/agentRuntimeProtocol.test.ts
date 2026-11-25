@@ -6,26 +6,18 @@ import {
 } from "../../shared/agentRuntimeProtocol";
 
 describe("agent runtime protocol", () => {
-  it("accepts only the versioned utility-process smoke-test request shape", () => {
+  it("accepts the managed smoke storage root and rejects the superseded database-path shape", () => {
+    const request = { id: "smoke-1", type: "smoke-test", storageRoot: "C:/temp/smoke" };
+    expect(parseAgentRuntimeRequest(request)).toEqual(request);
+    expect(parseAgentRuntimeRequest({ ...request, storageRoot: "" })).toBeNull();
     expect(
       parseAgentRuntimeRequest({
-        id: "smoke-1",
-        type: "smoke-test",
+        ...request,
+        storageRoot: undefined,
         databasePath: "C:/temp/session.sqlite",
       }),
-    ).toEqual({
-      id: "smoke-1",
-      type: "smoke-test",
-      databasePath: "C:/temp/session.sqlite",
-    });
-    expect(parseAgentRuntimeRequest({ id: "x", type: "smoke-test", databasePath: "" })).toBeNull();
-    expect(
-      parseAgentRuntimeRequest({ id: "x", type: "smoke-test", databasePath: "x", extra: true }),
-    ).toEqual({
-      id: "x",
-      type: "smoke-test",
-      databasePath: "x",
-    });
+    ).toBeNull();
+    expect(parseAgentRuntimeRequest({ ...request, extra: true })).toEqual(request);
   });
 
   it("bounds message fields and validates runtime protocol handshakes", () => {

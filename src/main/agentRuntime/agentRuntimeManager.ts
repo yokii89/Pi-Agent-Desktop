@@ -115,7 +115,7 @@ class AgentRuntimeManager {
         {
           id: randomUUID(),
           type: "smoke-test",
-          databasePath: path.join(directory, "session.sqlite"),
+          storageRoot: directory,
         },
         REQUEST_TIMEOUT_MS,
       );

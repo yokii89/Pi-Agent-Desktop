@@ -1,7 +1,7 @@
-export const AGENT_RUNTIME_PROTOCOL_VERSION = 1;
+export const AGENT_RUNTIME_PROTOCOL_VERSION = 2;
 
 export type AgentRuntimeRequest =
-  | { id: string; type: "smoke-test"; databasePath: string }
+  | { id: string; type: "smoke-test"; storageRoot: string }
   | { id: string; type: "shutdown" };
 
 export type AgentRuntimeMessage =
@@ -46,13 +46,13 @@ export function parseAgentRuntimeRequest(value: unknown): AgentRuntimeRequest | 
     typeof record.id !== "string" ||
     record.id.length === 0 ||
     record.id.length > MAX_ID_LENGTH ||
-    typeof record.databasePath !== "string" ||
-    record.databasePath.length === 0 ||
-    record.databasePath.length > MAX_PATH_LENGTH
+    typeof record.storageRoot !== "string" ||
+    record.storageRoot.length === 0 ||
+    record.storageRoot.length > MAX_PATH_LENGTH
   ) {
     return null;
   }
-  return { id: record.id, type: "smoke-test", databasePath: record.databasePath };
+  return { id: record.id, type: "smoke-test", storageRoot: record.storageRoot };
 }
 
 export function parseAgentRuntimeMessage(value: unknown): AgentRuntimeMessage | null {

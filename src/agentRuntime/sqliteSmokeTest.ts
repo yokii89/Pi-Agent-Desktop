@@ -1,98 +1,137 @@
-import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { createModels } from "@earendil-works/pi-ai/models";
-import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
-import type { ConversationId, EntryId, EntryRecord } from "@earendil-works/pi-durable";
-import { AssistantEntry, createRegistry, Harness } from "@earendil-works/pi-durable";
-import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import {
+  fauxAssistantMessage,
+  fauxProvider,
+  fauxToolCall,
+} from "@earendil-works/pi-ai/providers/faux";
+import {
+  createRegistry,
+  defineExtension,
+  defineTool,
+  type SubmissionId,
+} from "@earendil-works/pi-durable";
+import { DurableSessions, type DurableSessionUpdate } from "./durableSessions.js";
 
 const SMOKE_REPLY = "PiDesk Durable SQLite round-trip passed.";
 
-function makeModels() {
-  const models = createModels();
-  const faux = fauxProvider();
-  models.setProvider(faux.provider);
-  faux.setResponses([fauxAssistantMessage(SMOKE_REPLY)]);
-  return { models, faux };
-}
-
-function assistantText(entry: EntryRecord | undefined): string | null {
-  if (!AssistantEntry.is(entry)) return null;
-  for (const message of entry.model ?? []) {
-    if (message.role !== "assistant") continue;
-    const text = message.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("");
-    if (text) return text;
-  }
-  return null;
-}
-
-/** Opens a real Node SQLite database, completes one faux-model turn, then reopens and verifies its transcript. */
-export async function runDurableSqliteSmokeTest(databasePath: string): Promise<{
+/** Exercise the production session owner with real SQLite and a local model, including tool and reopen boundaries. */
+export async function runDurableSqliteSmokeTest(directory: string): Promise<{
   conversationId: number;
   reply: string;
 }> {
-  const context = BACKGROUND_CONTEXT;
-  const firstModels = makeModels();
-  const firstHarness = await Harness.open(
-    await openNodeSqliteStorage(databasePath),
-    { models: firstModels.models, registry: createRegistry() },
-    context,
+  const models = createModels();
+  const faux = fauxProvider();
+  models.setProvider(faux.provider);
+  faux.setResponses([
+    fauxAssistantMessage(fauxToolCall("smoke", {}, { id: "smoke-tool" }), {
+      stopReason: "toolUse",
+    }),
+    fauxAssistantMessage(SMOKE_REPLY),
+  ]);
+  const registry = createRegistry();
+  let toolCalls = 0;
+  registry.install(
+    defineExtension({
+      name: "pidesk-smoke",
+      tools: [
+        defineTool({
+          name: "smoke",
+          description: "Local runtime verification; no files or network.",
+          parameters: { type: "object", properties: {}, additionalProperties: false },
+          replay: "safe",
+          execute: async () => {
+            ++toolCalls;
+            return { output: [{ type: "text", text: "tool committed" }] };
+          },
+        }),
+      ],
+    }),
   );
 
-  let conversationId: ConversationId;
-  let answerId: EntryId;
+  const updates: DurableSessionUpdate[] = [];
+  let onUpdate: (() => void) | undefined;
+  const service = new DurableSessions(
+    directory,
+    () => ({ models, registry }),
+    (update) => {
+      updates.push(update);
+      onUpdate?.();
+    },
+  );
+  const sessionId = randomUUID();
+  const request = {
+    sessionId,
+    cwd: directory,
+    agent: { model: { provider: faux.provider.id, modelId: faux.models[0].id } },
+  };
   try {
-    const conversation = await firstHarness.root(context, {
-      agent: {
-        model: {
-          provider: firstModels.faux.provider.id,
-          modelId: firstModels.faux.models[0].id,
-        },
-      },
+    const [opened, duplicateOpen] = await Promise.all([
+      service.open(request),
+      service.open(request),
+    ]);
+    assert.deepEqual(opened, duplicateOpen);
+    assert.equal(updates.filter((update) => update.type === "snapshot").length, 1);
+    const draft = {
+      type: "input",
+      content: "Run the local Durable SQLite smoke test.",
+      requestId: "smoke-input",
+    } as const;
+    const [submission, duplicate] = await Promise.all([
+      service.submit(sessionId, draft),
+      service.submit(sessionId, draft),
+    ]);
+    assert.deepEqual(submission, duplicate);
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Durable session did not settle.")), 30_000);
+      const check = () => {
+        const error = updates.find((update) => update.type === "error");
+        if (error?.type === "error") {
+          clearTimeout(timer);
+          reject(new Error(error.error));
+        } else if (
+          updates.some(
+            (update) =>
+              update.type === "settled" &&
+              update.view.entries.some((entry) => entry.kind === "pi.assistant"),
+          )
+        ) {
+          clearTimeout(timer);
+          resolve();
+        }
+      };
+      onUpdate = check;
+      check();
     });
-    conversationId = conversation.id;
-    const submission = await conversation.submit(
-      { type: "input", content: "Run the local Durable SQLite smoke test." },
-      context,
-    );
-    const settled = await submission.wait(context);
-    if (settled.status !== "done" || settled.answer === undefined) {
-      throw new Error(`Faux-model submission did not complete with an answer: ${settled.status}`);
-    }
-    answerId = settled.answer;
-    const answer = await conversation.commit((tx) => tx.entry(AssistantEntry, answerId), context);
-    if (assistantText(answer) !== SMOKE_REPLY) {
-      throw new Error("Faux model did not produce the expected assistant entry.");
-    }
-  } finally {
-    await firstHarness.close(context);
-  }
+    const settled = await service.submission(sessionId, submission.submissionId as SubmissionId);
+    assert.equal(settled?.status, "done");
+    assert.equal(toolCalls, 1);
+    const emitted = updates
+      .filter((update) => update.type === "entries")
+      .flatMap((update) => update.entries);
+    assert.equal(new Set(emitted.map((entry) => entry.id)).size, emitted.length);
+    assert.equal(emitted.filter((entry) => entry.kind === "pi.tool-result").length, 1);
+    await service.close(sessionId);
 
-  const secondModels = makeModels();
-  const reopenedHarness = await Harness.open(
-    await openNodeSqliteStorage(databasePath),
-    { models: secondModels.models, registry: createRegistry() },
-    context,
-  );
-  try {
-    const conversation = await reopenedHarness.conversation(conversationId, context);
-    if (!conversation) throw new Error("Conversation was missing after reopening SQLite storage.");
-    const watch = await conversation.watch(context, { min: 1, max: 100 });
-    try {
-      const persistedAnswer = watch.value.entries.find((entry) => entry.id === answerId);
-      const reply = assistantText(persistedAnswer);
-      if (reply !== SMOKE_REPLY) {
-        throw new Error(
-          "Assistant transcript did not survive closing and reopening SQLite storage.",
-        );
-      }
-      return { conversationId, reply };
-    } finally {
-      await watch.stop();
-    }
+    updates.length = 0;
+    assert.deepEqual(await service.open(request), opened);
+    assert.deepEqual(await service.submit(sessionId, draft), submission);
+    assert.equal(faux.state.callCount, 2);
+    const persisted = await service.entries(sessionId);
+    const answer = persisted.find((entry) => entry.id === settled?.answer);
+    const reply = answer?.model
+      ?.flatMap((message) =>
+        message.role === "assistant"
+          ? message.content.filter((block) => block.type === "text").map((block) => block.text)
+          : [],
+      )
+      .join("");
+    assert.equal(reply, SMOKE_REPLY);
+    assert.equal(updates.filter((update) => update.type === "entries").length, 0);
+    return { conversationId: opened.conversationId, reply };
   } finally {
-    await reopenedHarness.close(context);
+    onUpdate = undefined;
+    await service.dispose();
   }
 }
