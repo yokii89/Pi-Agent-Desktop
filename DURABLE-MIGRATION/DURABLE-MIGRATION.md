@@ -1,6 +1,6 @@
 # PiDesk 内置 Durable 迁移方案
 
-状态：P0 已完成本机开发态与打包态验证；P1 会话服务与事件投影基础已实现，默认业务会话尚未切换。工作分支：`trans-to-durable`。实施记录见 [P0 验证](./P0-VERIFICATION.md) 与 [P1 会话基础](./P1-SESSION-FOUNDATION.md)。
+状态：P0 内置运行时、P1 默认业务会话与投影、P2 历史和应用服务已接通；P3A 原生扩展宿主与 P3B 技能/模板/项目指令已完成本机开发态和 ASAR 验证。P3 持久交互、View 与设置宿主仍待实现。当前工作分支：`feat/durable-desktop-integration`。实施记录见 [迁移索引](./README.md)。
 
 ## 1. 已确认的目标与边界
 
@@ -8,7 +8,7 @@
 - 新会话全部由 Durable 执行，不保留 pi RPC 作为备用执行路径。
 - 前端布局、文档流、工具摘要、输入栏、工作台与 View 槽位整体保留；允许调整数据适配和少量具有旧运行时语义的控件。
 - 旧 pi JSONL 历史仅供查看，不导入为可续接的 Durable 会话，也不通过旧 pi 进程继续执行。
-- 实施按第 10 节分阶段推进；已固定并安装运行时依赖，新增独立 ESM utility process，以及 P1 内部会话服务和投影基础。相邻扩展仓库尚未修改；默认业务会话仍待完成后续接入。
+- 实施按第 10 节分阶段推进；运行时使用固定版本和独立 ESM utility process，默认新会话已切换到 Durable。原生扩展、声明式技能/模板与项目指令已接入；相邻扩展仓库尚未修改，不能据此宣布旧扩展已兼容。
 
 依据：当前 PiDesk 源码、相邻 `pi-learn` 源码、相邻 `MyPiExtension` 的扩展示例，以及 npm 发布包的 README / `.d.ts`。发布包核对版本为 `@earendil-works/pi-durable`、`pi-ai`、`pi-mcp` **1.6.0**；相邻 `pi-learn` 的 Durable 是 **1.4.0**，不能直接把它的 API 当作目标版本。
 
@@ -272,6 +272,8 @@ pi-ai 提供 Models、CredentialStore 和 provider auth，PiDesk 提供桌面登
 | P4 MCP 与常用扩展 | MCP 登录 / 重连 / 资源、网关、web、image、bash jobs、Telegram | 能力逐项验收并显示兼容状态；无旧 API 静默失败 |
 | P5 手机与清理 | remote repository / cursor、旧记录只读权限、恢复竞态、删旧执行路径 | v2 手机同步和控制通过；全仓无任何调用 pi 可执行文件的业务路径 |
 
+当前已验证范围：P0、P1/P2 的桌面业务主链路，以及 [P3A 原生扩展/提示命令](./P3-EXTENSION-HOST.md) 和 [P3B 技能/模板/项目指令](./P3-RESOURCES.md)。P3 尚缺 View/设置宿主、可恢复交互及问卷/计划样例；后续阶段不能因前面的基础已接通而视为完成。
+
 每阶段补充有意义的主进程纯逻辑 / 协议 Vitest，不引入渲染测试框架。关键验证覆盖：
 
 - 重复提交 requestId、并发同会话打开、SQLite 单写者、关闭与提交竞态、崩溃恢复。
@@ -300,7 +302,7 @@ pi-ai 提供 Models、CredentialStore 和 provider auth，PiDesk 提供桌面登
 
 不需要改掉文档流 UI、IPC 信封、主题令牌、View 安全边界、remote 授权和 pnpm / strict / Biome 规范。
 
-P0 已通过本机 Electron / ASAR 验证，P1 已实现内部会话服务与投影基础；实际范围和限制见 [P1 实施记录](./P1-SESSION-FOUNDATION.md)。下一步固定正式 SessionRef / userData 路径和生产 MessagePort DTO，接通模型服务与 React store 的水合、对账和历史分页，再完成新会话入口切换。随后定稿 PiDesk 扩展宿主 API 和问卷 / 计划两个迁移样例，以可运行样例验证接口后扩大到 Telegram、网关和后台作业。
+SessionRef、受控 userData 存储、生产 MessagePort DTO、默认会话入口、React 水合/对账和历史分页现已接通。P3A/B 的最新范围和验收见 [原生扩展宿主](./P3-EXTENSION-HOST.md) 与 [资源服务](./P3-RESOURCES.md)。下一步继续 P3 的 View/设置作用域宿主与持久交互，完成问卷/计划两个可恢复样例，再扩大到 MCP、Telegram、网关和后台作业。
 
 ## 13. 核对入口
 

@@ -9,6 +9,8 @@
 - `development.json` / `packaged.json`：对应环境的依赖、Node 版本、SQLite、工作台、故障结算和恢复结果。
 - `development-restored.png` / `packaged-restored.png`：从侧栏重新打开保存历史后的实际界面。
 - `development-fault.png` / `packaged-fault.png`：生成过程中 utility process 被终止后的实际界面。
+- `development-p3-native.png` / `packaged-p3-native.png`：原生扩展命令与工具执行界面。
+- `development-p3-resources.png` / `packaged-p3-resources.png`：从补全菜单选择并发送技能/提示模板后的实际界面，对应报告 `workbench.p3Resources`。
 - `public-provider.json` / `public-provider.png`：显式运行公网验证时保存的结果；后续本地验证不会覆盖它们。
 - `workbench-failure.png` / `workbench-failure.txt`：仅在工作台验收失败时输出，便于定位界面问题。
 
@@ -26,9 +28,11 @@
 - renderer reload 后重新打开历史，以及关闭会话后重新打开 SQLite，均恢复回答且不增加模型请求、不重放完成事件。
 - 生成过程中通过捕获的专属 `UtilityProcess` 对象强制终止写者，确认在途请求被拒绝、会话只推送一次 error 和 exit、界面显示 Interrupted 和错误提示、发送按钮退出 Stop 状态。
 - 重新从侧栏打开会话，启动新 utility process，恢复持久任务并完成回答；先前保存的回答仍在，用户消息没有重复。
+- 真实补全菜单中的原生扩展命令、原生工具执行、原始命令历史、未知命令拒绝与 SQLite 重开。
+- 包内技能与本地提示模板的补全和展开、带引号参数、用户原始命令展示；关闭重开后确认更新的 AGENTS.md、技能正文和命令目录。
 - 正常关闭 runtime，确认关闭后拒绝再次启动；打包态断言应用路径位于 `app.asar` 内。
 
-默认检查只请求本机临时模型服务。每次 Electron 运行使用新 profile、验收项目和数据库；utility process 沿用生产的空环境变量配置。工作台沿用现有历史目录发现逻辑，但测试会话写入独立 profile，不修改日常会话或模型配置。
+默认检查只请求本机临时模型服务。每次 Electron 运行使用独立 userData、home、agent 目录、验收项目和数据库；utility process 沿用生产的空环境变量配置。工作台沿用现有历史目录发现逻辑，但测试会话写入独立 profile，不修改日常会话、资源或模型配置。
 
 ## 显式公网验证
 
@@ -48,4 +52,4 @@ pnpm check:agent-runtime --live
 
 前置条件是已安装完整的 Electron 二进制。可运行 `pnpm rebuild electron` 和 `pnpm exec electron --version` 检查；安装脚本退出码不能代替实际执行验证。
 
-本轮结果见 [桌面业务验收记录](../../DURABLE-MIGRATION/P1-DESKTOP-ACCEPTANCE.md)。本脚本覆盖工作台会话主链路与 utility process 中断恢复；NSIS 安装/卸载、应用或系统整体崩溃、其他模型供应商/API 类型、全部扩展/MCP/远程能力和其他工作台资源仍按各自范围验收。
+结果见 [桌面业务验收记录](../../DURABLE-MIGRATION/P1-DESKTOP-ACCEPTANCE.md)、[P3A 原生扩展宿主](../../DURABLE-MIGRATION/P3-EXTENSION-HOST.md) 与 [P3B 资源服务](../../DURABLE-MIGRATION/P3-RESOURCES.md)。本脚本覆盖工作台会话主链路、已实现的扩展/资源与 utility process 中断恢复；NSIS 安装/卸载、应用或系统整体崩溃、其他模型供应商/API 类型、全部扩展/MCP/远程能力和其他工作台资源仍按各自范围验收。

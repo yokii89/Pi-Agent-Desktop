@@ -50,6 +50,8 @@ export interface DurableSessionOptions {
   /** Applied only when creating the root. Later changes go through configure(). */
   create?: boolean;
   agent?: AgentChange;
+  /** Refresh app-owned project instructions before restoring saved tasks. */
+  instructions?: string;
 }
 
 /** Owns one SQLite writer and one root conversation per top-level desktop session. Not a public extension API. */
@@ -85,7 +87,7 @@ export class DurableSessions {
       cwd,
       accepting: true,
       operations: new Set(),
-      opening: this.create(sessionId, cwd, request.agent, request.create),
+      opening: this.create(sessionId, cwd, request.agent, request.create, request.instructions),
     };
     this.sessions.set(sessionId, slot);
     try {
@@ -238,6 +240,7 @@ export class DurableSessions {
     cwd: string,
     agent?: AgentChange,
     create?: boolean,
+    instructions?: string,
   ): Promise<OpenSession> {
     const directory = path.join(this.storageRoot, sessionId);
     if (create === false) await access(path.join(directory, "session.sqlite"));
@@ -252,10 +255,15 @@ export class DurableSessions {
       const runtimeOptions = this.options(sessionId);
       storage = await openNodeSqliteStorage(path.join(canonical, "session.sqlite"));
       harness = await Harness.open(storage, runtimeOptions, context);
-      const conversation = await harness.root(context, { agent: { ...agent, cwd } });
-      if ((await conversation.agent(context)).cwd !== cwd) {
+      const conversation = await harness.root(context, {
+        agent: { ...agent, ...(instructions === undefined ? {} : { instructions }), cwd },
+      });
+      const current = await conversation.agent(context);
+      if (current.cwd !== cwd) {
         throw new Error("Persisted Durable session belongs to another cwd.");
       }
+      if (instructions !== undefined && current.instructions !== instructions)
+        await conversation.configure({ instructions }, context);
       const watch = await conversation.watch(context, { min: PAGE_SIZE, max: PAGE_SIZE * 2 });
       const session: OpenSession = {
         harness,

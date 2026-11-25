@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { EntryId, SubmissionId } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
@@ -12,6 +11,7 @@ import { DESKTOP_PROVIDER, desktopModels } from "./desktopModels.js";
 import { readDurableEntries } from "./durableHistory.js";
 import { DurableSessions } from "./durableSessions.js";
 import { SessionExtensionHost } from "./extensions/sessionExtensionHost.js";
+import { loadSessionResources } from "./resources/sessionResources.js";
 
 interface HostedSession {
   host: SessionExtensionHost;
@@ -177,15 +177,16 @@ export class DesktopRuntime {
       const slot: HostedSession = { host, active: 0, ready: false };
       this.hosts.set(id, slot);
       try {
+        const resources = await loadSessionResources(command.cwd, command.resources ?? []);
+        host.installResources(resources.commands);
         await host.load(command.extensions ?? []);
-        const instructions = command.create ? await projectInstructions(command.cwd) : undefined;
         const result = await service.open({
           ...command,
+          instructions: resources.instructions,
           agent: {
             ...(this.modelId
               ? { model: { provider: DESKTOP_PROVIDER, modelId: this.modelId } }
               : {}),
-            ...(instructions ? { instructions } : {}),
           },
         });
         slot.ready = true;
@@ -220,29 +221,4 @@ export class DesktopRuntime {
     slot.closing = operation;
     return operation;
   }
-}
-
-async function projectInstructions(cwd: string): Promise<string> {
-  const directories: string[] = [];
-  let directory = path.resolve(cwd);
-  for (;;) {
-    directories.unshift(directory);
-    const parent = path.dirname(directory);
-    if (parent === directory) break;
-    directory = parent;
-  }
-  const sections: string[] = [];
-  let size = 0;
-  for (const root of directories) {
-    const file = path.join(root, "AGENTS.md");
-    try {
-      const text = await readFile(file, "utf8");
-      size += Buffer.byteLength(text);
-      if (size > 128 * 1024) throw new Error("Project instructions exceed 128 KiB.");
-      sections.push(`${file}\n${text}`);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    }
-  }
-  return sections.join("\n\n");
 }

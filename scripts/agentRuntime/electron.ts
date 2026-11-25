@@ -26,6 +26,7 @@ if (!configuredReportPath) throw new Error("Missing runtime check report path.")
 const reportPath: string = configuredReportPath;
 // Use an isolated profile: verification must never open the user's application settings or sessions.
 app.setPath("userData", mkdtempSync(path.join(path.dirname(reportPath), "profile-")));
+app.setPath("home", app.getPath("userData"));
 process.env.PI_CODING_AGENT_DIR = path.join(app.getPath("userData"), "legacy-agent");
 
 const hostRequire = createRequire(__filename);

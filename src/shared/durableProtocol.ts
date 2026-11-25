@@ -4,6 +4,11 @@ import {
   type DurableExtensionSpec,
   isDurableExtensionSpec,
 } from "./durableExtension";
+import {
+  DURABLE_RESOURCE_LIMIT,
+  type DurableResourceSpec,
+  isDurableResourceSpec,
+} from "./durableResources";
 import type { IpcResult } from "./ipc";
 
 export interface DurableDesktopApi {
@@ -54,6 +59,7 @@ export type DurableCommand =
       cwd: string;
       create: boolean;
       extensions?: readonly DurableExtensionSpec[];
+      resources?: readonly DurableResourceSpec[];
     }
   | { op: "commands"; sessionId: string }
   | {
@@ -184,6 +190,13 @@ export function parseDurableCommand(value: unknown): DurableCommand | null {
           !value.extensions.every(isDurableExtensionSpec))
       )
         return null;
+      if (
+        value.resources !== undefined &&
+        (!Array.isArray(value.resources) ||
+          value.resources.length > DURABLE_RESOURCE_LIMIT ||
+          !value.resources.every(isDurableResourceSpec))
+      )
+        return null;
       return boundedText(value.cwd, 32_768) && typeof value.create === "boolean"
         ? {
             op: "open",
@@ -193,6 +206,9 @@ export function parseDurableCommand(value: unknown): DurableCommand | null {
             ...(value.extensions === undefined
               ? {}
               : { extensions: value.extensions as DurableExtensionSpec[] }),
+            ...(value.resources === undefined
+              ? {}
+              : { resources: value.resources as DurableResourceSpec[] }),
           }
         : null;
     }

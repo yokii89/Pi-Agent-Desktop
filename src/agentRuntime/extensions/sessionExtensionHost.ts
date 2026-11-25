@@ -13,13 +13,19 @@ import {
   durableExtensionError,
   isDurableExtensionSpec,
 } from "../../shared/durableExtension.js";
+import type { DurableResourceCommand } from "../../shared/durableResources.js";
+
+type HostedCommand = DurablePromptCommand & {
+  readonly source: "extension" | "skill" | "prompt";
+  readonly filePath?: string;
+};
 
 /** One registry and factory instance set per top-level session. Module imports may be cached. */
 export class SessionExtensionHost {
   readonly registry: Registry = createRegistry();
   private readonly controller = new AbortController();
   private readonly instances: { id: string; instance: DurableExtensionInstance }[] = [];
-  private readonly commands = new Map<string, DurablePromptCommand>();
+  private readonly commands = new Map<string, HostedCommand>();
   private readonly inputs = new Map<string, { text: string; result: Promise<string> }>();
   private readonly pending = new Set<Promise<string>>();
   private accepting = true;
@@ -53,13 +59,28 @@ export class SessionExtensionHost {
     }
   }
 
+  /** Declarative resources share admission deduplication with native prompt commands. */
+  installResources(commands: readonly DurableResourceCommand[]): void {
+    if (this.loaded || !this.accepting) throw durableExtensionError("closed", this.sessionId);
+    for (const command of commands) {
+      if (this.commands.has(command.name)) throw durableExtensionError("duplicate", command.name);
+      this.commands.set(command.name, command);
+    }
+  }
+
   /** JSON-only command metadata, consumed by the existing composer completion UI. */
-  listCommands(): { name: string; description: string; source: "extension" }[] {
+  listCommands(): {
+    name: string;
+    description: string;
+    source: HostedCommand["source"];
+    filePath?: string;
+  }[] {
     if (!this.accepting) throw durableExtensionError("closed", this.sessionId);
-    return [...this.commands.values()].map(({ name, description }) => ({
+    return [...this.commands.values()].map(({ name, description, source, filePath }) => ({
       name,
       description,
-      source: "extension",
+      source,
+      ...(filePath === undefined ? {} : { filePath }),
     }));
   }
 
@@ -215,7 +236,12 @@ export class SessionExtensionHost {
       )
         throw durableExtensionError("invalid", spec.id);
       if (this.commands.has(command.name)) throw durableExtensionError("duplicate", command.name);
-      this.commands.set(command.name, command);
+      this.commands.set(command.name, {
+        name: command.name,
+        description: command.description,
+        source: "extension",
+        expand: (args) => command.expand(args),
+      });
     }
   }
 

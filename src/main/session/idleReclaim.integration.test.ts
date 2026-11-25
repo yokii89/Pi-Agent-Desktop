@@ -17,7 +17,11 @@ const f = vi.hoisted(() => ({
   updates: new Set<(update: RuntimeSessionUpdate) => void>(),
   scheduler: { tasks: [], runs: [] } as SchedulerSnapshot,
 }));
-vi.mock("electron", () => ({ powerMonitor: { on() {}, off() {} }, shell: { trashItem: vi.fn() } }));
+vi.mock("electron", () => ({
+  app: { getPath: () => f.root },
+  powerMonitor: { on() {}, off() {} },
+  shell: { trashItem: vi.fn() },
+}));
 vi.mock("../window/createMainWindow", () => ({ getMainWindow: () => null }));
 vi.mock("../extension/contributionCatalog", () => ({
   getCatalogSnapshot: () => ({ fingerprint: "test" }),

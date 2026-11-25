@@ -128,7 +128,7 @@ function readPackageResources(root: string): {
   const matchers: Record<PiPackageResourceKind, Matcher> = {
     extensions: { matchFile: (name) => /\.(ts|js)$/i.test(name) },
     skills: {
-      matchFile: () => false,
+      matchFile: (name) => /\.md$/i.test(name),
       matchDirEntry: (name, abs) => {
         if (name.startsWith(".")) return false;
         try {
@@ -152,6 +152,10 @@ function readPackageResources(root: string): {
         const abs = path.resolve(root, item);
         try {
           if (fs.statSync(abs).isDirectory()) {
+            if (kind === "skills" && fs.existsSync(path.join(abs, "SKILL.md"))) {
+              pushItem(resourceItems, kind, root, abs);
+              continue;
+            }
             for (const entry of fs.readdirSync(abs, { withFileTypes: true })) {
               if (entry.name.startsWith(".")) continue;
               const child = path.join(abs, entry.name);
@@ -277,6 +281,7 @@ export interface PiPackageEntries {
   project: PiPackageEntry[];
   agentDir: string;
   userSettings: Record<string, unknown> | null;
+  projectSettings: Record<string, unknown> | null;
 }
 
 /** 只读 packages 条目；catalog / worker 不需要本地资源目录，避免递归扫描。 */
@@ -297,7 +302,7 @@ export function listPackageEntries(projectDir: string | null): PiPackageEntries 
         .filter((e): e is PiPackageEntry => e !== null)
     : [];
 
-  return { user, project, agentDir, userSettings };
+  return { user, project, agentDir, userSettings, projectSettings };
 }
 
 /** 组装扩展页快照。projectDir 为空时 project 列表为空。 */

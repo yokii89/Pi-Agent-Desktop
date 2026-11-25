@@ -2,10 +2,14 @@ import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { ConversationView, EntryRecord } from "@earendil-works/pi-durable";
-import { shell } from "electron";
-import { DURABLE_COMMAND_NAME, durableDisplayMessages } from "../../shared/durableExtension";
+import { app, shell } from "electron";
+import { durableDisplayMessages } from "../../shared/durableExtension";
 import type { DurableCommand, RuntimeSessionUpdate } from "../../shared/durableProtocol";
 import { record, validEntries } from "../../shared/durableProtocol";
+import {
+  DURABLE_COMMAND_CATALOG_LIMIT,
+  isDurableCommandMetadata,
+} from "../../shared/durableResources";
 import type {
   PiAgentEvent,
   PiChatMessage,
@@ -19,6 +23,7 @@ import type {
 import { SESSION_IPC } from "../../shared/ipc";
 import { DURABLE_SESSION_ID, sessionRefFromKey, sessionRefKey } from "../../shared/sessionRef";
 import { discoverDurableExtensions } from "../extension/durableExtensions";
+import { discoverDurableResources } from "../extension/durableResources";
 import {
   markRuntimeActivity,
   markRuntimeExit,
@@ -39,6 +44,7 @@ import { getSettings } from "../settings/settings";
 import { getMainWindow } from "../window/createMainWindow";
 import { agentRuntimeManager } from "./agentRuntimeManager";
 import { DurableProjection } from "./durableProjection";
+import { localizeRuntimeError } from "./runtimeError";
 
 interface Attachment {
   id: SessionId;
@@ -185,6 +191,7 @@ class DesktopSessions {
         cwd,
         create: !known,
         extensions,
+        resources: discoverDurableResources(cwd, app.getPath("home")),
       });
       markRuntimeReady(id);
       if (!attachment.settled) markRuntimeActivity(id, "busy");
@@ -196,6 +203,10 @@ class DesktopSessions {
       if (this.attachments.get(id) === attachment) {
         this.attachments.delete(id);
         this.byStoredId.delete(storedId);
+      }
+      if (error instanceof Error) {
+        const message = localizeRuntimeError(error.message);
+        if (message !== error.message) throw new Error(message);
       }
       throw error;
     }
@@ -266,16 +277,8 @@ class DesktopSessions {
     const value = await this.command(id, { op: "commands", sessionId: attachment.storedId });
     if (
       !Array.isArray(value) ||
-      value.length > 4096 ||
-      !value.every(
-        (item) =>
-          record(item) &&
-          typeof item.name === "string" &&
-          DURABLE_COMMAND_NAME.test(item.name) &&
-          item.source === "extension" &&
-          typeof item.description === "string" &&
-          item.description.length <= 400,
-      )
+      value.length > DURABLE_COMMAND_CATALOG_LIMIT ||
+      !value.every(isDurableCommandMetadata)
     )
       throw new Error("Invalid native command catalog.");
     return value as PiSlashCommand[];

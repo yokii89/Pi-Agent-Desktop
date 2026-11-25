@@ -198,6 +198,81 @@ describe("desktop production provider, DTO and transcript integration", () => {
     ).rejects.toThrow();
   });
 
+  it("persists resource commands, refreshes instructions before recovery and honors resource removal on reopen", async () => {
+    const f = await fixture((response) => {
+      chunk(response, { role: "assistant", content: "Resource request passed." });
+      chunk(response, {}, "stop");
+      finish(response);
+    });
+    await f.runtime.execute({ op: "close", sessionId: f.sessionId });
+    const file = path.join(f.directory, "review.md");
+    await writeFile(
+      file,
+      "---\nname: review\ndescription: Review the workspace\n---\nRESOURCE_BODY_ONE",
+    );
+    await writeFile(path.join(f.directory, "AGENTS.md"), "INSTRUCTIONS_ONE");
+    const open = {
+      op: "open",
+      sessionId: f.sessionId,
+      cwd: f.directory,
+      create: false,
+      resources: [{ kind: "skill", root: f.directory, file, scope: "project" }],
+    } as const;
+    await f.runtime.execute(open);
+    const command = {
+      op: "submit",
+      sessionId: f.sessionId,
+      requestId: randomUUID(),
+      text: "/skill:review changes",
+      mode: "followUp",
+    } as const;
+    const admission = await f.runtime.execute(command);
+    await until(() => f.entries().some((entry) => entry.kind === "assistant"));
+    await until(() =>
+      f.updates.some(
+        (update) =>
+          update.type === "settled" &&
+          update.view.entries.some((entry) => entry.kind === "pi.assistant"),
+      ),
+    );
+    expect(JSON.stringify(f.requests[0])).toContain("INSTRUCTIONS_ONE");
+    expect(JSON.stringify(f.requests[0])).toContain("RESOURCE_BODY_ONE");
+    expect(f.entries().filter((entry) => entry.kind === "user")).toMatchObject([
+      { text: command.text },
+    ]);
+    await f.runtime.execute({ op: "close", sessionId: f.sessionId });
+    await writeFile(file, "---\nname: review\ndescription: Updated review\n---\nRESOURCE_BODY_TWO");
+    await writeFile(path.join(f.directory, "AGENTS.md"), "INSTRUCTIONS_TWO");
+    f.updates.length = 0;
+    await f.runtime.execute(open);
+    expect(await f.runtime.execute(command)).toEqual(admission);
+    expect(f.requests).toHaveLength(1);
+    const snapshot = f.updates.find((update) => update.type === "snapshot");
+    expect(snapshot?.type === "snapshot" && snapshot.view.docs["pi.agent"]?.instructions).toContain(
+      "INSTRUCTIONS_TWO",
+    );
+    expect(
+      snapshot?.type === "snapshot" && snapshot.view.docs["pi.agent"]?.instructions,
+    ).not.toContain("INSTRUCTIONS_ONE");
+    await f.runtime.execute({ ...command, requestId: randomUUID() });
+    await until(() => f.requests.length === 2);
+    expect(JSON.stringify(f.requests[1])).toContain("RESOURCE_BODY_TWO");
+    expect(JSON.stringify(f.requests[1])).toContain("INSTRUCTIONS_TWO");
+    await f.runtime.execute({ op: "close", sessionId: f.sessionId });
+    await f.runtime.execute({ ...open, resources: [] });
+    expect(await f.runtime.execute({ op: "commands", sessionId: f.sessionId })).toEqual([]);
+    await expect(f.runtime.execute({ ...command, requestId: randomUUID() })).rejects.toThrow(
+      "unknownCommand",
+    );
+    expect(f.requests).toHaveLength(2);
+    await f.runtime.execute({ op: "close", sessionId: f.sessionId });
+    await rm(path.join(f.directory, "AGENTS.md"));
+    f.updates.length = 0;
+    await f.runtime.execute({ ...open, resources: [] });
+    const cleared = f.updates.find((update) => update.type === "snapshot");
+    expect(cleared?.type === "snapshot" && cleared.view.docs["pi.agent"]?.instructions).toBe("");
+  });
+
   it("queues steer and follow-up submissions, withdraws only one, and aborts a streaming provider", async () => {
     const held: ServerResponse[] = [];
     const f = await fixture((response) => {

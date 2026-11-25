@@ -97,7 +97,16 @@ function isFileEntry(entry: fs.Dirent, dir: string): boolean {
 
 function scanSkills(dir: string, mode: "pi" | "agents"): string[] {
   const out: string[] = [];
+  const visited = new Set<string>();
   const walk = (current: string, isRoot: boolean): void => {
+    let canonical: string;
+    try {
+      canonical = fs.realpathSync(current);
+    } catch {
+      return;
+    }
+    if (visited.has(canonical)) return;
+    visited.add(canonical);
     const entries = plainEntries(current);
     const skill = entries.find((entry) => entry.name === "SKILL.md");
     if (skill && isFileEntry(skill, current)) {
@@ -310,14 +319,14 @@ export function listLocalResourceDirs(
   agentDir: string,
   settings: Record<string, unknown> | null,
   homeDir: string = os.homedir(),
-): PiLocalResourceDir[] {
-  const kinds: readonly PiLocalResourceKind[] = [
+  kinds: readonly PiLocalResourceKind[] = [
     "extensions",
     "skills",
     "sharedSkills",
     "prompts",
     "themes",
-  ];
+  ],
+): PiLocalResourceDir[] {
   const compiled = new Map<ResourceType, CompiledOverrides>();
   const overridesFor = (type: ResourceType): CompiledOverrides => {
     let value = compiled.get(type);
@@ -337,6 +346,27 @@ export function listLocalResourceDirs(
       items: exists ? scanDir(location, overridesFor(location.resourceType)) : [],
     };
   });
+}
+
+/** Scan an explicit skill/template path using the same enablement rules as conventional directories. */
+export function listLocalResourcePath(
+  kind: "skills" | "prompts",
+  target: string,
+  baseDir: string,
+  settings: Record<string, unknown> | null,
+): PiLocalResourceItem[] {
+  const overrides = compileOverrides(readStringArray(settings?.[kind]));
+  if (fs.statSync(target).isDirectory())
+    return scanDir({ dir: target, baseDir, resourceType: kind, skillMode: "pi" }, overrides);
+  if (!/\.md$/i.test(target)) return [];
+  return [
+    {
+      name: displayName(target, kind),
+      path: target,
+      relativePath: toPosix(path.relative(baseDir, target)),
+      enabled: isEnabled(overrides, matchCandidates(target, baseDir)),
+    },
+  ];
 }
 
 function readSettings(agentDir: string): Record<string, unknown> {

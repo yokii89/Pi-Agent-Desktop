@@ -48,6 +48,23 @@ export const sessionMessages = defineMessages({
     "zh-CN": "扩展 {name} 未能释放资源，请重试关闭会话。",
     "en-US": "Extension {name} could not release its resources. Retry closing the session.",
   },
+  "session.durable.resourceInvalid": {
+    "zh-CN": "资源 {name} 的路径、元数据或正文无效，请修复或停用后重开会话。",
+    "en-US":
+      "Resource {name} has an invalid path, metadata or body. Fix or disable it and reopen the session.",
+  },
+  "session.durable.resourceLoad": {
+    "zh-CN": "无法读取资源 {name}，请检查文件及访问权限。",
+    "en-US": "Could not read resource {name}. Check the file and access permissions.",
+  },
+  "session.durable.resourceDuplicate": {
+    "zh-CN": "同一作用域内存在重名资源 {name}，请重命名或停用其中一项。",
+    "en-US": "Duplicate resource {name} in the same scope. Rename or disable one of them.",
+  },
+  "session.durable.resourceTooLarge": {
+    "zh-CN": "资源 {name} 超出大小或数量上限，请精简后重开会话。",
+    "en-US": "Resource {name} exceeds the size or count limit. Reduce it and reopen the session.",
+  },
   "session.durable.modelTitle": { "zh-CN": "内置会话模型", "en-US": "Built-in session model" },
   "session.durable.modelDescription": {
     "zh-CN":
