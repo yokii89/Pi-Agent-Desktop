@@ -10,6 +10,7 @@ import { sessionTitle } from "../../utils/sessionTitle";
 import { formatShortRelativeTime } from "../../utils/time";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { IconButton } from "../ui/IconButton";
 import styles from "./LiveSessionsPanel.module.css";
 import settingsStyles from "./Settings.module.css";
 
@@ -88,11 +89,12 @@ export function LiveSessionsPanel() {
 
   return (
     <div className={settingsStyles.panel} data-selectable-text>
-      <p>{t("settings.liveSessions.description")}</p>
-      <Button onClick={() => void refresh()} disabled={loading}>
-        <ArrowsClockwise size={16} weight="regular" />
-        {t("common.refresh")}
-      </Button>
+      <div className={styles.toolbar}>
+        <p className={styles.description}>{t("settings.liveSessions.description")}</p>
+        <IconButton title={t("common.refresh")} onClick={() => void refresh()} disabled={loading}>
+          <ArrowsClockwise size={16} weight="regular" />
+        </IconButton>
+      </div>
       {error && (
         <p className={styles.error} role="alert">
           {t("settings.liveSessions.error", { error })}

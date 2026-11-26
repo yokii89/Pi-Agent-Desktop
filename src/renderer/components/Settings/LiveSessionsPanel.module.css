@@ -1,3 +1,14 @@
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--spacing-md);
+}
+
+.description {
+  margin: 0;
+}
+
 .listHeader {
   display: flex;
   align-items: baseline;
