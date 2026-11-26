@@ -78,7 +78,7 @@ export interface DurableHostCommand {
   readonly name: string;
   readonly description: string;
   /** Return a prompt to admit model work, or no value when the operation is handled. */
-  execute(args: string): string | void | Promise<string | void>;
+  execute(args: string): string | void | Promise<string | undefined> | Promise<void>;
 }
 
 export interface DurableExtensionInstance {
