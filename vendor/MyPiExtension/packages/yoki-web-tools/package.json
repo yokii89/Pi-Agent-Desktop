@@ -1,0 +1,78 @@
+{
+	"name": "@yoki/yoki-web-tools",
+	"version": "1.21.0",
+	"description": "Pi extension. Web search and fetch for the model with pluggable providers (Brave, Tavily, Serper, Exa, You.com, Jina, Firecrawl, Perplexity, SearXNG, Ollama).",
+	"keywords": [
+		"pi-package",
+		"pi-extension",
+		"yoki",
+		"web-search",
+		"web-fetch",
+		"search",
+		"fetch",
+		"scrape",
+		"web-scraping",
+		"ai",
+		"llm",
+		"agent",
+		"local",
+		"self-hosted",
+		"brave",
+		"tavily",
+		"serper",
+		"exa",
+		"youcom",
+		"jina",
+		"firecrawl",
+		"perplexity",
+		"searxng",
+		"ollama"
+	],
+	"type": "module",
+	"license": "MIT",
+	"author": "yokii89",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/yokii89/MyPiExtension.git",
+		"directory": "packages/yoki-web-tools"
+	},
+	"homepage": "https://github.com/yokii89/MyPiExtension/tree/main/packages/yoki-web-tools#readme",
+	"bugs": {
+		"url": "https://github.com/yokii89/MyPiExtension/issues"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"test": "vitest run"
+	},
+	"files": [
+		"index.ts",
+		"web-tools.ts",
+		"providers/",
+		"docs/",
+		"!docs/*.png",
+		"!docs/*.jpg",
+		"!docs/*.svg",
+		"README.md",
+		"LICENSE",
+		"!**/*.test.ts"
+	],
+	"pi": {
+		"image": "./docs/cover.png",
+		"extensions": [
+			"./index.ts"
+		]
+	},
+	"dependencies": {
+		"@yoki/yoki-config": "^1.20.0",
+		"typebox": "^1.1.24"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": ">=1.4.0",
+		"@earendil-works/pi-tui": ">=1.4.0"
+	},
+	"engines": {
+		"node": ">=22.19.0"
+	}
+}

@@ -1,5 +1,11 @@
 import type { EntryRecord } from "@earendil-works/pi-durable";
 import {
+  type BuiltinToolsConfig,
+  parseBuiltinToolsConfig,
+  type RuntimeBuiltinToolsConfig,
+  type SaveBuiltinToolsConfig,
+} from "./builtinTools";
+import {
   DURABLE_EXTENSION_LIMIT,
   type DurableExtensionSpec,
   isDurableExtensionSpec,
@@ -11,11 +17,53 @@ import {
 } from "./durableResources";
 import { parseImageInputContents } from "./imageInput";
 import type { IpcResult, PiImageContent } from "./ipc";
+import type { NativeExecutionConfig as ExecutionConfig } from "./nativeBuiltins";
+import {
+  isNativeSessionState,
+  type NativeJob,
+  type NativeJobOutput,
+  type NativeSessionState,
+  type NativeStatePush,
+  PLAN_ACTIONS,
+  type PlanAction,
+  type QuestionnaireReply,
+} from "./nativeBuiltins";
+import {
+  type GatewayCatalog,
+  type GatewayInput,
+  type GatewayModel,
+  type GatewayModelInfo,
+  type GatewayThinking,
+  gatewayModelRows,
+} from "./newApi";
 
 export const DURABLE_RUNTIME_MESSAGE_MAX_BYTES = 66 * 1024 * 1024;
 
 export interface DurableDesktopApi {
+  nativeState(sessionId: string): Promise<IpcResult<NativeSessionState>>;
+  onNativeState(callback: (push: NativeStatePush) => void): () => void;
+  nativeMode(sessionId: string, mode: "edit" | "plan"): Promise<IpcResult<null>>;
+  answerQuestionnaire(
+    sessionId: string,
+    taskId: number,
+    version: number,
+    reply: QuestionnaireReply,
+  ): Promise<IpcResult<string>>;
+  answerPlan(
+    sessionId: string,
+    taskId: number,
+    action: PlanAction,
+  ): Promise<IpcResult<{ status: string; sessionId?: string; file?: string }>>;
+  jobs(sessionId: string): Promise<IpcResult<NativeJob[]>>;
+  inspectJob(sessionId: string, job: string): Promise<IpcResult<NativeJobOutput>>;
+  stopJob(sessionId: string, job: string): Promise<IpcResult<NativeJobOutput>>;
   model(): Promise<IpcResult<DurableModelConfig | null>>;
+  modelCatalog(force?: boolean): Promise<IpcResult<GatewayCatalog<GatewayModelInfo>>>;
+  clearModelCache(): Promise<IpcResult<null>>;
+  testModelConnection(): Promise<IpcResult<{ count: number; latencyMs: number }>>;
+  importCodexModel(): Promise<IpcResult<DurableModelConfig>>;
+  builtinTools(): Promise<IpcResult<BuiltinToolsConfig>>;
+  saveBuiltinTools(config: SaveBuiltinToolsConfig): Promise<IpcResult<BuiltinToolsConfig>>;
   saveModel(
     config: Omit<DurableModelConfig, "hasKey"> & { apiKey: string },
   ): Promise<IpcResult<DurableModelConfig>>;
@@ -32,7 +80,13 @@ export const DESKTOP_RETRY_ATTEMPTS = 3;
 
 export const DURABLE_IPC = {
   model: "pidesk:durable:model",
+  builtinTools: "pidesk:durable:builtinTools",
+  saveBuiltinTools: "pidesk:durable:saveBuiltinTools",
   saveModel: "pidesk:durable:saveModel",
+  modelCatalog: "pidesk:durable:modelCatalog",
+  clearModelCache: "pidesk:durable:clearModelCache",
+  testModelConnection: "pidesk:durable:testModelConnection",
+  importCodexModel: "pidesk:durable:importCodexModel",
   history: "pidesk:durable:history",
   continue: "pidesk:durable:continue",
   compact: "pidesk:durable:compact",
@@ -47,15 +101,30 @@ export interface DurableModelConfig {
   contextWindow: number;
   maxTokens: number;
   reasoning: boolean;
+  input?: GatewayInput[];
+  capabilityMode?: "auto" | "manual";
+  preferredThinking?: GatewayThinking;
   hasKey: boolean;
 }
 
 /** Only the trusted main process sends the decrypted key to its private utility port. */
-export type RuntimeModelConfig = Omit<DurableModelConfig, "hasKey"> & { apiKey: string };
+export type RuntimeModelConfig = Omit<DurableModelConfig, "hasKey"> & {
+  apiKey: string;
+  models?: GatewayModel[];
+};
 
 export type DurableCommand =
-  | { op: "initialize"; storageRoot: string; model?: RuntimeModelConfig }
+  | {
+      op: "initialize";
+      storageRoot: string;
+      model?: RuntimeModelConfig;
+      builtins?: RuntimeBuiltinToolsConfig;
+      execution?: ExecutionConfig;
+    }
+  | { op: "models" }
+  | { op: "modelPreference"; modelId: string; thinkingLevel?: GatewayThinking }
   | { op: "model"; model: RuntimeModelConfig }
+  | { op: "builtins"; config: RuntimeBuiltinToolsConfig }
   | {
       op: "open";
       sessionId: string;
@@ -64,7 +133,17 @@ export type DurableCommand =
       extensions?: readonly DurableExtensionSpec[];
       resources?: readonly DurableResourceSpec[];
     }
-  | { op: "commands"; sessionId: string }
+  | { op: "commands" | "nativeState" | "jobs"; sessionId: string }
+  | { op: "nativeMode"; sessionId: string; mode: "edit" | "plan" }
+  | {
+      op: "answerQuestionnaire";
+      sessionId: string;
+      taskId: number;
+      version: number;
+      reply: unknown;
+    }
+  | { op: "answerPlan"; sessionId: string; taskId: number; action: PlanAction }
+  | { op: "inspectJob" | "stopJob"; sessionId: string; job: string }
   | {
       op: "submit";
       sessionId: string;
@@ -86,7 +165,9 @@ export type DurableCommand =
   | { op: "compact"; sessionId: string; instructions?: string }
   | { op: "history" | "readHistory"; sessionId: string; before?: number; limit: number };
 
-export type RuntimeSessionUpdate = DurableSessionUpdate;
+export type RuntimeSessionUpdate =
+  | DurableSessionUpdate
+  | ({ type: "nativeState" } & NativeStatePush);
 export type DurableHistoryPage = readonly EntryRecord[];
 
 export function record(value: unknown): value is Record<string, unknown> {
@@ -160,6 +241,30 @@ export function parseRuntimeModel(value: unknown): RuntimeModelConfig | null {
   } catch {
     return null;
   }
+  if (
+    (value.input !== undefined &&
+      (!Array.isArray(value.input) ||
+        !value.input.length ||
+        value.input.length > 2 ||
+        value.input.some((item) => item !== "text" && item !== "image"))) ||
+    (value.capabilityMode !== undefined &&
+      value.capabilityMode !== "auto" &&
+      value.capabilityMode !== "manual") ||
+    (value.preferredThinking !== undefined &&
+      !["off", "minimal", "low", "medium", "high", "xhigh"].includes(
+        String(value.preferredThinking),
+      ))
+  )
+    return null;
+  let models: GatewayModel[] | undefined;
+  if (value.models !== undefined) {
+    try {
+      models = gatewayModelRows(value.models, true);
+    } catch {
+      return null;
+    }
+    if (models.length !== (value.models as unknown[]).length) return null;
+  }
   return {
     baseUrl: value.baseUrl,
     modelId: value.modelId,
@@ -168,22 +273,69 @@ export function parseRuntimeModel(value: unknown): RuntimeModelConfig | null {
     contextWindow: value.contextWindow,
     maxTokens: value.maxTokens,
     reasoning: value.reasoning,
+    ...(value.input === undefined ? {} : { input: value.input as GatewayInput[] }),
+    ...(value.capabilityMode === undefined ? {} : { capabilityMode: value.capabilityMode }),
+    ...(value.preferredThinking === undefined
+      ? {}
+      : { preferredThinking: value.preferredThinking as GatewayThinking }),
+    ...(models === undefined ? {} : { models }),
   };
 }
 
 export function parseDurableCommand(value: unknown): DurableCommand | null {
   if (!record(value)) return null;
-  const maxBytes = value.op === "submit" ? DURABLE_RUNTIME_MESSAGE_MAX_BYTES : 512 * 1024;
+  const maxBytes =
+    value.op === "submit"
+      ? DURABLE_RUNTIME_MESSAGE_MAX_BYTES
+      : ["initialize", "model"].includes(String(value.op))
+        ? 4 * 1024 * 1024
+        : 512 * 1024;
   if (!boundedJson(value, maxBytes)) return null;
+  if (value.op === "models") return { op: "models" };
+  if (value.op === "modelPreference")
+    return boundedText(value.modelId, 256) &&
+      (value.thinkingLevel === undefined ||
+        ["off", "minimal", "low", "medium", "high", "xhigh"].includes(String(value.thinkingLevel)))
+      ? {
+          op: "modelPreference",
+          modelId: value.modelId,
+          ...(value.thinkingLevel === undefined
+            ? {}
+            : { thinkingLevel: value.thinkingLevel as GatewayThinking }),
+        }
+      : null;
   if (value.op === "initialize") {
     const model = value.model === undefined ? undefined : parseRuntimeModel(value.model);
-    return boundedText(value.storageRoot, 32_768) && model !== null
-      ? { op: "initialize", storageRoot: value.storageRoot, ...(model ? { model } : {}) }
+    const builtins =
+      value.builtins === undefined ? undefined : parseBuiltinToolsConfig(value.builtins);
+    if (
+      value.execution !== undefined &&
+      (!record(value.execution) ||
+        !boundedText(value.execution.shell, 32768) ||
+        !record(value.execution.env) ||
+        Object.entries(value.execution.env).some(
+          ([key, item]) =>
+            !/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(key) || !boundedText(item, 32768, true),
+        ))
+    )
+      return null;
+    return boundedText(value.storageRoot, 32_768) && model !== null && builtins !== null
+      ? {
+          op: "initialize",
+          storageRoot: value.storageRoot,
+          ...(model ? { model } : {}),
+          ...(builtins ? { builtins } : {}),
+          ...(value.execution ? { execution: value.execution as ExecutionConfig } : {}),
+        }
       : null;
   }
   if (value.op === "model") {
     const model = parseRuntimeModel(value.model);
     return model ? { op: "model", model } : null;
+  }
+  if (value.op === "builtins") {
+    const config = parseBuiltinToolsConfig(value.config);
+    return config ? { op: "builtins", config } : null;
   }
   if (typeof value.sessionId !== "string" || !DURABLE_SESSION_ID.test(value.sessionId)) return null;
   const sessionId = value.sessionId.toLowerCase();
@@ -219,7 +371,30 @@ export function parseDurableCommand(value: unknown): DurableCommand | null {
         : null;
     }
     case "commands":
-      return { op: "commands", sessionId };
+    case "nativeState":
+    case "jobs":
+      return { op: value.op, sessionId };
+    case "nativeMode":
+      return value.mode === "edit" || value.mode === "plan"
+        ? { op: "nativeMode", sessionId, mode: value.mode }
+        : null;
+    case "answerQuestionnaire":
+      return positiveId(value.taskId) && value.version === 1 && record(value.reply)
+        ? {
+            op: "answerQuestionnaire",
+            sessionId,
+            taskId: value.taskId,
+            version: 1,
+            reply: value.reply,
+          }
+        : null;
+    case "answerPlan":
+      return positiveId(value.taskId) && PLAN_ACTIONS.includes(value.action as PlanAction)
+        ? { op: "answerPlan", sessionId, taskId: value.taskId, action: value.action as PlanAction }
+        : null;
+    case "inspectJob":
+    case "stopJob":
+      return boundedText(value.job, 64) ? { op: value.op, sessionId, job: value.job } : null;
     case "abort":
     case "close":
     case "closeIdle":
@@ -426,6 +601,8 @@ export function parseRuntimeUpdate(value: unknown): RuntimeSessionUpdate | null 
     !DURABLE_SESSION_ID.test(value.sessionId)
   )
     return null;
+  if (value.type === "nativeState")
+    return isNativeSessionState(value.state) ? (value as RuntimeSessionUpdate) : null;
   if (value.type === "error")
     return boundedText(value.error, 2000, true) ? (value as RuntimeSessionUpdate) : null;
   if (value.type === "entries")

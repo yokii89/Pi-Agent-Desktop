@@ -161,6 +161,8 @@ import {
   WALLPAPER_IPC,
   WINDOW_IPC,
 } from "../shared/ipc";
+import { MANAGED_SKILLS_IPC, type ManagedSkillsDesktopApi } from "../shared/managedSkills";
+import { NATIVE_IPC, type NativeStatePush } from "../shared/nativeBuiltins";
 import type {
   NotificationPushMessage,
   SystemToastActivated,
@@ -175,6 +177,7 @@ import type {
   SchedulerTaskInput,
 } from "../shared/scheduler";
 import { SCHEDULER_IPC } from "../shared/scheduler";
+import { TELEGRAM_IPC, type TelegramDesktopApi } from "../shared/telegram";
 import type { UpdateStatus } from "../shared/update";
 import { UPDATE_IPC } from "../shared/update";
 import type { UsageQuery, UsageReport } from "../shared/usage";
@@ -406,8 +409,36 @@ contextBridge.exposeInMainWorld("pidesk", {
       ipcRenderer.invoke(MODEL_OVERRIDES_IPC.set, req),
   },
 
+  managedSkills: {
+    list: (projectDir) => ipcRenderer.invoke(MANAGED_SKILLS_IPC.list, { projectDir }),
+    plan: (request) => ipcRenderer.invoke(MANAGED_SKILLS_IPC.plan, request),
+    apply: (id) => ipcRenderer.invoke(MANAGED_SKILLS_IPC.apply, { id }),
+  } satisfies ManagedSkillsDesktopApi,
+  telegram: {
+    status: () => ipcRenderer.invoke(TELEGRAM_IPC.status),
+    save: (config) => ipcRenderer.invoke(TELEGRAM_IPC.save, config),
+    connect: () => ipcRenderer.invoke(TELEGRAM_IPC.connect),
+    disconnect: () => ipcRenderer.invoke(TELEGRAM_IPC.disconnect),
+    bind: (sessionId) => ipcRenderer.invoke(TELEGRAM_IPC.bind, { sessionId }),
+  } satisfies TelegramDesktopApi,
   durable: {
+    nativeState: (sessionId) => ipcRenderer.invoke(NATIVE_IPC.state, { sessionId }),
+    onNativeState: (callback) => subscribe<NativeStatePush>(NATIVE_IPC.output, callback),
+    nativeMode: (sessionId, mode) => ipcRenderer.invoke(NATIVE_IPC.mode, { sessionId, mode }),
+    answerQuestionnaire: (sessionId, taskId, version, reply) =>
+      ipcRenderer.invoke(NATIVE_IPC.answer, { sessionId, taskId, version, reply }),
+    answerPlan: (sessionId, taskId, action) =>
+      ipcRenderer.invoke(NATIVE_IPC.plan, { sessionId, taskId, action }),
+    jobs: (sessionId) => ipcRenderer.invoke(NATIVE_IPC.jobs, { sessionId }),
+    inspectJob: (sessionId, job) => ipcRenderer.invoke(NATIVE_IPC.inspect, { sessionId, job }),
+    stopJob: (sessionId, job) => ipcRenderer.invoke(NATIVE_IPC.stop, { sessionId, job }),
+    builtinTools: () => ipcRenderer.invoke(DURABLE_IPC.builtinTools),
+    saveBuiltinTools: (config) => ipcRenderer.invoke(DURABLE_IPC.saveBuiltinTools, config),
     model: () => ipcRenderer.invoke(DURABLE_IPC.model),
+    modelCatalog: (force) => ipcRenderer.invoke(DURABLE_IPC.modelCatalog, { force }),
+    clearModelCache: () => ipcRenderer.invoke(DURABLE_IPC.clearModelCache),
+    testModelConnection: () => ipcRenderer.invoke(DURABLE_IPC.testModelConnection),
+    importCodexModel: () => ipcRenderer.invoke(DURABLE_IPC.importCodexModel),
     saveModel: (config) => ipcRenderer.invoke(DURABLE_IPC.saveModel, config),
     history: (sessionId, before) => ipcRenderer.invoke(DURABLE_IPC.history, { sessionId, before }),
     continue: (sessionId, requestId) =>

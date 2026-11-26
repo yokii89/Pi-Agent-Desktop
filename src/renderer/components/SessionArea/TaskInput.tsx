@@ -1,6 +1,7 @@
 import { Folder } from "@phosphor-icons/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FsSearchHit, PiSlashCommand, QueueIntent } from "../../../shared/ipc";
+import { parseManagedSkillCommand } from "../../../shared/managedSkillCommand";
 import { FileIcon } from "../../fileIcons/FileIcon";
 import { useGlideOverlay } from "../../hooks/useGlideOverlay";
 import { useGlidePill } from "../../hooks/useGlidePill";
@@ -9,6 +10,7 @@ import { fsService } from "../../services/fsService";
 import { useBrowserStore } from "../../stores/browserStore";
 import { useComposerStore } from "../../stores/composerStore";
 import { useExtensionViewStore } from "../../stores/extensionViewStore";
+import { managedSkillsNavigation } from "../../stores/managedSkillsNavigation";
 import { useProjectStore } from "../../stores/projectStore";
 import { useSessionMeta, useSessionQueue } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -35,6 +37,7 @@ import { ImageAttachStrip } from "./ImageAttachStrip";
 import { InputAura } from "./InputAura";
 import auraStyles from "./InputAura.module.css";
 import { InputBuddy, type InputBuddyHandle } from "./InputBuddy/InputBuddy";
+import { NativePlanReview } from "./NativeSessionControls";
 import styles from "./TaskInput.module.css";
 import { TaskInputContextBar } from "./TaskInputContextBar";
 import { TaskInputToolbar } from "./TaskInputToolbar";
@@ -78,7 +81,7 @@ export function TaskInput({
     modelLabel,
     readUserHistory,
   } = useSessionMeta();
-  const { showToast, inputBuddy, inputEffect } = useUiStore();
+  const { showToast, inputBuddy, inputEffect, navigate } = useUiStore();
   const browser = useBrowserStore();
   const { currentProject } = useProjectStore();
   const { thinkingLevel, thinkingLevels } = useComposerStore();
@@ -263,7 +266,10 @@ export function TaskInput({
 
   /** 本地命令（/steer）：查询为空或命中名称/说明时展示，不依赖 pi 命令表加载。 */
   const localCommands = useMemo<LocalSlashCommand[]>(
-    () => [{ name: "steer", description: t("session.queue.steerDesc") }],
+    () => [
+      { name: "steer", description: t("session.queue.steerDesc") },
+      { name: "skills", description: t("skills.commandDescription") },
+    ],
     [t],
   );
 
@@ -278,7 +284,7 @@ export function TaskInput({
     if (local.length > 0) {
       groups.push({ title: t("session.input.group.local"), items: local });
     }
-    const commands = slashFiltered.filter((c) => c.source !== "skill");
+    const commands = slashFiltered.filter((c) => c.source !== "skill" && c.name !== "skills");
     const skills = slashFiltered.filter((c) => c.source === "skill");
     if (commands.length > 0)
       groups.push({ title: t("session.input.group.commands"), items: commands });
@@ -501,6 +507,25 @@ export function TaskInput({
       return;
     }
     const { text: rawText, itemIds, filePaths, fileMentions: orderedFiles } = composer.read();
+    const skillsIntent = parseManagedSkillCommand(rawText);
+    if (skillsIntent !== null) {
+      if (
+        skillsIntent === "invalid" ||
+        itemIds.length ||
+        filePaths.length ||
+        imageAttachments.length ||
+        fileAttachments.length
+      ) {
+        showToast(t("skills.commandUsage"));
+        return;
+      }
+      setDraftContent([]);
+      composer.clear();
+      hideSuggestNow();
+      managedSkillsNavigation.open(skillsIntent);
+      navigate("extensions");
+      return;
+    }
     // `/steer <内容>` 是 PiDesk 输入栏命令（docs/design/73）：命中时只把正文发给 pi
     const parsed = parseSteerCommand(rawText);
     const text = parsed.text;
@@ -731,6 +756,7 @@ export function TaskInput({
 
   return (
     <div className={styles.wrap}>
+      <NativePlanReview />
       {suggest && (
         <div
           ref={suggestPanelRef}

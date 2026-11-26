@@ -1,0 +1,84 @@
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  width: min(calc(var(--font-size-md) * 48), calc(100vw - var(--spacing-xl)));
+  max-height: calc(100vh - var(--spacing-xl) * 2);
+  padding: var(--spacing-lg);
+  color: var(--color-text);
+  background: var(--color-bg);
+  font-size: var(--font-size-md);
+}
+.dialog h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+.scroll {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+.question {
+  margin: 0;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.question legend {
+  padding: 0 var(--spacing-xs);
+}
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) 0;
+}
+.description {
+  display: block;
+  color: var(--color-text-muted);
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}
+.custom {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-sm) 0;
+}
+.textarea {
+  resize: vertical;
+  min-height: calc(var(--font-size-md) * 4);
+  padding: var(--spacing-sm);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+.review {
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+.review p {
+  margin: 0 0 var(--spacing-sm);
+  font-size: var(--font-size-md);
+}
+.output {
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: calc(var(--font-size-md) * 20);
+  margin: 0;
+  padding: var(--spacing-sm);
+  background: var(--color-bg-surface);
+  font-size: var(--font-size-sm);
+}

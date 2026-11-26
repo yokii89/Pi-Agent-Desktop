@@ -46,6 +46,9 @@ vi.mock("../settings/scheduledTaskStore", () => ({
   },
   trimScheduledRuns: (runs: unknown[]) => runs,
 }));
+vi.mock("../settings/newApiStore", () => ({
+  loadGatewayCatalog: async () => ({ models: [], fetchedAt: null, stale: false, error: null }),
+}));
 vi.mock("../settings/durableStore", () => ({
   durableStorageRoot: () => path.join(f.root, "durable"),
   durableCatalog: () => [...f.summaries],
@@ -118,7 +121,9 @@ beforeEach(async () => {
   );
   f.request.mockImplementation(async (command: DurableCommand) => {
     if (command.op === "initialize") return null;
-    if (command.op === "model") return null;
+    if (command.op === "models") return [];
+    if (command.op === "model" || command.op === "builtins" || command.op === "modelPreference")
+      return null;
     const id = command.sessionId;
     switch (command.op) {
       case "open":

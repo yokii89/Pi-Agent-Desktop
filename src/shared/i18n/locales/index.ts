@@ -7,8 +7,11 @@ import { commitDialogMessages } from "./commitDialog";
 import { commonMessages } from "./common";
 import { contextMessages } from "./context";
 import { extensionMessages } from "./extensions";
+import { managedSkillsMessages } from "./managedSkills";
 import { mcpMessages } from "./mcp";
 import { monitorMessages } from "./monitor";
+import { nativeMessages } from "./nativeBuiltins";
+import { newApiMessages } from "./newApi";
 import { notificationMessages } from "./notification";
 import { panelMessages } from "./panels";
 import { procMessages } from "./proc";
@@ -34,6 +37,7 @@ const ALL_DEFS: MessageDefs = {
   ...chromeMessages,
   ...browserMessages,
   ...extensionMessages,
+  ...managedSkillsMessages,
   ...mcpMessages,
   ...monitorMessages,
   ...commitDialogMessages,
@@ -43,6 +47,8 @@ const ALL_DEFS: MessageDefs = {
   ...commandPaletteMessages,
   ...scheduledMessages,
   ...windowMessages,
+  ...nativeMessages,
+  ...newApiMessages,
 };
 
 function catalogFor(locale: LocaleId): Record<string, string> {

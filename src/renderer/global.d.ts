@@ -133,6 +133,7 @@ import type {
   TerminalCreateRequest,
   TerminalPushMessage,
 } from "../shared/ipc";
+import type { ManagedSkillsDesktopApi } from "../shared/managedSkills";
 import type {
   NotificationPushMessage,
   SystemToastActivated,
@@ -144,6 +145,7 @@ import type {
   SchedulerSnapshot,
   SchedulerTaskInput,
 } from "../shared/scheduler";
+import type { TelegramDesktopApi } from "../shared/telegram";
 import type { UpdateStatus } from "../shared/update";
 import type { UsageQuery, UsageReport } from "../shared/usage";
 import type { ExtensionViewPush, ViewEvent } from "../shared/view";
@@ -267,6 +269,8 @@ export interface PideskGlobalApi {
     set(req: PiModelOverrideSetRequest): Promise<IpcResult<PiModelOverrideSetResult>>;
   };
   durable: DurableDesktopApi;
+  telegram: TelegramDesktopApi;
+  managedSkills: ManagedSkillsDesktopApi;
   session: {
     start(req: SessionStartRequest): Promise<IpcResult<SessionId>>;
     prompt(req: SessionPromptRequest): Promise<IpcResult<PromptDisposition>>;

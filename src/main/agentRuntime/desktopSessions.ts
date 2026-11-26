@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { ConversationView, EntryRecord } from "@earendil-works/pi-durable";
@@ -23,9 +23,17 @@ import type {
   SessionStartRequest,
 } from "../../shared/ipc";
 import { SESSION_IPC } from "../../shared/ipc";
+import { NATIVE_IPC } from "../../shared/nativeBuiltins";
+import {
+  type GatewayCatalog,
+  type GatewayModelInfo,
+  isGatewayModelInfo,
+  NEWAPI_MODEL_LIMIT,
+} from "../../shared/newApi";
 import { DURABLE_SESSION_ID, sessionRefFromKey, sessionRefKey } from "../../shared/sessionRef";
 import { discoverDurableExtensions } from "../extension/durableExtensions";
 import { discoverDurableResources } from "../extension/durableResources";
+import { resolveBashForTerminal } from "../session/piShell";
 import {
   markRuntimeActivity,
   markRuntimeExit,
@@ -35,13 +43,16 @@ import {
 } from "../session/runtimeCoordinator";
 import { clearSessionCwd, noteSessionCwd } from "../session/sessionCwdRegistry";
 import { publishSessionEvent } from "../session/sessionEvents";
+import { readBuiltinTools } from "../settings/builtinToolsStore";
 import {
   durableCatalog,
   durableStorageRoot,
   readDurableModel,
   removeDurableSummary,
+  saveDurableModel,
   saveDurableSummary,
 } from "../settings/durableStore";
+import { loadGatewayCatalog } from "../settings/newApiStore";
 import { getSettings } from "../settings/settings";
 import { getMainWindow } from "../window/createMainWindow";
 import { agentRuntimeManager } from "./agentRuntimeManager";
@@ -67,6 +78,15 @@ class DesktopSessions {
   private readonly byStoredId = new Map<string, SessionId>();
   private readonly opening = new Map<string, Promise<SessionId>>();
   private initialized?: Promise<void>;
+  private changingModel = false;
+  private models: GatewayModelInfo[] = [];
+  private catalogStatus: GatewayCatalog = {
+    models: [],
+    fetchedAt: null,
+    stale: false,
+    error: null,
+  };
+  private catalogStamp = "";
 
   constructor() {
     agentRuntimeManager.subscribe(
@@ -92,9 +112,46 @@ class DesktopSessions {
 
   async initialize(): Promise<void> {
     if (!this.initialized) {
-      const operation = agentRuntimeManager
-        .request({ op: "initialize", storageRoot: durableStorageRoot(), model: readDurableModel() })
-        .then(() => undefined);
+      const operation = (async () => {
+        const model = readDurableModel();
+        this.catalogStatus = await loadGatewayCatalog();
+        const runtimeModel = model ? { ...model, models: this.catalogStatus.models } : undefined;
+        await agentRuntimeManager.request({
+          op: "initialize",
+          storageRoot: durableStorageRoot(),
+          model: runtimeModel,
+          builtins: readBuiltinTools(),
+          execution: {
+            shell:
+              resolveBashForTerminal() ??
+              (process.platform === "win32"
+                ? "C:\\Program Files\\Git\\bin\\bash.exe"
+                : "/bin/bash"),
+            env: Object.fromEntries(
+              [
+                "PATH",
+                "Path",
+                "SystemRoot",
+                "WINDIR",
+                "TEMP",
+                "TMP",
+                "USERPROFILE",
+                "APPDATA",
+                "LOCALAPPDATA",
+                "HOMEDRIVE",
+                "HOMEPATH",
+                "COMSPEC",
+                "PATHEXT",
+                "LANG",
+              ].flatMap((key) =>
+                process.env[key] === undefined ? [] : [[key, process.env[key] as string]],
+              ),
+            ),
+          },
+        });
+        this.catalogStamp = JSON.stringify(runtimeModel);
+        await this.readModels();
+      })();
       this.initialized = operation;
       void operation.catch(() => {
         if (this.initialized === operation) this.initialized = undefined;
@@ -104,6 +161,8 @@ class DesktopSessions {
   }
 
   start(request: SessionStartRequest): Promise<SessionId> {
+    if (this.changingModel)
+      return Promise.reject(new Error("Wait for the gateway configuration to finish saving."));
     const key = request.ref
       ? sessionRefKey(request.ref)
       : (request.sessionFile ?? request.sessionId ?? randomUUID());
@@ -116,7 +175,35 @@ class DesktopSessions {
     return operation;
   }
 
-  private async open(request: SessionStartRequest): Promise<SessionId> {
+  async executePlanInNewSession(
+    sourceId: string,
+    taskId: number,
+    text: string,
+    artifact: string,
+  ): Promise<{ sessionId: string; file: string }> {
+    const source = this.require(sourceId);
+    const cwd = durableCatalog().find((item) => item.id === source.storedId)?.cwd;
+    if (!cwd) throw new Error("Unknown plan workspace.");
+    const hex = createHash("sha256").update(`plan:${source.storedId}:${taskId}`).digest("hex");
+    const storedId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+    let opening = this.opening.get(`plan:${storedId}`);
+    if (!opening) {
+      opening = this.open({ cwd, sessionId: `sess_${storedId}` }, storedId).finally(() =>
+        this.opening.delete(`plan:${storedId}`),
+      );
+      this.opening.set(`plan:${storedId}`, opening);
+    }
+    const id = await opening;
+    await this.submit(
+      id,
+      `Implement the approved plan saved at ${artifact}.\n\n${text}`,
+      "followUp",
+      `plan:${storedId}`,
+    );
+    return { sessionId: id, file: sessionRefKey({ kind: "durable", id: storedId }) };
+  }
+
+  private async open(request: SessionStartRequest, fixedStoredId?: string): Promise<SessionId> {
     const ref =
       request.ref ?? (request.sessionFile ? sessionRefFromKey(request.sessionFile) : undefined);
     if (ref?.kind === "legacy-jsonl")
@@ -126,6 +213,7 @@ class DesktopSessions {
     if (ref && !DURABLE_SESSION_ID.test(ref.id))
       throw new Error("Invalid Durable session reference.");
     const storedId =
+      fixedStoredId ??
       ref?.id.toLowerCase() ??
       this.attachments.get(request.sessionId ?? "")?.storedId ??
       randomUUID();
@@ -139,7 +227,7 @@ class DesktopSessions {
       const existing = this.attachments.get(existingId);
       if (existing?.closing) {
         await existing.closing;
-        return this.open(request);
+        return this.open(request, fixedStoredId);
       }
       // Reattach after renderer reload with replacement, never replay completion events.
       await this.command(existingId, { op: "snapshot", sessionId: storedId });
@@ -150,7 +238,7 @@ class DesktopSessions {
       throw new Error("UI session ID is already attached.");
     if (this.attachments.size >= getSettings().maxParallelSessions)
       throw new Error(`并行会话已达上限（${getSettings().maxParallelSessions}）`);
-    await this.initialize();
+    await this.refreshModels();
     if (this.attachments.size >= getSettings().maxParallelSessions)
       throw new Error(`并行会话已达上限（${getSettings().maxParallelSessions}）`);
     const attachment: Attachment = {
@@ -195,6 +283,7 @@ class DesktopSessions {
         extensions,
         resources: discoverDurableResources(cwd, app.getPath("home")),
       });
+      await this.readModels();
       markRuntimeReady(id);
       if (!attachment.settled) markRuntimeActivity(id, "busy");
       return id;
@@ -259,7 +348,7 @@ class DesktopSessions {
     mode: "steer" | "followUp" | "reject" = "followUp",
     requestId: string = randomUUID(),
     images?: readonly PiImageContent[],
-  ): Promise<"started" | "queued"> {
+  ): Promise<"started" | "queued" | "handled"> {
     const attachment = this.require(id);
     if (!readDurableModel())
       throw new Error("Configure a model in Settings → Models before sending.");
@@ -271,9 +360,9 @@ class DesktopSessions {
       mode,
       ...(images?.length ? { images } : {}),
     });
-    if (!record(result) || !["started", "queued"].includes(String(result.disposition)))
+    if (!record(result) || !["started", "queued", "handled"].includes(String(result.disposition)))
       throw new Error("Invalid Durable admission response.");
-    return result.disposition as "started" | "queued";
+    return result.disposition as "started" | "queued" | "handled";
   }
 
   async commands(id: string): Promise<PiSlashCommand[]> {
@@ -451,33 +540,118 @@ class DesktopSessions {
       record(agent?.model) && typeof agent.model.modelId === "string"
         ? agent.model.modelId
         : config?.modelId;
+    const current = this.models.find((row) => row.id === model);
     return {
-      modelLabel: model ?? "Durable",
+      modelLabel: current?.name ?? model ?? "Durable",
       modelProvider: config ? "pidesk-openai" : null,
       modelId: model ?? null,
       thinkingLevel:
-        typeof agent?.thinkingLevel === "string"
-          ? (agent.thinkingLevel as PiModelState["thinkingLevel"])
-          : "off",
-      availableThinkingLevels: config?.reasoning
+        current?.reasoning === false
+          ? "off"
+          : typeof agent?.thinkingLevel === "string"
+            ? (agent.thinkingLevel as PiModelState["thinkingLevel"])
+            : (config?.preferredThinking ?? "off"),
+      availableThinkingLevels: current?.reasoning
         ? ["off", "minimal", "low", "medium", "high", "xhigh"]
         : ["off"],
-      modelInput: ["text", "image"],
-      contextWindow: config?.contextWindow ?? null,
+      modelInput: current?.input ?? config?.input ?? ["text", "image"],
+      contextWindow: current?.contextWindow ?? config?.contextWindow ?? null,
       autoCompactionEnabled: true,
     };
   }
 
   /** Avoid rebinding an open conversation's provider to another endpoint or credential. */
   assertModelEditable(): void {
-    if (this.attachments.size || this.opening.size)
+    if (this.changingModel || this.attachments.size || this.opening.size)
       throw new Error("Close open sessions before changing the desktop model configuration.");
   }
 
-  async updateModel(): Promise<void> {
+  /** Hold admission closed through discovery, encrypted persistence and runtime rebinding. */
+  async changeModel<T>(operation: () => Promise<T>): Promise<T> {
+    this.assertModelEditable();
+    this.changingModel = true;
+    try {
+      const result = await operation();
+      await this.updateModel();
+      return result;
+    } finally {
+      this.changingModel = false;
+    }
+  }
+
+  async updateBuiltinTools(): Promise<void> {
     await this.initialize();
-    const model = readDurableModel();
-    if (model) await agentRuntimeManager.request({ op: "model", model });
+    await agentRuntimeManager.request({ op: "builtins", config: readBuiltinTools() });
+  }
+
+  async updateModel(): Promise<void> {
+    await this.refreshModels();
+  }
+
+  private async readModels(): Promise<void> {
+    const rows = await agentRuntimeManager.request({ op: "models" });
+    if (
+      !Array.isArray(rows) ||
+      rows.length > NEWAPI_MODEL_LIMIT + 1 ||
+      !rows.every(isGatewayModelInfo)
+    )
+      throw new Error("Invalid runtime model catalog.");
+    this.models = rows;
+  }
+
+  /** Refresh catalog metadata without changing any conversation's selected model. */
+  async refreshModels(force = false): Promise<GatewayCatalog<GatewayModelInfo>> {
+    await this.initialize();
+    const config = readDurableModel();
+    if (config) {
+      const status = await loadGatewayCatalog(force);
+      const model = { ...config, models: status.models };
+      const stamp = JSON.stringify(model);
+      if (stamp !== this.catalogStamp) {
+        await agentRuntimeManager.request({ op: "model", model });
+        await this.readModels();
+        this.catalogStamp = stamp;
+      }
+      this.catalogStatus = status;
+    }
+    return { ...this.catalogStatus, models: this.models };
+  }
+
+  /** Persist defaults separately from a conversation's durable model choice. */
+  async selectModel(modelId: string, sessionId?: string, persist = true) {
+    if (this.changingModel) throw new Error("Wait for the gateway configuration to finish saving.");
+    await this.refreshModels();
+    if (this.changingModel) throw new Error("Wait for the gateway configuration to finish saving.");
+    const model = this.models.find((row) => row.id === modelId);
+    const config = readDurableModel();
+    if (!model || !config) throw new Error("Model is not in the desktop catalog.");
+    if (sessionId) {
+      const attachment = this.require(sessionId);
+      await this.command(sessionId, {
+        op: "configure",
+        sessionId: attachment.storedId,
+        modelId,
+        ...(!model.reasoning ? { thinkingLevel: "off" } : {}),
+      });
+    }
+    if (persist) {
+      const saved = saveDurableModel({
+        ...config,
+        modelId,
+        input: model.input,
+        reasoning: model.reasoning,
+        contextWindow: model.contextWindow,
+        maxTokens: model.maxTokens,
+        capabilityMode: "manual",
+        preferredThinking: undefined,
+      });
+      await agentRuntimeManager.request({ op: "modelPreference", modelId: saved.modelId });
+      this.catalogStamp = JSON.stringify({
+        ...readDurableModel(),
+        models: this.catalogStatus.models,
+      });
+    }
+    return { provider: "pidesk-openai", modelId, label: model.name, sessionApplied: !!sessionId };
   }
 
   async remove(key: string): Promise<void> {
@@ -505,6 +679,15 @@ class DesktopSessions {
     const id = this.byStoredId.get(update.sessionId);
     const attachment = id ? this.attachments.get(id) : undefined;
     if (!attachment) return;
+    if (update.type === "nativeState") {
+      const window = getMainWindow();
+      if (window && !window.isDestroyed())
+        window.webContents.send(NATIVE_IPC.output, {
+          sessionId: attachment.id,
+          state: update.state,
+        });
+      return;
+    }
     if ("view" in update) attachment.view = update.view;
     if (update.type === "settled") {
       attachment.settled = true;

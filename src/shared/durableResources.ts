@@ -50,6 +50,7 @@ export function isDurableCommandMetadata(value: unknown): boolean {
   const item = value as Record<string, unknown>;
   if (typeof item.name !== "string" || typeof item.description !== "string") return false;
   if (item.description.length > 400) return false;
+  if (item.source === "builtin") return item.name === "plan";
   if (item.source === "extension") return DURABLE_COMMAND_NAME.test(item.name);
   if (item.source !== "skill" && item.source !== "prompt") return false;
   const name = item.source === "skill" ? item.name.replace(/^skill:/, "") : item.name;

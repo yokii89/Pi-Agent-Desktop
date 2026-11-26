@@ -68,9 +68,9 @@ export const sessionMessages = defineMessages({
   "session.durable.modelTitle": { "zh-CN": "内置会话模型", "en-US": "Built-in session model" },
   "session.durable.modelDescription": {
     "zh-CN":
-      "配置 OpenAI 或兼容供应商。保存后供新会话使用；已打开的会话保留原模型选择。支持文本、图片附件和内置文件、命令工具；图片需要供应商的模型支持视觉输入。",
+      "配置 OpenAI 或 New API 兼容网关，支持模型自动发现与缓存。首选模型供新会话使用；已打开的会话保留各自选择。更换网关或密钥前请关闭已打开的会话。",
     "en-US":
-      "Configure OpenAI or a compatible provider for new sessions. Open sessions keep their model selection. Text, image attachments and built-in file and command tools are supported. Images require a model that supports vision.",
+      "Configure OpenAI or a New API compatible gateway with model discovery and caching. The preferred model applies to new sessions; existing sessions keep their choices. Close open sessions before changing the gateway or API key.",
   },
   "session.durable.inputTooLong": {
     "zh-CN": "输入不能超过 256000 个字符。",

@@ -4,6 +4,7 @@ import { registerBrowserIpc } from "../browser/browserIpc";
 import { registerClipboardIpc } from "../clipboard/clipboardIpc";
 import { registerCatalogIpc } from "../extension/catalogIpc";
 import { registerExtensionIpc } from "../extension/extensionIpc";
+import { registerManagedSkillsIpc } from "../extension/managedSkillsIpc";
 import { registerWorkerIpc } from "../extension/workerIpc";
 import { registerFaviconIpc } from "../favicon/faviconIpc";
 import { registerFsIpc } from "../fs/fsIpc";
@@ -20,6 +21,7 @@ import { registerPrefetchIpc } from "../session/prefetchIpc";
 import { registerRuntimeIpc } from "../session/runtimeIpc";
 import { registerSessionUiIpc } from "../session/sessionUiIpc";
 import { registerSettingsIpc } from "../settings/settingsIpc";
+import { registerTelegramIpc } from "../telegram/telegramService";
 import { registerTerminalIpc } from "../terminal/terminalIpc";
 import { registerUpdaterIpc } from "../updater/updaterIpc";
 import { registerUsageIpc } from "../usage/usageIpc";
@@ -41,6 +43,7 @@ export function registerIpc(): void {
     registerProjectIpc,
     registerRemoteIpc,
     registerDurableSessionIpc,
+    registerTelegramIpc,
     registerSessionUiIpc,
     registerProcIpc,
     registerRuntimeIpc,
@@ -55,6 +58,7 @@ export function registerIpc(): void {
     registerModelOverridesIpc,
     registerBrowserIpc,
     registerExtensionIpc,
+    registerManagedSkillsIpc,
     registerCatalogIpc,
     registerWorkerIpc,
     registerFaviconIpc,

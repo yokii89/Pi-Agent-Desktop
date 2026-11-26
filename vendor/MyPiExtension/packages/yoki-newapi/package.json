@@ -1,0 +1,27 @@
+{
+  "name": "pi-provider-newapi",
+  "version": "0.1.0",
+  "description": "New API / One API compatible proxy provider for Pi",
+  "type": "module",
+  "license": "MIT",
+  "keywords": ["pi-package", "pi-mono", "new-api", "one-api", "openai", "provider", "proxy"],
+  "main": "./index.ts",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": ">=1.4.0",
+    "@earendil-works/pi-coding-agent": ">=1.4.0",
+    "@earendil-works/pi-tui": ">=1.4.0"
+  },
+  "dependencies": {
+    "yoki_ui": "*"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

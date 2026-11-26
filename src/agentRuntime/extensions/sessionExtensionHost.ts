@@ -4,6 +4,10 @@ import { pathToFileURL } from "node:url";
 import { createRegistry, type Extension, type Registry } from "@earendil-works/pi-durable";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
 import {
+  defaultBuiltinToolsConfig,
+  type RuntimeBuiltinToolsConfig,
+} from "../../shared/builtinTools.js";
+import {
   DURABLE_COMMAND_NAME,
   DURABLE_EXTENSION_LIMIT,
   type DurableExtensionFactory,
@@ -14,6 +18,9 @@ import {
   isDurableExtensionSpec,
 } from "../../shared/durableExtension.js";
 import type { DurableResourceCommand } from "../../shared/durableResources.js";
+import { type BuiltinSessionServices, desktopBuiltinTools } from "../builtins/index.js";
+import { planExtension } from "../builtins/plan.js";
+import { gatewayResponseRecovery } from "../models/gatewayRecovery.js";
 
 type HostedCommand = DurablePromptCommand & {
   readonly source: "extension" | "skill" | "prompt";
@@ -35,8 +42,12 @@ export class SessionExtensionHost {
   constructor(
     readonly sessionId: string,
     readonly cwd: string,
+    getBuiltinConfig: () => RuntimeBuiltinToolsConfig = defaultBuiltinToolsConfig,
+    services?: BuiltinSessionServices,
   ) {
     this.registry.install(CodingTools);
+    this.registry.install(gatewayResponseRecovery());
+    this.registry.install(desktopBuiltinTools(cwd, getBuiltinConfig, services));
   }
 
   /** Install all required definitions before the Harness resumes saved tasks. */
@@ -57,6 +68,7 @@ export class SessionExtensionHost {
         throw durableExtensionError("invalid", spec.id);
       }
     }
+    this.registry.install(planExtension());
   }
 
   /** Declarative resources share admission deduplication with native prompt commands. */

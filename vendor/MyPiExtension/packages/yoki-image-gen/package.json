@@ -1,0 +1,48 @@
+{
+	"name": "@yoki/yoki-image-gen",
+	"version": "1.21.0",
+	"description": "Pi extension. generate_image tool — text-to-image via OpenAI-compatible Images API or OpenRouter chat image models.",
+	"keywords": [
+		"pi-package",
+		"pi-extension",
+		"yoki",
+		"image-generation",
+		"openai",
+		"openrouter"
+	],
+	"type": "module",
+	"license": "MIT",
+	"author": "yokii89",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/yokii89/MyPiExtension.git",
+		"directory": "packages/yoki-image-gen"
+	},
+	"homepage": "https://github.com/yokii89/MyPiExtension/tree/main/packages/yoki-image-gen#readme",
+	"bugs": {
+		"url": "https://github.com/yokii89/MyPiExtension/issues"
+	},
+	"exports": {
+		".": "./index.ts"
+	},
+	"scripts": {
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-ai": ">=1.4.0",
+		"@earendil-works/pi-coding-agent": ">=1.4.0"
+	},
+	"dependencies": {
+		"@yoki/yoki-config": "^1.20.0",
+		"typebox": "^1.1.24"
+	},
+	"engines": {
+		"node": ">=22.19.0"
+	}
+}

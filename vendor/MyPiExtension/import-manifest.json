@@ -1,0 +1,1928 @@
+{
+  "upstream": "MyPiExtension",
+  "revision": "c38fa19415cbe42962dbf0272bb587de61f065c3",
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "c266d8543b917244e008113117f9bb8843c23b621b53c787ad78d57f603e45c3"
+    },
+    {
+      "path": "docs/design/01-开源卫生复核.md",
+      "sha256": "c52e9d5bd05948fb7d4ab930dc5939a4e44a431ada78b92e81172db301ec0f03"
+    },
+    {
+      "path": "docs/design/02-pi-1.4-兼容规划.md",
+      "sha256": "f088654c362199f2274ac49139f4b649a731a725987c604960b3358964b8a37f"
+    },
+    {
+      "path": "docs/design/03-newapi思考能力匹配.md",
+      "sha256": "2c33e3a78c7c07cf7dfe52edfbc5ff32b88681834a5e8ed0a26b83e0eeab4a52"
+    },
+    {
+      "path": "docs/design/04-Qoder排队失败的退避重试.md",
+      "sha256": "68a34244dac6d55831cbef31481be241513f4dfeb72b4c5c3cdc2ff3f482fbeb"
+    },
+    {
+      "path": "docs/design/04-ask-user-question-pidesk界面设计稿.html",
+      "sha256": "507efc51818c33d69a2864b1253cec72b3ee591b0162c28a307fda866f34e54b"
+    },
+    {
+      "path": "docs/design/05-ask-user-question桌面动线优化.md",
+      "sha256": "8dcebf01ec232143c3ab97327fc927769acc21dccaa88163bc36e84353ba4c6d"
+    },
+    {
+      "path": "docs/design/06-bash作业守护扩展.md",
+      "sha256": "91ddac77e94fc80df358a1a0c9259e04ffbc7a44e6d4fc72c2663e97dc8e5a53"
+    },
+    {
+      "path": "docs/design/README.md",
+      "sha256": "d3287e68ee5c9ed6557ac8bb50ae7ace3f210434e35914e061431d962a2afcf7"
+    },
+    {
+      "path": "packages/pi-bash-jobs/README.md",
+      "sha256": "b28834e333543f4c407def2f8b44a4b553cfe65e74375e29f4069123db45a852"
+    },
+    {
+      "path": "packages/pi-bash-jobs/core/classify.ts",
+      "sha256": "31e3860f107cba032e68897676603bbbff37ff6f53cff26bf300309794e47a62"
+    },
+    {
+      "path": "packages/pi-bash-jobs/core/format.ts",
+      "sha256": "c8b67efa51c4adaf5ecbdb7d7fe3ac460940be65a20985614ef909a067154bc4"
+    },
+    {
+      "path": "packages/pi-bash-jobs/core/jobs.ts",
+      "sha256": "a2f93b1bf1e635a5ab44828a5db57913f5dd777a014bba362ae449dfa009aeb1"
+    },
+    {
+      "path": "packages/pi-bash-jobs/core/policy.ts",
+      "sha256": "b2a9994d1149b417d42c4d54cb8dfbf3fd07bd2f2d567896e6323e5d9a11c2bc"
+    },
+    {
+      "path": "packages/pi-bash-jobs/core/wait.ts",
+      "sha256": "064755dc86842f25f94750f35c08bf42ee9f39f662675137da4adc7831ca1e06"
+    },
+    {
+      "path": "packages/pi-bash-jobs/core/wake.ts",
+      "sha256": "f16c9aa3137132d55e20ec7e09afd4614d2d6c380eec37e858eed042ccc99771"
+    },
+    {
+      "path": "packages/pi-bash-jobs/index.ts",
+      "sha256": "253521a7ff7526fb2e779a7c97b24ec31c16f1db47698c282d9c086c0e8a6b05"
+    },
+    {
+      "path": "packages/pi-bash-jobs/infra/ansi.ts",
+      "sha256": "05256f7268c588225432e3882becfd4f342ff63a83b855c5e5c7933215b0c70a"
+    },
+    {
+      "path": "packages/pi-bash-jobs/infra/paths.ts",
+      "sha256": "15ae4a7018af35948e1c3c3be0c5eae6d423fc7daf0831fd61a2c72d58b66dab"
+    },
+    {
+      "path": "packages/pi-bash-jobs/infra/ring.ts",
+      "sha256": "e6eef120756adbad783a16acb94c98cec0af74e19645efc2ded4309c776827c9"
+    },
+    {
+      "path": "packages/pi-bash-jobs/infra/shell.ts",
+      "sha256": "0c16bed7af6e769f3ac41d0f2eed02d182e9fc7329a074f2ab9979fdf4a391c5"
+    },
+    {
+      "path": "packages/pi-bash-jobs/infra/tee.ts",
+      "sha256": "1f2226a0716fce6d5dba2853a54b0da56d28f82086379ac5efd171f1253dc195"
+    },
+    {
+      "path": "packages/pi-bash-jobs/package.json",
+      "sha256": "9b6e0035992df7eda8001c0b0c60668929f219b849e9f1cd15aa3fbb9e9e6010"
+    },
+    {
+      "path": "packages/pi-bash-jobs/run/inspect.ts",
+      "sha256": "1a210e2c7d2ea8710e9dfec97c15b601905d75881abd0228884b75e10d9dc8d2"
+    },
+    {
+      "path": "packages/pi-bash-jobs/run/runBash.ts",
+      "sha256": "7a10d16263a6db20aeebdce986ce06e3cb2f61ccc3c98bc0bf6a4a9609ca6349"
+    },
+    {
+      "path": "packages/pi-bash-jobs/run/stop.ts",
+      "sha256": "08460406e0893e0f7f3917178f8f5c5d4b33d090832a40b1cd8beb8ffa506598"
+    },
+    {
+      "path": "packages/pi-bash-jobs/state/config.ts",
+      "sha256": "d60c8ae7840d0ae37a8b007f9a99f3df00f44d0130746d062a2661c77f12b4e2"
+    },
+    {
+      "path": "packages/pi-bash-jobs/state/persist.ts",
+      "sha256": "62ca835e9c44cb9ccd0275892c85c5e09918b70a90ee5f7a5b36c78715989ebb"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/classify.test.ts",
+      "sha256": "9ac51d0815d05cc6b2e1cba32e5d336e12ae79ad1f0f38c68f0545f1c55486cc"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/config.test.ts",
+      "sha256": "0579b96c82b6e7b164d2fc24c04bbeeff7e792243c7ee8bb3d9602d1d671620b"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/format.test.ts",
+      "sha256": "253053fade14455701b38bbbb1f6c1d3b4a51338771f24af5ffea7a02104d382"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/inspect.test.ts",
+      "sha256": "6cccf5f63e2e74f4b8df77b9832a4e4dddd9977007f3dee10f0d5f06e25091ba"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/jobs.test.ts",
+      "sha256": "8d6610f2d39efdac8a9ea9e78f83b32551e5284e56dbf26364b2269aa1ca3525"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/persist.test.ts",
+      "sha256": "63eedde1ea32e0aa65257f8593b565633ece2d971510bbb2ded1292ddf4b0183"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/platform.test.ts",
+      "sha256": "27ba582e48cb9db6b51023cbab34ee61e6d3cb30fb5df17df503193c7a01750f"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/policy.test.ts",
+      "sha256": "0045b0eb3232ea02957c75699bb2f79f6b969abcecb21474694a7c447eb56eaf"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/ring.test.ts",
+      "sha256": "597df532c15cb3afbc73b7438069159d26d9957b77ba9d787702201ebf384675"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/runBash.test.ts",
+      "sha256": "ccc9412c2cbbc3bdf2c1543ffdf44a5cb0dd19bcc2bde2890cec4406a7b831f9"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/session.test.ts",
+      "sha256": "beb57946bd116d0ded4abd7041df851b0630a244e4281bc423c5b7ee27ac207b"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/stop.test.ts",
+      "sha256": "587ff847e37a4ce5295f76f8b1f2bf6d18c21e1b2220e2c982f1de6e3cefe179"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/tee.test.ts",
+      "sha256": "872adf39d9de5d4894aadeed4992235c1f451754c68f97bd65a5d77d7d4d0302"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/tools.test.ts",
+      "sha256": "a4fdd14d9c17110f1f1c901f76fa21419828152420ce2b9e3d5ed38d52281945"
+    },
+    {
+      "path": "packages/pi-bash-jobs/test/wake.test.ts",
+      "sha256": "c56ca4d6ddf5b7643fae1769baf4267f288f293f747f0c9e938b89c90c4b7c1a"
+    },
+    {
+      "path": "packages/pi-bash-jobs/tools/bashTool.ts",
+      "sha256": "1b26fed30017c2d93ed09840018d34de965510b4e1e7eb759dd154ea68440dc2"
+    },
+    {
+      "path": "packages/pi-bash-jobs/tools/inspectTool.ts",
+      "sha256": "38022b18290a2ddfd14172ff8bfb01550a38a6787a4eee5cc61d1cbe12e6e311"
+    },
+    {
+      "path": "packages/pi-bash-jobs/tools/stopTool.ts",
+      "sha256": "2550cddbd2647435922ff6163b4531e2fc20de70db9bbe48c1aa1048a88ed84c"
+    },
+    {
+      "path": "packages/pi-bash-jobs/types.ts",
+      "sha256": "70f8d5386b27044d56e42db71e36c865f7e184f391ae060673f3a87e4eb9a84e"
+    },
+    {
+      "path": "packages/pi-telegram-main/.agents/skills/domain-dag/AGENTS.md",
+      "sha256": "cf9f3a12815434f56e20b9758080edd777eca89202ba7188f11b6ab799db827f"
+    },
+    {
+      "path": "packages/pi-telegram-main/.agents/skills/domain-dag/SKILL.md",
+      "sha256": "d138e38a155d7e94d30be0d78136c9fb423b910e5de77b117d444f451b040339"
+    },
+    {
+      "path": "packages/pi-telegram-main/.agents/skills/domain-dag/domain-dag.json",
+      "sha256": "3876c713323c81e16f7b29e90afd2059c4c5c2deaf31911659848a67da0d092f"
+    },
+    {
+      "path": "packages/pi-telegram-main/.agents/skills/domain-dag/recipes/validate-domain-dag.json",
+      "sha256": "a4161bb27d75b1a7b58c5eda9395c92ac34febff6013d3261f0ecb763d5bc286"
+    },
+    {
+      "path": "packages/pi-telegram-main/.agents/skills/telegram-bot/SKILL.md",
+      "sha256": "d56098497aaefaf7d71891beb4cf963b84e35bc2c4be93e676b2e68b5e50ad09"
+    },
+    {
+      "path": "packages/pi-telegram-main/.agents/skills/telegram-bot/api.md",
+      "sha256": "117275021984384f9e2b782ff3d9133b9fc4bc1f2b9949f44269b9499dfcb431"
+    },
+    {
+      "path": "packages/pi-telegram-main/.github/workflows/release.yml",
+      "sha256": "29bb9d12faa1f1e7ec16c26aec8f97ca7a172e88e04cb4b83307ab751f58e964"
+    },
+    {
+      "path": "packages/pi-telegram-main/.github/workflows/validate.yml",
+      "sha256": "08245f67456dbc63b55b0915a1246c98609cb1ad182348aa82857bfa78f1589a"
+    },
+    {
+      "path": "packages/pi-telegram-main/.gitignore",
+      "sha256": "4d56952b0fb13bf8f9b6c13a6d4c34a075bac3af447636a1df4335d7576e2f97"
+    },
+    {
+      "path": "packages/pi-telegram-main/AGENTS.md",
+      "sha256": "eb8d4de5aad852cf5a335125d312c519e765a9bb7139b6ebf326afb20caa8486"
+    },
+    {
+      "path": "packages/pi-telegram-main/BACKLOG.md",
+      "sha256": "a9aed549fb188b30ce6bfb48adb690c353cb89535482b4ad9a6c004dbad14391"
+    },
+    {
+      "path": "packages/pi-telegram-main/CHANGELOG.md",
+      "sha256": "835fe69db5ca77c44e39a520a21897adb8563449504a305096da79fb0e3d5bb7"
+    },
+    {
+      "path": "packages/pi-telegram-main/README.md",
+      "sha256": "45a050ab169464ac81e1d46b6abdd6f5baeb84fbfd41ad64e771c741ee1ff105"
+    },
+    {
+      "path": "packages/pi-telegram-main/api/activity.ts",
+      "sha256": "6684d6cc922fe2c2427e9bb0b57a5638b1fc2f6854875bc71121931f5b11c0ae"
+    },
+    {
+      "path": "packages/pi-telegram-main/api/commands.ts",
+      "sha256": "b0f25b7b326569848d25fb9c427199d0a88e259bbc0251ab5c60173e14e40b3d"
+    },
+    {
+      "path": "packages/pi-telegram-main/api/delivery.ts",
+      "sha256": "2afa3dd7c547c48e38b4d909d14f0e97f7156c6d75285c1b26d0c3d9351bf4f8"
+    },
+    {
+      "path": "packages/pi-telegram-main/api/inbound.ts",
+      "sha256": "0fafc29d135f3cd314d9de23195c9628c2d1b7754798af96cffeac7eceacf1eb"
+    },
+    {
+      "path": "packages/pi-telegram-main/api/keyboard.ts",
+      "sha256": "48d9cdedc6612d3c36a2dcb3ceb17f8e89b5439654051b4b3e7e66cbb5f25e39"
+    },
+    {
+      "path": "packages/pi-telegram-main/api/outbound.ts",
+      "sha256": "82b80e3deb6d3f7e68b9ef1f351b585bf02aa83d974a3898be7f4473ab0246cc"
+    },
+    {
+      "path": "packages/pi-telegram-main/api/sections.ts",
+      "sha256": "a1030a204190929da237f994df27ad48a871efb2af82554ce34a6aa79ee56ecf"
+    },
+    {
+      "path": "packages/pi-telegram-main/api/status.ts",
+      "sha256": "022eff53bb2e7e3280fe288669222e4f02f8f84fc5d7c0f74353bd4d70123209"
+    },
+    {
+      "path": "packages/pi-telegram-main/api/updates.ts",
+      "sha256": "4f54dd471455a8ace9a8d0caf17159c60726136717fc4786abc49d0c0b0fd819"
+    },
+    {
+      "path": "packages/pi-telegram-main/api/voice.ts",
+      "sha256": "6b12e228797c9ea16e145dad91a7620e9bee919318d04e70a2e7592106b2b918"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/README.md",
+      "sha256": "fe3e04c7113be41027caa26ab351d1c3ae73a83cb5a944d01d5c077caf942314"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/activity.md",
+      "sha256": "4ca69712ce4cbbd927de770ce312fac05a52d6952e3e285c47fcb5df708d697a"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/architecture.md",
+      "sha256": "5cac4cb0771bf17cc459e581c3399a8166620792869a53dfa74e1bbf72c9ce6e"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/callback-namespaces.md",
+      "sha256": "0e5d90547e6c3a1bf2b8efcada2713fcf6d89d54f12ee4cf44e44b5df26d6a6d"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/command-templates.md",
+      "sha256": "36317db5c12fa488ad4b5211e949c20cbc045035807ecffbeff0e4d87b9c664b"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/delivery.md",
+      "sha256": "0df4b317089230c4e69064eade4ee400781f189185a41e30ee75372b6ab4a684"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/inbound.md",
+      "sha256": "3f4d621f0693a7d09346628edbd4449bc86f6f841cc1b2bfd2565ad92c2867a2"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/multi-instance-bus.md",
+      "sha256": "8a97ba3c104d36de35c729ef729d92e8e9dfea3714f8e1d50ca515b97c8c2f6a"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/outbound.md",
+      "sha256": "db19995d63cc014e1c9d95bceb67ae9ee62714df55a846201f7f358c7d851f32"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/public-api.md",
+      "sha256": "0e272430a5c6514e8f0aa9859c3679203c1f1331e17e7a126464372e3928dc76"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/sections.md",
+      "sha256": "d96f7e5ffbf0cdfa39e8ce37aca41352f8f721fc8642d034666164548f9a4085"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/ui-style.md",
+      "sha256": "0ce02373b55a2b3aa276cb9fffd7957146520edcd1ee736652b522537ef22d13"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/updates.md",
+      "sha256": "3e5fd612a47e2869bda4ae1374ba09c60dbd49a8feb53ab6674bdee661b6789f"
+    },
+    {
+      "path": "packages/pi-telegram-main/docs/voice.md",
+      "sha256": "c36c7e2bbdb568d4f29b2f1774e3abac2043478a4771b80fdbd07071bfa9a092"
+    },
+    {
+      "path": "packages/pi-telegram-main/index.ts",
+      "sha256": "ce9a3688ffc8f27d6672ac3f5d6e037a1cfde30f73474c64623a8c663287bf80"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/activity.ts",
+      "sha256": "b78a159fa30921f03b708467dbd04d3ab01636e5844572f9fcf88d3153f0e68a"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/ask-user-host.ts",
+      "sha256": "101e09d179e142482beeb2dd678efc8d16574c8867e1b82503c0a86e09e76ba1"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/bindings.ts",
+      "sha256": "309a9710f8172f1acdb3b9f278528551e49c2b2c0724927bc7bddb89176f812e"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/bus-api.ts",
+      "sha256": "41c73a31fc35f306e7a093d79f83da705a96446448d7065801588e08d424eb98"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/bus-follower.ts",
+      "sha256": "ad10c7d59c7c285b20b360871a98a72c038878998fb9e71addf63579eb2c339e"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/bus-leader.ts",
+      "sha256": "0d6522d9983ec179386c56be33192697328a0ee00fb9cc9528d9c01d15a6606b"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/bus-transport.ts",
+      "sha256": "6dcafb2ddd2f6c63e39a0e5b30ade720ebf78e648d9427a26cecce763aaf5ebf"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/bus.ts",
+      "sha256": "1ed371b83418f5c01c3f5a7b8ed526ceab79eb108113d0d5fe2af7b4c481b3f1"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/command-templates.ts",
+      "sha256": "4916339f77034e5c8c7189bff49417d8dfa51a07664550a3ea4f2a2f369fad4b"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/commands.ts",
+      "sha256": "6bbbe69fd1dc3249d16023d4e5541df632f3d7d6a7c05feccfe8676120c7ba57"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/config.ts",
+      "sha256": "2aa176f442ed69cbcdd5d825ddaa7038b65b3cb00c0931cdb5dada72ad76c6d9"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/delivery.ts",
+      "sha256": "2c8e901e8d1383b720a532d3901d9983332612a065d2dd74d29b275d633e7bf4"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/desktop-panel-sdk.ts",
+      "sha256": "6e18dd16227815729a68a04776b284da4a4f8eb48b27024293098ab6f0a4fa1b"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/desktop-panel.ts",
+      "sha256": "c371e69c02a83edb35231120e42b4f4ca571096db5760efa3bb6747d1602c841"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/desktop-view.ts",
+      "sha256": "0fea36025c5de8700847c9c5db9edf8d89980b7dfd5aa66bbf16c24c66e021d0"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/inbound.ts",
+      "sha256": "9be6d58490636fb7204997ca992057738b5da32f91086bcf17010c809f310d96"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/keyboard.ts",
+      "sha256": "ef08331578c34a9b901dc3aab256f927147d85f3b3e206bcd6fa1fab42793dac"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/lifecycle.ts",
+      "sha256": "c8467088fd8524cc6c5daef2af0e3f3dc7ef9eb28167ad072d3a4eb61acf7e27"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/locks.ts",
+      "sha256": "6109fdd863bfc01d0d982d31a999addcec32cb5c250c6c56da74332d94d6c395"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/logs.ts",
+      "sha256": "82cc439665f0b9df6cd39b5249a8fe300c494b426063ad53116e4bfe49f943b8"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/media.ts",
+      "sha256": "c29607adace89ccbdea2a2cde9dcd279c9126e49c5eb09a9d9630e5bcd08f2cf"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/menu-model.ts",
+      "sha256": "11de6e1628f9b99e4b37380807a231abf902c09c74e998204c3f3a79379b7d7d"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/menu-queue.ts",
+      "sha256": "6b79612a04642d42355c8d51fc81d2384c2c48b88e1aaa48e7dd25f6a256a409"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/menu-settings.ts",
+      "sha256": "cef527fc46eaba1eb2de3a084657bb5de271679187e7db17cb90305fa4de5c9e"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/menu-status.ts",
+      "sha256": "af423f9822f260ac62996a3086764e063a33560335e8a2cea686d12e665b8712"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/menu-thinking.ts",
+      "sha256": "8898a60c71c5d6894310d4f27b82c7a2cf4fd8c70b1e8d4e5ce5a6034ad32193"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/menu.ts",
+      "sha256": "28c33b002429f466057341cc7defe23096def81df4b8e6ac77b5b10871bda516"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/model.ts",
+      "sha256": "c6335a0b79c1032fae4b3e07f8dda2ff7df93ac15d262e500a91768aee6669b0"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/outbound-attachments.ts",
+      "sha256": "14cbfc20170cc45adb2bfe23d62700957b125f24ab09fb6e426d8b6d844322a4"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/outbound-buttons.ts",
+      "sha256": "5483f674d0aa09c9d22170f0494e6bd20efc997e15bc582fa2ecdcc3298bb33a"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/outbound-markup.ts",
+      "sha256": "075056b2f1b8209983fb10a9927be770cd0ef285b75a6368f9368eb844ef9ec2"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/outbound-voice.ts",
+      "sha256": "f5065c8dc8385258e059d52e5bae3f6fa4f26fdfd67c6f09bd3b8c44c134566e"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/outbound.ts",
+      "sha256": "09ad550a155227bf594db12e4be1ecac2c429f65a0b8b14ac813a670108fa789"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/ownership.ts",
+      "sha256": "3724cb1775442573a60d0c99e84b074ae0a3f6ddca08085ce9e1384ab5432cd6"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/paths.ts",
+      "sha256": "63ed35e6e7e922da5b15f7e83d2301af61966c6dfea35830d184e7d9b03fa39b"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/pi.ts",
+      "sha256": "94facd6f7034de19f8c3ef71efef083fe5dd522e1ff9e982f98ec6a95c5dbf96"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/polling.ts",
+      "sha256": "73ac633016a08d725ae73751618ea0655d0d54a86b52ac68f91ebf46546bf6ad"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/preview.ts",
+      "sha256": "732df3d8c29f1254e9c909a232eaea174108bab0d652326ac501d4aeb38fd303"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/prompt-templates.ts",
+      "sha256": "0a13b85dd188ff0240564ea74b5baa18192dab976a752d944390e2c59690fadb"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/prompts.ts",
+      "sha256": "175bd6559c27f61a7a2ab0291f5e48f031c9ac210eb1e622567a423e68e7f50f"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/queue.ts",
+      "sha256": "336f49c4369b03e051e95c86933607a56daac7b89f1c48e7e1e4dd496cbe0e22"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/rendering.ts",
+      "sha256": "80e988187e0df943f25673bdd317fd5330679747404ae19e0d1d5ad2f1d01cf1"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/replies.ts",
+      "sha256": "b5b65fb1d24eabc9e35939b2c72b17e1679a9bcd052e7911577b26bc7d60c6af"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/routing.ts",
+      "sha256": "f924d20361a622037bde9284b86cec5d4bcb2e62e4e90fe7078fe34a4aa24186"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/runtime.ts",
+      "sha256": "62b1c6e1192b9447e779b0d4beadd7a9cfbadcaddb18812a6d559483b6af4beb"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/sections.ts",
+      "sha256": "69e8d6aef6cc2946ed64f19a552478206293585e2b4181dccdbc911d92090ebb"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/setup.ts",
+      "sha256": "5c032cd507eb5e9ddf346a41f7e8e3c806b65bf56000370cd5b4d014281a3bac"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/spawn.ts",
+      "sha256": "79b22a3ee42c5e8224502baabc29c15e79efe24044bb3bf1dbe7c70888ddba66"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/status.ts",
+      "sha256": "d0865b31ea20f621454aa5cee6157b3258e6dac095aab5fd6aefda84a155a07e"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/sync.ts",
+      "sha256": "9005b1f4a04d5b0386d00bac1db654b2bc16a19423c60fc990f11e7c68feafaf"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/target.ts",
+      "sha256": "3f303780496efd0d3f0002386577124e44d21010cb3b77dfd925e560c50ff43e"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/telegram-api.ts",
+      "sha256": "4a024553bde24be054c7a289c71c58b57a1199cdaa7e9869a683156e803342b5"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/text-groups.ts",
+      "sha256": "63f3bf9f7ab244c983d5093fea467de4226c35c9d18f9796fc45eb649f705200"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/thread-reconciler.ts",
+      "sha256": "57397f21bdbb3fd0b0e25cbab2135ea47f206e317bfb57f9e7fd16e45b95290a"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/threads.ts",
+      "sha256": "f023c8d861b1b74239d4f9434f56301668a364f0a32503e756b5937370bfff74"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/time-injection.ts",
+      "sha256": "9cf3d292f4ecf53f869b076818bef24658202b72a03d3cb5dfd095c88c455849"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/turns.ts",
+      "sha256": "fa5ce4f9739ec4c19086284332984203fb133040962414706174ff69d323b9c5"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/ui-copy.ts",
+      "sha256": "baa4fa50f94999e441f28950bc862fd1f61a86b878e24cb834ce51046b2211f4"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/updates.ts",
+      "sha256": "52d3164ee1c2bc54ad11d8a9b20e4ec764d12f8571a858f59f91fcdb36c7b06e"
+    },
+    {
+      "path": "packages/pi-telegram-main/lib/voice.ts",
+      "sha256": "9d1173e301591fd95f8b408653afbb846bff20bb33c825298dffe6a0eba0b9c9"
+    },
+    {
+      "path": "packages/pi-telegram-main/package.json",
+      "sha256": "69534f9419de37e1bbc181fc6f55ac40b43e2861a585332bb6ceec9b5020e708"
+    },
+    {
+      "path": "packages/pi-telegram-main/screenshot.png",
+      "sha256": "663372ccf5c9d7c3bd838fdad2fab5dc67bb50a772d4204042594d793f134be9"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/activity.test.ts",
+      "sha256": "bad7f8481c2e709338a652dd4caefa9ccefae748c2c09ba95e0810adcf189cc1"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/ask-user-host.test.ts",
+      "sha256": "11aa12b13935bbe62cdccec866ea200a0268e1655befcda9893a2c68cd1f4837"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/bindings.test.ts",
+      "sha256": "cf10913f2fdbd0708a5558fa4e89b04620f446f411fad507adb4bfcd26e07521"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/bus-api.test.ts",
+      "sha256": "04b1c6843da7625edfca1279f02f7607f4564cc3767a798a5ee30176462639cd"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/bus-follower.test.ts",
+      "sha256": "826309e199442a0d2b0c3299e9f499446bb849c1e418f7d027ca9a7e950794a8"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/bus-leader.test.ts",
+      "sha256": "488a1e44b25a7d1890dab2d691f6dd2a0601992fd76a16e3d72d00ac6f5b7b60"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/bus.test.ts",
+      "sha256": "ce3f3702dbc4f1905bace55f8c269d77fc2c6f95c32c8dc7e9c401e3debbbf30"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/command-templates.test.ts",
+      "sha256": "110a275477ad7125ff453208dfbaaa4971d54dbf82753ba7bd0f25d67bde7c70"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/commands.test.ts",
+      "sha256": "1ca9a910b5e4783821460fc355f2a2ecf68e4d14e78c18dff770cf92a1736035"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/config.test.ts",
+      "sha256": "b39fb8f94197ebb828ce74160c7b98d595e7e1bb880013a91a96db6b11c83c69"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/delivery.test.ts",
+      "sha256": "4f6dcde438b66ffc2925bdef25aad3818e6d3167f063596a5cc7cb5652ad1fee"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/desktop-view.test.ts",
+      "sha256": "37c6d5ded662faad5da01296a10ef05d2da381124c8879a3822994f13a6f9340"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/inbound.test.ts",
+      "sha256": "0bc99aa0bd7b88c0c4944f59c3507e0c681241224262b1fb67a8a557f8ee9c96"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/index.test.ts",
+      "sha256": "f031783dd78a7c2f092c4089cf314859a69204f3b84b65b906d82ffd77f03d80"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/integration.test.ts",
+      "sha256": "9ee579789aee1ebdcc360ea13e22e9c79676e4979f71c9492a63588cfc3de237"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/invariants.test.ts",
+      "sha256": "98edf24f819adbe1751387d140ce581628e12881dc2eca5f7a5e366285ddc800"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/lifecycle.test.ts",
+      "sha256": "ddbf664104c2a7d00b1cc233387c276270975db18061cfc03d2ce9abdf0ac751"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/locks.test.ts",
+      "sha256": "ac4fd9d87b7adedb3ed4e76a45413d2ef436d7fe1b4965d3aabbf74133d3d2f8"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/logs.test.ts",
+      "sha256": "d6ceb863d9b993585f612118543a12725c16494b6a234a028f6a213ca6387bb0"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/media.test.ts",
+      "sha256": "05e1d78dce3229f21b0e3c315ae9a358c60255690cb77559b911e89977a857a1"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/menu-settings.test.ts",
+      "sha256": "73ceaf026d8a835b2fadd0e41d0e117c409538392584cdf6f7aa7586b9326b37"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/menu-status.test.ts",
+      "sha256": "4e4e5f8760a6bda58091557a8ebabb5d9aaca4d326200227fd929ba1489483de"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/menu-thinking.test.ts",
+      "sha256": "3f04c63ebfb8d379ddbf5954c37b7194c207ca550a3056357897314c0a5e7a51"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/menu.test.ts",
+      "sha256": "10887f29398828de7ca14128e1bac7e6c0df7b3cf7b79f8f88b2b075e610ea9f"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/model.test.ts",
+      "sha256": "263f7731fdbd1ab77d9eb18db99cb2980d6123e1fc91e9dc2eba3277fd04a3af"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/outbound-attachments.test.ts",
+      "sha256": "6c9b4dd640b6d59eb15224c868b021794ac0c60783d1898479e6f6cd336ca94e"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/outbound-buttons.test.ts",
+      "sha256": "5e625e039a63546be1b7989d5ddbb06078f4c8f27f443c241111874465711fee"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/outbound-markup.test.ts",
+      "sha256": "067069c6ec890cf039b99c45869f75f8077d2a904f4293ee013e05406d63579f"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/outbound-voice.test.ts",
+      "sha256": "b6339cf4427ac80857c4035e1d1241b25e326aa71b64c87e4dfcd4885b9dff57"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/outbound.test.ts",
+      "sha256": "2ef551fa4d110a788d1c6c738dd09660a475336e27222e70b7935f42bbee651a"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/ownership.test.ts",
+      "sha256": "963a572b0f30e89c6b3a5d342df6b8bf8487bd6d90e5fb48a6bfde237b7d44f3"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/paths.test.ts",
+      "sha256": "57ad249fa7730a292440a5d3e5c039b83a7ec9cb61894bd9be9e5bc976ba2048"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/pi.test.ts",
+      "sha256": "d497c6f9e3927b47dccdbd3c22367c49d078c4f51e266152cc200a66f555699f"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/polling.test.ts",
+      "sha256": "040ec425e6f5fab660412410d200dcadd519d71fbda70365930abf3eb7253d84"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/preview.test.ts",
+      "sha256": "a6735ee14dac1b256b009694cfc5d8fde323de3ceade192196da84a0cf056381"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/process-shutdown.test.ts",
+      "sha256": "65cf4f33d0e1f53e1cdc7eaf549c20ff79f66e13b0013878d47dcd3e509e2d30"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/prompt-templates.test.ts",
+      "sha256": "5e0ae888e445498c6db28791900d74f461ececad5b89d9c7e676f720a637f8b1"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/prompts.test.ts",
+      "sha256": "88fe31b9394a3303171cfe7a3b4756546d92759303d1c9564d29189b38f9958a"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/public-api.test.ts",
+      "sha256": "82f13e7cc426aac5da81979320a91edcd64afec2855663fbaab4d7a813f69a22"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/queue.test.ts",
+      "sha256": "ff777d7c109300634f0f7b725cbf63a856e323c0126f6904557e6c763687df92"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/rendering.test.ts",
+      "sha256": "c3a30469a11219be6a7e7b1b9ad0e646e52e4b89460f17e6879712f5fd6d50e3"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/replies.test.ts",
+      "sha256": "9d13a7ea66c03484d09e4d5b69ebe497be4882eca8e2933e7484d173ebac3913"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/routing.test.ts",
+      "sha256": "8baa9812ac621dc028af9b21dbeb6fa76955291fed5e7a78b0b51856b8114ed0"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/runtime.test.ts",
+      "sha256": "a4775391de3619096ab57b261f7bc916d72a2c9c1b20a1538dc422e18e9e63d1"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/sections.test.ts",
+      "sha256": "1ec2dfd06fbceeffa486f00d6a9427b9c515fcf202a51772aaddbdd8546642ab"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/setup.test.ts",
+      "sha256": "28c937ba6a550866121996cf7b076c8663931b361737277f8c962f4ce3881921"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/spawn.test.ts",
+      "sha256": "018b6d7454d362e3f3b1039f90b40f7fabe2e2f8107dcff05df13e28744b9026"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/status.test.ts",
+      "sha256": "5a9befda3ca7fde011027305cfe3d63749bcab3eb593782f218fef89fd94d4b3"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/sync.test.ts",
+      "sha256": "935cea6fb35b9c440ba830b59e18d1f450574c147091aaef0598de1bc3b52bdd"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/target.test.ts",
+      "sha256": "f26c99ed01bb9f8c4ce1d12347e5496d8a6105f41f2bf265588cf03bf4709a33"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/telegram-api.test.ts",
+      "sha256": "16dc3659905d20049af3d80b6266ba259098ffb8fb9534e76e22e2aae874f6e6"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/text-groups.test.ts",
+      "sha256": "00d8975638ff8827079823e5a757e273631bdc65722c8cca1aead018fcf3287d"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/thread-reconciler.test.ts",
+      "sha256": "aa8449c373b58c61f42bb5ecaebfb31fe432f39fac02897fa802fd55e3e8485b"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/threads.test.ts",
+      "sha256": "d3d5c9c701e5266ee5ea2aca64a83f7133b51f460d3fea9e9c88f55c290edc79"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/time-injection.test.ts",
+      "sha256": "5ebbff9f5fd5d88b800482757f2092e3e4015e625db658533cfbe33cf9d052c8"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/turns.test.ts",
+      "sha256": "f094e7f37c6491a3c2cce5946c06a49621b6eb474eb53e517d51598130a926b3"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/updates.test.ts",
+      "sha256": "0a38fe32a7ff5a93b92a617f0d471fd5eb493dc5cb4c14b1fff534406eda4b1c"
+    },
+    {
+      "path": "packages/pi-telegram-main/tests/voice.test.ts",
+      "sha256": "183b9aeed1fbcce26920af8252f8dbd23f1c8d6979ec938afaba9b8bfb2e184c"
+    },
+    {
+      "path": "packages/pi-telegram-main/tsconfig.json",
+      "sha256": "72c52cfa32b8b31eb04eb76c04b8e07a2b31cf6b641bcfe50022ad0dcff3fcb1"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/CHANGELOG.md",
+      "sha256": "02967fb3de8d981b2737eeaee337265554c79e9fd98af10205fffd4666465c4f"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/LICENSE",
+      "sha256": "c266d8543b917244e008113117f9bb8843c23b621b53c787ad78d57f603e45c3"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/README.md",
+      "sha256": "043704929136cdb44deb840342938d43dfe4556cf9d387df6885227f10b08509"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/config.ts",
+      "sha256": "26d2a4ab1b39aa0187515cb034281ebc52e7403645f8af73b043d4518583ed36"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/desktop-view.ts",
+      "sha256": "914d5204ea07552776c9fe5b498fb69a7eee616037b8f6a717d68f99ccf79865"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/events.ts",
+      "sha256": "cecfa0c7e6fc9363a17182b4e5d25987af502189049ceedf439bac9d95a4f9b3"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/host.ts",
+      "sha256": "3ec1d82d719be5510dcd3957dae9d39265edf2a59a45783f977651b664bb7eb5"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/index.ts",
+      "sha256": "19861f3aa436694211a7fdc843a494f700e37d300759857deefa6ef74ee10ae6"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/package.json",
+      "sha256": "3373112cc0d939ae7959cf2a9f9fd3871aa202579f4fc18ad4787ef492864b27"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/reconcile.ts",
+      "sha256": "87c7ce758b7c2de0cbf37a20f739a45c2244417cbae9951c60b23de7c28037d0"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/rpc-fallback.ts",
+      "sha256": "ea410913fde63f8a1861e8107de1a956509bb5964580646a248778008cd7da1c"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/state/row-intent.ts",
+      "sha256": "dddc32cfe7988aebdec65227392f8cc3b22e3835d06c0e07f0a8b988abe36fd7"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/state/selectors/contract.ts",
+      "sha256": "3627f86c4fc1ed369b5e6ca2933bd7204d4e1c36ebd207bbbc6f9f90a531bd63"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/state/selectors/derivations.ts",
+      "sha256": "ecce9e8d202f2ce77a5577ab7332315108001f29810c999f168c946912a87f03"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/state/selectors/focus.ts",
+      "sha256": "fa8b74bdebda024430e993a4abb56f3976e9ec8ed83d69b2769735acf17fc3a2"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/state/selectors/projections.ts",
+      "sha256": "f70c094a9668a8e3844c0e5a35544412c9611219d3d9fcbfb1614b6793318953"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/state/state-reducer.ts",
+      "sha256": "31684c76cb8efba6bbe51b4ed62df0d0148af91f10006d72d3f9540c344a260f"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/state/state.ts",
+      "sha256": "89374260b6e4dba9332ee9591e65d61a1528b5f47edce6316eb76b75f5cca3e8"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/ask-user-question.execute.test.ts",
+      "sha256": "f88acd48285c22d02c67b883a9fa67220937492940b6d4e5610815c39489004d"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/ask-user-question.guidance.test.ts",
+      "sha256": "8053ac14359b2c5e881b17c34c6d1b57a0906c60d83f66e7bcf30d823357197a"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/ask-user-question.listener.test.ts",
+      "sha256": "0178655b291f01e1fe15e91d2162b3af619f92d93355507dffed26750e1a702a"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/ask-user-question.session-load.test.ts",
+      "sha256": "cefd1e0232685571f417e78e2053bdbb3e91634d53c1bb2d8152eb6e5fd52785"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/ask-user-question.test.ts",
+      "sha256": "642fd642feefe2b3bda1f46a349e7efe5a2ef1a1a91d06b8b7862bbbcebf5cee"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/banned-flags.test.ts",
+      "sha256": "24f579dcac5da92a94265f6b1b0d6a103a2b8930b2784476aa9e13401dd29b40"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/config.test.ts",
+      "sha256": "ed947ab61810df57a150b051054c7896cd2b3301cf71da0cbccc33309aee83c8"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/desktop-view.test.ts",
+      "sha256": "cc79fa8e9abb43835e4035d58e809425fcef247df14a2cd92e23b7ffe52c7761"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/dialog-builder.test.ts",
+      "sha256": "ffc05133b1e28ba02eb91b4f3e47652f3e0c5289a08f84cda688adab2661b662"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/fixtures.ts",
+      "sha256": "6b0bd774a9a173c66eadd91cbf27a10f512d883a6e4e3e147d0ca09663bae051"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/host.test.ts",
+      "sha256": "e0f51b013edb6075bb9aeed43467bf50d26889e2b79f645cdc8e9afcf1161eea"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/key-router.test.ts",
+      "sha256": "8c1d890d01eb8c8634fa44c485483a853fffea3b48771647b9a51376a58504b0"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/questionnaire-state.test.ts",
+      "sha256": "1ab68d11aad8f3e81eda2105753c3d0bf2ff48e05cb4f67015be6e2d1d745c1d"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/reconcile.test.ts",
+      "sha256": "b9d28b656ca5de5f8a3330e36e6aeea8d3a4741d39b4d3ad4ee6ad8651dbf4d1"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/row-intent.test.ts",
+      "sha256": "598457a1c33bb8adce4f07b31508507fa48dacdf708652ca9948a87193785a70"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/rpc-fallback.test.ts",
+      "sha256": "61a3cff2bf1fe8f17205621c7c05644c78ddf103aae0fa2db4567d80f090d44b"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/state-reducer.test.ts",
+      "sha256": "4776f6390f3cd5d5c2f2f2efc02294d8cd06c143ff6b32c4b72dea50c7a7a85a"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/submit-picker.test.ts",
+      "sha256": "ce1d839b8e137f002cc31bd42cee2367f41c09b83c7e8162f6217119635c20ca"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/types.test.ts",
+      "sha256": "369f9c19cd96c3afd3b4e54ce0e160e9a44acb4617a4d807a5b1d89a2a71b52e"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/tool/format-answer.ts",
+      "sha256": "f22905961d1d6c9e1b27332a4d459f357c45853b7e7cd7df6ff5ca446df374a8"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/tool/response-envelope.ts",
+      "sha256": "e8944a4c0ed38d3ca771d62a879ea4cd136f71d46fb710c53a6868d900afb173"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/tool/types.ts",
+      "sha256": "88f76f16c9308c5b58a6bb964fd413c8fa7f2060459ffb313073357151c84f05"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/tool/validate-questionnaire.ts",
+      "sha256": "2a63c6204cde2b41d033c58620eb217dc0dbedbc004628c4c65f04791ad7808d"
+    },
+    {
+      "path": "packages/yoki-config/CHANGELOG.md",
+      "sha256": "d819264dd86ebd8a7c5ea8c7767590fd64ea9aa2fa547e352f0ef14facac92c4"
+    },
+    {
+      "path": "packages/yoki-config/config.ts",
+      "sha256": "68162e559fcb0b5373b641e38783dd8509cc3a2792d3406ed4bf5d37d07a0aa1"
+    },
+    {
+      "path": "packages/yoki-config/index.ts",
+      "sha256": "e1687e77ba508bc1d35ebdbdbd562182f026670d784b443af7521a7acd3b706b"
+    },
+    {
+      "path": "packages/yoki-config/package.json",
+      "sha256": "b5ec063e73aabbc3bfaa87d8db4d3cb6d2944cedf914663916ac845b8c586217"
+    },
+    {
+      "path": "packages/yoki-config/project-paths.ts",
+      "sha256": "f6915e1dafb41436129c994bb2e67bdc363e5fc0fbc8349af7be15b79799aea7"
+    },
+    {
+      "path": "packages/yoki-config/test/config.test.ts",
+      "sha256": "d90eea48df433ebc48e119cc4933b3f9120a153d4afe83d35bb6a302a6f492c4"
+    },
+    {
+      "path": "packages/yoki-config/test/project-paths.test.ts",
+      "sha256": "fc2a52bffe95b7d2ba082f27a10aa4f5150d0bfd4cc22cc5ec1ca2dcc71a5834"
+    },
+    {
+      "path": "packages/yoki-image-gen/config.ts",
+      "sha256": "f980928fb09ffa2180011a8d9235a25e5980133a318016312bccfe6091ac47fc"
+    },
+    {
+      "path": "packages/yoki-image-gen/helpers.ts",
+      "sha256": "d545439df0aaf1dbfaa76184e3a12fea70c867be416666be1d6ff3d7f67501b4"
+    },
+    {
+      "path": "packages/yoki-image-gen/images-api.ts",
+      "sha256": "5feacc8a70b5933dc21540a5fb64945223485fe734ca7a73951f2c212509674e"
+    },
+    {
+      "path": "packages/yoki-image-gen/index.ts",
+      "sha256": "8d49d0ce87fe28509513b53db4177676826dacc387f402f2dbda5c2430a2b22c"
+    },
+    {
+      "path": "packages/yoki-image-gen/package.json",
+      "sha256": "ca7fb7cc8f1dff819a95b8b9f9552968775143f1910f2fee7a8d2ef99f58bc3d"
+    },
+    {
+      "path": "packages/yoki-image-gen/test/config.test.ts",
+      "sha256": "5ff41aed691a1783b065f8b661fe602faf1660bc33e64693488cbbc78d13f59d"
+    },
+    {
+      "path": "packages/yoki-image-gen/test/index.test.ts",
+      "sha256": "e462fd3d05c7e09b0006d4e0d28fecf450250e71553941f991514d49a208ed08"
+    },
+    {
+      "path": "packages/yoki-image-gen/tsconfig.json",
+      "sha256": "272186ece9d81dfc6c5f9f7c54d28c4f46d9c3f7a4b52e125967d6eead3923ce"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/README.md",
+      "sha256": "dc760c84f180a5af89ed6216f3c5ad3ac72d0d381b0efd723d3014244c8f6cdc"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/busyError.ts",
+      "sha256": "ae9b5bed1cbbdf3c735b4563f9933c0607576afa9f47d61cdc03ea118a0a6a78"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/index.ts",
+      "sha256": "e4ddf4f7bf0e7bf7a9e9d0ef428ab7cc580585cef73caef4543380aa403ca895"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/package.json",
+      "sha256": "daa4da0b07ec0d7d4fd7d0ed63fe7cf27814e1d25c516d62902c2da254c1ed83"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/policy.ts",
+      "sha256": "c34cf254899f095e239b0f455d119d5006fde8ed0ff6bf57598e0b51508f2eaf"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/retryStream.ts",
+      "sha256": "34b02bfcead9180a8092033293b06fcfc2574e7aef2f4aa4e65ad9bf27f52cb8"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/test/busyError.test.ts",
+      "sha256": "81e78b0693ece61253b3f31fdac4835c6294ec483ddaab80ee332cf05cfba5f0"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/test/policy.test.ts",
+      "sha256": "e6bfaa73d5cfabff446cfc3afa4c009f248180f999b1623cbef481dbdcbb3b91"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/test/retryStream.test.ts",
+      "sha256": "3e690a5d0e1012bdd5ed45cc4246593a772b3e67e431edd671b7a6d6d8a8599f"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/test/support.ts",
+      "sha256": "f27bb36f2f2cdf198b5c33a39db93965d901ed96344c6c5caf8ea979f051134d"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/test/wrapProviders.test.ts",
+      "sha256": "02bfb2e902749447dd689d41b6233ab09bde2d81f88e6a37952392f2920d1731"
+    },
+    {
+      "path": "packages/yoki-model-busy-retry/wrapProviders.ts",
+      "sha256": "188e1e0dfa205405b4e6b2cb828c5cbef9faf67b4c8a6a3beb58b24e6d09feeb"
+    },
+    {
+      "path": "packages/yoki-newapi/README.md",
+      "sha256": "d4ede8a7d2918df2f6216dd797cd52e5571f5de29a1f1395e08440e33d080467"
+    },
+    {
+      "path": "packages/yoki-newapi/capabilities.ts",
+      "sha256": "4f1fd8d58960a00bfa3b7a364fad2634001a1b4309bd9816194428cebc4df1c7"
+    },
+    {
+      "path": "packages/yoki-newapi/helpers.ts",
+      "sha256": "8f6a3f4a89305631e85767679cc68c8bfd52c345f64fbcd9fc19f9b6ff80a19d"
+    },
+    {
+      "path": "packages/yoki-newapi/index.ts",
+      "sha256": "58b8d332e64be79d76b98cfbf79c69893836f3b1192956d43065e42ca07dd1ef"
+    },
+    {
+      "path": "packages/yoki-newapi/package.json",
+      "sha256": "1b492714abc6715d283a20a8a4be5062dff0b8ed678710cbf17a9e191930ed3a"
+    },
+    {
+      "path": "packages/yoki-newapi/test/capabilities.test.ts",
+      "sha256": "c90159fdc3d0703cb7c294ee4d2a7eeb49341174766b4ad114137de8af82e3f6"
+    },
+    {
+      "path": "packages/yoki-newapi/test/helpers.test.ts",
+      "sha256": "a7e01b5176e9b4535f63d97f3057bba2a81f4866432efeefb01466deee39440e"
+    },
+    {
+      "path": "packages/yoki-newapi/test/panel.test.ts",
+      "sha256": "b9290e3b5e34a2b54833ed4b770fa4e621ade8a2864981fe33b938decbfab34e"
+    },
+    {
+      "path": "packages/yoki-newapi/tsconfig.json",
+      "sha256": "0f524713bec3468199d25c2ff346d9721f88076f7a9cebee243311c76aa10d04"
+    },
+    {
+      "path": "packages/yoki-newapi/vitest.config.ts",
+      "sha256": "c63ffcf72b92cd3dc652522a98d01ab82f75dbe43a0ececa7a1bca0aaf12e988"
+    },
+    {
+      "path": "packages/yoki-plan/CHANGELOG.md",
+      "sha256": "9dd7a21c7a8714fc818c9f18d2737a3fd64669f54363a146bee5969be3529ddb"
+    },
+    {
+      "path": "packages/yoki-plan/LICENSE",
+      "sha256": "c266d8543b917244e008113117f9bb8843c23b621b53c787ad78d57f603e45c3"
+    },
+    {
+      "path": "packages/yoki-plan/README.md",
+      "sha256": "f49f32374ddbfdd947ec3ca6f162244d3eb370f6e2eab7463878cfff2488e3b1"
+    },
+    {
+      "path": "packages/yoki-plan/bash-allowlist.ts",
+      "sha256": "4b5676edad2c5face869416edba42db66ba1b476b1cd39f8218b40489d97a697"
+    },
+    {
+      "path": "packages/yoki-plan/bridge.ts",
+      "sha256": "e669212c4a2b6c78d4c3efce5906fc30e4155c3e76d4b6314a82eb205a3b338a"
+    },
+    {
+      "path": "packages/yoki-plan/desktop-view.ts",
+      "sha256": "0494c62e39443599fb80f592cf59fea92e49d2ffc7390ae5e29be188640ad367"
+    },
+    {
+      "path": "packages/yoki-plan/extract.ts",
+      "sha256": "beb33441e07df982a3fafa5cdb4bfb0a9009af5d53f8f303a6f799ab91f1a5a0"
+    },
+    {
+      "path": "packages/yoki-plan/index.ts",
+      "sha256": "110a4be6591e70c46309b045889364205d7d959cbcb69245a59c6c418268840e"
+    },
+    {
+      "path": "packages/yoki-plan/mode.ts",
+      "sha256": "d638be1674005aacbf82bf9a84a226bb34c8a652d0b3fa531e7b08cdb10d3d4d"
+    },
+    {
+      "path": "packages/yoki-plan/package.json",
+      "sha256": "cb3bbd90714d26f9e5ea25330d2b0c03ad71b9eab18841ecc7fa7fda75eac5e2"
+    },
+    {
+      "path": "packages/yoki-plan/persist.ts",
+      "sha256": "76a53234465dde28ab912ca0b6f9e0f30b86bdcc6a033c29225d641e967fe3ed"
+    },
+    {
+      "path": "packages/yoki-plan/post-plan-options.ts",
+      "sha256": "dc255b433eea697d3f39dfe560ea66d13125f47498837362cb643a91ba2e787d"
+    },
+    {
+      "path": "packages/yoki-plan/post-plan.ts",
+      "sha256": "fb8e161ab1ed07d1709be841552d5ebab1e46c42497e4915a1034dfff89f2960"
+    },
+    {
+      "path": "packages/yoki-plan/prompts.ts",
+      "sha256": "26bb6cae0e1fa037ab9330998d4035f1cac29090202780ba966fe1429ba940a9"
+    },
+    {
+      "path": "packages/yoki-plan/test/bash-allowlist.test.ts",
+      "sha256": "ef288edfed10a0284749c17298cf42b1d39b418b7cd85d94ae99f36de87bd590"
+    },
+    {
+      "path": "packages/yoki-plan/test/desktop-view.test.ts",
+      "sha256": "5dda63fabf9618d499c561c9c2cda2779996ab23d3f70585667af2a2ce8a1129"
+    },
+    {
+      "path": "packages/yoki-plan/test/extract.test.ts",
+      "sha256": "5e22ec5e24f4bc7c5eacff9605ecffd6ec33db95cbc107fd2021258acde0627a"
+    },
+    {
+      "path": "packages/yoki-plan/test/index.test.ts",
+      "sha256": "779f684349a994594d265d352051a6cb329449ed154c87f937129c1550ad6acb"
+    },
+    {
+      "path": "packages/yoki-plan/test/mode.test.ts",
+      "sha256": "5cd9e786b5d6dc779d9a3692df38f4c48dbd3632c5b1e92bb6c9206b1366ad2d"
+    },
+    {
+      "path": "packages/yoki-plan/test/model-selector.test.ts",
+      "sha256": "0ce0358eda1fd8f34ba9eacf323b1805d46610c9f5ffcfd1a25c5c116325d8c5"
+    },
+    {
+      "path": "packages/yoki-plan/test/persist.test.ts",
+      "sha256": "995a26ac638355a035ffcb8eb3d5ae32dccd43281d9663d5ef1fd3231e216143"
+    },
+    {
+      "path": "packages/yoki-plan/test/post-plan.test.ts",
+      "sha256": "a83d87b73650b79fbe8b31fa28a040dda9b1ccc0efe87b765ef18f44e96f37b6"
+    },
+    {
+      "path": "packages/yoki-plan/test/prompts.test.ts",
+      "sha256": "c779710e13d86d6d07eb165d0583eebe73652a270b985fc2421e30739bfde292"
+    },
+    {
+      "path": "packages/yoki-plan/test/tools.test.ts",
+      "sha256": "e1f68da63ad659c100c420336c5192afab7d1fe6d585a8f615b0a01db764e93e"
+    },
+    {
+      "path": "packages/yoki-plan/tools.ts",
+      "sha256": "a4ed358e08b405cc282f7d003a46654d066b502c96aad7c3e99e621b05e57960"
+    },
+    {
+      "path": "packages/yoki-skills/README.md",
+      "sha256": "2b11b85d7991bdd5f3d811072631e91c1d534a6988ee34843e28d9e149caa526"
+    },
+    {
+      "path": "packages/yoki-skills/extensions/pi-codex-skills/catalog.ts",
+      "sha256": "540c58ddc149d45ce676c7a21038640db7d507c81c606f3d8802c65234ccaa4b"
+    },
+    {
+      "path": "packages/yoki-skills/extensions/pi-codex-skills/installer.ts",
+      "sha256": "21a31c4d38406cba9d5e72ce9e108ea8b94f25618beae1eb80342849fa45a787"
+    },
+    {
+      "path": "packages/yoki-skills/extensions/pi-codex-skills/manifest.ts",
+      "sha256": "1906f7b59fe13805d8a3a789e8fc0181d8d53eeda87526bd84157251f3724887"
+    },
+    {
+      "path": "packages/yoki-skills/extensions/pi-codex-skills/types.ts",
+      "sha256": "b9f8532c8e2f7f248eb095f67bbe2a5d51d6214130f0a8588cb3238fe6673a44"
+    },
+    {
+      "path": "packages/yoki-skills/package.json",
+      "sha256": "b67c6aab4137506e353bc2751b93df76b808f4ef03fdf06daf2e025177700e66"
+    },
+    {
+      "path": "packages/yoki-skills/skills/plugin-creator/SKILL.md",
+      "sha256": "68e06c1e3740056ba8e7c3eec21a3e4ac11d3a7d40c7c30ad229ce0dc7c27fbe"
+    },
+    {
+      "path": "packages/yoki-skills/skills/plugin-creator/agents/openai.yaml",
+      "sha256": "fecaf35d692bd3d33d1a065648258d12e393afa9055d78adf6e57b42f4142f6d"
+    },
+    {
+      "path": "packages/yoki-skills/skills/plugin-creator/assets/plugin-creator-small.svg",
+      "sha256": "6591bf8ea9bb9435890dbdea299e0d2bd05f3aa893a335d26e4c535e93c8e7fb"
+    },
+    {
+      "path": "packages/yoki-skills/skills/plugin-creator/assets/plugin-creator.png",
+      "sha256": "a4024b0306ddb05847e1012879d37aaf1e658205199da596f5145ed7a88d9162"
+    },
+    {
+      "path": "packages/yoki-skills/skills/plugin-creator/references/installing-and-updating.md",
+      "sha256": "b030517fe05b12dda71babe2890656d7c6db6a0111797e1d20d208804427276d"
+    },
+    {
+      "path": "packages/yoki-skills/skills/plugin-creator/references/plugin-json-spec.md",
+      "sha256": "eeb640130f69636affaa299d4170d5a7ae6a0ff978296ddf75c409ce6dd87b91"
+    },
+    {
+      "path": "packages/yoki-skills/skills/skill-creator/SKILL.md",
+      "sha256": "81fbdaa7bd4024906a37c90c4bcb7ec10b574b1755cc21e73c363d3494b92b91"
+    },
+    {
+      "path": "packages/yoki-skills/skills/skill-creator/agents/openai.yaml",
+      "sha256": "d07d21b93fcf3d4dc8d9a3399c05fc226a49a333a96d3e1c68b451b8dd9eade6"
+    },
+    {
+      "path": "packages/yoki-skills/skills/skill-creator/assets/skill-creator-small.svg",
+      "sha256": "6591bf8ea9bb9435890dbdea299e0d2bd05f3aa893a335d26e4c535e93c8e7fb"
+    },
+    {
+      "path": "packages/yoki-skills/skills/skill-creator/assets/skill-creator.png",
+      "sha256": "a4024b0306ddb05847e1012879d37aaf1e658205199da596f5145ed7a88d9162"
+    },
+    {
+      "path": "packages/yoki-skills/skills/skill-creator/license.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "packages/yoki-skills/skills/skill-creator/references/openai_yaml.md",
+      "sha256": "ffac39318e408108141d40f820968e59f70434a891694f9bf1d25be8237b150c"
+    },
+    {
+      "path": "packages/yoki-skills/test/catalog.test.ts",
+      "sha256": "e66029de578bca3e38228ad7c9b64cf6cc74adcb6e9d42dcb66202ed4386997f"
+    },
+    {
+      "path": "packages/yoki-skills/test/installer.test.ts",
+      "sha256": "6f8bdc6809b3ec5f8df1fa9767d4857c00a1cfa86c09d4ddfe233f2178e34e2a"
+    },
+    {
+      "path": "packages/yoki-skills/test/pi-loader-smoke.test.ts",
+      "sha256": "1c0868946a5eacb319a14826d0c076a1c8461d7196b720874b46e423160ff0f5"
+    },
+    {
+      "path": "packages/yoki-skills/tsconfig.json",
+      "sha256": "dae8fb28698c248b57e01f83fc7b74ea955b5fe16f19342632edca312e3a19db"
+    },
+    {
+      "path": "packages/yoki-warp-notify/CHANGELOG.md",
+      "sha256": "b7f9a0853ba7add65cbe8aeaaa0afc87a142c8c070eb0fdd5f710f8f0aa49ff8"
+    },
+    {
+      "path": "packages/yoki-warp-notify/README.md",
+      "sha256": "1c4e4118bb6019de8def72879a7e438873cadc40f2b6007bd03f83544192fab7"
+    },
+    {
+      "path": "packages/yoki-warp-notify/config.ts",
+      "sha256": "644a77bd130eb96d51cb62ae73b2bbccd34c6b8a8803a7357b9efde868fa3a0c"
+    },
+    {
+      "path": "packages/yoki-warp-notify/index.ts",
+      "sha256": "b1fb58cde04944ab0c3e67bcd294e2fa871809996279f0c9fb40832d8eae916a"
+    },
+    {
+      "path": "packages/yoki-warp-notify/package.json",
+      "sha256": "651a8450847e601b2c41e0712eeee2b48025a850e61d36e2a99d7f5293659e4f"
+    },
+    {
+      "path": "packages/yoki-warp-notify/payload.ts",
+      "sha256": "170f264f64c9efd6005899d709320c6015165362a66d27d76455e9eaee58115c"
+    },
+    {
+      "path": "packages/yoki-warp-notify/protocol.ts",
+      "sha256": "55d1d6f6aa29c65fc52b8566f6a53aef61dd39052448a1b7b88ade90f09cb9c2"
+    },
+    {
+      "path": "packages/yoki-warp-notify/status.ts",
+      "sha256": "01879db20e68016c10594716be12974e2393f70dcb2b727cd1feffa4d5a93016"
+    },
+    {
+      "path": "packages/yoki-warp-notify/test/config.test.ts",
+      "sha256": "587bc6bddd77b7e6278d07ad07204f0c070253e75599a2503ad4d6367399df3e"
+    },
+    {
+      "path": "packages/yoki-warp-notify/test/index.test.ts",
+      "sha256": "cd5c6b506924f2999a2b2b245ef43f42786443acd322b10e6220000def9bd377"
+    },
+    {
+      "path": "packages/yoki-warp-notify/test/payload.test.ts",
+      "sha256": "00c6a248c9e107d7edb19d78b9e1a9fdcc513e54dab4cf8bd3b2157a536fbf36"
+    },
+    {
+      "path": "packages/yoki-warp-notify/test/protocol.test.ts",
+      "sha256": "aec94851261a279d5c27c92946b1e64e5fef571dc7fa9a10376d04f4aa1a8c39"
+    },
+    {
+      "path": "packages/yoki-warp-notify/test/status.test.ts",
+      "sha256": "b9ff32e380d9303f23032612feb152066673351fea1f0d3d0588dffdab7104c5"
+    },
+    {
+      "path": "packages/yoki-warp-notify/test/title-spinner.test.ts",
+      "sha256": "701131593167adbae528681b69a07456c15997861d52443189c7c2198402d777"
+    },
+    {
+      "path": "packages/yoki-warp-notify/test/warp-notify.test.ts",
+      "sha256": "0c35def0950f305af0ed52df5a95c070a5ad1d74ff57ed204fe9c9490ff5307a"
+    },
+    {
+      "path": "packages/yoki-warp-notify/test/workflow-transport.test.ts",
+      "sha256": "2a94ecb37d28188033f5ea39d128230e6b2bd6487b32e4a93f8bc2313a5eef44"
+    },
+    {
+      "path": "packages/yoki-warp-notify/warp-notify.ts",
+      "sha256": "95cdd66699b6555ce1bb2130dcd7495a8f7d8519cb638e2e7c367e89acb3ccaf"
+    },
+    {
+      "path": "packages/yoki-warp-notify/workflow-transport.ts",
+      "sha256": "7e5bb10e144fa89d184cf56ca6a36ff7e7b0fea4c2b75f87fd4b6fedc5d6e071"
+    },
+    {
+      "path": "packages/yoki-web-tools/CHANGELOG.md",
+      "sha256": "fa064dfe1c09fe42c1f3fd9ae376debed91dd7c1a3b84ffa111a549afce72230"
+    },
+    {
+      "path": "packages/yoki-web-tools/LICENSE",
+      "sha256": "c266d8543b917244e008113117f9bb8843c23b621b53c787ad78d57f603e45c3"
+    },
+    {
+      "path": "packages/yoki-web-tools/README.md",
+      "sha256": "c3dde25543475e7a7d3a3bd05eb4f94c58714df259f095b0aa99b0f198b171ba"
+    },
+    {
+      "path": "packages/yoki-web-tools/docs/config.jpg",
+      "sha256": "55de123aede565107ae4949d473d5ed39c96f0d8db327145bf9aca7380e55857"
+    },
+    {
+      "path": "packages/yoki-web-tools/docs/configuration.md",
+      "sha256": "d2761665db595f19bc6c52576b6832aa6e5233aef0688ad35c812559e592d1d7"
+    },
+    {
+      "path": "packages/yoki-web-tools/docs/cover.png",
+      "sha256": "0b33ebc9ad10fa3466f1744fda41ffb51979ff42464f8613928a6bd8de0bf6e3"
+    },
+    {
+      "path": "packages/yoki-web-tools/docs/cover.svg",
+      "sha256": "a5634a616013907aa102d265bd8ad13e97c43706673b995f5bbf4def0568892b"
+    },
+    {
+      "path": "packages/yoki-web-tools/docs/github-interceptor.md",
+      "sha256": "66ea61d95e5b4baaa1414d9bcc5e4dbf2467ec57d12f9c14a74532a182e18f97"
+    },
+    {
+      "path": "packages/yoki-web-tools/docs/providers.md",
+      "sha256": "b06e7d9bbbceeb229973e0b45c810b02a5d2c4b84777e6d1db590ac3e5bb9f1c"
+    },
+    {
+      "path": "packages/yoki-web-tools/docs/self-hosted.md",
+      "sha256": "a1529f36168afefdca3b9d36d2056c9c839835d36e3a4078640fc69f12de4947"
+    },
+    {
+      "path": "packages/yoki-web-tools/docs/tools.md",
+      "sha256": "00a7d5ab1c3db3306abacc64b6a07eb9980dbca8837a50e6f17b0dd38b5c4289"
+    },
+    {
+      "path": "packages/yoki-web-tools/docs/vertical-cover.png",
+      "sha256": "3ce0c9db5f9199078e807601d731979c3c17303d02b1e767ac7a3fe4d205f16a"
+    },
+    {
+      "path": "packages/yoki-web-tools/docs/vertical-cover.svg",
+      "sha256": "d92cb02962df21eeed63b93a4d5dffe420d1ba9e364986278ff1d2f92b8eac4e"
+    },
+    {
+      "path": "packages/yoki-web-tools/index.ts",
+      "sha256": "793792f54e2f0171f1794723daee3483586075c6eeaee0e125f65c29588d7fad"
+    },
+    {
+      "path": "packages/yoki-web-tools/package.json",
+      "sha256": "95c125e05ea78a041068c6f2419bd9f21bf5672334a20799ad11a41e51f7ce07"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/brave.ts",
+      "sha256": "3181faed874f271ce5b2ef4aaf86f94e042f85c65919f6d359600e5b2a2166ef"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/config.ts",
+      "sha256": "65fae51c82e878197c4fad7be53e6e1097a05fa1bcd14c0d57f8566aa4985c64"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/exa.ts",
+      "sha256": "f2a41730887442a068382ff2084cb7d57f45060341efbeb1a943bec48977bea1"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/factory.ts",
+      "sha256": "6adaffbbf7090d8937cf9625889eecf050d731cc3676b860ee6addaaf6a406ec"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/fetch-helpers.ts",
+      "sha256": "268e2a43c927037eca5dbc002a6e4c6097f3a3c355e6265f1d5f81418cb18f75"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/firecrawl.ts",
+      "sha256": "3eab01bbf22a41c16fc1f3c4a3702dfdc3022b3a6b9d9798b088aa55e8025326"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/index.ts",
+      "sha256": "3855dedbbcf69b4627d4f6af669e2b36f9a781cadcb4741b70bb5c3a522e628b"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/interceptors/github.ts",
+      "sha256": "ca4514cb84f21a2e69c16529d7d3ca4026afb9cddfb9af0d8e4f45ff2d732008"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/interceptors/index.ts",
+      "sha256": "78ac8e8da146675596e912ae2709744e41c81d8f634880df08c9e60d07a97266"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/interceptors/types.ts",
+      "sha256": "064279a0b4513c99fcadc7145f6a2b31e71b91ebdd88bf622190014cd4059231"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/jina.ts",
+      "sha256": "bc78bafecd37caad5f8bb49825d4d10a4113a77dba0b1a1de0f454ac21e42dc8"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/ollama.ts",
+      "sha256": "a4d842c28a232983199a9aba00d0c7272efe8bcbc38fe4e964329e4212cb6e70"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/perplexity.ts",
+      "sha256": "736793ff3eb303154f94dba2e1f285236c1463ff6993ff9bdd16a31900faf498"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/searxng.ts",
+      "sha256": "46f66783dbff2ef98c953c1e33de403bc5cfe603cbfd81310a7e7a347598fc8d"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/serper.ts",
+      "sha256": "1d0a898615d358ccd216189685a4760fe537f55c4b5625995b86c76873237586"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/tavily.ts",
+      "sha256": "87c09461c35684d1affa8451141340763f82d5410815bda172953ab7fc911b08"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/types.ts",
+      "sha256": "50552e271d05477e4ab9fc92a927b25de913827618245ec5db6e7fcd33d3b361"
+    },
+    {
+      "path": "packages/yoki-web-tools/providers/youcom.ts",
+      "sha256": "6cd6e38a9c0d6bcb54f35a201031cb4302998afa21f939c5b3a054033efe79e9"
+    },
+    {
+      "path": "packages/yoki-web-tools/test/chain.test.ts",
+      "sha256": "95ab7e8d96dd67d7e14e11a520e05f22580da56dbfabe32bb9e840ea8db49f41"
+    },
+    {
+      "path": "packages/yoki-web-tools/test/config.test.ts",
+      "sha256": "f1aca47d799e9fb2f819ba95e9166bde112aa4e78a6881a4c96c4a58f102df45"
+    },
+    {
+      "path": "packages/yoki-web-tools/test/github.test.ts",
+      "sha256": "760347387130803e49aa3855b86f99c27de030feaf28e13c594711281e1ee764"
+    },
+    {
+      "path": "packages/yoki-web-tools/test/index.test.ts",
+      "sha256": "dca4f92fa7fc91f3e1a1b2d8a2dea56d070bd55f035264e611c93a6ebdde2402"
+    },
+    {
+      "path": "packages/yoki-web-tools/test/ship-manifest.test.ts",
+      "sha256": "6db94abb6cda216210913e837a5d4103e13c4e8e25b61d6cfc47de244119e443"
+    },
+    {
+      "path": "packages/yoki-web-tools/test/web-tools.guidance.test.ts",
+      "sha256": "8bc03db986b3a89efdca7633580ac81d9b0f715308b7851c9a63a7226d66d53f"
+    },
+    {
+      "path": "roadmap.md",
+      "sha256": "98a1ccb76f4a5d05fb7e8fb67be641bf997db10bbc96d391b08acccfb7b7ef97"
+    }
+  ],
+  "omitted": [
+    {
+      "path": "packages/pi-telegram-main/.agents/skills/domain-dag/scripts/validate-domain-dag.mjs",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/pi-telegram-main/.agents/skills/domain-dag/scripts/validate-domain-dag.sh",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/pi-telegram-main/scripts/pi-telegram-spawn.ps1",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/pi-telegram-main/scripts/pi-telegram-spawn.sh",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/ask-user-question.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/state/build-questionnaire.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/state/key-router.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/state/questionnaire-session.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/dialog-container.test.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/dialog-overflow.test.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/factory.test.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/inline-input.test.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/multi-select-view.test.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/option-list-view.test.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/props-adapter.test.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/tab-bar.test.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/test/wrapping-select.test.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/component-binding.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/components/inline-input.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/components/multi-select-view.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/components/option-list-view.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/components/submit-picker.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/components/tab-bar.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/components/wrapping-select.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/dialog-builder.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/props-adapter.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/stateful-view.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/tab-components.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ask-user-question/view/tab-content-strategy.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-newapi/panel.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-plan/model-selector.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-skills/extensions/pi-codex-skills/index.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-skills/extensions/pi-codex-skills/panel-style.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-skills/extensions/pi-codex-skills/skills-panel.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-skills/extensions/pi-codex-skills/skills-plan-panel.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-skills/scripts/run-pi-smoke.mjs",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/yoki-skills/skills/plugin-creator/scripts/create_basic_plugin.py",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/yoki-skills/skills/plugin-creator/scripts/read_marketplace_name.py",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/yoki-skills/skills/plugin-creator/scripts/update_plugin_cachebuster.py",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/yoki-skills/skills/plugin-creator/scripts/validate_plugin.py",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/yoki-skills/skills/skill-creator/scripts/generate_openai_yaml.py",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/yoki-skills/skills/skill-creator/scripts/init_skill.py",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/yoki-skills/skills/skill-creator/scripts/quick_validate.py",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/yoki-skills/test/mock-pi-loader.mjs",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/yoki-skills/test/register-mock-pi-loader.mjs",
+      "reason": "legacy scripts; not part of the desktop runtime"
+    },
+    {
+      "path": "packages/yoki-skills/test/skills-panel.test.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-test-utils/CHANGELOG.md",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/contract.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/exec.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/fetch.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/fs.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/index.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/manifest.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/package.json",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/pi.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/session.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/spawn.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/test/manifest.test.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-test-utils/theme.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/.gitignore",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/LICENSE",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/README.md",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/STYLE.md",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/package.json",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/test/config.test.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/test/editor-bridge.test.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/test/render-utils.test.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/test/shared-input-history.test.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/test/statusline.test.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/test/window-title/config.test.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/test/window-title/controller.test.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/test/window-title/title-format.test.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/themes/yoki_themes.json",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/tsconfig.json",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/config.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/editor.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/header.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/index.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/render-utils.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/shared-input-history.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/statusline.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/style.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/window-title/config.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/window-title/controller.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/window-title/index.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/window-title/notify.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/window-title/title-format.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-ui/yoki_ui/window-title/types.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-warp-notify/title-spinner.ts",
+      "reason": "terminal UI or legacy UI test harness"
+    },
+    {
+      "path": "packages/yoki-web-tools/test/web-tools.render.test.ts",
+      "reason": "direct terminal UI dependency"
+    },
+    {
+      "path": "packages/yoki-web-tools/web-tools.ts",
+      "reason": "direct terminal UI dependency"
+    }
+  ]
+}

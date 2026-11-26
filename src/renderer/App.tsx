@@ -10,6 +10,7 @@ import { MobilePage } from "./components/Mobile/MobilePage";
 import { RollbackPromptHost } from "./components/Review/RollbackPromptHost";
 import { ReviewWindow } from "./components/ReviewWindow/ReviewWindow";
 import { ScheduledTasksPage } from "./components/ScheduledTasks/ScheduledTasksPage";
+import { NativeQuestionnaireHost } from "./components/SessionArea/NativeSessionControls";
 import { SessionArea } from "./components/SessionArea/SessionArea";
 import { SessionMonitor } from "./components/SessionMonitor/SessionMonitor";
 import { ExtensionUiDialogHost } from "./components/SessionUi/ExtensionUiDialogHost";
@@ -30,6 +31,7 @@ import { procService } from "./services/procService";
 import { ComposerProvider } from "./stores/composerStore";
 import { ExtensionViewProvider, useExtensionViewStore } from "./stores/extensionViewStore";
 import { InspectorProvider } from "./stores/inspectorStore";
+import { NativeSessionProvider } from "./stores/nativeSessionStore";
 import { bindProcOutputStream, bindProcStream } from "./stores/procStore";
 import { ProjectProvider } from "./stores/projectStore";
 import { ReviewProvider } from "./stores/reviewStore";
@@ -232,6 +234,7 @@ function AppLayout() {
       <AppErrorBoundary>
         <ExtensionViewHost />
         <ExtensionUiDialogHost />
+        <NativeQuestionnaireHost />
       </AppErrorBoundary>
       <CommandPalette />
       {reviewWindowOpen && <ReviewWindow />}
@@ -254,25 +257,27 @@ export function App() {
             <AppErrorBoundary>
               <ExtensionViewProvider>
                 <SessionProvider>
-                  <ExtensionViewSessionBridge />
-                  <NotificationSoundsBridge />
-                  <SchedulerProvider>
-                    <SchedulerSessionBridge />
-                    <ReviewProvider>
-                      <RollbackPromptHost />
-                      <TerminalProvider>
-                        <SessionBrowserProvider>
-                          <InspectorProvider>
-                            <StyleEditProvider>
-                              <UpdateStatusBridge />
-                              <ProcStreamBridge />
-                              <AppLayout />
-                            </StyleEditProvider>
-                          </InspectorProvider>
-                        </SessionBrowserProvider>
-                      </TerminalProvider>
-                    </ReviewProvider>
-                  </SchedulerProvider>
+                  <NativeSessionProvider>
+                    <ExtensionViewSessionBridge />
+                    <NotificationSoundsBridge />
+                    <SchedulerProvider>
+                      <SchedulerSessionBridge />
+                      <ReviewProvider>
+                        <RollbackPromptHost />
+                        <TerminalProvider>
+                          <SessionBrowserProvider>
+                            <InspectorProvider>
+                              <StyleEditProvider>
+                                <UpdateStatusBridge />
+                                <ProcStreamBridge />
+                                <AppLayout />
+                              </StyleEditProvider>
+                            </InspectorProvider>
+                          </SessionBrowserProvider>
+                        </TerminalProvider>
+                      </ReviewProvider>
+                    </SchedulerProvider>
+                  </NativeSessionProvider>
                 </SessionProvider>
               </ExtensionViewProvider>
             </AppErrorBoundary>

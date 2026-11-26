@@ -1,12 +1,16 @@
 import path from "node:path";
 import type { EntryId, SubmissionId, UserInput } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
+import { defaultBuiltinToolsConfig } from "../shared/builtinTools.js";
 import { DURABLE_COMMAND_ENTRY, durableExtensionError } from "../shared/durableExtension.js";
 import {
   DESKTOP_RETRY_ATTEMPTS,
   type DurableCommand,
   type RuntimeSessionUpdate,
 } from "../shared/durableProtocol.js";
+import type { NativeJob } from "../shared/nativeBuiltins.js";
+import { BackgroundJobs, type ExecutionConfig } from "./builtins/jobs/manager.js";
+import type { TelegramHost } from "./builtins/telegram.js";
 import { DESKTOP_PROVIDER, desktopModels } from "./desktopModels.js";
 import { readDurableEntries } from "./durableHistory.js";
 import { DurableSessions } from "./durableSessions.js";
@@ -25,21 +29,43 @@ export class DesktopRuntime {
   private service?: DurableSessions;
   private readonly catalog = desktopModels();
   private modelId?: string;
+  private preferredThinking?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  private builtinConfig = defaultBuiltinToolsConfig();
   private storageRoot?: string;
   private readonly hosts = new Map<string, HostedSession>();
   private readonly opening = new Map<string, Promise<{ conversationId: number }>>();
   private stopping = false;
+  private jobs?: BackgroundJobs;
+  private execution: ExecutionConfig = {
+    shell: process.platform === "win32" ? "C:\\Program Files\\Git\\bin\\bash.exe" : "/bin/bash",
+    env: Object.fromEntries(
+      Object.entries(process.env).filter(
+        (entry): entry is [string, string] => entry[1] !== undefined,
+      ),
+    ),
+  };
 
-  constructor(private readonly publish: (update: RuntimeSessionUpdate) => void) {}
+  constructor(
+    private readonly publish: (update: RuntimeSessionUpdate) => void,
+    private readonly telegram?: TelegramHost,
+  ) {}
 
   async execute(command: DurableCommand): Promise<unknown> {
     if (command.op === "initialize") {
       if (this.service) throw new Error("Runtime already initialized.");
       if (command.model) {
-        this.catalog.configure(command.model);
+        await this.catalog.configure(command.model);
         this.modelId = command.model.modelId;
+        this.preferredThinking = command.model.preferredThinking;
       }
+      this.builtinConfig = command.builtins ?? defaultBuiltinToolsConfig();
       this.storageRoot = command.storageRoot;
+      if (command.execution) this.execution = command.execution;
+      this.jobs = new BackgroundJobs(
+        command.storageRoot,
+        () => this.execution,
+        (id, rows, completed, output) => this.jobsChanged(id, rows, completed, output),
+      );
       this.service = new DurableSessions(
         command.storageRoot,
         (sessionId) => ({
@@ -51,14 +77,32 @@ export class DesktopRuntime {
           env: ({ cwd }) => new NodeExecutionEnv({ cwd: cwd ?? process.cwd() }),
         }),
         this.publish,
+        (push) => this.publish({ type: "nativeState", ...push }),
+        async (agent) => {
+          if (agent.model?.provider === DESKTOP_PROVIDER)
+            await this.catalog.ensure(agent.model.modelId);
+        },
       );
       return null;
     }
     const service = this.service;
     if (!service) throw new Error("Runtime not initialized.");
+    if (command.op === "models") return this.catalog.catalog();
+    if (command.op === "modelPreference") {
+      if (!this.catalog.models.getModel(DESKTOP_PROVIDER, command.modelId))
+        throw new Error("Model is not in the desktop catalog.");
+      this.modelId = command.modelId;
+      this.preferredThinking = command.thinkingLevel;
+      return null;
+    }
     if (command.op === "model") {
-      this.catalog.configure(command.model);
+      await this.catalog.configure(command.model);
       this.modelId = command.model.modelId;
+      this.preferredThinking = command.model.preferredThinking;
+      return null;
+    }
+    if (command.op === "builtins") {
+      this.builtinConfig = command.config;
       return null;
     }
     const id = command.sessionId;
@@ -67,19 +111,45 @@ export class DesktopRuntime {
         return readDurableEntries(this.storageRoot as string, id, command.before, command.limit);
       case "closeIdle": {
         const slot = this.hosts.get(id);
-        if (!slot || slot.closing || slot.active) return false;
+        if (!slot || slot.closing || slot.active || this.jobs?.hasRunning(id)) return false;
         const closed = await service.closeIdle(id);
         if (closed) await this.close(id);
         return closed;
       }
       case "commands":
-        return this.requireHost(id).host.listCommands();
+        return [
+          {
+            name: "plan",
+            description: "Built-in plan mode: /plan, /plan on, /plan off",
+            source: "builtin",
+          },
+          ...this.requireHost(id).host.listCommands(),
+        ];
+      case "nativeState":
+        return service.nativeState(id);
+      case "nativeMode":
+        await service.setNativeMode(id, command.mode);
+        return null;
+      case "answerQuestionnaire":
+        return service.answerQuestionnaire(id, command.taskId, command.version, command.reply);
+      case "answerPlan":
+        return service.answerPlan(id, command.taskId, command.action);
+      case "jobs":
+        return this.jobs?.list(id) ?? [];
+      case "inspectJob":
+        return this.jobs?.inspect(id, command.job);
+      case "stopJob":
+        return this.jobs?.stop(id, command.job);
       case "open":
         return this.open(command);
       case "submit": {
         const slot = this.requireHost(id);
         slot.active++;
         try {
+          if (/^\/plan(?:\s|$)/i.test(command.text.trim())) {
+            await service.planCommand(id, command.requestId, command.text.trim());
+            return { disposition: "handled" };
+          }
           const text = await slot.host.expand(command.requestId, command.text);
           if (slot.closing) throw durableExtensionError("closed", id);
           const content: UserInput = command.images?.length
@@ -144,6 +214,7 @@ export class DesktopRuntime {
     await Promise.allSettled([...this.opening.values()]);
     const results = await Promise.allSettled([...this.hosts.keys()].map((id) => this.close(id)));
     await this.service?.dispose();
+    await this.jobs?.dispose();
     const failed = results.find((item) => item.status === "rejected");
     if (failed?.status === "rejected") throw failed.reason;
   }
@@ -176,7 +247,12 @@ export class DesktopRuntime {
       return service.open(command);
     }
     const operation = (async () => {
-      const host = new SessionExtensionHost(id, path.resolve(command.cwd));
+      const host = new SessionExtensionHost(
+        id,
+        path.resolve(command.cwd),
+        () => this.builtinConfig,
+        this.jobs ? { jobs: this.jobs, sessionId: id, telegram: this.telegram } : undefined,
+      );
       const slot: HostedSession = { host, active: 0, ready: false };
       this.hosts.set(id, slot);
       try {
@@ -190,8 +266,18 @@ export class DesktopRuntime {
             ...(this.modelId
               ? { model: { provider: DESKTOP_PROVIDER, modelId: this.modelId } }
               : {}),
+            ...(this.preferredThinking
+              ? {
+                  thinkingLevel: this.catalog.models.getModel(DESKTOP_PROVIDER, this.modelId ?? "")
+                    ?.reasoning
+                    ? this.preferredThinking
+                    : "off",
+                }
+              : {}),
           },
         });
+        this.jobs?.restore(id, await service.jobRows(id));
+        await service.updateJobs(id, this.jobs?.list(id) ?? []);
         slot.ready = true;
         return result;
       } catch (error) {
@@ -204,6 +290,28 @@ export class DesktopRuntime {
     });
     this.opening.set(id, operation);
     return operation;
+  }
+
+  private async jobsChanged(
+    id: string,
+    rows: NativeJob[],
+    completed?: NativeJob,
+    output = "",
+  ): Promise<void> {
+    const slot = this.hosts.get(id);
+    if (!slot?.ready || slot.closing || !this.service) return;
+    await this.service.updateJobs(id, rows);
+    if (completed) {
+      const notice = `Background job ${completed.id} ${completed.status}${completed.exitCode === null ? "" : ` (exit ${completed.exitCode})`}: ${completed.label || completed.command}\n${output}`;
+      await this.service.submit(id, {
+        type: "input",
+        requestId: `job-exit:${completed.id}`,
+        content: notice,
+        entry: { kind: "bash-job", data: notice },
+        whenBusy: "followUp",
+        onAbort: "keep",
+      });
+    }
   }
 
   private async close(id: string): Promise<void> {

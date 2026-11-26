@@ -1,7 +1,7 @@
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 import type { LiveState } from "@earendil-works/pi-durable";
 import { DURABLE_COMMAND_ENTRY, durableDisplayMessages } from "../../shared/durableExtension";
-import { DESKTOP_RETRY_ATTEMPTS } from "../../shared/durableProtocol";
+import { DESKTOP_RETRY_ATTEMPTS, type RuntimeSessionUpdate } from "../../shared/durableProtocol";
 import type { DurableProjectionAction, DurableSessionUpdate } from "../../shared/durableSession";
 
 export type { DurableProjectionAction } from "../../shared/durableSession";
@@ -32,9 +32,10 @@ export class DurableProjection {
 
   constructor(private readonly sessionId: string) {}
 
-  apply(update: DurableSessionUpdate): DurableProjectionAction[] {
+  apply(update: RuntimeSessionUpdate): DurableProjectionAction[] {
     if (update.sessionId !== this.sessionId)
       throw new Error("Durable projection session mismatch.");
+    if (update.type === "nativeState") return [];
     if (update.type === "error") return [{ type: "error", error: update.error }];
     if (update.type === "snapshot") {
       this.conversationId = update.view.conversation.id;

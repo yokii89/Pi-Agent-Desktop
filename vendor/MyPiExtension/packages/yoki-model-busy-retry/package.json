@@ -1,0 +1,44 @@
+{
+	"name": "@yoki/yoki-model-busy-retry",
+	"version": "1.22.0",
+	"description": "Pi extension. Waits out a saturated model (Qoder 10605 request queued) by chasing the queue's own announced wait in probe slices instead of failing the turn.",
+	"keywords": [
+		"pi-package",
+		"pi-extension",
+		"yoki",
+		"retry",
+		"backoff",
+		"rate-limit",
+		"qoder"
+	],
+	"type": "module",
+	"license": "MIT",
+	"author": "yokii89",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/yokii89/MyPiExtension.git",
+		"directory": "packages/yoki-model-busy-retry"
+	},
+	"homepage": "https://github.com/yokii89/MyPiExtension/tree/main/packages/yoki-model-busy-retry#readme",
+	"bugs": {
+		"url": "https://github.com/yokii89/MyPiExtension/issues"
+	},
+	"exports": {
+		".": "./index.ts"
+	},
+	"scripts": {
+		"test": "vitest run"
+	},
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-ai": ">=1.4.0",
+		"@earendil-works/pi-coding-agent": ">=1.4.0"
+	},
+	"engines": {
+		"node": ">=22.19.0"
+	}
+}

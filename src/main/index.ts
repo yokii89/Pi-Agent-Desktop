@@ -22,6 +22,7 @@ import { detectPiExecutablePath } from "./session/piLauncher";
 import { disposeAllSessions } from "./session/piSession";
 import { warmPiShellCache } from "./session/piShell";
 import { getSettings, updateSettings } from "./settings/settings";
+import { telegramService } from "./telegram/telegramService";
 import { registerTerminalLifecycle } from "./terminal/terminal";
 import { disposeUpdater, scheduleStartupCheck } from "./updater/updaterService";
 import { disposeViewHost, ensureViewHost } from "./view/viewHost";
@@ -173,6 +174,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   if (durableShutdownStarted) return;
   durableShutdownStarted = true;
+  telegramService.disconnect();
   void disposeAgentRuntime().finally(() => {
     durableShutdownFinished = true;
     app.quit();

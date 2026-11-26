@@ -8,6 +8,7 @@ import {
   Keyboard,
   MagnifyingGlass,
   Palette,
+  PaperPlaneTilt,
   PuzzlePiece,
   Rocket,
   Sparkle,
@@ -41,6 +42,7 @@ export type SettingsSectionId =
   | "liveSessions"
   | "extensions"
   | "archived"
+  | "telegram"
   | "about";
 
 interface NavItem {
@@ -162,6 +164,12 @@ const NAV_GROUPS: NavGroup[] = [
         labelKey: "settings.section.liveSessions",
         icon: <Cpu size={20} weight="regular" />,
         keywords: ["存活", "会话", "进程", "空闲", "预热", "session", "process", "idle", "live"],
+      },
+      {
+        id: "telegram",
+        labelKey: "telegram.title",
+        icon: <PaperPlaneTilt size={20} weight="regular" />,
+        keywords: ["telegram", "bot", "机器人"],
       },
       {
         id: "scheduled",

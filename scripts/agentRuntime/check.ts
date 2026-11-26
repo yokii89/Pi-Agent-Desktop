@@ -8,7 +8,11 @@ import path from "node:path";
 
 const require = createRequire(import.meta.url);
 const projectRoot = path.resolve(import.meta.dirname, "../..");
-const output = path.join(projectRoot, "temp/agent-runtime-check");
+const output = path.join(
+  projectRoot,
+  "temp/agent-runtime-check",
+  process.argv.includes("--newapi") ? "newapi" : "",
+);
 const hostOutput = path.join(projectRoot, "dist/runtimeCheck");
 const tsc = require.resolve("typescript/bin/tsc");
 const electron = require("electron") as string;
@@ -73,6 +77,7 @@ try {
   await run(electron, [developmentRoot], {
     PIDESK_RUNTIME_CHECK_REPORT: developmentReport,
     PIDESK_RUNTIME_CHECK_LIVE_AUTH: live ? path.join(homedir(), ".pi/agent/auth.json") : "",
+    PIDESK_RUNTIME_CHECK_NEWAPI_ONLY: process.argv.includes("--newapi") ? "1" : "",
   });
   console.log("Electron utility process verification:", await readFile(developmentReport, "utf8"));
 
@@ -96,6 +101,7 @@ try {
   await run(path.join(packageOutput, "win-unpacked/PiDesk.exe"), [], {
     PIDESK_RUNTIME_CHECK_REPORT: packagedReport,
     PIDESK_RUNTIME_CHECK_LIVE_AUTH: "",
+    PIDESK_RUNTIME_CHECK_NEWAPI_ONLY: process.argv.includes("--newapi") ? "1" : "",
   });
   const report = JSON.parse(await readFile(packagedReport, "utf8")) as { packaged?: boolean };
   assert.equal(report.packaged, true);

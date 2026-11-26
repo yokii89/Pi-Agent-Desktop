@@ -5,6 +5,7 @@ import {
   parseAgentRuntimeRequest,
 } from "../../shared/agentRuntimeProtocol";
 import { parseRuntimeUpdate } from "../../shared/durableProtocol";
+import { initialNativeSessionState } from "../../shared/nativeBuiltins";
 
 describe("agent runtime protocol", () => {
   it("accepts the managed smoke storage root and rejects the superseded database-path shape", () => {
@@ -58,6 +59,33 @@ describe("agent runtime protocol", () => {
       },
     };
     expect(parseRuntimeUpdate(update)).not.toBeNull();
+  });
+
+  it("validates app document pushes separately from built-in conversation snapshots", () => {
+    const update = {
+      type: "nativeState",
+      sessionId: "00000000-0000-4000-8000-000000000001",
+      state: initialNativeSessionState(),
+    };
+    expect(parseRuntimeUpdate(update)).toEqual(update);
+    expect(
+      parseRuntimeUpdate({ ...update, state: { ...update.state, mode: "unknown" } }),
+    ).toBeNull();
+    expect(
+      parseRuntimeUpdate({
+        ...update,
+        state: {
+          ...update.state,
+          plan: { taskId: 1, text: "Plan", fingerprint: "invalid", until: Date.now() },
+        },
+      }),
+    ).toBeNull();
+    expect(
+      parseRuntimeUpdate({
+        ...update,
+        state: { ...update.state, questions: { bad: { taskId: 1 } } },
+      }),
+    ).toBeNull();
   });
 
   it("bounds message fields and validates runtime protocol handshakes", () => {

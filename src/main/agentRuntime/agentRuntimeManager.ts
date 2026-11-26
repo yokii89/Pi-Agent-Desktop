@@ -13,6 +13,7 @@ import {
   parseDurableCommand,
   type RuntimeSessionUpdate,
 } from "../../shared/durableProtocol";
+import type { TelegramHostRequest } from "../../shared/telegram";
 import { localizeRuntimeError } from "./runtimeError";
 
 const READY_TIMEOUT_MS = 15_000;
@@ -43,6 +44,13 @@ function supportsDurableNodeVersion(version: string): boolean {
 }
 
 export class AgentRuntimeManager {
+  private readonly hostRequests = new Map<string, AbortController>();
+  private hostHandler?: (request: TelegramHostRequest, signal: AbortSignal) => Promise<string>;
+  setHostHandler(
+    handler: (request: TelegramHostRequest, signal: AbortSignal) => Promise<string>,
+  ): void {
+    this.hostHandler = handler;
+  }
   private readonly updateListeners = new Set<(update: RuntimeSessionUpdate) => void>();
   private readonly faultListeners = new Set<(error: Error) => void>();
 
@@ -232,6 +240,34 @@ export class AgentRuntimeManager {
       return;
     }
 
+    if (message.type === "host-cancel") {
+      this.hostRequests.get(message.id)?.abort();
+      return;
+    }
+    if (message.type === "host-request") {
+      if (this.hostRequests.size >= 64 || this.hostRequests.has(message.id)) {
+        this.reset(child, new Error("Too many host operations."));
+        return;
+      }
+      const controller = new AbortController();
+      this.hostRequests.set(message.id, controller);
+      const response = (payload: Record<string, unknown>) => {
+        if (this.child === child && !controller.signal.aborted)
+          this.port?.postMessage({ type: "host-response", id: message.id, ...payload });
+      };
+      void Promise.resolve()
+        .then(() => {
+          if (!this.hostHandler) throw new Error("Telegram service is unavailable.");
+          return this.hostHandler(message.request, controller.signal);
+        })
+        .then(
+          (result) => response({ ok: true, result }),
+          (error: unknown) => response({ ok: false, error: errorMessage(error).slice(0, 2000) }),
+        )
+        .finally(() => this.hostRequests.delete(message.id))
+        .catch(() => {});
+      return;
+    }
     if (message.type === "ready") {
       if (message.protocolVersion !== AGENT_RUNTIME_PROTOCOL_VERSION) {
         this.reset(child, new Error("Durable utility process protocol version mismatch."));
@@ -335,6 +371,8 @@ export class AgentRuntimeManager {
       this.retiring = retirement;
       void retirement.catch(() => undefined);
     }
+    for (const controller of this.hostRequests.values()) controller.abort();
+    this.hostRequests.clear();
     this.child = null;
     this.ready = null;
     this.port?.close();

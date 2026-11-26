@@ -6,7 +6,8 @@
       "!src/renderer/fileIcons/mapping.ts",
       "!src/renderer/fileIcons/assets",
       "!src/renderer/fileIcons/icons-extra",
-      "!session-flow-preview.html"
+      "!session-flow-preview.html",
+      "!vendor/MyPiExtension"
     ]
   },
   "vcs": {

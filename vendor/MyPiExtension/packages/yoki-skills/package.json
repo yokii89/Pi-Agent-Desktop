@@ -1,0 +1,38 @@
+{
+  "name": "pi-codex-skills",
+  "version": "0.1.0",
+  "description": "Auditable managed Pi skills with a Codex-style selection layer.",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "extensions",
+    "skills",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/pi-codex-skills/index.ts"
+    ]
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --import ./test/register-mock-pi-loader.mjs --test test/**/*.test.ts",
+    "test:pi-smoke": "node scripts/run-pi-smoke.mjs"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=1.4.0",
+    "@earendil-works/pi-tui": ">=1.4.0"
+  },
+  "dependencies": {
+    "yoki_ui": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "1.4.0",
+    "@earendil-works/pi-tui": "1.4.0",
+    "@types/node": "^22.19.19",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

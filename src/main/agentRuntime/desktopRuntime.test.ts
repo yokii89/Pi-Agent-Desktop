@@ -9,6 +9,7 @@ import { type SessionEntry, sessionEntriesReducer } from "../../renderer/stores/
 import {
   parseDurableCommand,
   parseRuntimeUpdate,
+  type RuntimeModelConfig,
   type RuntimeSessionUpdate,
 } from "../../shared/durableProtocol";
 import { DurableProjection } from "./durableProjection";
@@ -39,6 +40,7 @@ async function until(check: () => boolean): Promise<void> {
 
 async function fixture(
   onRequest: (response: ServerResponse, body: Record<string, unknown>) => void,
+  model: Partial<RuntimeModelConfig> = {},
 ) {
   const directory = await mkdtemp(path.join(tmpdir(), "pidesk-desktop-protocol-"));
   cleanup.push(() => rm(directory, { recursive: true, force: true }));
@@ -98,14 +100,260 @@ async function fixture(
       contextWindow: 128000,
       maxTokens: 1024,
       reasoning: false,
+      ...model,
     },
   });
   const sessionId = "00000000-0000-4000-8000-000000000001";
   await runtime.execute({ op: "open", sessionId, cwd: directory, create: true });
-  return { runtime, directory, sessionId, requests, updates, entries: () => entries };
+  return {
+    runtime,
+    directory,
+    sessionId,
+    requests,
+    updates,
+    baseUrl: `http://127.0.0.1:${address.port}/v1`,
+    entries: () => entries,
+  };
 }
 
 describe("desktop production provider, DTO and transcript integration", () => {
+  it("retries empty gateway length responses without summarizing or losing earlier context", async () => {
+    let count = 0;
+    const f = await fixture((response) => {
+      count++;
+      if (count === 2 || count === 3) {
+        chunk(response, { role: "assistant" });
+        chunk(response, {}, "length");
+        response.write(
+          `data: ${JSON.stringify({ id: "empty", object: "chat.completion.chunk", created: 1, model: "desktop-test", choices: [], usage: { prompt_tokens: 10, completion_tokens: 1, total_tokens: 11 } })}\n\n`,
+        );
+        response.end("data: [DONE]\n\n");
+      } else {
+        chunk(response, {
+          role: "assistant",
+          content: count === 1 ? "EARLIER_ASSISTANT" : "Recovered answer",
+        });
+        chunk(response, {}, "stop");
+        finish(response);
+      }
+    });
+    await f.runtime.execute({
+      op: "submit",
+      sessionId: f.sessionId,
+      requestId: "before-empty",
+      text: "EARLIER_USER",
+      mode: "followUp",
+    });
+    await until(() =>
+      f.updates.some(
+        (update) =>
+          update.type === "settled" &&
+          update.view.entries.some((entry) => entry.kind === "pi.assistant"),
+      ),
+    );
+    f.updates.length = 0;
+    await f.runtime.execute({
+      op: "submit",
+      sessionId: f.sessionId,
+      requestId: "recover-empty",
+      text: "FOLLOWUP_USER",
+      mode: "followUp",
+    });
+    await until(() =>
+      f.updates.some(
+        (update) =>
+          update.type === "settled" &&
+          JSON.stringify(update.view.entries).includes("Recovered answer"),
+      ),
+    );
+    expect(f.requests).toHaveLength(4);
+    for (const request of f.requests.slice(1)) {
+      const body = JSON.stringify(request.messages);
+      expect(body).toContain("EARLIER_USER");
+      expect(body).toContain("EARLIER_ASSISTANT");
+      expect(body).toContain("FOLLOWUP_USER");
+    }
+    const history = (await f.runtime.execute({
+      op: "history",
+      sessionId: f.sessionId,
+      limit: 100,
+    })) as { kind: string }[];
+    expect(history.filter((entry) => entry.kind === "pi.compaction")).toHaveLength(0);
+    expect(history.filter((entry) => entry.kind === "pi.assistant")).toHaveLength(4);
+    expect(JSON.stringify(history)).toContain("history preserved");
+    await f.runtime.execute({ op: "close", sessionId: f.sessionId });
+    await f.runtime.execute({
+      op: "open",
+      sessionId: f.sessionId,
+      cwd: f.directory,
+      create: false,
+    });
+    expect(f.requests).toHaveLength(4);
+    expect(
+      JSON.stringify(
+        await f.runtime.execute({ op: "history", sessionId: f.sessionId, limit: 100 }),
+      ),
+    ).toContain("EARLIER_USER");
+  }, 10000);
+
+  it("bounds repeated degenerate responses and preserves real truncated output", async () => {
+    const f = await fixture((response) => {
+      chunk(response, { role: "assistant" });
+      chunk(response, {}, "length");
+      response.write(
+        `data: ${JSON.stringify({ id: "empty", object: "chat.completion.chunk", created: 1, model: "desktop-test", choices: [], usage: { prompt_tokens: 7, completion_tokens: 1, total_tokens: 8 } })}\n\n`,
+      );
+      response.end("data: [DONE]\n\n");
+    });
+    await f.runtime.execute({
+      op: "submit",
+      sessionId: f.sessionId,
+      requestId: "repeat-empty",
+      text: "Keep my history",
+      mode: "followUp",
+    });
+    await until(() =>
+      f.updates.some(
+        (update) => update.type === "settled" && !!update.view.docs["pi.live"]?.runFailure,
+      ),
+    );
+    expect(f.requests).toHaveLength(3);
+    expect(
+      f.updates.some(
+        (update) =>
+          "view" in update &&
+          Array.isArray(update.view.docs["pi.live"]?.compactions) &&
+          update.view.docs["pi.live"].compactions.length > 0,
+      ),
+    ).toBe(false);
+    const real = await fixture((response) => {
+      chunk(response, { role: "assistant", content: "Real output" });
+      chunk(response, {}, "length");
+      finish(response);
+    });
+    await real.runtime.execute({
+      op: "submit",
+      sessionId: real.sessionId,
+      requestId: "real-length",
+      text: "Say something",
+      mode: "followUp",
+    });
+    await until(() =>
+      real.updates.some(
+        (update) =>
+          update.type === "settled" && JSON.stringify(update.view.entries).includes("Real output"),
+      ),
+    );
+    expect(real.requests).toHaveLength(1);
+  }, 10000);
+
+  it("restores a conversation's own model and thinking while using the imported preference for new sessions", async () => {
+    const f = await fixture(
+      (response) => {
+        chunk(response, { role: "assistant", content: "Choice restored" });
+        chunk(response, {}, "stop");
+        finish(response);
+      },
+      {
+        modelId: "imported-unlisted",
+        reasoning: true,
+        preferredThinking: "high",
+        models: [{ id: "chosen", name: "Chosen" }],
+      },
+    );
+    const initial = (await f.runtime.execute({ op: "models" })) as { id: string }[];
+    expect(initial.map((row) => row.id)).toEqual(["chosen", "imported-unlisted"]);
+    let snapshot = f.updates.findLast((update) => update.type === "snapshot");
+    expect(snapshot?.type === "snapshot" && snapshot.view.docs["pi.agent"]).toMatchObject({
+      model: { modelId: "imported-unlisted" },
+      thinkingLevel: "high",
+    });
+    await f.runtime.execute({
+      op: "configure",
+      sessionId: f.sessionId,
+      modelId: "chosen",
+      thinkingLevel: "low",
+    });
+    await f.runtime.execute({ op: "close", sessionId: f.sessionId });
+    await f.runtime.execute({
+      op: "modelPreference",
+      modelId: "imported-unlisted",
+      thinkingLevel: "high",
+    });
+    await f.runtime.execute({
+      op: "open",
+      sessionId: f.sessionId,
+      cwd: f.directory,
+      create: false,
+    });
+    snapshot = f.updates.findLast((update) => update.type === "snapshot");
+    expect(snapshot?.type === "snapshot" && snapshot.view.docs["pi.agent"]).toMatchObject({
+      model: { modelId: "chosen" },
+      thinkingLevel: "low",
+    });
+    await f.runtime.execute({
+      op: "submit",
+      sessionId: f.sessionId,
+      requestId: "restored-choice",
+      text: "Use my saved model",
+      mode: "followUp",
+    });
+    await until(() => f.requests.length === 1);
+    expect(f.requests[0].model).toBe("chosen");
+    await until(() =>
+      f.updates.some(
+        (update) =>
+          update.type === "settled" &&
+          JSON.stringify(update.view.entries).includes("Choice restored"),
+      ),
+    );
+    await f.runtime.dispose();
+    const recovered: RuntimeSessionUpdate[] = [];
+    const restarted = new DesktopRuntime((update) => recovered.push(update));
+    cleanup.push(() => restarted.dispose());
+    await restarted.execute({
+      op: "initialize",
+      storageRoot: f.directory,
+      model: {
+        baseUrl: f.baseUrl,
+        apiKey: "test-only-key",
+        api: "openai-completions",
+        modelId: "imported-unlisted",
+        contextWindow: 128000,
+        maxTokens: 1024,
+        reasoning: true,
+        models: [],
+      },
+    });
+    await restarted.execute({
+      op: "open",
+      sessionId: f.sessionId,
+      cwd: f.directory,
+      create: false,
+    });
+    expect(await restarted.execute({ op: "models" })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "chosen" })]),
+    );
+    expect(f.requests).toHaveLength(1);
+    await restarted.execute({
+      op: "submit",
+      sessionId: f.sessionId,
+      requestId: "after-runtime-restart",
+      text: "Restore even when discovery is offline",
+      mode: "followUp",
+    });
+    await until(() =>
+      recovered.some(
+        (update) =>
+          update.type === "settled" &&
+          update.view.entries.some(
+            (entry) => entry.kind === "pi.user" && JSON.stringify(entry.model).includes("offline"),
+          ),
+      ),
+    );
+    expect(f.requests[1].model).toBe("chosen");
+  });
+
   it("sends text and image-only submissions to the provider and restores their images from SQLite", async () => {
     const f = await fixture((response) => {
       chunk(response, { role: "assistant", content: "Images received." });
@@ -331,7 +579,9 @@ describe("desktop production provider, DTO and transcript integration", () => {
     expect(JSON.stringify(f.requests[1])).toContain("INSTRUCTIONS_TWO");
     await f.runtime.execute({ op: "close", sessionId: f.sessionId });
     await f.runtime.execute({ ...open, resources: [] });
-    expect(await f.runtime.execute({ op: "commands", sessionId: f.sessionId })).toEqual([]);
+    expect(await f.runtime.execute({ op: "commands", sessionId: f.sessionId })).toEqual([
+      { name: "plan", description: expect.any(String), source: "builtin" },
+    ]);
     await expect(f.runtime.execute({ ...command, requestId: randomUUID() })).rejects.toThrow(
       "unknownCommand",
     );

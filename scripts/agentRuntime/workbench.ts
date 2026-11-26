@@ -7,7 +7,10 @@ import path from "node:path";
 import { app, type BrowserWindow } from "electron";
 import type { RuntimeModelConfig } from "../../src/shared/durableProtocol";
 import type { PideskSettings, SessionPushMessage, SessionSummary } from "../../src/shared/ipc";
+import { checkBuiltinsWorkbench } from "./builtinsWorkbench";
 import { checkImageWorkbench } from "./imageWorkbench";
+import { checkInteractionsWorkbench } from "./interactionsWorkbench";
+import { checkNewApiWorkbench } from "./newApiWorkbench";
 import { checkP2Workbench } from "./p2Workbench";
 import { checkP3ResourcesWorkbench } from "./p3ResourcesWorkbench";
 import { checkP3Workbench } from "./p3Workbench";
@@ -214,6 +217,8 @@ export async function checkWorkbench(
       );
     };
     await ready();
+    if (process.env.PIDESK_RUNTIME_CHECK_NEWAPI_ONLY === "1")
+      return { newapi: await checkNewApiWorkbench(window, reportPath) };
     await newTask();
     await send(prompt);
     await until(() => assistantHas(reply), "saved assistant rendered");
@@ -339,6 +344,9 @@ export async function checkWorkbench(
     result.images = await checkImageWorkbench(window, reportPath);
     result.p3 = await checkP3Workbench(window, reportPath);
     result.p3Resources = await checkP3ResourcesWorkbench(window, reportPath);
+    result.builtins = await checkBuiltinsWorkbench(window, reportPath);
+    result.interactions = await checkInteractionsWorkbench(window, reportPath, getWriter);
+    result.newapi = await checkNewApiWorkbench(window, reportPath);
     const liveAuth = process.env.PIDESK_RUNTIME_CHECK_LIVE_AUTH;
     if (liveAuth) {
       // Explicit --live authorization only. Read credentials in main and never serialize them to logs or reports.

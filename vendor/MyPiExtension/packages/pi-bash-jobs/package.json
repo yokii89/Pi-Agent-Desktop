@@ -1,0 +1,45 @@
+{
+	"name": "@yoki/pi-bash-jobs",
+	"version": "0.1.0",
+	"description": "Pi extension. Gives bash a third state — background jobs: blocked commands yield instead of being killed, long tasks can be inspected by tail/cursor, and a finished job wakes the model. Supersedes fixed-default-timeout packages.",
+	"keywords": [
+		"pi-package",
+		"pi-extension",
+		"yoki",
+		"bash",
+		"background",
+		"timeout",
+		"jobs",
+		"long-running"
+	],
+	"type": "module",
+	"license": "MIT",
+	"author": "yokii89",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/yokii89/MyPiExtension.git",
+		"directory": "packages/pi-bash-jobs"
+	},
+	"homepage": "https://github.com/yokii89/MyPiExtension/tree/main/packages/pi-bash-jobs#readme",
+	"bugs": {
+		"url": "https://github.com/yokii89/MyPiExtension/issues"
+	},
+	"exports": {
+		".": "./index.ts"
+	},
+	"scripts": {
+		"test": "vitest run"
+	},
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": ">=1.4.0",
+		"typebox": "*"
+	},
+	"engines": {
+		"node": ">=22.19.0"
+	}
+}

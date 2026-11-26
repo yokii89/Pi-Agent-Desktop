@@ -16,9 +16,12 @@ import type { PiModelOption, ThinkingLevelId } from "../../../shared/ipc";
 import { ACCESS_MODE_ACTIONS } from "../../../shared/view";
 import { useT } from "../../hooks/useT";
 import { authService } from "../../services/authService";
+import { unwrap } from "../../services/ipc";
+import { pideskApi } from "../../services/pideskApi";
 import { sessionService } from "../../services/sessionService";
 import { THINKING_LABEL_KEY, useComposerStore } from "../../stores/composerStore";
 import { useExtensionViewStore } from "../../stores/extensionViewStore";
+import { useNativeSession } from "../../stores/nativeSessionStore";
 import { useSessionMeta } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
 import { AiModelIcon } from "../AiIcons/AiModelIcon";
@@ -28,6 +31,7 @@ import { OptionList, type OptionRow } from "../ui/OptionList";
 import { Popover } from "../ui/Popover";
 import { ThinkingLevelSlider } from "../ui/ThinkingLevelSlider";
 import { ContextUsageChip } from "./ContextUsageChip";
+import { NativeJobsButton } from "./NativeSessionControls";
 import { SendButton } from "./SendButton";
 import styles from "./TaskInputToolbar.module.css";
 import { ThinkingAnimationMark } from "./ThinkingAnimationMark";
@@ -118,6 +122,7 @@ export function TaskInputToolbar({
       />
 
       <AccessModeChip running={running} />
+      <NativeJobsButton />
 
       <div className={styles.spacer} />
 
@@ -194,9 +199,26 @@ function AccessModeChip({ running }: { running: boolean }) {
     activateAccessMode,
   } = useExtensionViewStore();
   const { ensureSession } = useSessionMeta();
+  const native = useNativeSession();
+  const { showToast } = useUiStore();
+  const [nativeBusy, setNativeBusy] = useState(false);
+  const nativePlan = native?.mode === "plan";
+  const chooseNative = async (mode: "edit" | "plan") => {
+    const api = pideskApi();
+    if (!api || running || modeTransitioning || nativeBusy) return;
+    setNativeBusy(true);
+    try {
+      const id = await ensureSession("view-action");
+      if (id) await unwrap(api.durable.nativeMode(id, mode));
+    } catch (error) {
+      showToast(String(error));
+    } finally {
+      setNativeBusy(false);
+    }
+  };
 
   const selectRow = async (row: (typeof accessModeRows)[number]): Promise<void> => {
-    if (modeTransitioning || running) return;
+    if (modeTransitioning || running || nativePlan || nativeBusy) return;
     if (!row.contributionKey && row.state === "live" && row.liveViewId) {
       // live 路径：直接经 Host 发到扩展
       if (row.liveActive) return;
@@ -213,8 +235,11 @@ function AccessModeChip({ running }: { running: boolean }) {
   };
 
   const selectFull = (): void => {
-    if (modeTransitioning || running) return;
-    if (accessModeSelection !== "confirmed-extension") return;
+    if (modeTransitioning || running || nativeBusy) return;
+    if (nativePlan || accessModeSelection !== "confirmed-extension") {
+      void chooseNative("edit");
+      return;
+    }
     const activeLive = accessModeRows.find((r) => r.state === "live" && r.liveActive);
     if (!activeLive?.contributionKey && activeLive?.liveViewId) {
       sendAction(activeLive.liveViewId, ACCESS_MODE_ACTIONS.deactivate, {});
@@ -257,8 +282,16 @@ function AccessModeChip({ running }: { running: boolean }) {
             ? t("session.access.unresolved")
             : t("session.access.fullDesc"),
       icon: <ShieldCheck size={18} weight="regular" />,
-      active: accessModeSelection === "confirmed-full",
-      onSelect: accessModeSelection === "confirmed-extension" ? selectFull : undefined,
+      active: !nativePlan && native?.mode === "edit" && accessModeSelection === "confirmed-full",
+      onSelect: selectFull,
+    },
+    {
+      key: "pidesk-plan",
+      title: t("native.plan"),
+      desc: t("native.plan.description"),
+      icon: <ClipboardText size={20} weight="regular" />,
+      active: nativePlan,
+      onSelect: () => void chooseNative("plan"),
     },
     ...accessModeRows.map(
       (row): AccessModeRow => ({
@@ -283,17 +316,31 @@ function AccessModeChip({ running }: { running: boolean }) {
           type="button"
           className={[
             styles.accessChip,
-            accessModeSelection === "confirmed-extension" ? styles.accessChipActive : "",
+            nativePlan || accessModeSelection === "confirmed-extension"
+              ? styles.accessChipActive
+              : "",
           ].join(" ")}
           onClick={onClick}
           // 窄宽度下不再展示文案，模式名/切换状态收进 tooltip + aria
           title={
-            accessModeError ??
-            (modeTransitioning ? t("session.access.switching") : accessModeChip.title)
+            nativePlan
+              ? t("native.plan")
+              : (accessModeError ??
+                (modeTransitioning || nativeBusy
+                  ? t("session.access.switching")
+                  : accessModeChip.title))
           }
-          aria-label={modeTransitioning ? t("session.access.switching") : accessModeChip.title}
+          aria-label={
+            nativePlan
+              ? t("native.plan")
+              : modeTransitioning || nativeBusy
+                ? t("session.access.switching")
+                : accessModeChip.title
+          }
         >
-          {accessModeSelection === "confirmed-extension" ? (
+          {nativePlan ? (
+            <ClipboardText size={20} weight="regular" />
+          ) : accessModeSelection === "confirmed-extension" ? (
             accessModeIcon(
               accessModeRows.find((r) => r.liveActive)?.icon,
               <Shield size={16} weight="regular" />,
@@ -313,7 +360,11 @@ function AccessModeChip({ running }: { running: boolean }) {
           rows={rows.map<OptionRow>((item) => ({
             key: item.key,
             className: styles.modeRow,
-            disabled: running || modeTransitioning,
+            disabled:
+              running ||
+              modeTransitioning ||
+              nativeBusy ||
+              (nativePlan && item.key !== "full" && item.key !== "pidesk-plan"),
             title: running ? t("session.access.waitUntilIdle") : undefined,
             selected: item.active,
             text: item.title,

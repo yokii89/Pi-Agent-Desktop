@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import {
@@ -5,6 +6,7 @@ import {
   parseAgentRuntimeRequest,
 } from "../shared/agentRuntimeProtocol.js";
 import { boundedJson, DURABLE_RUNTIME_MESSAGE_MAX_BYTES } from "../shared/durableProtocol.js";
+import type { TelegramHostRequest } from "../shared/telegram.js";
 import { DesktopRuntime } from "./desktopRuntime.js";
 import { runDurableSqliteSmokeTest } from "./sqliteSmokeTest.js";
 
@@ -34,6 +36,35 @@ if (!parentPort)
 let channel: RuntimePort | null = null;
 let runningSmokeTest = false;
 let shuttingDown = false;
+const hostRequests = new Map<
+  string,
+  { resolve: (value: string) => void; reject: (error: Error) => void; cleanup: () => void }
+>();
+function hostRequest(request: TelegramHostRequest, signal?: AbortSignal): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted || !channel) {
+      reject(new Error("Host operation cancelled."));
+      return;
+    }
+    const id = randomUUID();
+    const abort = () => {
+      const pending = hostRequests.get(id);
+      if (!pending) return;
+      pending.cleanup();
+      channel?.postMessage({ type: "host-cancel", id });
+      reject(new Error("Host operation cancelled."));
+    };
+    const timer = setTimeout(abort, 120000);
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      hostRequests.delete(id);
+    };
+    hostRequests.set(id, { resolve, reject, cleanup });
+    signal?.addEventListener("abort", abort, { once: true });
+    channel?.postMessage({ type: "host-request", id, request });
+  });
+}
 const runtime = new DesktopRuntime((update) => {
   // Strip optional undefined fields at the private JSON DTO boundary.
   const wire: unknown = JSON.parse(JSON.stringify({ type: "update", update }));
@@ -49,7 +80,7 @@ const runtime = new DesktopRuntime((update) => {
     return;
   }
   channel?.postMessage(wire);
-});
+}, hostRequest);
 const active = new Set<Promise<void>>();
 
 function sendError(id: string, error: unknown): void {
@@ -66,6 +97,15 @@ async function handleRequest(value: unknown): Promise<void> {
     return;
   }
 
+  if (request.type === "host-response") {
+    const pending = hostRequests.get(request.id);
+    if (pending) {
+      pending.cleanup();
+      if (request.ok) pending.resolve(request.result);
+      else pending.reject(new Error(request.error));
+    }
+    return;
+  }
   if (request.type === "shutdown") {
     if (runningSmokeTest) {
       sendError(request.id, new Error("Runtime cannot stop while a smoke test is running."));

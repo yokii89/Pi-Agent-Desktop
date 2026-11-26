@@ -229,6 +229,7 @@ describe("Durable native extension host", () => {
     const [a, b] = await Promise.all([runtime.execute(open), runtime.execute(open)]);
     expect(a).toEqual(b);
     expect(await runtime.execute({ op: "commands", sessionId })).toEqual([
+      { name: "plan", description: expect.any(String), source: "builtin" },
       { name: "native:review", description: "Review work", source: "extension" },
     ]);
     const input = {
@@ -296,6 +297,9 @@ describe("Durable native extension host", () => {
       `close:${sessionId}:true`,
     );
     await runtime.execute({ op: "open", sessionId, cwd: root, create: true, extensions: [good] });
-    expect(await runtime.execute({ op: "commands", sessionId })).toHaveLength(1);
+    expect(await runtime.execute({ op: "commands", sessionId })).toEqual([
+      { name: "plan", description: expect.any(String), source: "builtin" },
+      { name: "native:review", description: "Review work", source: "extension" },
+    ]);
   });
 });

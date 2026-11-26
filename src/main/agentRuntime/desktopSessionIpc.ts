@@ -8,13 +8,17 @@ import {
 import { t } from "../../shared/i18n";
 import { parseImageInputContents } from "../../shared/imageInput";
 import { isThinkingLevelId, PI_IPC, SESSION_IPC, type SessionStartRequest } from "../../shared/ipc";
+import { NATIVE_IPC } from "../../shared/nativeBuiltins";
 import { sessionRefFromKey } from "../../shared/sessionRef";
 import { envelopeAsync } from "../ipc/envelope";
+import { discoverGatewayModels } from "../models/newApiCatalog";
 import { disposeIdleSession } from "../session/disposeIdleSession";
 import { exportSessionHtml, exportSessionMarkdown } from "../session/exportSession";
 import { getCachedPiShellProbe, setPiShellPath } from "../session/piShell";
 import { sessionRepository } from "../session/sessionRepository";
-import { publicDurableModel, saveDurableModel } from "../settings/durableStore";
+import { publicBuiltinTools, saveBuiltinTools } from "../settings/builtinToolsStore";
+import { publicDurableModel, readDurableModel } from "../settings/durableStore";
+import { gatewayCatalog, importCodexModel, saveGatewayModel } from "../settings/newApiStore";
 import { getMainWindow } from "../window/createMainWindow";
 import { desktopSessions } from "./desktopSessions";
 
@@ -119,27 +123,28 @@ export function registerDurableSessionIpc(): void {
     return { name: desktopSessions.rename(request.file, request.name) };
   });
   handle(SESSION_IPC.getCommands, (request) => desktopSessions.commands(id(request.sessionId)));
-  handle(SESSION_IPC.getModelState, (request) =>
-    desktopSessions.modelState(request.sessionId === undefined ? undefined : id(request.sessionId)),
-  );
+  handle(SESSION_IPC.getModelState, async (request) => {
+    await desktopSessions.initialize();
+    return desktopSessions.modelState(
+      request.sessionId === undefined ? undefined : id(request.sessionId),
+    );
+  });
   handle(SESSION_IPC.getStats, () => ({}));
-  handle(SESSION_IPC.getModels, () => {
-    const model = publicDurableModel();
-    return model
-      ? [
-          {
-            provider: "pidesk-openai",
-            modelId: model.modelId,
-            label: model.modelId,
-            contextWindow: model.contextWindow,
-            maxTokens: model.maxTokens,
-            input: ["text", "image"],
-            availableThinkingLevels: model.reasoning
-              ? ["off", "minimal", "low", "medium", "high", "xhigh"]
-              : ["off"],
-          },
-        ]
-      : [];
+  handle(SESSION_IPC.getModels, async (request) => {
+    if (request.force !== undefined && typeof request.force !== "boolean")
+      throw new Error("Invalid refresh request.");
+    const catalog = await desktopSessions.refreshModels(request.force === true);
+    return catalog.models.map((model) => ({
+      provider: "pidesk-openai",
+      modelId: model.id,
+      label: model.name,
+      contextWindow: model.contextWindow,
+      maxTokens: model.maxTokens,
+      input: model.input,
+      availableThinkingLevels: model.reasoning
+        ? ["off", "minimal", "low", "medium", "high", "xhigh"]
+        : ["off"],
+    }));
   });
   handle(SESSION_IPC.setThinkingLevel, async (request) => {
     if (!isThinkingLevelId(request.level)) throw new Error("Invalid thinking level.");
@@ -152,23 +157,12 @@ export function registerDurableSessionIpc(): void {
     return null;
   });
   const selectModel = async (request: Record<string, unknown>) => {
-    const config = publicDurableModel();
-    if (!config || request.provider !== "pidesk-openai" || request.modelId !== config.modelId)
-      throw new Error("Model is not configured in desktop settings.");
-    if (request.sessionId) {
-      const attachment = desktopSessions.require(id(request.sessionId));
-      await desktopSessions.command(attachment.id, {
-        op: "configure",
-        sessionId: attachment.storedId,
-        modelId: config.modelId,
-      });
-    }
-    return {
-      provider: "pidesk-openai",
-      modelId: config.modelId,
-      label: config.modelId,
-      sessionApplied: !!request.sessionId,
-    };
+    if (request.provider !== "pidesk-openai" || !boundedText(request.modelId, 256))
+      throw new Error("Invalid desktop model selection.");
+    return desktopSessions.selectModel(
+      request.modelId,
+      request.sessionId === undefined ? undefined : id(request.sessionId),
+    );
   };
   handle(SESSION_IPC.setModel, selectModel);
   handle(SESSION_IPC.setDefaultModel, async (request) => {
@@ -187,13 +181,79 @@ export function registerDurableSessionIpc(): void {
         throw new Error("Invalid export request.");
       return exporter({ file: request.file, title: request.title as string | undefined });
     });
-  handle(DURABLE_IPC.model, () => publicDurableModel());
-  handle(DURABLE_IPC.saveModel, async (request) => {
-    desktopSessions.assertModelEditable();
-    const config = saveDurableModel(request);
-    await desktopSessions.updateModel();
+  for (const op of [
+    "nativeState",
+    "nativeMode",
+    "answerQuestionnaire",
+    "answerPlan",
+    "jobs",
+    "inspectJob",
+    "stopJob",
+  ] as const) {
+    const channel = {
+      nativeState: NATIVE_IPC.state,
+      nativeMode: NATIVE_IPC.mode,
+      answerQuestionnaire: NATIVE_IPC.answer,
+      answerPlan: NATIVE_IPC.plan,
+      jobs: NATIVE_IPC.jobs,
+      inspectJob: NATIVE_IPC.inspect,
+      stopJob: NATIVE_IPC.stop,
+    }[op];
+    handle(channel, async (request) => {
+      const attachment = desktopSessions.require(id(request.sessionId));
+      const command = parseDurableCommand({ ...request, op, sessionId: attachment.storedId });
+      if (!command) throw new Error("Invalid built-in operation.");
+      const result = await desktopSessions.command(attachment.id, command);
+      if (command.op === "answerPlan") {
+        if (!record(result) || typeof result.status !== "string")
+          throw new Error("Invalid plan review response.");
+        if (
+          record(result.result) &&
+          result.result.action === "new" &&
+          boundedText(result.result.text, 128000) &&
+          boundedText(result.result.path, 32768)
+        )
+          return {
+            status: result.status,
+            ...(await desktopSessions.executePlanInNewSession(
+              attachment.id,
+              command.taskId,
+              result.result.text,
+              result.result.path,
+            )),
+          };
+        return { status: result.status };
+      }
+      return result;
+    });
+  }
+  handle(DURABLE_IPC.builtinTools, () => publicBuiltinTools());
+  handle(DURABLE_IPC.saveBuiltinTools, async (request) => {
+    const config = saveBuiltinTools(request);
+    await desktopSessions.updateBuiltinTools();
     return config;
   });
+  handle(DURABLE_IPC.model, () => publicDurableModel());
+  handle(DURABLE_IPC.modelCatalog, (request) => {
+    if (request.force !== undefined && typeof request.force !== "boolean")
+      throw new Error("Invalid refresh request.");
+    return desktopSessions.refreshModels(request.force === true);
+  });
+  handle(DURABLE_IPC.clearModelCache, () => {
+    gatewayCatalog.clear();
+    return null;
+  });
+  handle(DURABLE_IPC.testModelConnection, async () => {
+    const config = readDurableModel();
+    if (!config) throw new Error("Save a gateway configuration first.");
+    const started = Date.now();
+    const models = await discoverGatewayModels(config);
+    return { count: models.length, latencyMs: Date.now() - started };
+  });
+  handle(DURABLE_IPC.importCodexModel, () => desktopSessions.changeModel(importCodexModel));
+  handle(DURABLE_IPC.saveModel, (request) =>
+    desktopSessions.changeModel(() => saveGatewayModel(request)),
+  );
   handle(DURABLE_IPC.history, (request) => {
     const attachment = desktopSessions.require(id(request.sessionId));
     const command = parseDurableCommand({

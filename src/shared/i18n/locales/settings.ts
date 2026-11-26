@@ -2,6 +2,29 @@ import { defineMessages } from "../types";
 
 export const settingsMessages = defineMessages({
   "settings.title": { "zh-CN": "设置", "en-US": "Settings" },
+  "settings.builtins.title": { "zh-CN": "内置工具", "en-US": "Built-in tools" },
+  "settings.builtins.description": {
+    "zh-CN":
+      "网页搜索、网页读取和图片生成为 Durable 会话的基础功能。网页读取无需密钥；凭据由系统加密保存。保存后对后续工具调用生效，密钥留空则保留已保存的值。",
+    "en-US":
+      "Web search, page reading and image generation are built into Durable sessions. Page reading needs no key. Credentials are encrypted by the OS. Changes apply to subsequent tool calls; blank keys preserve saved values.",
+  },
+  "settings.builtins.searchProvider": { "zh-CN": "搜索服务", "en-US": "Search provider" },
+  "settings.builtins.searchEndpoint": { "zh-CN": "搜索服务地址", "en-US": "Search endpoint" },
+  "settings.builtins.searchKey": { "zh-CN": "搜索 API 密钥", "en-US": "Search API key" },
+  "settings.builtins.imageProvider": { "zh-CN": "图片生成服务", "en-US": "Image provider" },
+  "settings.builtins.openaiCompatible": {
+    "zh-CN": "OpenAI 兼容接口",
+    "en-US": "OpenAI-compatible",
+  },
+  "settings.builtins.imageEndpoint": { "zh-CN": "图片 API 地址", "en-US": "Image API endpoint" },
+  "settings.builtins.imageModel": { "zh-CN": "图片模型", "en-US": "Image model" },
+  "settings.builtins.imageKey": { "zh-CN": "图片 API 密钥", "en-US": "Image API key" },
+  "settings.builtins.save": { "zh-CN": "保存内置工具配置", "en-US": "Save tool settings" },
+  "settings.builtins.saved": {
+    "zh-CN": "内置工具配置已保存",
+    "en-US": "Built-in tool settings saved",
+  },
   "settings.close": { "zh-CN": "关闭设置", "en-US": "Close settings" },
   "settings.searchPlaceholder": {
     "zh-CN": "搜索设置",

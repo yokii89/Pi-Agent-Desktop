@@ -538,7 +538,7 @@ export interface SessionExportRequest {
 export interface PiSlashCommand {
   name: string;
   description?: string;
-  source: "extension" | "prompt" | "skill";
+  source: "builtin" | "extension" | "prompt" | "skill";
   /**
    * 技能源文件绝对路径（`source === "skill"` 时取 pi 的 `sourceInfo.path`）。
    * 监控卡用它把「模型读了某个 SKILL.md」精确映射回技能名。

@@ -25,6 +25,7 @@ import styles from "./Settings.module.css";
 import { SettingsNav, type SettingsSectionId } from "./SettingsNav";
 import { ShortcutsPanel } from "./ShortcutsPanel";
 import { StartupPanel } from "./StartupPanel";
+import { TelegramPanel } from "./TelegramPanel";
 import { UsagePanel } from "./UsagePanel";
 
 const SECTION_TITLE_KEYS: Record<SettingsSectionId, string> = {
@@ -45,6 +46,7 @@ const SECTION_TITLE_KEYS: Record<SettingsSectionId, string> = {
   extensions: "settings.section.extensions",
   archived: "settings.section.archived",
   about: "settings.section.about",
+  telegram: "telegram.title",
 };
 
 /** 打开设置时默认落在「配置」（pi 路径等真实设置），避免先看到纯占位页。 */
@@ -80,6 +82,8 @@ export function SettingsDialog() {
 
   const panel = useMemo(() => {
     switch (active) {
+      case "telegram":
+        return <TelegramPanel />;
       case "general":
         return <GeneralPanel />;
       case "appearance":

@@ -3,19 +3,31 @@ import path from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type {
   AgentChange,
+  AgentState,
   Conversation,
   ConversationView,
   ConversationWatch,
+  DocumentWatch,
   EntryId,
   EntryRecord,
   HarnessOptions,
   SubmissionDraft,
   SubmissionId,
   SubmissionRecord,
+  TaskId,
 } from "@earendil-works/pi-durable";
-import { Harness } from "@earendil-works/pi-durable";
+import { Harness, LiveDoc } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import type { DurableSessionUpdate } from "../shared/durableSession.js";
+import {
+  initialNativeSessionState,
+  type NativeJob,
+  type NativeSessionState,
+  type NativeStatePush,
+  type PlanAction,
+  parseQuestionnaireReply,
+} from "../shared/nativeBuiltins.js";
+import { NativeJobs, NativeState, PlanSignal, QuestionnaireSignal } from "./builtins/state.js";
 
 export type { DurableSessionUpdate } from "../shared/durableSession.js";
 
@@ -27,8 +39,10 @@ const writers = new Set<string>();
 
 interface OpenSession {
   harness: Harness;
+  now: () => number;
   conversation: Conversation;
   watch: ConversationWatch;
+  nativeWatch: DocumentWatch<NativeSessionState>;
   writerKey: string;
   lastEntry?: EntryId;
   listener: Promise<void>;
@@ -64,6 +78,10 @@ export class DurableSessions {
     private readonly storageRoot: string,
     private readonly options: (sessionId: string) => HarnessOptions,
     private readonly publish: (update: DurableSessionUpdate) => void,
+    private readonly publishNative: (push: NativeStatePush) => void = () => {},
+    private readonly prepareAgent: (
+      agent: Pick<AgentState, "model">,
+    ) => Promise<void> = async () => {},
   ) {
     if (!path.isAbsolute(storageRoot)) throw new Error("Durable storage root must be absolute.");
   }
@@ -134,6 +152,7 @@ export class DurableSessions {
     return this.run(sessionId, async (session) => {
       const epoch = ++session.epoch;
       await session.conversation.abort(context);
+      await this.reconcileNativeState(session);
       this.observeIdle(sessionId.toLowerCase(), session, epoch);
     });
   }
@@ -190,6 +209,169 @@ export class DurableSessions {
         await watch.stop();
       }
     });
+  }
+
+  /** Read the persistent interaction state without exposing raw task or signal access. */
+  nativeState(sessionId: string): Promise<NativeSessionState> {
+    return this.run(sessionId, async (session) => {
+      await this.reconcileNativeState(session);
+      return (
+        (await session.harness.snapshot(NativeState, session.conversation.id, context)) ??
+        initialNativeSessionState()
+      );
+    });
+  }
+
+  /** Local commands are durable passive entries, atomically deduplicated with the mode change. */
+  planCommand(sessionId: string, requestId: string, text: string): Promise<void> {
+    const match = /^\/plan(?:\s+(on|off))?$/i.exec(text);
+    if (!match)
+      return Promise.reject(
+        new Error(
+          "Use /plan, /plan on or /plan off. Review actions are available above the input bar.",
+        ),
+      );
+    return this.run(sessionId, async (session) => {
+      const epoch = ++session.epoch;
+      try {
+        await session.harness.commit(async (tx) => {
+          const previous = await tx.submissionByRequest(session.conversation.id, requestId);
+          if (previous) return;
+          const live = await tx.doc(LiveDoc, session.conversation.id);
+          if (live.run || live.compactions?.length)
+            throw new Error("Wait for the session to settle before changing mode.");
+          const state = await tx.doc(NativeState, session.conversation.id);
+          await session.conversation.submit(tx, {
+            type: "write",
+            requestId,
+            entry: { kind: "pidesk.command", data: text },
+          });
+          state.mode = match[1]
+            ? match[1].toLowerCase() === "on"
+              ? "plan"
+              : "edit"
+            : state.mode === "plan"
+              ? "edit"
+              : "plan";
+        }, context);
+      } finally {
+        this.observeIdle(sessionId.toLowerCase(), session, epoch);
+      }
+    });
+  }
+
+  setNativeMode(sessionId: string, mode: "edit" | "plan"): Promise<void> {
+    return this.run(sessionId, (session) =>
+      session.harness.commit(async (tx) => {
+        const live = await tx.doc(LiveDoc, session.conversation.id);
+        if (live.run || live.compactions?.length)
+          throw new Error("Wait for the session to settle before changing mode.");
+        (await tx.doc(NativeState, session.conversation.id)).mode = mode;
+      }, context),
+    );
+  }
+
+  answerQuestionnaire(
+    sessionId: string,
+    taskId: number,
+    version: number,
+    value: unknown,
+  ): Promise<string> {
+    return this.run(sessionId, (session) =>
+      session.harness.commit(async (tx) => {
+        const task = await tx.task(taskId as TaskId);
+        const state = await tx.doc(NativeState, session.conversation.id);
+        const pending = state.questions[String(taskId)];
+        if (
+          !pending ||
+          pending.version !== version ||
+          !task ||
+          task.kind !== "pi.tool" ||
+          task.conversationId !== session.conversation.id
+        )
+          return "closed";
+        if (task.state.status === "terminal" || pending.until <= session.now()) {
+          delete state.questions[String(taskId)];
+          return "closed";
+        }
+        const reply = parseQuestionnaireReply(value, pending.questions);
+        if (!reply) throw new Error("Invalid answer for the current questionnaire.");
+        const result = await tx.signal(
+          taskId as TaskId,
+          QuestionnaireSignal,
+          "answer",
+          JSON.stringify(reply),
+        );
+        if (["delivered", "duplicate", "closed"].includes(result))
+          delete state.questions[String(taskId)];
+        return result;
+      }, context),
+    );
+  }
+
+  answerPlan(sessionId: string, taskId: number, action: PlanAction): Promise<unknown> {
+    return this.run(sessionId, async (session) => {
+      const delivered = await session.harness.commit(async (tx) => {
+        const task = await tx.task(taskId as TaskId);
+        if (task?.kind !== "pidesk.review-plan" || task.conversationId !== session.conversation.id)
+          return "closed";
+        const state = await tx.doc(NativeState, session.conversation.id);
+        if (task.state.status === "terminal") {
+          const outcome = task.state.outcome;
+          return outcome.status === "completed" &&
+            typeof outcome.result === "object" &&
+            outcome.result !== null &&
+            "action" in outcome.result &&
+            outcome.result.action === action
+            ? "duplicate"
+            : "closed";
+        }
+        if (state.plan?.taskId !== taskId) return "closed";
+        if (state.plan.until <= session.now()) {
+          state.plan = null;
+          return "closed";
+        }
+        return tx.signal(taskId as TaskId, PlanSignal, "answer", action);
+      }, context);
+      if (!["delivered", "duplicate"].includes(delivered)) return { status: delivered };
+      const task = await session.harness.waitForTask(taskId as TaskId, context);
+      if (task.state.outcome.status !== "completed") {
+        await session.harness.commit(async (tx) => {
+          const state = await tx.doc(NativeState, session.conversation.id);
+          if (state.plan?.taskId === taskId) {
+            state.plan = null;
+            state.lastPlan = "";
+          }
+        }, context);
+        throw new Error(
+          "The plan review could not complete. Prepare the plan again before executing.",
+        );
+      }
+      const result = task.state.outcome.result;
+      if (
+        typeof result !== "object" ||
+        result === null ||
+        !("action" in result) ||
+        result.action !== action
+      )
+        return { status: "closed" };
+      return { status: delivered, result };
+    });
+  }
+
+  jobRows(sessionId: string): Promise<NativeJob[]> {
+    return this.run(sessionId, async (session) => [
+      ...((await session.harness.snapshot(NativeJobs, session.conversation.id, context))?.items ??
+        []),
+    ]);
+  }
+
+  updateJobs(sessionId: string, rows: NativeJob[]): Promise<void> {
+    return this.run(sessionId, (session) =>
+      session.harness.commit(async (tx) => {
+        (await tx.doc(NativeJobs, session.conversation.id)).items = rows;
+      }, context),
+    );
   }
 
   /** Atomically verify ownership settlement before retiring this writer. */
@@ -262,13 +444,23 @@ export class DurableSessions {
       if (current.cwd !== cwd) {
         throw new Error("Persisted Durable session belongs to another cwd.");
       }
+      await this.prepareAgent(current);
       if (instructions !== undefined && current.instructions !== instructions)
         await conversation.configure({ instructions }, context);
+      await conversation.commit(async (tx) => {
+        await tx.doc(NativeState, conversation.id);
+        await tx.doc(NativeJobs, conversation.id);
+      }, context);
+      await this.reconcileNativeState({ harness, conversation });
       const watch = await conversation.watch(context, { min: PAGE_SIZE, max: PAGE_SIZE * 2 });
+      const nativeWatch = await harness.watchDoc(NativeState, conversation.id, context);
+      if (!nativeWatch) throw new Error("Native session state was not initialized.");
       const session: OpenSession = {
         harness,
+        now: runtimeOptions.now ?? Date.now,
         conversation,
         watch,
+        nativeWatch,
         writerKey,
         lastEntry: watch.value.entries.at(-1)?.id ?? watch.value.before,
         listener: Promise.resolve(),
@@ -276,6 +468,25 @@ export class DurableSessions {
         settledEpoch: -1,
       };
       this.emit({ type: "snapshot", sessionId, view: watch.value });
+      // ConversationView mounts only pi.* documents; app-owned interaction state needs its own watch.
+      const publishNative = (state: NativeSessionState) => {
+        try {
+          this.publishNative({ sessionId, state });
+        } catch {
+          /* A disconnected desktop cannot fail a commit. */
+        }
+      };
+      publishNative(nativeWatch.value);
+      nativeWatch.start(async (call) => {
+        await this.enqueue(sessionId, session, async () => {
+          if (call.kind === "failed") throw call.error;
+          publishNative(call.value);
+        });
+      });
+      void nativeWatch.closed.then((end) => {
+        if (end.kind === "failed" || end.kind === "listener_error")
+          this.emit({ type: "error", sessionId, error: errorText(end.error) });
+      });
       watch.start(async (call) => {
         await this.enqueue(sessionId, session, async () => {
           if (call.kind === "failed") throw call.error;
@@ -336,6 +547,7 @@ export class DurableSessions {
       .then(async () => {
         const slot = this.sessions.get(sessionId);
         if (!slot?.accepting || session.epoch !== epoch) return;
+        await this.reconcileNativeState(session);
         const watch = await session.conversation.watch(context, { min: 1, max: 1 });
         try {
           await this.enqueue(sessionId, session, async () => {
@@ -360,6 +572,27 @@ export class DurableSessions {
           this.emit({ type: "error", sessionId, error: errorText(error) });
         }
       });
+  }
+
+  /** Remove requests whose owner ended before its normal cancellation/decision cleanup could commit. */
+  private reconcileNativeState(
+    session: Pick<OpenSession, "harness" | "conversation">,
+  ): Promise<void> {
+    return session.harness.commit(async (tx) => {
+      const state = await tx.doc(NativeState, session.conversation.id);
+      for (const [key, pending] of Object.entries(state.questions)) {
+        const task = await tx.task(pending.taskId as TaskId);
+        if (!task || task.state.status === "terminal") delete state.questions[key];
+      }
+      if (state.plan) {
+        const task = await tx.task(state.plan.taskId as TaskId);
+        if (!task || task.state.status === "terminal") {
+          state.plan = null;
+          if (task?.state.status === "terminal" && task.state.outcome.status !== "completed")
+            state.lastPlan = "";
+        }
+      }
+    }, context);
   }
 
   private enqueue(
@@ -393,6 +626,7 @@ export class DurableSessions {
     }
     await Promise.allSettled([...slot.operations]);
     ++session.epoch;
+    await session.nativeWatch.stop();
     await session.watch.stop();
     await session.listener;
     await session.harness.close(context);

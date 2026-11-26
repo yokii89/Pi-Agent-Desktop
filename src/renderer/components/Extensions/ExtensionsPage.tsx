@@ -28,6 +28,7 @@ import {
   type InstallPackageRequest,
 } from "./InstallPackageDialog";
 import { LocalResourcesSection } from "./LocalResourcesSection";
+import { ManagedSkillsSection } from "./ManagedSkillsSection";
 import { PackageList } from "./PackageList";
 
 type ScopeTab = "user" | "project";
@@ -450,6 +451,12 @@ export function ExtensionsPage() {
             />
           )}
         </section>
+
+        <ManagedSkillsSection
+          projectDir={projectDir}
+          onOpenPath={openPath}
+          onChanged={() => void refresh({ includeCatalog: false, silent: true })}
+        />
 
         {snapshot ? (
           <LocalResourcesSection

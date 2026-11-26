@@ -1,0 +1,123 @@
+{
+  "name": "@yoki/pi-telegram",
+  "version": "0.24.0",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Telegram runtime adapter for Pi",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "telegram",
+    "bot",
+    "extension"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yokii89/MyPiExtension.git",
+    "directory": "packages/pi-telegram-main"
+  },
+  "homepage": "https://github.com/yokii89/MyPiExtension/tree/main/packages/pi-telegram-main#readme",
+  "bugs": {
+    "url": "https://github.com/yokii89/MyPiExtension/issues"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test --test-reporter=dot tests/*.test.ts",
+    "test:verbose": "node --experimental-strip-types --test --test-reporter=spec tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "audit": "npm audit",
+    "pack:check": "npm pack --dry-run",
+    "validate": "npm run typecheck && npm test && npm run audit && npm run pack:check"
+  },
+  "files": [
+    "index.ts",
+    "api/",
+    "lib/",
+    "scripts/",
+    "README.md",
+    "AGENTS.md",
+    "BACKLOG.md",
+    "CHANGELOG.md",
+    "docs/",
+    "screenshot.png"
+  ],
+  "exports": {
+    ".": "./index.ts",
+    "./inbound": "./api/inbound.ts",
+    "./outbound": "./api/outbound.ts",
+    "./delivery": "./api/delivery.ts",
+    "./activity": "./api/activity.ts",
+    "./updates": "./api/updates.ts",
+    "./commands": "./api/commands.ts",
+    "./sections": "./api/sections.ts",
+    "./status": "./api/status.ts",
+    "./voice": "./api/voice.ts",
+    "./keyboard": "./api/keyboard.ts"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "./screenshot.png"
+  },
+  "pidesk": {
+    "contributes": {
+      "panels": [
+        {
+          "id": "telegram-bridge",
+          "title": "Telegram",
+          "description": "Bridge 连接态、队列、Threads 与 runtime 事件（观察与控制面板）",
+          "icon": "puzzle-piece",
+          "accent": "default",
+          "activation": "onSessionView"
+        }
+      ],
+      "accessModes": [],
+      "settingsViews": []
+    },
+    "worker": {
+      "safe": false
+    }
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": ">=1.4.0",
+    "@earendil-works/pi-ai": ">=1.4.0",
+    "@earendil-works/pi-coding-agent": ">=1.4.0",
+    "typebox": "*"
+  },
+  "dependencies": {
+    "@pidesk/view-sdk": "^0.5.2"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "latest"
+  },
+  "overrides": {
+    "protobufjs": "7.6.4",
+    "undici": "8.5.0",
+    "ws": "8.21.0",
+    "@earendil-works/pi-coding-agent": {
+      "protobufjs": "7.6.4",
+      "undici": "8.5.0",
+      "ws": "8.21.0",
+      "@google/genai": {
+        "protobufjs": "7.6.4",
+        "ws": "8.21.0"
+      },
+      "@earendil-works/pi-ai": {
+        "protobufjs": "7.6.4",
+        "ws": "8.21.0",
+        "@google/genai": {
+          "protobufjs": "7.6.4",
+          "ws": "8.21.0"
+        }
+      }
+    }
+  }
+}

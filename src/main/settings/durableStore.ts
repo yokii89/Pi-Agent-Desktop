@@ -4,6 +4,7 @@ import { app, safeStorage } from "electron";
 import type { DurableModelConfig, RuntimeModelConfig } from "../../shared/durableProtocol";
 import { parseRuntimeModel } from "../../shared/durableProtocol";
 import type { SessionSummary } from "../../shared/ipc";
+import { gatewayBaseUrl } from "../../shared/newApi";
 import { DURABLE_SESSION_ID, sessionRefKey } from "../../shared/sessionRef";
 
 const root = () => path.join(app.getPath("userData"), "durable", "v1");
@@ -74,7 +75,7 @@ export function readDurableModel(): RuntimeModelConfig | undefined {
 export function publicDurableModel(): DurableModelConfig | null {
   const config = readDurableModel();
   if (!config) return null;
-  const { apiKey: _key, ...publicConfig } = config;
+  const { apiKey: _key, models: _models, ...publicConfig } = config;
   return { ...publicConfig, hasKey: true };
 }
 
@@ -83,10 +84,17 @@ export function saveDurableModel(value: unknown): DurableModelConfig {
   if (typeof value !== "object" || value === null || Array.isArray(value))
     throw new Error("Invalid model configuration.");
   const request = value as Record<string, unknown>;
+  if (typeof request.baseUrl !== "string") throw new Error("Invalid gateway endpoint.");
+  const baseUrl = gatewayBaseUrl(request.baseUrl);
   const previous = readDurableModel();
-  if (!request.apiKey && previous && previous.baseUrl !== request.baseUrl)
+  if (!request.apiKey && previous && gatewayBaseUrl(previous.baseUrl) !== baseUrl)
     throw new Error("Enter an API key for the new endpoint.");
-  const config = parseRuntimeModel({ ...request, apiKey: request.apiKey || previous?.apiKey });
+  const config = parseRuntimeModel({
+    ...request,
+    baseUrl,
+    apiKey: request.apiKey || previous?.apiKey,
+    models: undefined,
+  });
   if (!config) throw new Error("Invalid model configuration. Use HTTPS or a local HTTP endpoint.");
   if (!safeStorage.isEncryptionAvailable())
     throw new Error("OS credential encryption is unavailable.");
