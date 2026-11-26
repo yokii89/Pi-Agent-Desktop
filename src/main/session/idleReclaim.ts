@@ -20,7 +20,6 @@ import {
   waitForSessionDisposal,
 } from "./piSession";
 import {
-  deferRuntimeIdleReclaim,
   getWatchedSession,
   listIdleReclaimCandidates,
   noteRuntimeTouched,
@@ -47,6 +46,8 @@ let viewingAt: number | null = null;
 let lastScanAt: number | null = null;
 let graceStartedAt: number | null = null;
 let suspended = false;
+// 回收核对的退避不属于会话活动；按进程身份保存，实例替换后不继承旧等待。
+let reclaimDeferredAt = new WeakMap<object, number>();
 // dispose / suspend / resume 使已开始的异步核对失效，旧扫描不得在恢复后继续关闭进程。
 let epoch = 0;
 const stats = { reclaimed: 0, lastScanAt: null as number | null };
@@ -112,6 +113,16 @@ function canScan(now: number, scanEpoch: number): boolean {
   );
 }
 
+function deferIdleReclaim(
+  sessionId: SessionId,
+  processToken = getSessionProcessToken(sessionId),
+  scanEpoch = epoch,
+): void {
+  if (epoch === scanEpoch && processToken && getSessionProcessToken(sessionId) === processToken) {
+    reclaimDeferredAt.set(processToken, Date.now());
+  }
+}
+
 function stillIdle(sessionId: SessionId, now: number): boolean {
   const candidate = listIdleReclaimCandidates().find((item) => item.sessionId === sessionId);
   if (!candidate) return false;
@@ -129,8 +140,10 @@ function stillIdle(sessionId: SessionId, now: number): boolean {
     now,
     threshold(),
   );
-  if (!verdict.reclaim && verdict.reason !== "not-idle-enough") deferRuntimeIdleReclaim(sessionId);
-  return verdict.reclaim;
+  if (!verdict.reclaim && verdict.reason !== "not-idle-enough") deferIdleReclaim(sessionId);
+  const processToken = getSessionProcessToken(sessionId);
+  const deferredAt = processToken ? reclaimDeferredAt.get(processToken) : undefined;
+  return verdict.reclaim && (deferredAt === undefined || now - deferredAt >= threshold());
 }
 
 /** 不从缺失字段推断空闲，兼容不了的旧协议保留实例。 */
@@ -178,7 +191,7 @@ async function scan(now: number, scanEpoch: number): Promise<ScanResult> {
     if (!processToken) continue;
     try {
       if (await hasLiveBackgroundJobs(sessionId)) {
-        deferRuntimeIdleReclaim(sessionId);
+        deferIdleReclaim(sessionId, processToken, scanEpoch);
         result.unsure.push(sessionId);
         continue;
       }
@@ -193,7 +206,7 @@ async function scan(now: number, scanEpoch: number): Promise<ScanResult> {
       }
       const state = await fetchSessionState(sessionId, STATE_PROBE_TIMEOUT_MS);
       if (!confirmsIdle(state)) {
-        deferRuntimeIdleReclaim(sessionId);
+        deferIdleReclaim(sessionId, processToken, scanEpoch);
         result.unsure.push(sessionId);
         continue;
       }
@@ -210,7 +223,7 @@ async function scan(now: number, scanEpoch: number): Promise<ScanResult> {
       result.reclaimed.push(sessionId);
       stats.reclaimed += 1;
     } catch {
-      deferRuntimeIdleReclaim(sessionId);
+      deferIdleReclaim(sessionId, processToken, scanEpoch);
       result.unsure.push(sessionId);
     }
   }
@@ -237,6 +250,7 @@ export function initIdleReclaim(): void {
 /** 结束后，尚未返回的探测也失去回收权限。 */
 export function disposeIdleReclaim(): void {
   epoch += 1;
+  reclaimDeferredAt = new WeakMap();
   initialized = false;
   if (scanTimer) clearInterval(scanTimer);
   scanTimer = null;

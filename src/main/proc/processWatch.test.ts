@@ -74,6 +74,23 @@ describe("collectSubtree / isDescendantOf", () => {
   });
 });
 
+describe("mergeSnapshots 的进程身份", () => {
+  it("PID 已复用时保留新进程的父节点和创建时间", () => {
+    const before = row({ pid: 2, ppid: 1, startedAt: 1000 });
+    const after = row({ pid: 2, ppid: 99, name: "msedge.exe", startedAt: 10_000 });
+    expect(mergeSnapshots(snap(before), snap(after)).get(2)).toEqual(after);
+  });
+
+  it.each([1000, 0])("同一进程或创建时间未知（%i）时保留历史父节点", (startedAt) => {
+    const before = row({ pid: 2, ppid: 1, startedAt: 1000 });
+    const after = row({ pid: 2, ppid: 99, startedAt });
+    expect(mergeSnapshots(snap(before), snap(after)).get(2)).toMatchObject({
+      ppid: 1,
+      startedAt: 1000,
+    });
+  });
+});
+
 describe("diffNewInSubtree", () => {
   it("returns only new descendants of root", () => {
     const baseline = snap(
@@ -94,6 +111,56 @@ describe("diffNewInSubtree", () => {
     const baseline = snap(row({ pid: 1, ppid: 0 }), row({ pid: 2, ppid: 1 }));
     const current = snap(row({ pid: 1, ppid: 0 }), row({ pid: 2, ppid: 1 }));
     expect(diffNewInSubtree(baseline, current, 1)).toEqual([]);
+  });
+
+  it("旧 shell 的 PID 被浏览器复用后，不把浏览器及其子进程归到会话", () => {
+    const root = row({ pid: 1 });
+    const baseline = snap(root, row({ pid: 2, ppid: 1, startedAt: 1000 }));
+    const current = snap(
+      root,
+      row({ pid: 2, ppid: 99, name: "msedge.exe", startedAt: 10_000 }),
+      row({ pid: 3, ppid: 2, name: "msedge.exe", startedAt: 11_000 }),
+    );
+    expect(diffNewInSubtree(baseline, current, 1, 1000)).toEqual([]);
+  });
+
+  it("父 PID 已复用时，仍通过历史身份找回原先未退出的后台作业", () => {
+    const root = row({ pid: 1 });
+    const baseline = snap(root, row({ pid: 2, ppid: 1, startedAt: 1000 }));
+    const job = row({ pid: 3, ppid: 2, name: "curl.exe", startedAt: 2000 });
+    const current = snap(
+      root,
+      row({ pid: 2, ppid: 99, name: "msedge.exe", startedAt: 10_000 }),
+      job,
+      row({ pid: 4, ppid: 2, name: "msedge.exe", startedAt: 11_000 }),
+    );
+    expect(diffNewInSubtree(baseline, current, 1, 1000)).toEqual([job]);
+  });
+
+  it("会话内新进程复用了基线 PID，仍应识别为新后台工作", () => {
+    const root = row({ pid: 1 });
+    const baseline = snap(root, row({ pid: 2, ppid: 99, startedAt: 1000 }));
+    const job = row({ pid: 2, ppid: 1, name: "curl.exe", startedAt: 10_000 });
+    expect(diffNewInSubtree(baseline, snap(root, job), 1)).toEqual([job]);
+  });
+
+  it("已知父进程晚于子进程创建时，不建立不可能的父子关系", () => {
+    const root = row({ pid: 1 });
+    const current = snap(
+      root,
+      row({ pid: 2, ppid: 1, startedAt: 10_000 }),
+      row({ pid: 3, ppid: 2, startedAt: 2000 }),
+    );
+    expect(diffNewInSubtree(snap(root), current, 1).map((item) => item.pid)).toEqual([2]);
+  });
+
+  it("根 PID 已复用时，不把替代进程的子树归到原会话", () => {
+    const baseline = snap(row({ pid: 1, startedAt: 1000 }));
+    const current = snap(
+      row({ pid: 1, ppid: 99, startedAt: 10_000 }),
+      row({ pid: 2, ppid: 1, startedAt: 11_000 }),
+    );
+    expect(diffNewInSubtree(baseline, current, 1, 1000)).toEqual([]);
   });
 });
 

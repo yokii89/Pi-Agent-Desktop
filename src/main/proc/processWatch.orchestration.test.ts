@@ -72,6 +72,133 @@ describe("ProcessWatcher 边界编排", () => {
     watcher.dispose();
   });
 
+  it.each([false, true])(
+    "并发调用分别收口，不因基线返回顺序留下永久保护（逆序 %s）",
+    async (reverse) => {
+      const first = deferred<ProcessSnapshot | null>();
+      const second = deferred<ProcessSnapshot | null>();
+      const enumerate = vi
+        .fn<() => Promise<ProcessSnapshot | null>>()
+        .mockImplementationOnce(() => first.promise)
+        .mockImplementationOnce(() => second.promise)
+        .mockResolvedValue(baselineWithoutService);
+      const watcher = new ProcessWatcher({ enumerate, register: vi.fn(), markExited: vi.fn() });
+      const a = watcher.noteBashStart("s1", 1, "a");
+      const b = watcher.noteBashStart("s1", 1, "b");
+      watcher.noteBashEnd("s1", "b");
+      watcher.noteBashEnd("s1", "a");
+      if (reverse) {
+        second.resolve(baselineWithoutService);
+        await b;
+        first.resolve(baselineWithoutService);
+        await a;
+      } else {
+        first.resolve(baselineWithoutService);
+        await a;
+        second.resolve(baselineWithoutService);
+        await b;
+      }
+      await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs);
+      expect(watcher.hasPotentialBackgroundWork("s1", baselineWithoutService)).toBe(false);
+      watcher.dispose();
+    },
+  );
+
+  it("并发调用中先结束的调用仍登记自己的后台作业，另一调用继续受保护", async () => {
+    const enumerate = vi
+      .fn<() => Promise<ProcessSnapshot | null>>()
+      .mockResolvedValue(baselineWithService);
+    const register = vi.fn();
+    const watcher = new ProcessWatcher({ enumerate, register, markExited: vi.fn() });
+    await watcher.noteBashStart("s1", 1, "a");
+    await watcher.noteBashStart("s1", 1, "b");
+    watcher.noteBashEnd("s1", "a");
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs + WATCH_TIMING.recheckMs[0]);
+    expect(register).toHaveBeenCalledWith(
+      expect.objectContaining({ pid: 300, sourceToolCallId: "a" }),
+    );
+    expect(watcher.hasPotentialBackgroundWork("s1", baselineWithoutService)).toBe(true);
+    watcher.noteBashEnd("s1", "b");
+    enumerate.mockResolvedValue(baselineWithoutService);
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs);
+    expect(watcher.hasPotentialBackgroundWork("s1", baselineWithoutService)).toBe(false);
+    watcher.dispose();
+  });
+
+  it("下一调用开始时不会取消上一调用已安排的收口", async () => {
+    const watcher = new ProcessWatcher({
+      enumerate: async () => baselineWithoutService,
+      register: vi.fn(),
+      markExited: vi.fn(),
+    });
+    await watcher.noteBashStart("s1", 1, "a");
+    watcher.noteBashEnd("s1", "a");
+    await watcher.noteBashStart("s1", 1, "b");
+    watcher.noteBashEnd("s1", "b");
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs);
+    expect(watcher.hasPotentialBackgroundWork("s1", baselineWithoutService)).toBe(false);
+    watcher.dispose();
+  });
+
+  it("无调用 ID 的结束事件只对唯一在途调用收口", async () => {
+    const watcher = new ProcessWatcher({
+      enumerate: async () => baselineWithoutService,
+      register: vi.fn(),
+      markExited: vi.fn(),
+    });
+    await watcher.noteBashStart("s1", 1, "a");
+    await watcher.noteBashStart("s1", 1, "b");
+    watcher.noteBashEnd("s1");
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs);
+    expect(watcher.hasPotentialBackgroundWork("s1", baselineWithoutService)).toBe(true);
+    watcher.noteBashEnd("s1", "a");
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs);
+    expect(watcher.hasPotentialBackgroundWork("s1", baselineWithoutService)).toBe(true);
+    watcher.noteBashEnd("s1");
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs);
+    expect(watcher.hasPotentialBackgroundWork("s1", baselineWithoutService)).toBe(false);
+    watcher.dispose();
+  });
+
+  it("收口快照返回前取消会话，旧调用不能再登记进程或影响同 ID 的新调用", async () => {
+    const closing = deferred<ProcessSnapshot | null>();
+    const enumerate = vi
+      .fn<() => Promise<ProcessSnapshot | null>>()
+      .mockResolvedValueOnce(baselineWithoutService)
+      .mockImplementationOnce(() => closing.promise)
+      .mockResolvedValue(baselineWithService);
+    const register = vi.fn();
+    const watcher = new ProcessWatcher({ enumerate, register, markExited: vi.fn() });
+    await watcher.noteBashStart("s1", 1, "a");
+    watcher.noteBashEnd("s1", "a");
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs);
+    watcher.cancelSession("s1");
+    await watcher.noteBashStart("s1", 1, "a");
+    watcher.noteBashEnd("s1", "a");
+    closing.resolve(baselineWithService);
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs + WATCH_TIMING.jobSurviveMs);
+    expect(register).not.toHaveBeenCalled();
+    expect(watcher.hasPotentialBackgroundWork("s1", baselineWithoutService)).toBe(false);
+    watcher.dispose();
+  });
+
+  it("取消所有并发调用后，迟到的基线不会重新加入保护", async () => {
+    const baseline = deferred<ProcessSnapshot | null>();
+    const watcher = new ProcessWatcher({
+      enumerate: () => baseline.promise,
+      register: vi.fn(),
+      markExited: vi.fn(),
+    });
+    const a = watcher.noteBashStart("s1", 1, "a");
+    const b = watcher.noteBashStart("s1", 1, "b");
+    watcher.cancelSession("s1");
+    baseline.resolve(baselineWithService);
+    await Promise.all([a, b]);
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs);
+    expect(watcher.hasPotentialBackgroundWork("s1", baselineWithService)).toBe(false);
+    watcher.dispose();
+  });
+
   it("baseline 晚拍已含新服务：按创建时间判据仍登记", async () => {
     const enumerate = vi
       .fn<() => Promise<ProcessSnapshot | null>>()
@@ -142,6 +269,29 @@ describe("ProcessWatcher 边界编排", () => {
     );
     expect(register).toHaveBeenCalledTimes(1);
     expect(markExited).not.toHaveBeenCalled();
+    watcher.dispose();
+  });
+
+  it.each([0, 1])("服务第 %i 档复核不认领复用后的 PID", async (step) => {
+    const reused = snap(
+      row({ pid: 1 }),
+      row({ pid: 300, ppid: 99, name: "msedge.exe", startedAt: 10_000 }),
+    );
+    const enumerate = vi
+      .fn<() => Promise<ProcessSnapshot | null>>()
+      .mockResolvedValueOnce(baselineWithoutService)
+      .mockResolvedValueOnce(baselineWithService);
+    if (step > 0) enumerate.mockResolvedValueOnce(baselineWithService);
+    enumerate.mockResolvedValue(reused);
+    const register = vi.fn();
+    const markExited = vi.fn();
+    const watcher = new ProcessWatcher({ enumerate, register, markExited });
+    await watcher.noteBashStart("s1", 1, "a");
+    watcher.noteBashEnd("s1", "a");
+    await vi.advanceTimersByTimeAsync(WATCH_TIMING.settleMs + WATCH_TIMING.recheckMs[step]);
+    expect(register).toHaveBeenCalledTimes(step);
+    if (step > 0) expect(markExited).toHaveBeenCalledWith(300, "s1");
+    else expect(markExited).not.toHaveBeenCalled();
     watcher.dispose();
   });
 

@@ -19,6 +19,20 @@ export interface ProcessSnapshotRow {
 
 export type ProcessSnapshot = ReadonlyMap<number, ProcessSnapshotRow>;
 
+const PROCESS_START_TOLERANCE_MS = 2000;
+
+function startsAfter(left: ProcessSnapshotRow, right: ProcessSnapshotRow): boolean {
+  return (
+    left.startedAt > 0 &&
+    right.startedAt > 0 &&
+    left.startedAt - right.startedAt > PROCESS_START_TOLERANCE_MS
+  );
+}
+
+function hasDifferentIdentity(left: ProcessSnapshotRow, right: ProcessSnapshotRow): boolean {
+  return startsAfter(left, right) || startsAfter(right, left);
+}
+
 /** 中间层 shell / 宿主：只作树边，不单独登记。 */
 const SHELL_WRAPPERS = new Set(
   [
@@ -116,9 +130,9 @@ export function mergeSnapshots(...maps: ProcessSnapshot[]): ProcessSnapshot {
   const merged = new Map<number, ProcessSnapshotRow>();
   for (const map of maps) {
     for (const [pid, row] of map) {
-      // 后写覆盖：S1 的存活信息优先；PPID 以最早可见为准（S0 更接近创建时）
+      // 只有同一代进程才能沿用历史父节点，PID 复用后必须采用新进程的关系。
       const existing = merged.get(pid);
-      if (!existing) {
+      if (!existing || hasDifferentIdentity(existing, row)) {
         merged.set(pid, row);
       } else {
         merged.set(pid, {
@@ -134,20 +148,25 @@ export function mergeSnapshots(...maps: ProcessSnapshot[]): ProcessSnapshot {
 
 /**
  * 从 pid 沿 PPID 爬到 rootPid（允许经过已死节点，只要 merged 里有历史行）。
- * 到达返回 true；成环或断链返回 false。
+ * 到达返回 true；成环或断链返回 false。历史快照可找回父 PID 复用前的旧进程。
  */
 export function isDescendantOf(
   merged: ProcessSnapshot,
   pid: number,
   rootPid: number,
   maxHops = 64,
+  historical?: ProcessSnapshot,
 ): boolean {
-  let cur = pid;
-  for (let hop = 0; hop < maxHops; hop += 1) {
-    if (cur === rootPid) return true;
-    const row = merged.get(cur);
-    if (!row || row.ppid === 0 || row.ppid === cur) return false;
-    cur = row.ppid;
+  let row = merged.get(pid);
+  const originalRoot = historical?.get(rootPid);
+  for (let hop = 0; hop < maxHops && row; hop += 1) {
+    if (row.pid === rootPid) return !originalRoot || !hasDifferentIdentity(originalRoot, row);
+    if (row.ppid === 0 || row.ppid === row.pid) return false;
+    let parent = merged.get(row.ppid);
+    // 子进程早于当前父 PID 的创建时间，属于该 PID 被复用前的旧一代。
+    if (parent && startsAfter(parent, row)) parent = historical?.get(row.ppid);
+    if (!parent || startsAfter(parent, row)) return false;
+    row = parent;
   }
   return false;
 }
@@ -170,8 +189,9 @@ export function diffNewInSubtree(
   for (const [pid, row] of current) {
     if (pid === rootPid) continue;
     const startedThisCall = sinceMs !== undefined && row.startedAt > 0 && row.startedAt >= sinceMs;
-    if (baseline.has(pid) && !startedThisCall) continue;
-    if (!isDescendantOf(merged, pid, rootPid)) continue;
+    const previous = baseline.get(pid);
+    if (previous && !hasDifferentIdentity(previous, row) && !startedThisCall) continue;
+    if (!isDescendantOf(merged, pid, rootPid, undefined, baseline)) continue;
     out.push(row);
   }
   return out;
@@ -290,14 +310,14 @@ interface PendingBoundary {
 
 /**
  * bash 边界编排：start 记基线，end 延迟快照 diff，再按复核窗丢短命进程。
- * 同 session 串行处理最近一次 bash（并发 bash 时后一次覆盖前一次的 pending）。
+ * 每个 session + toolCallId 独立收口，并发调用不能覆盖彼此的基线或结束事件。
  *
  * pending 必须同步建立：baseline 枚举要 ~1.8s，快速命令（`npm run dev &`）
  * 的 end 会先到；等 await 完再登记 pending 会把这类边界整个丢掉。
  */
 export class ProcessWatcher {
   private readonly deps: ProcessWatcherDeps;
-  private readonly pending = new Map<SessionId, PendingBoundary>();
+  private readonly pending = new Map<SessionId, Map<string, PendingBoundary>>();
   // 展示启发式会丢掉 shell、短命或枚举失败的条目；自动回收必须另保留完整边界证据。
   private readonly reclaimBoundaries = new Map<SessionId, Set<BashBoundaryState>>();
   private readonly reclaimRows = new Map<BashBoundaryState, ProcessSnapshotRow[]>();
@@ -311,25 +331,29 @@ export class ProcessWatcher {
   /** tool_execution_start（bash）：记 t0 + 基线 S0（异步补齐）。 */
   async noteBashStart(sessionId: SessionId, rootPid: number, toolCallId: string): Promise<void> {
     if (this.disposed || rootPid <= 0) return;
-    const existing = this.pending.get(sessionId);
-    if (existing?.timer) clearTimeout(existing.timer);
+    let calls = this.pending.get(sessionId);
+    if (calls?.has(toolCallId)) return;
+    if (!calls) {
+      calls = new Map();
+      this.pending.set(sessionId, calls);
+    }
     const entry: PendingBoundary = {
       state: { sessionId, rootPid, toolCallId, baseline: null, startedAt: Date.now() },
       timer: null,
       endedAt: null,
     };
-    this.pending.set(sessionId, entry);
+    calls.set(toolCallId, entry);
     let boundaries = this.reclaimBoundaries.get(sessionId);
     if (!boundaries) {
       boundaries = new Set();
       this.reclaimBoundaries.set(sessionId, boundaries);
     }
     boundaries.add(entry.state);
-    const observed = await this.deps.enumerate();
+    const observed = await this.deps.enumerate().catch(() => null);
     // 缺失基线意味着无法证明没有遗漏后台进程，保守保留此边界直到会话显式结束。
     const baseline = observed ?? new Map();
-    // 期间被新的 bash 取代 / 会话取消 / 应用退出：旧边界不复活
-    if (this.disposed || this.pending.get(sessionId) !== entry) return;
+    // 会话取消或退出后，迟到的基线不能影响同 ID 的新调用。
+    if (this.disposed || this.pending.get(sessionId)?.get(toolCallId) !== entry) return;
     entry.state.baseline = baseline;
     if (!observed) this.reclaimRows.set(entry.state, []);
     if (entry.endedAt !== null) {
@@ -339,13 +363,18 @@ export class ProcessWatcher {
 
   /**
    * tool_execution_end（bash）：+settleMs 再快照 S1 并 diff 登记。
-   * toolCallId 可选：传入时仅当与 pending 的 bash 调用匹配才收口。
+   * 缺少 toolCallId 时只能确认唯一在途调用，不能猜测并发调用的归属。
    */
   noteBashEnd(sessionId: SessionId, toolCallId?: string): void {
     if (this.disposed) return;
-    const entry = this.pending.get(sessionId);
+    const calls = this.pending.get(sessionId);
+    const entry =
+      toolCallId === undefined
+        ? calls?.size === 1
+          ? calls.values().next().value
+          : undefined
+        : calls?.get(toolCallId);
     if (!entry) return;
-    if (toolCallId !== undefined && entry.state.toolCallId !== toolCallId) return;
     if (entry.timer) clearTimeout(entry.timer);
     entry.timer = null;
     if (entry.state.baseline === null) {
@@ -358,8 +387,9 @@ export class ProcessWatcher {
 
   /** 会话 dispose：取消未决边界（不 kill 后台，回收由调用方决定）。 */
   cancelSession(sessionId: SessionId): void {
-    const entry = this.pending.get(sessionId);
-    if (entry?.timer) clearTimeout(entry.timer);
+    for (const entry of this.pending.get(sessionId)?.values() ?? []) {
+      if (entry.timer) clearTimeout(entry.timer);
+    }
     this.pending.delete(sessionId);
     for (const state of this.reclaimBoundaries.get(sessionId) ?? []) this.reclaimRows.delete(state);
     this.reclaimBoundaries.delete(sessionId);
@@ -377,10 +407,7 @@ export class ProcessWatcher {
       const current = diffNewInSubtree(state.baseline, snapshot, state.rootPid, state.startedAt);
       const surviving = known.filter((row) => {
         const alive = snapshot.get(row.pid);
-        return (
-          alive &&
-          (!row.startedAt || !alive.startedAt || Math.abs(row.startedAt - alive.startedAt) <= 2000)
-        );
+        return alive && !hasDifferentIdentity(row, alive);
       });
       if (current.length > 0 || surviving.length > 0) return true;
       boundaries.delete(state);
@@ -392,8 +419,10 @@ export class ProcessWatcher {
 
   dispose(): void {
     this.disposed = true;
-    for (const entry of this.pending.values()) {
-      if (entry.timer) clearTimeout(entry.timer);
+    for (const calls of this.pending.values()) {
+      for (const entry of calls.values()) {
+        if (entry.timer) clearTimeout(entry.timer);
+      }
     }
     this.pending.clear();
     this.reclaimBoundaries.clear();
@@ -414,15 +443,17 @@ export class ProcessWatcher {
   }
 
   private async resolveBoundary(entry: PendingBoundary): Promise<void> {
-    const { sessionId, baseline } = entry.state;
-    if (this.disposed || this.pending.get(sessionId) !== entry) return;
-    this.pending.delete(sessionId);
+    const { sessionId, toolCallId, baseline } = entry.state;
+    const calls = this.pending.get(sessionId);
+    if (this.disposed || calls?.get(toolCallId) !== entry) return;
+    calls.delete(toolCallId);
+    if (calls.size === 0) this.pending.delete(sessionId);
     if (!baseline) return;
-    const current = await this.deps.enumerate();
-    if (!current || this.disposed) return;
-    const rows = diffNewInSubtree(baseline, current, entry.state.rootPid, entry.state.startedAt);
+    const current = await this.deps.enumerate().catch(() => null);
     const boundaries = this.reclaimBoundaries.get(sessionId);
-    if (boundaries?.has(entry.state) && !this.reclaimRows.has(entry.state)) {
+    if (!current || this.disposed || !boundaries?.has(entry.state)) return;
+    const rows = diffNewInSubtree(baseline, current, entry.state.rootPid, entry.state.startedAt);
+    if (!this.reclaimRows.has(entry.state)) {
       if (rows.length > 0) this.reclaimRows.set(entry.state, rows);
       else boundaries.delete(entry.state);
     }
@@ -476,8 +507,7 @@ export class ProcessWatcher {
     if (isShellWrapper(name)) return;
     // 防 PID 复用：创建时间漂移过大就不是当初那个进程（对齐 procService.revalidate）
     const startedAt = alive.startedAt || row.startedAt;
-    if (row.startedAt && alive.startedAt && Math.abs(alive.startedAt - row.startedAt) > 2000)
-      return;
+    if (hasDifferentIdentity(row, alive)) return;
     this.deps.register({
       sessionId,
       pid: row.pid,
@@ -535,7 +565,7 @@ export class ProcessWatcher {
       return;
     }
     const alive = snapshot.get(row.pid);
-    if (!alive) {
+    if (!alive || hasDifferentIdentity(row, alive)) {
       if (step > 0) this.deps.markExited(row.pid, sessionId);
       return;
     }

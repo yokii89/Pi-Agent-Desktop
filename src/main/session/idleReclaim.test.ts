@@ -54,10 +54,6 @@ vi.mock("./runtimeCoordinator", () => ({
     const item = fake.candidates.find((row) => row.sessionId === id);
     if (item && fake.alive.has(id)) item.lastActivityAt = Date.now();
   },
-  deferRuntimeIdleReclaim: (id: string) => {
-    const item = fake.candidates.find((row) => row.sessionId === id);
-    if (item && fake.alive.has(id)) item.lastActivityAt = Date.now();
-  },
 }));
 
 import {
@@ -161,7 +157,7 @@ describe("空闲回收的正常边界", () => {
     expect(fake.disposed).toEqual([]);
   });
   it.each(["active", "dialog", "modal", "rpc", "activation", "scheduled", "background"])(
-    "%s 保护并延后空闲起点",
+    "%s 保护不改写最近活动时间",
     async (kind) => {
       const item = add();
       if (kind === "active") fake.watched = "a";
@@ -173,11 +169,11 @@ describe("空闲回收的正常边界", () => {
       if (kind === "background") fake.background.mockResolvedValue(true);
       await scanIdleSessions();
       expect(fake.disposed).toEqual([]);
-      expect(item.lastActivityAt).toBe(NOW);
+      expect(item.lastActivityAt).toBe(NOW - IDLE_MS - 1);
     },
   );
-  it("后台作业结束后重新等满阈值", async () => {
-    add();
+  it("后台作业结束后独立等待阈值，最近活动时间保持真实", async () => {
+    const item = add();
     fake.background.mockResolvedValueOnce(true);
     await scanIdleSessions();
     for (let minute = 1; minute < 30; minute += 1) {
@@ -190,6 +186,26 @@ describe("空闲回收的正常边界", () => {
     report();
     await scanIdleSessions();
     expect(fake.disposed).toEqual(["a"]);
+    expect(item.lastActivityAt).toBe(NOW - IDLE_MS - 1);
+  });
+  it.each(["background", "probe"] as const)(
+    "%s 查询失败只延后重试，不伪造会话活动",
+    async (target) => {
+      const item = add();
+      fake[target].mockRejectedValueOnce(new Error("timeout"));
+      expect((await scanIdleSessions()).unsure).toEqual(["a"]);
+      expect(item.lastActivityAt).toBe(NOW - IDLE_MS - 1);
+      await scanIdleSessions();
+      expect(fake.disposed).toEqual([]);
+      expect(fake.background).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("旧进程的重试等待不会转移给同会话 ID 的替代实例", async () => {
+    add();
+    fake.background.mockResolvedValueOnce(true);
+    await scanIdleSessions();
+    fake.tokens.set("a", {});
+    expect((await scanIdleSessions()).reclaimed).toEqual(["a"]);
   });
 });
 
