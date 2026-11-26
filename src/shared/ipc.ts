@@ -153,8 +153,8 @@ export interface PideskSettings {
   projects: PideskProject[];
   /** 上次使用的项目，启动时恢复。 */
   lastProjectId: string | null;
-  /** pi 可执行文件路径；null 时主进程从 PATH 解析。 */
-  piExecutablePath: string | null;
+  /** Desktop-owned bash override for Durable tools and Git Bash terminals. */
+  executionShellPath: string | null;
   terminalShell: TerminalShellKind;
   /** Tab 补全形态；cycle 逐个替换候选，list 一次列出全部（docs/design/60）。 */
   terminalTabCompletion: TerminalTabCompletion;
@@ -332,31 +332,29 @@ export const PROJECT_IPC = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// pi 信息
+// Bundled runtime information
 // ---------------------------------------------------------------------------
 
-/** pi 侧信息（版本 + 配置的默认模型），只读展示用（docs/design/01 §2.3）。 */
+/** Bundled Durable runtime and desktop model configuration, for read-only display. */
 export interface PiInfo {
-  /** `pi --version` 输出；解析失败为 null。 */
+  /** Bundled runtime version; null if unavailable. */
   version: string | null;
   provider: string | null;
   model: string | null;
   thinkingLevel: string | null;
-  /** 使用的 pi 可执行文件路径（供设置页校验展示）。 */
-  executablePath: string | null;
 }
 
 export const PI_IPC = {
-  /** 读取 pi 版本与默认模型配置；参数为可选的 pi 路径（设置页校验用）。 */
+  /** Read the bundled runtime version and desktop model configuration. */
   info: "pidesk:pi:info",
-  /** 探测 pi 将使用的 bash（按 pi 查找顺序），返回候选与推算结果。 */
+  /** Probe the desktop execution shell and its available candidates. */
   shellGet: "pidesk:pi:shellGet",
-  /** 写入 / 清除 pi 自身的 shellPath 配置。 */
+  /** Save or clear the desktop execution shell override. */
   shellSet: "pidesk:pi:shellSet",
 } as const;
 
 // ---------------------------------------------------------------------------
-// pi bash（shellPath）探测 —— pi 自己的配置，不落 PiDesk settings.json
+// Desktop execution shell probe — stored in PiDesk settings.json
 // ---------------------------------------------------------------------------
 
 /** 候选 bash 来源。 */
@@ -378,7 +376,7 @@ export interface PiShellCandidate {
 
 /** pi 将使用的 bash 探测结果。 */
 export interface PiShellProbe {
-  /** pi settings.json 里 shellPath 的原始值（未校验）。 */
+  /** PiDesk's configured execution shell override. */
   shellPath: string | null;
   candidates: PiShellCandidate[];
   /** 按 pi 查找顺序推算出的「pi 将使用的 bash」。 */
@@ -388,17 +386,17 @@ export interface PiShellProbe {
 }
 
 // ---------------------------------------------------------------------------
-// pi 会话（RPC 模式，废除内嵌 TUI；多实例并行见 docs/多会话并行架构方案）
+// Durable conversations, projected onto the desktop session channel
 // ---------------------------------------------------------------------------
 
 /**
  * 会话运行时实例 id（非 pi 协议 id，非 SessionSummary.id / sessionFile）。
- * 每个存活 `pi --mode rpc` 子进程对应一个 SessionId。
+ * Each attached Durable conversation has its own SessionId in the shared runtime.
  */
 export type SessionId = string;
 
 export const SESSION_IPC = {
-  /** 启动 pi RPC 子进程（`--mode rpc`）；同 sessionFile 存活实例复用，否则新建实例。 */
+  /** Open or reattach a Durable conversation; legacy JSONL is read-only. */
   start: "pidesk:session:start",
   /** 提交用户输入（RPC `prompt`；可携带运行中排队意图）。 */
   prompt: "pidesk:session:prompt",
@@ -406,7 +404,7 @@ export const SESSION_IPC = {
   clearQueue: "pidesk:session:clearQueue",
   /** 中断当前执行（RPC `abort`）。 */
   stop: "pidesk:session:stop",
-  /** 结束指定会话的 pi 进程（历史 JSONL 保留）。 */
+  /** Close one conversation's writer while preserving saved history. */
   dispose: "pidesk:session:dispose",
   /** 仅在主进程确认空闲后结束 pi；历史与后台项目进程保留。 */
   disposeIdle: "pidesk:session:disposeIdle",
@@ -418,7 +416,7 @@ export const SESSION_IPC = {
   messages: "pidesk:session:messages",
   /** 移除历史会话（会话 JSONL 文件移入系统回收站）。 */
   remove: "pidesk:session:remove",
-  /** 重命名会话（写入 pi JSONL 的 session_info；空名 = 清除）。 */
+  /** Rename a Durable conversation; an empty name clears the title. */
   rename: "pidesk:session:rename",
   /** 主进程推送：会话事件流 `{ sessionId, type, payload }`。 */
   output: "pidesk:session:output",
@@ -430,15 +428,15 @@ export const SESSION_IPC = {
   getModelState: "pidesk:session:getModelState",
   /** 切换模型（RPC `set_model`；同时写入 pi settings 默认模型）。 */
   setModel: "pidesk:session:setModel",
-  /** 读取可用模型列表（RPC `get_available_models`；无会话或 force 时短连探测）。 */
+  /** Read the desktop gateway's model catalog; force refreshes discovery. */
   getModels: "pidesk:session:getModels",
-  /** 仅写入 pi settings 的 defaultProvider/defaultModel（不依赖存活会话）。 */
+  /** Save the desktop model preference without requiring an open conversation. */
   setDefaultModel: "pidesk:session:setDefaultModel",
   /** 读取会话 JSONL 转为消息数组（磁盘优先展示，不依赖 pi 进程）。 */
   readTranscript: "pidesk:session:readTranscript",
   /** 导出会话记录为 Markdown 文件（保存对话框；docs/design/45）。 */
   exportMarkdown: "pidesk:session:exportMarkdown",
-  /** 导出会话记录为 HTML 文件（pi 原生导出：存活实例走 RPC，冷会话走 CLI）。 */
+  /** Export saved conversation history as HTML through the desktop exporter. */
   exportHtml: "pidesk:session:exportHtml",
   /** 读取会话用量统计（RPC `get_session_stats`，上下文占用）。 */
   getStats: "pidesk:session:getStats",
@@ -683,167 +681,6 @@ export interface PiModelOption {
   /** 是否已应用到存活会话；仅落盘默认模型或无会话时为 false。 */
   sessionApplied?: boolean;
 }
-
-// ---------------------------------------------------------------------------
-// 模型能力覆盖（~/.pi/agent/models.json → providers.<id>.modelOverrides，docs/design/49）
-// ---------------------------------------------------------------------------
-
-export const MODEL_OVERRIDES_IPC = {
-  /** 读取覆盖快照（provider → modelId → 本 UI 管理的字段）。 */
-  get: "pidesk:modelOverrides:get",
-  /** 写入一条覆盖补丁并重载存活会话（null 表示删除该键，回到默认）。 */
-  set: "pidesk:modelOverrides:set",
-} as const;
-
-/** 单模型覆盖补丁；字段为 null 表示删除该键。 */
-export interface PiModelOverridePatch {
-  contextWindow?: number | null;
-  maxTokens?: number | null;
-  input?: PiModelInputModality[] | null;
-  /**
-   * 该模型支持的思考档位；null = 删除 reasoning / thinkingLevelMap 覆盖。
-   * 主进程会据此写 pi 的 reasoning + thinkingLevelMap（只写非默认档位），
-   * 渲染层不需要了解 provider 级映射值。
-   */
-  thinkingLevels?: ThinkingLevelId[] | null;
-}
-
-/** 覆盖快照投影：provider → modelId → 覆盖字段（只含本 UI 管理的键）。 */
-export type PiModelOverridesSnapshot = Record<
-  string,
-  Record<
-    string,
-    {
-      contextWindow?: number;
-      maxTokens?: number;
-      input?: PiModelInputModality[];
-      /** 原始覆盖的 reasoning 键（存在即表示思考档位被用户改过）。 */
-      reasoning?: boolean;
-      /** 原始覆盖的档位映射（仅保留已知档位键）。 */
-      thinkingLevelMap?: PiThinkingLevelMap;
-    }
-  >
->;
-
-export interface PiModelOverrideSetRequest {
-  provider: string;
-  modelId: string;
-  patch: PiModelOverridePatch;
-}
-
-/** set 结果：写盘后自动重载的存活会话计数。 */
-export interface PiModelOverrideSetResult {
-  reloaded: number;
-  failed: number;
-}
-
-// ---------------------------------------------------------------------------
-// pi-ai 鉴权（~/.pi/agent/auth.json）—— 对齐 pi /login 与 pi-ai env-api-keys
-// ---------------------------------------------------------------------------
-
-/** 凭据类型：API Key 或 OAuth token（含自定义 provider 如 newapi）。 */
-export type PiAuthKind = "api_key" | "oauth" | "unknown";
-
-/**
- * 单条命名凭据（密钥只回传掩码，永不出渲染层明文）。
- * 同一 provider 可有多条（如公司/个人两把 DeepSeek key），激活时写入 auth.json 标准键。
- */
-export interface PiAuthProviderStatus {
-  /** 凭据唯一 id（PiDesk 注册表，非 auth.json 键名）。 */
-  id: string;
-  /** 自定义展示名，如「DeepSeek 公司」。 */
-  name: string;
-  /** 标准 provider id：deepseek / anthropic / newapi …（auth.json 键名）。 */
-  provider: string;
-  /**
-   * 凭据来源：pidesk = 在 PiDesk 里创建（激活时重写 auth.json）；
-   * pi = 从 pi CLI 已有登录导入（只读，激活只切默认 provider，不改写 auth.json）。
-   */
-  origin: "pidesk" | "pi";
-  kind: PiAuthKind;
-  /** 掩码凭据；无凭据为 null。 */
-  maskedCredential: string | null;
-  baseUrl: string | null;
-  /** 网关协议（目前仅 newapi：openai-completions | openai-responses）。 */
-  api: string | null;
-  /** 偏好默认模型（激活时写入 pi defaultModel）。 */
-  preferredModel: string | null;
-  /** 过期时间（Unix ms）；永不过期或未知为 null。 */
-  expiresAt: number | null;
-  expired: boolean;
-  /**
-   * pi 来源专用：auth.json 中已不存在该 provider 的登录（CLI 侧已登出 / 删除）。
-   * pidesk 来源恒为 false。
-   */
-  sourceMissing: boolean;
-  /** 是否为全局当前激活凭据（仅 settings.defaultProvider 对应的那一条为 true）。 */
-  active: boolean;
-}
-
-/** auth.json 中已有、但尚未导入 PiDesk 注册表的 provider（只含掩码信息）。 */
-export interface PiImportableProvider {
-  provider: string;
-  label: string;
-  kind: PiAuthKind;
-  maskedCredential: string | null;
-  expiresAt: number | null;
-  expired: boolean;
-}
-
-export interface PiAuthSnapshot {
-  providers: PiAuthProviderStatus[];
-  /** auth.json 中可导入的 provider（已收录的不会再出现）。 */
-  importable: PiImportableProvider[];
-  /** 当前激活凭据所属的 provider id（settings.defaultProvider）；无凭据时为 null。 */
-  activeProvider: string | null;
-  /** 当前激活凭据 id；无时为 null。 */
-  activeCredentialId: string | null;
-  /** 注册表文件绝对路径（便于用户手动打开核对）。 */
-  file: string;
-}
-
-/** 常见 API Key provider（写入 auth.json 的键名 + 展示名），对齐 pi providers 文档。 */
-export interface PiApiKeyProviderOption {
-  id: string;
-  label: string;
-  /** 对应环境变量名（仅展示提示）。 */
-  envVar: string;
-  /** 网关类 provider：允许自定义 baseUrl / api（目前仅 newapi）。官方源为 false。 */
-  gateway?: boolean;
-}
-
-/** newapi 等网关的协议类型。 */
-export type PiGatewayApiType = "openai-completions" | "openai-responses";
-
-/** 新增 / 更新凭据的请求体。密钥为 null 表示不修改原密钥。 */
-export interface PiAuthUpsertRequest {
-  /** 更新时必填；新增时省略（服务端生成 id）。 */
-  id?: string | null;
-  /** 自定义名称，如「DeepSeek 公司」。 */
-  name: string;
-  provider: string;
-  /** API Key 明文；新增时必填，更新时 null 表示保留原密钥。 */
-  apiKey?: string | null;
-  baseUrl?: string | null;
-  /** 网关协议；仅 newapi 使用。 */
-  api?: string | null;
-  preferredModel?: string | null;
-}
-
-export const AUTH_IPC = {
-  /** 读取 auth.json 中已配置的 provider 列表（掩码）。 */
-  list: "pidesk:pi:authList",
-  /** 新增 / 更新某 provider 凭据。 */
-  upsert: "pidesk:pi:authUpsert",
-  /** 移除某 provider 凭据。 */
-  remove: "pidesk:pi:authRemove",
-  /** 激活某凭据（写入 pi defaultProvider，并按 preferredModel 更新 defaultModel）。 */
-  setActive: "pidesk:pi:authSetActive",
-  /** 把 auth.json 中已有的 provider 导入注册表（origin=pi，不改写 auth.json）。 */
-  import: "pidesk:pi:authImport",
-  /** 常见 API Key provider 下拉选项（静态表）。 */
-  listApiKeyProviders: "pidesk:pi:authListApiKeyProviders",
-} as const;
 
 // ---------------------------------------------------------------------------
 // MCP 服务器管理（docs/design/39：pi 内置 MCP 扩展的 mcp.json 管理面板）

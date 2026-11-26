@@ -1006,8 +1006,8 @@ export const settingsMessages = defineMessages({
   },
 
   "settings.config.group.runtime": {
-    "zh-CN": "pi 运行时",
-    "en-US": "pi runtime",
+    "zh-CN": "内置 Durable 运行时",
+    "en-US": "Bundled Durable runtime",
   },
   "settings.config.piPath": {
     "zh-CN": "pi 可执行路径",
@@ -1036,14 +1036,18 @@ export const settingsMessages = defineMessages({
   },
   "settings.config.validating": { "zh-CN": "校验中…", "en-US": "Validating…" },
   "settings.config.browse": { "zh-CN": "浏览…", "en-US": "Browse…" },
-  "settings.config.piVersion": { "zh-CN": "pi 版本", "en-US": "pi version" },
+  "settings.config.runtimeDescription": {
+    "zh-CN": "pi-durable 随 PiDesk 内置提供，模型与工具由桌面管理。",
+    "en-US": "pi-durable ships with PiDesk. Models and tools are managed by the desktop.",
+  },
+  "settings.config.piVersion": { "zh-CN": "Durable 版本", "en-US": "Durable version" },
   "settings.config.piVersion.ready": {
     "zh-CN": "已就绪：v{version}",
     "en-US": "Ready: v{version}",
   },
   "settings.config.piVersion.missing": {
-    "zh-CN": "未找到 pi 或未安装",
-    "en-US": "pi not found or not installed",
+    "zh-CN": "无法读取内置运行时信息",
+    "en-US": "Bundled runtime information is unavailable",
   },
   "settings.config.notConnected": {
     "zh-CN": "未接入",
@@ -1058,8 +1062,8 @@ export const settingsMessages = defineMessages({
     "en-US": "Configure on Environment",
   },
   "settings.config.shell.source.settings": {
-    "zh-CN": "shellPath 配置",
-    "en-US": "shellPath setting",
+    "zh-CN": "PiDesk 执行 Shell 设置",
+    "en-US": "PiDesk execution shell setting",
   },
   "settings.config.shell.source.gitBashDefault": {
     "zh-CN": "Git Bash 默认位置",
@@ -1071,8 +1075,8 @@ export const settingsMessages = defineMessages({
     "en-US": "Reading probe results…",
   },
   "settings.config.shell.resolved.found": {
-    "zh-CN": "pi 将使用：{path}（来源 {source}）",
-    "en-US": "pi will use: {path} (from {source})",
+    "zh-CN": "Durable 将使用：{path}（来源 {source}）",
+    "en-US": "Durable will use: {path} (from {source})",
   },
   "settings.config.shell.resolved.missing": {
     "zh-CN": "未找到 bash：请安装 Git，或在环境页手动指定 bash.exe",
@@ -1111,8 +1115,8 @@ export const settingsMessages = defineMessages({
       "Applies to new terminal instances. Cycle replaces the word with each candidate on Tab; List all shows every candidate at once (in PowerShell, press Enter once more to run the selected candidate).",
   },
   "settings.environment.piShell": {
-    "zh-CN": "pi Shell（bash）",
-    "en-US": "pi shell (bash)",
+    "zh-CN": "Durable 执行 Shell（bash）",
+    "en-US": "Durable execution shell (bash)",
   },
   "settings.environment.select": { "zh-CN": "选择…", "en-US": "Choose…" },
   "settings.environment.clear": { "zh-CN": "清除", "en-US": "Clear" },
@@ -1121,12 +1125,12 @@ export const settingsMessages = defineMessages({
     "en-US": "First on PATH",
   },
   "settings.environment.shellPath.set": {
-    "zh-CN": "已写入 pi 配置：shellPath = {path}",
-    "en-US": "Saved to pi config: shellPath = {path}",
+    "zh-CN": "已保存 PiDesk 执行 Shell：{path}",
+    "en-US": "Saved PiDesk execution shell: {path}",
   },
   "settings.environment.shellPath.cleared": {
-    "zh-CN": "已清除 pi 的 shellPath 配置",
-    "en-US": "Cleared pi shellPath setting",
+    "zh-CN": "已清除 PiDesk 执行 Shell 设置",
+    "en-US": "Cleared PiDesk execution shell setting",
   },
   "settings.environment.shellPath.failed": {
     "zh-CN": "写入失败",
@@ -1787,8 +1791,8 @@ export const settingsMessages = defineMessages({
     "en-US": "No extension settings can run independently",
   },
   "settings.extensions.workerFailed": {
-    "zh-CN": "Worker 启动失败",
-    "en-US": "Worker failed to start",
+    "zh-CN": "原生扩展宿主启动失败",
+    "en-US": "Native extension host failed to start",
   },
   "settings.extensions.providedSettings": {
     "zh-CN": "扩展提供的设置",
@@ -1816,6 +1820,14 @@ export const settingsMessages = defineMessages({
   "settings.extensions.entry.description": {
     "zh-CN": " — {description}",
     "en-US": " — {description}",
+  },
+  "settings.extensions.entry.nativeHost": {
+    "zh-CN": " · 独立设置",
+    "en-US": " · Settings host",
+  },
+  "settings.extensions.legacyHost": {
+    "zh-CN": "需升级为原生扩展",
+    "en-US": "Native extension update required",
   },
   "settings.extensions.entry.workerSafe": {
     "zh-CN": " · Worker",

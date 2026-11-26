@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import type { PiShellCandidate, PiShellKind, PiShellProbe, PiShellSource } from "../../shared/ipc";
-import { readPiSettingsLenient, readPiSettingsStrict, writePiSettings } from "./piSettings";
+import { getSettings, updateSettings } from "../settings/settings";
 
 /** Git for Windows 的默认安装位置（pi 查找顺序的第二位）。 */
 const GIT_BASH_DEFAULT = path.join("C:\\Program Files\\Git", "bin", "bash.exe");
@@ -22,9 +22,9 @@ function detectKind(candidatePath: string): PiShellKind {
   return "unknown";
 }
 
-/** 读取 pi settings.json 的 shellPath 原始值；空串 / 非字符串按 null 处理。 */
+/** The execution shell is owned by PiDesk, independent of external agent configuration. */
 function readShellPath(): string | null {
-  const raw = readPiSettingsLenient().shellPath;
+  const raw = getSettings().executionShellPath;
   return typeof raw === "string" && raw.trim().length > 0 ? raw : null;
 }
 
@@ -165,21 +165,12 @@ export function validateBash(candidatePath: string): string {
   return out.trim().split(/\r?\n/)[0] ?? "";
 }
 
-/**
- * 写入 / 清除 pi 的 shellPath：读-改-写保留其余字段，只增删改 shellPath。
- * 文件不存在时创建（只含 shellPath）；文件损坏时抛错，绝不覆盖写。
- */
+/** Validate and persist the desktop execution shell through the central settings store. */
 export function setPiShellPath(value: string | null): PiShellProbe {
   if (value !== null) {
     validateBash(value);
   }
-  const next = readPiSettingsStrict();
-  if (value === null) {
-    delete next.shellPath;
-  } else {
-    next.shellPath = value;
-  }
-  writePiSettings(next);
+  updateSettings({ executionShellPath: value });
   const probe = probePiShell();
   cachedProbe = probe;
   return probe;

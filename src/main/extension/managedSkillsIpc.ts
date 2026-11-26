@@ -36,14 +36,7 @@ export function registerManagedSkillsIpc(): void {
     (service ??= new ManagedSkills({
       agentDir: getPiAgentDir(),
       version: app.getVersion(),
-      sourceRoot: path.join(
-        app.getAppPath(),
-        "vendor",
-        "MyPiExtension",
-        "packages",
-        "yoki-skills",
-        "skills",
-      ),
+      sourceRoot: path.join(app.getAppPath(), "assets", "skills"),
       discover: (directory) => discoverDurableResources(directory, app.getPath("home")),
     }));
   const handle = (channel: string, operation: (request: Record<string, unknown>) => unknown) => {

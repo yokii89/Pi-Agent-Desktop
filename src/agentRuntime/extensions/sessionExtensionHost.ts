@@ -3,6 +3,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRegistry, type Extension, type Registry } from "@earendil-works/pi-durable";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
+import { DesktopViewClient } from "@pidesk/view-sdk";
 import {
   defaultBuiltinToolsConfig,
   type RuntimeBuiltinToolsConfig,
@@ -11,6 +12,7 @@ import {
   DURABLE_COMMAND_NAME,
   DURABLE_EXTENSION_LIMIT,
   type DurableExtensionFactory,
+  type DurableExtensionHostScope,
   type DurableExtensionInstance,
   type DurableExtensionSpec,
   type DurablePromptCommand,
@@ -22,9 +24,11 @@ import { type BuiltinSessionServices, desktopBuiltinTools } from "../builtins/in
 import { planExtension } from "../builtins/plan.js";
 import { gatewayResponseRecovery } from "../models/gatewayRecovery.js";
 
-type HostedCommand = DurablePromptCommand & {
+type HostedCommand = Omit<DurablePromptCommand, "expand"> & {
   readonly source: "extension" | "skill" | "prompt";
   readonly filePath?: string;
+  expand(args: string): unknown;
+  hostOperation?: boolean;
 };
 
 /** One registry and factory instance set per top-level session. Module imports may be cached. */
@@ -33,8 +37,9 @@ export class SessionExtensionHost {
   private readonly controller = new AbortController();
   private readonly instances: { id: string; instance: DurableExtensionInstance }[] = [];
   private readonly commands = new Map<string, HostedCommand>();
-  private readonly inputs = new Map<string, { text: string; result: Promise<string> }>();
-  private readonly pending = new Set<Promise<string>>();
+  private readonly inputs = new Map<string, { text: string; result: Promise<string | null> }>();
+  private readonly pending = new Set<Promise<string | null>>();
+  private readonly viewClients = new Set<DesktopViewClient>();
   private accepting = true;
 
   private loaded = false;
@@ -44,10 +49,13 @@ export class SessionExtensionHost {
     readonly cwd: string,
     getBuiltinConfig: () => RuntimeBuiltinToolsConfig = defaultBuiltinToolsConfig,
     services?: BuiltinSessionServices,
+    readonly hostScope: DurableExtensionHostScope = "session",
   ) {
-    this.registry.install(CodingTools);
-    this.registry.install(gatewayResponseRecovery());
-    this.registry.install(desktopBuiltinTools(cwd, getBuiltinConfig, services));
+    if (hostScope === "session") {
+      this.registry.install(CodingTools);
+      this.registry.install(gatewayResponseRecovery());
+      this.registry.install(desktopBuiltinTools(cwd, getBuiltinConfig, services));
+    }
   }
 
   /** Install all required definitions before the Harness resumes saved tasks. */
@@ -57,7 +65,8 @@ export class SessionExtensionHost {
     if (specs.length > DURABLE_EXTENSION_LIMIT) throw durableExtensionError("invalid", "limit");
     const ids = new Set<string>();
     for (const spec of specs) {
-      if (!isDurableExtensionSpec(spec)) throw durableExtensionError("invalid", "manifest");
+      if (!isDurableExtensionSpec(spec) || !(spec.hosts ?? ["session"]).includes(this.hostScope))
+        throw durableExtensionError("invalid", "manifest");
       if (ids.has(spec.id) || this.registry.snapshot().extension(spec.id))
         throw durableExtensionError("duplicate", spec.id);
       ids.add(spec.id);
@@ -68,7 +77,7 @@ export class SessionExtensionHost {
         throw durableExtensionError("invalid", spec.id);
       }
     }
-    this.registry.install(planExtension());
+    if (this.hostScope === "session") this.registry.install(planExtension());
   }
 
   /** Declarative resources share admission deduplication with native prompt commands. */
@@ -97,7 +106,7 @@ export class SessionExtensionHost {
   }
 
   /** Concurrent retry of the same admission shares expansion; never retain failed expansions. */
-  expand(requestId: string, text: string): Promise<string> {
+  expand(requestId: string, text: string): Promise<string | null> {
     if (!this.accepting) return Promise.reject(durableExtensionError("closed", this.sessionId));
     const previous = this.inputs.get(requestId);
     if (previous) {
@@ -115,6 +124,10 @@ export class SessionExtensionHost {
         expanded = await command.expand(match[2] ?? "");
       } catch {
         throw durableExtensionError("commandFailed", command.name);
+      }
+      if (expanded === undefined && command.hostOperation) {
+        if (!this.accepting) throw durableExtensionError("closed", this.sessionId);
+        return null;
       }
       if (
         typeof expanded !== "string" ||
@@ -140,6 +153,8 @@ export class SessionExtensionHost {
   async stop(): Promise<void> {
     this.accepting = false;
     this.controller.abort();
+    for (const client of this.viewClients) client.dispose();
+    this.viewClients.clear();
     await Promise.allSettled([...this.pending]);
   }
 
@@ -161,7 +176,7 @@ export class SessionExtensionHost {
     this.commands.clear();
   }
 
-  private finish(requestId: string, result: Promise<string>, failed: boolean): void {
+  private finish(requestId: string, result: Promise<string | null>, failed: boolean): void {
     this.pending.delete(result);
     if (failed) this.inputs.delete(requestId);
     // Bound successful admission retries without evicting an expansion still in flight.
@@ -200,6 +215,19 @@ export class SessionExtensionHost {
     } catch {
       throw durableExtensionError("load", spec.id);
     }
+    let views: DesktopViewClient | undefined;
+    if (spec.capabilities.includes("views")) {
+      if (!spec.view) throw durableExtensionError("capability", spec.id);
+      views = new DesktopViewClient(
+        {
+          endpoint: spec.view.endpoint,
+          token: spec.view.token,
+          protocol: spec.view.protocol,
+        },
+        { env: {} },
+      );
+      this.viewClients.add(views);
+    }
     let instance: DurableExtensionInstance;
     try {
       instance = await factory(
@@ -209,6 +237,9 @@ export class SessionExtensionHost {
           cwd: this.cwd,
           scope: spec.scope,
           signal: this.controller.signal,
+          hostScope: this.hostScope,
+          views,
+          contributions: Object.freeze({ ...spec.view?.contributions }),
         }),
       );
     } catch {
@@ -223,8 +254,9 @@ export class SessionExtensionHost {
     )
       throw durableExtensionError("invalid", spec.id);
     if (
-      (instance.agent && !spec.capabilities.includes("agent")) ||
-      (instance.commands && !spec.capabilities.includes("commands"))
+      (instance.agent && (!spec.capabilities.includes("agent") || this.hostScope !== "session")) ||
+      (instance.commands &&
+        (!spec.capabilities.includes("commands") || this.hostScope !== "session"))
     )
       throw durableExtensionError("capability", spec.id);
     if (instance.agent) {
@@ -244,7 +276,9 @@ export class SessionExtensionHost {
         !command.name.startsWith(`${spec.id}:`) ||
         typeof command.description !== "string" ||
         command.description.length > 400 ||
-        typeof command.expand !== "function"
+        (typeof ("expand" in command ? command.expand : undefined) !== "function" &&
+          typeof ("execute" in command ? command.execute : undefined) !== "function") ||
+        ("expand" in command && "execute" in command)
       )
         throw durableExtensionError("invalid", spec.id);
       if (this.commands.has(command.name)) throw durableExtensionError("duplicate", command.name);
@@ -252,7 +286,8 @@ export class SessionExtensionHost {
         name: command.name,
         description: command.description,
         source: "extension",
-        expand: (args) => command.expand(args),
+        expand: (args) => ("execute" in command ? command.execute(args) : command.expand(args)),
+        hostOperation: "execute" in command,
       });
     }
   }

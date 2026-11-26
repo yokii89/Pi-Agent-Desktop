@@ -14,10 +14,8 @@ import { Button } from "../ui/Button";
 import styles from "./Settings.module.css";
 
 /**
- * 设置「来自扩展」（docs/design/16 Phase F + docs/design/19 §10.2）：
- * - 打开时 acquire Extension Worker lease（选择性加载 worker-safe 扩展）
- * - 关闭时 release；宽限期内无新 lease 才退出
- * - Catalog settings 条目可 `view:open` 激活会话内 live 卡片；live 卡片来自 View 协议
+ * 设置页持有内置原生扩展宿主的 lease；释放后在宽限期内复用。
+ * settings/app 生命周期不创建 agent 会话。
  */
 export function ExtensionsSettingsPanel() {
   const t = useT();
@@ -123,12 +121,18 @@ export function ExtensionsSettingsPanel() {
                           description: entry.description,
                         })
                       : ""}
-                    {entry.workerSafe ? t("settings.extensions.entry.workerSafe") : ""}
+                    {entry.nativeHosts?.includes("settings")
+                      ? t("settings.extensions.entry.nativeHost")
+                      : ""}
                   </span>
                   {hasLive ? (
                     <span className={styles.panelHint}>{t("settings.extensions.opened")}</span>
-                  ) : entry.workerSafe ? (
+                  ) : entry.nativeHosts?.some(
+                      (scope) => scope === "settings" || scope === "app",
+                    ) ? (
                     <span className={styles.panelHint}>{t("settings.extensions.autoLoad")}</span>
+                  ) : entry.workerSafe ? (
+                    <span className={styles.panelHint}>{t("settings.extensions.legacyHost")}</span>
                   ) : (
                     <Button
                       variant="default"

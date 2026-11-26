@@ -26,9 +26,11 @@ vi.mock("../window/createMainWindow", () => ({ getMainWindow: () => null }));
 vi.mock("../extension/contributionCatalog", () => ({
   getCatalogSnapshot: () => ({ fingerprint: "test" }),
 }));
-vi.mock("../view/viewHost", () => ({ hasSessionModal: () => false }));
+vi.mock("../view/viewHost", () => ({
+  hasSessionModal: () => false,
+  revokeNativeExtensionViews: vi.fn(),
+}));
 vi.mock("./extensionUi", () => ({ pendingUiCount: () => 0, pendingUiRequests: () => [] }));
-vi.mock("./piSession", () => ({ respondSessionUi: () => false }));
 vi.mock("./backgroundJobs", () => ({ hasLiveBackgroundJobs: async () => false }));
 vi.mock("./piInfo", () => ({ getPiAgentDir: () => f.root }));
 vi.mock("../settings/settings", () => ({
@@ -122,8 +124,14 @@ beforeEach(async () => {
   f.request.mockImplementation(async (command: DurableCommand) => {
     if (command.op === "initialize") return null;
     if (command.op === "models") return [];
-    if (command.op === "model" || command.op === "builtins" || command.op === "modelPreference")
+    if (
+      command.op === "model" ||
+      command.op === "builtins" ||
+      command.op === "modelPreference" ||
+      command.op === "executionShell"
+    )
       return null;
+    if (command.op === "openExtensionHost" || command.op === "closeExtensionHost") return null;
     const id = command.sessionId;
     switch (command.op) {
       case "open":

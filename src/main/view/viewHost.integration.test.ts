@@ -87,7 +87,9 @@ import {
   disposeViewHost,
   ensureViewHost,
   hasSessionModal,
+  issueNativeViewBinding,
   reportViewLayout,
+  revokeNativeExtensionViews,
   sendViewEvent,
 } from "./viewHost";
 
@@ -194,6 +196,118 @@ afterAll(() => {
 });
 
 describe("viewHost ↔ view-sdk over the real transport", () => {
+  it("binds native clients to their actual owner, isolates slots, and revokes every View on disposal", async () => {
+    await ensureViewHost();
+    const a = new DesktopViewClient(
+      {
+        ...issueNativeViewBinding(
+          { ownerId: "native-a", sessionId: "ui-a", extensionId: "first", hostScope: "session" },
+          {},
+        ),
+        sessionId: "forged",
+      },
+      { env: {} },
+    );
+    const b = new DesktopViewClient(
+      issueNativeViewBinding(
+        { ownerId: "native-b", sessionId: "ui-b", extensionId: "second", hostScope: "session" },
+        {},
+      ),
+      { env: {} },
+    );
+    try {
+      const first = await a.openLive({
+        placement: "panel",
+        placementHint: { panelId: "config" },
+        root: { type: "text", content: "A" },
+      });
+      const second = await b.openLive({
+        placement: "panel",
+        placementHint: { panelId: "config" },
+        root: { type: "text", content: "B" },
+      });
+      await waitFor(
+        () => pushesOfType("open").some((push) => push.id === second.id),
+        "native opens",
+      );
+      expect(pushesOfType("open").find((push) => push.id === first.id)?.sessionId).toBe("ui-a");
+      expect(pushesOfType("open").find((push) => push.id === second.id)?.sessionId).toBe("ui-b");
+      expect(first.panelId).not.toBe(second.panelId);
+      revokeNativeExtensionViews("native-a");
+      await first.closed;
+      expect(pushesOfType("closed").some((push) => push.id === second.id)).toBe(false);
+      second.update({ type: "text", content: "still alive" });
+      await waitFor(
+        () => pushesOfType("update").some((push) => push.id === second.id),
+        "other owner survives",
+      );
+    } finally {
+      a.dispose();
+      b.dispose();
+      revokeNativeExtensionViews("native-a");
+      revokeNativeExtensionViews("native-b");
+    }
+  });
+
+  it("enforces settings-only placement, preserves application scope, and refuses revoked credentials", async () => {
+    await ensureViewHost();
+    const binding = issueNativeViewBinding(
+      { ownerId: "native-settings", extensionId: "config", hostScope: "settings" },
+      {},
+    );
+    const settings = new DesktopViewClient(binding, { env: {} });
+    const app = new DesktopViewClient(
+      issueNativeViewBinding(
+        { ownerId: "native-app", extensionId: "global", hostScope: "app" },
+        {},
+      ),
+      { env: {} },
+    );
+    try {
+      const allowed = await settings.openLive({
+        placement: "settings",
+        root: { type: "text", content: "Config" },
+      });
+      await waitFor(
+        () => pushesOfType("open").some((push) => push.id === allowed.id),
+        "settings opens",
+      );
+      const global = await app.openLive({
+        placement: "header",
+        root: { type: "text", content: "Global" },
+      });
+      await waitFor(() => pushesOfType("open").some((push) => push.id === global.id), "app opens");
+      expect(pushesOfType("open").find((push) => push.id === global.id)).toMatchObject({
+        hostScope: "app",
+        sessionId: undefined,
+      });
+      await expect(
+        settings.open({
+          placement: "widget",
+          placementRequired: true,
+          root: { type: "text", content: "Forbidden" },
+        }),
+      ).rejects.toThrow();
+      revokeNativeExtensionViews("native-settings");
+      await allowed.closed;
+      const expired = new DesktopViewClient(binding, {
+        env: {},
+        helloTimeoutMs: 100,
+        connectTimeoutMs: 100,
+      });
+      try {
+        await expect(expired.ensureConnected()).rejects.toThrow();
+      } finally {
+        expired.dispose();
+      }
+    } finally {
+      settings.dispose();
+      app.dispose();
+      revokeNativeExtensionViews("native-settings");
+      revokeNativeExtensionViews("native-app");
+    }
+  });
+
   it("SDK modal 在关闭前保护所属会话，不影响其它会话", async () => {
     const modalClient = new DesktopViewClient({
       ...(await ensureViewHost()),

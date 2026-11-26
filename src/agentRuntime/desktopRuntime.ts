@@ -33,6 +33,9 @@ export class DesktopRuntime {
   private builtinConfig = defaultBuiltinToolsConfig();
   private storageRoot?: string;
   private readonly hosts = new Map<string, HostedSession>();
+  private readonly extensionHosts = new Map<string, SessionExtensionHost>();
+  private readonly openingExtensionHosts = new Map<string, Promise<unknown>>();
+  private readonly closingExtensionHosts = new Map<string, Promise<void>>();
   private readonly opening = new Map<string, Promise<{ conversationId: number }>>();
   private stopping = false;
   private jobs?: BackgroundJobs;
@@ -85,6 +88,33 @@ export class DesktopRuntime {
       );
       return null;
     }
+    if (command.op === "openExtensionHost") {
+      if (this.stopping || this.extensionHosts.has(command.hostId))
+        throw durableExtensionError("closed", command.hostId);
+      const host = new SessionExtensionHost(
+        command.hostId,
+        command.cwd,
+        undefined,
+        undefined,
+        command.hostScope,
+      );
+      this.extensionHosts.set(command.hostId, host);
+      const opening = host
+        .load(command.extensions)
+        .catch(async (error: unknown) => {
+          await host.dispose();
+          this.extensionHosts.delete(command.hostId);
+          throw error;
+        })
+        .finally(() => this.openingExtensionHosts.delete(command.hostId));
+      this.openingExtensionHosts.set(command.hostId, opening);
+      await opening;
+      return null;
+    }
+    if (command.op === "closeExtensionHost") {
+      await this.closeExtensionHost(command.hostId);
+      return null;
+    }
     const service = this.service;
     if (!service) throw new Error("Runtime not initialized.");
     if (command.op === "models") return this.catalog.catalog();
@@ -99,6 +129,10 @@ export class DesktopRuntime {
       await this.catalog.configure(command.model);
       this.modelId = command.model.modelId;
       this.preferredThinking = command.model.preferredThinking;
+      return null;
+    }
+    if (command.op === "executionShell") {
+      this.execution = { ...this.execution, shell: command.shell };
       return null;
     }
     if (command.op === "builtins") {
@@ -151,6 +185,9 @@ export class DesktopRuntime {
             return { disposition: "handled" };
           }
           const text = await slot.host.expand(command.requestId, command.text);
+          if (text === null) return { disposition: "handled" };
+          if (!this.modelId)
+            throw new Error("Configure a model in Settings → Models before sending.");
           if (slot.closing) throw durableExtensionError("closed", id);
           const content: UserInput = command.images?.length
             ? [...(text ? [{ type: "text" as const, text }] : []), ...command.images]
@@ -212,11 +249,30 @@ export class DesktopRuntime {
   async dispose(): Promise<void> {
     this.stopping = true;
     await Promise.allSettled([...this.opening.values()]);
-    const results = await Promise.allSettled([...this.hosts.keys()].map((id) => this.close(id)));
-    await this.service?.dispose();
-    await this.jobs?.dispose();
-    const failed = results.find((item) => item.status === "rejected");
+    const results = await Promise.allSettled([
+      ...[...this.extensionHosts.keys()].map((id) => this.closeExtensionHost(id)),
+      ...[...this.hosts.keys()].map((id) => this.close(id)),
+    ]);
+    const remaining = await Promise.allSettled([this.service?.dispose(), this.jobs?.dispose()]);
+    const failed = [...results, ...remaining].find((item) => item.status === "rejected");
     if (failed?.status === "rejected") throw failed.reason;
+  }
+
+  private closeExtensionHost(id: string): Promise<void> {
+    const closing = this.closingExtensionHosts.get(id);
+    if (closing) return closing;
+    const host = this.extensionHosts.get(id);
+    if (!host) return Promise.resolve();
+    const operation = (async () => {
+      await host.stop();
+      await this.openingExtensionHosts.get(id)?.catch(() => undefined);
+      // Failed factory cleanup retains the same instance for a later close retry.
+      if (this.extensionHosts.get(id) !== host) return;
+      await host.dispose();
+      this.extensionHosts.delete(id);
+    })().finally(() => this.closingExtensionHosts.delete(id));
+    this.closingExtensionHosts.set(id, operation);
+    return operation;
   }
 
   private requireHost(id: string, opening = false): HostedSession {

@@ -11,7 +11,7 @@ import {
 import { DURABLE_SESSION_ID } from "./sessionRef";
 import type { TelegramHostRequest } from "./telegram";
 
-export const AGENT_RUNTIME_PROTOCOL_VERSION = 7;
+export const AGENT_RUNTIME_PROTOCOL_VERSION = 8;
 
 export type AgentRuntimeRequest =
   | { id: string; type: "smoke-test"; storageRoot: string }

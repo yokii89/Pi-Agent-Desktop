@@ -15,7 +15,6 @@ import type { AccessModeIconName } from "../../../shared/contribution";
 import type { PiModelOption, ThinkingLevelId } from "../../../shared/ipc";
 import { ACCESS_MODE_ACTIONS } from "../../../shared/view";
 import { useT } from "../../hooks/useT";
-import { authService } from "../../services/authService";
 import { unwrap } from "../../services/ipc";
 import { pideskApi } from "../../services/pideskApi";
 import { sessionService } from "../../services/sessionService";
@@ -479,12 +478,10 @@ const ModelMenu = memo(function ModelMenu({
 
   const refreshModels = useCallback(() => {
     setLoading(true);
-    // force：切换凭据后绕过会话快照/网关缓存；严格按激活 provider 过滤，禁止回退全量
-    Promise.all([sessionService.getModels({ force: true }), authService.list()])
-      .then(([list, auth]) => {
-        const active = auth?.activeProvider ?? null;
-        setModels(active ? list.filter((m) => m.provider === active) : list);
-      })
+    // The desktop gateway owns the catalog and credentials for every Durable session.
+    sessionService
+      .getModels({ force: true })
+      .then(setModels)
       .catch(() => setModels([]))
       .finally(() => setLoading(false));
   }, []);

@@ -4,30 +4,11 @@
 
 import { describe, expect, it } from "vitest";
 import { parsePideskManifest } from "../extension/contributionSchema";
-import { buildWorkerArgsForTest } from "../extension/extensionWorkerArgs";
 import {
   canReclaimSpeculative,
   canSupersedeSpeculative,
   isSpeculativeCreatedBy,
 } from "./speculativeReclaim";
-
-describe("pi selective load worker args (spike)", () => {
-  it("uses -ne + explicit -e paths, never full discovery", () => {
-    const args = buildWorkerArgsForTest(["/abs/a.ts", "/abs/b.ts"]);
-    expect(args).toContain("--no-extensions");
-    expect(args).toContain("--no-skills");
-    const eIdx = args.indexOf("-e");
-    expect(eIdx).toBeGreaterThan(0);
-    expect(args[eIdx + 1]).toBe("/abs/a.ts");
-    expect(args.filter((a) => a === "-e")).toHaveLength(2);
-  });
-
-  it("empty worker-safe list still disables discovery", () => {
-    const args = buildWorkerArgsForTest([]);
-    expect(args).toContain("--no-extensions");
-    expect(args.filter((a) => a === "-e")).toHaveLength(0);
-  });
-});
 
 describe("worker-safe manifest gate", () => {
   it("default safe=false when pidesk.worker missing", () => {

@@ -14,6 +14,7 @@ import {
   type RuntimeSessionUpdate,
 } from "../../shared/durableProtocol";
 import type { TelegramHostRequest } from "../../shared/telegram";
+import { revokeRuntimeViews } from "../view/nativeViewLifecycle";
 import { localizeRuntimeError } from "./runtimeError";
 
 const READY_TIMEOUT_MS = 15_000;
@@ -371,6 +372,7 @@ export class AgentRuntimeManager {
       this.retiring = retirement;
       void retirement.catch(() => undefined);
     }
+    revokeRuntimeViews();
     for (const controller of this.hostRequests.values()) controller.abort();
     this.hostRequests.clear();
     this.child = null;

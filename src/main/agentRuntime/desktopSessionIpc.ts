@@ -276,16 +276,17 @@ export function registerDurableSessionIpc(): void {
       return desktopSessions.command(attachment.id, command);
     });
   handle(PI_IPC.info, () => ({
-    version: "Durable 1.6.0",
+    version: "1.6.0",
     provider: "pidesk-openai",
     model: publicDurableModel()?.modelId ?? null,
     thinkingLevel: "off",
-    executablePath: null,
   }));
   handle(PI_IPC.shellGet, () => getCachedPiShellProbe());
-  handle(PI_IPC.shellSet, (request) => {
+  handle(PI_IPC.shellSet, async (request) => {
     if (request.path !== null && !boundedText(request.path, 32_768))
       throw new Error("Invalid shell path.");
-    return setPiShellPath(request.path as string | null);
+    const probe = setPiShellPath(request.path as string | null);
+    await desktopSessions.updateExecutionShell();
+    return probe;
   });
 }

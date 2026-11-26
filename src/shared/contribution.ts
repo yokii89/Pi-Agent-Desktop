@@ -113,6 +113,8 @@ export interface ExtensionContribution {
   activation: ContributionActivation;
   /** pidesk.worker.safe；默认 false。 */
   workerSafe: boolean;
+  /** Native host lifetimes explicitly declared in pidesk.runtime.hosts. */
+  nativeHosts?: ("session" | "app" | "settings")[];
   packageVersion?: string;
 }
 

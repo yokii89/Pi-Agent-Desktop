@@ -342,15 +342,21 @@ describe("desktop production provider, DTO and transcript integration", () => {
       text: "Restore even when discovery is offline",
       mode: "followUp",
     });
+    // Settled carries the final entry delta; the accepted user entry arrived earlier.
     await until(() =>
       recovered.some(
         (update) =>
           update.type === "settled" &&
           update.view.entries.some(
-            (entry) => entry.kind === "pi.user" && JSON.stringify(entry.model).includes("offline"),
+            (entry) =>
+              entry.kind === "pi.assistant" &&
+              JSON.stringify(entry.model).includes("Choice restored"),
           ),
       ),
     );
+    const restored = await restarted.execute({ op: "history", sessionId: f.sessionId, limit: 100 });
+    expect(JSON.stringify(restored)).toContain("Restore even when discovery is offline");
+    expect(f.requests).toHaveLength(2);
     expect(f.requests[1].model).toBe("chosen");
   });
 

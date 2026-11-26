@@ -151,6 +151,118 @@ describe("Durable native extension host", () => {
     expect(await readFile(path.join(root, "disposed"), "utf8")).toBe("done");
   });
 
+  it("executes host commands once per request without model admission and opens app/settings hosts before initialization", async () => {
+    const root = await directory();
+    const spec = await extension(
+      root,
+      "operations",
+      `
+      import { appendFile } from 'node:fs/promises';
+      export default h => ({
+        commands: h.hostScope === 'session' ? [{name:h.id+':configure',description:'Configure',execute:async args=>{
+          await appendFile(${JSON.stringify(path.join(root, "commands"))}, args+'\\n');
+        }}] : undefined,
+        dispose: () => appendFile(${JSON.stringify(path.join(root, "hosts"))}, h.hostScope+':'+h.signal.aborted+'\\n')
+      });
+    `,
+    );
+    const runtime = new DesktopRuntime(() => {});
+    cleanup.push(() => runtime.dispose());
+    const hostId = `desktop-settings-${randomUUID()}`;
+    await runtime.execute({
+      op: "openExtensionHost",
+      hostId,
+      hostScope: "settings",
+      cwd: root,
+      extensions: [{ ...spec, capabilities: ["commands"], hosts: ["settings"] }],
+    });
+    await runtime.execute({ op: "closeExtensionHost", hostId });
+    expect(await readFile(path.join(root, "hosts"), "utf8")).toBe("settings:true\n");
+    await runtime.execute({ op: "initialize", storageRoot: root });
+    const sessionId = randomUUID();
+    await runtime.execute({ op: "open", sessionId, cwd: root, create: true, extensions: [spec] });
+    const input = {
+      op: "submit" as const,
+      sessionId,
+      requestId: "configure",
+      text: "/operations:configure example",
+      mode: "followUp" as const,
+    };
+    expect(await runtime.execute(input)).toEqual({ disposition: "handled" });
+    expect(await runtime.execute(input)).toEqual({ disposition: "handled" });
+    expect(await readFile(path.join(root, "commands"), "utf8")).toBe("example\n");
+    expect(await runtime.execute({ op: "history", sessionId, limit: 50 })).toEqual([]);
+    await expect(
+      runtime.execute({ ...input, requestId: "text", text: "needs a model" }),
+    ).rejects.toThrow("Configure a model");
+  });
+
+  it("shares concurrent app/settings close and retains failed factory cleanup for retry", async () => {
+    const root = await directory();
+    const runtime = new DesktopRuntime(() => {});
+    cleanup.push(() => runtime.dispose());
+    const spec = await extension(
+      root,
+      "cleanup",
+      `
+      import { appendFile } from 'node:fs/promises';
+      export default h => ({dispose: async () => {
+        await new Promise(resolve => setTimeout(resolve, 5));
+        await appendFile(${JSON.stringify(path.join(root, "closed"))}, h.hostScope+'\\n');
+      }});
+    `,
+    );
+    const open = {
+      op: "openExtensionHost" as const,
+      hostId: "desktop-settings-cleanup",
+      hostScope: "settings" as const,
+      cwd: root,
+      extensions: [
+        {
+          ...spec,
+          capabilities: ["views" as const],
+          hosts: ["settings" as const],
+          view: {
+            endpoint: "ws://127.0.0.1:1",
+            token: "a".repeat(48),
+            protocol: "view/v1",
+            contributions: {},
+          },
+        },
+      ],
+    };
+    await runtime.execute(open);
+    await Promise.all([
+      runtime.execute({ op: "closeExtensionHost", hostId: open.hostId }),
+      runtime.execute({ op: "closeExtensionHost", hostId: open.hostId }),
+    ]);
+    expect(await readFile(path.join(root, "closed"), "utf8")).toBe("settings\n");
+
+    const broken = await extension(
+      root,
+      "broken",
+      `
+      import { appendFile } from 'node:fs/promises';
+      export default () => {
+        let attempts = 0;
+        return { invalid: true, dispose: async () => {
+          if (++attempts === 1) throw Error('cleanup failed');
+          await appendFile(${JSON.stringify(path.join(root, "recovered"))}, 'done');
+        }};
+      };
+    `,
+    );
+    const failed = {
+      ...open,
+      hostId: "desktop-settings-broken",
+      extensions: [{ ...broken, hosts: ["settings" as const] }],
+    };
+    await expect(runtime.execute(failed)).rejects.toThrow("disposeFailed:broken");
+    await expect(runtime.execute(failed)).rejects.toThrow("closed");
+    await runtime.execute({ op: "closeExtensionHost", hostId: failed.hostId });
+    expect(await readFile(path.join(root, "recovered"), "utf8")).toBe("done");
+  });
+
   it("validates the private extension DTO before admitting module paths", async () => {
     const root = await directory();
     const spec = await extension(root);
@@ -162,6 +274,12 @@ describe("Durable native extension host", () => {
       extensions: [spec],
     };
     expect(parseDurableCommand(command)).toEqual(command);
+    expect(parseDurableCommand({ op: "executionShell", shell: "/bin/bash" })).toEqual({
+      op: "executionShell",
+      shell: "/bin/bash",
+    });
+    expect(parseDurableCommand({ op: "executionShell", shell: "bad\0path" })).toBeNull();
+    expect(parseDurableCommand({ op: "executionShell", shell: "" })).toBeNull();
     expect(
       parseDurableCommand({ ...command, extensions: [{ ...spec, capabilities: ["ipc"] }] }),
     ).toBeNull();

@@ -67,7 +67,7 @@ export function projectPanelCatalogRows(input: PanelCatalogInput): PanelCatalogR
       return {
         key: entry.key,
         contributionKey: entry.key,
-        id: entry.id,
+        id: live ? livePanelId(live) : entry.id,
         title: entry.title,
         description: entry.description,
         icon: entry.icon,

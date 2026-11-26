@@ -1,11 +1,10 @@
 /**
- * Speculative 会话预热（docs/design/16 Phase G / §8.2–8.3）。
+ * Speculative Durable conversation prefetch (docs/design/16 Phase G / §8.2–8.3).
  * 默认关闭；仅用空余额度；显式 send/view-action 永远优先且可晋升实例。
  */
 
 import type { PrefetchMetrics, PrefetchNotifyRequest, SessionId } from "../../shared/contribution";
 import { getSettings } from "../settings/settings";
-import { hasSession, listLiveSessions } from "./piSession";
 import { normalizePrefetchIntent, prefetchDwellMs, requiresIdleSystem } from "./prefetchPolicy";
 import {
   ensureSessionReady,
@@ -15,6 +14,7 @@ import {
   reclaimStaleSpeculativeSessions,
   recordReadyLatency,
 } from "./runtimeCoordinator";
+import { hasSession, listLiveSessions } from "./sessionRuntime";
 import { isSpeculativeCreatedBy } from "./speculativeReclaim";
 
 let stableTimer: ReturnType<typeof setTimeout> | null = null;

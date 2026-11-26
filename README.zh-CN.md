@@ -16,17 +16,17 @@
 
 </div>
 
-> 很多 agent 客户端，这一个跑在你的 pi 上。
+> 内置 pi-durable 的桌面工作台。
 
-PiDesk 是开源 coding agent [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户端。它不重新实现 agent：pi 以 `--mode rpc` 子进程运行（stdio 上的 JSONL），PiDesk 负责驱动它。会话历史始终是 pi 原生的 JSONL 文件，终端里的 pi 与 PiDesk 里的 pi 是同一份数据。**[官方网站](https://pidesk-web.pages.dev/)** 有带截图的完整导览和两段真操作演示。
+PiDesk 是基于 [pi-durable](https://github.com/earendil-works/pi) 的 Windows 编程工作台。运行时随应用内置，在 Electron utility process 中执行；模型、凭据、工具与扩展生命周期由 PiDesk 管理，无需安装外部 pi CLI。
 
-## 只做客户端该做的事
+## 运行时与数据
 
-- agent 循环、模型鉴权、上下文压缩、工具执行，全部发生在 pi 进程里。PiDesk 补上的是它们外面的桌面工作台：把事件流渲染成可读的文档，把项目、终端、浏览器和 git 变更摆在旁边。
-- **会话历史始终是 pi 原生文件。** 不复制正文、不做二次同步、不存在「两份数据谁为准」；PiDesk 只另存标题、归档、置顶这类标记。卸载 PiDesk，你的会话在终端里照样打得开。
-- **MCP 配置写在 pi 的用户级 `mcp.json`**，与 CLI 共用一份。
-- **没有 PiDesk 账号，也没有 PiDesk 的模型额度。** 模型鉴权由 pi 自身配置承担；GitHub 登录是可选项，用来同步设置。
-- pi 升级协议，PiDesk 不需要同步实现一份。
+- 内置 Durable 负责 agent 循环、工具执行和可恢复任务；桌面工作台在会话旁提供项目、终端、浏览器与 git 变更。
+- 新会话使用 Durable SQLite 存储。已有 pi JSONL 历史保留查看、复制和导出能力，不能续接或修改为 Durable 会话。
+- 在设置中配置 OpenAI 兼容网关与模型；模型凭据由桌面通过系统加密存储。
+- 原生扩展声明 `pidesk.runtime`，在内置 utility process 中运行。旧 coding-agent 扩展与 RPC 执行已不再支持。
+- MCP 现阶段仅保留已有配置的只读查看；原生连接、鉴权与工具注册尚待接入。
 
 ## 功能
 
@@ -34,11 +34,11 @@ PiDesk 是开源 coding agent [pi](https://github.com/earendil-works/pi) 的 Win
 
 - AI 回复一律按**文档流 Markdown** 渲染：GFM 表格、编号列表、行内 code 芯片、代码块一键复制。不用聊天气泡——一次 200 行的回答是一篇文档，不该被切成 20 个色块。
 - 工具调用压成一行紧凑状态行，连续调用自动折叠成摘要头（「已运行 2 条命令 · 已读取 3 个文件」）；思考过程默认收成一行，点开才展开。
-- **多会话并行**：默认 8 个 pi 进程同时存活，1–32 可调；切换绝不杀进程，超出上限时是新会话启动失败，而不是挤掉旧会话。
+- **多会话并行**：默认同时打开 8 个 Durable 会话，1–32 可调，共用内置 utility process；切换保留运行中的任务，超出上限时拒绝新会话。
 - `@` 文件引用是原子化 token + 只读文件芯片；图片可粘贴、可拖放，任意文件都能作为附件。
 - **问题导航分段栏**：每条提问一个跳转锚点，几十轮之后还能一步回到那一问。
-- 输入框旁常驻上下文用量；**本轮文件编辑汇总**在同一行给出撤销与审阅；整篇会话可**导出成 Markdown 或 HTML**（Markdown 正文按原顺序排，思考与工具调用折成折叠块，图片只记数量不落盘；HTML 走 pi 原生导出）。
-- 访问模式：内置「完全访问」，扩展可通过 SDK 注册自己的模式（计划模式就是一个扩展示例）。
+- 输入框旁常驻上下文用量；**本轮文件编辑汇总**在同一行给出撤销与审阅；整篇会话可**导出成 Markdown 或 HTML**（Markdown 正文按原顺序排，思考与工具调用折成折叠块，图片只记数量不落盘；两种格式均从已保存历史生成）。
+- 计划模式与问卷使用 Durable 持久交互；原生扩展通过实例专属客户端贡献桌面 View。
 - 流式渲染走约 32ms 合批的事件流，渲染层按 `sessionId` 路由，并行会话互不串台。
 
 ![会话区：用户气泡、运行头、思考折叠与工具调用摘要行](./assets/images/session-flow.webp)
@@ -61,13 +61,12 @@ PiDesk 是开源 coding agent [pi](https://github.com/earendil-works/pi) 的 Win
 
 分屏会优先复用一个已经在跑的终端，而不是再开一个会话；隐藏面板也不会 kill pty——窗格是看终端的方式，不是关终端的方式。
 
-### pi 的生态，装进面板里
+### 原生扩展与资源
 
-PiDesk 不制造生态，只做生态的宿主。
-
-- **扩展** —— 管理 pi packages：安装 / 卸载 / 启停，分全局与当前项目，扩展、技能、提示模板、主题都能按资源级开关。
-- **MCP 服务器** —— 配置增删改、状态探测、热重载进正在跑的会话；市场支持官方注册表搜索 + 精选清单一键预填，不用手抄 JSON。会话区用同一套状态行承接 `mcp__*` 调用。（需 pi ≥ 0.99.0。）
-- **View SDK**（`@pidesk/view-sdk`） —— 可序列化的 View 协议 + 宿主能力协商 + 软降级：扩展声明要装在哪个槽位、需要什么能力，宿主逐项裁决，装不下就按声明降级。八个挂载槽位，pi 本体零改动。
+- **扩展** —— 全局或按项目安装 Durable 原生包，保留包级与资源级开关。安装由桌面自己的 pnpm/Git 服务执行，跳过安装脚本，扩展需提前提供编译后的 ESM 入口。
+- **技能与模板** —— 声明式资源由原生加载器读取；受管技能目录随应用提供面向 Durable 的扩展与技能创作指南。
+- **MCP 服务器** —— 原生传输接入前，已有配置仅供查看。
+- **View SDK**（`@pidesk/view-sdk`） —— 可序列化 View 协议与能力协商；原生工厂获得独立鉴权的 View 客户端，生命周期显式区分会话、应用与设置。
 - **定时任务**与**用量统计**（汇总卡片 + 按天/按月趋势 + 按模型明细），定时任务复用同一套会话引擎。
 
 | ![扩展页管理 pi packages](./assets/images/extensions.webp) | ![MCP 市场：注册表搜索与精选清单](./assets/images/mcp-market.webp) |
@@ -78,34 +77,21 @@ PiDesk 不制造生态，只做生态的宿主。
 
 中英双语界面、亮暗主题、自定义标题栏、系统托盘、可替换标识 / 文案 / 字体的开屏动画、Windows 桌面通知与分场景提示音、可选的 GitHub 登录同步设置、应用内自动更新（GitHub Releases）——有新版本时，侧栏「设置」旁边会出现一个 **「更新」** 按钮。
 
-## 我们刻意没做的六件事
+## 当前范围
 
-客户端不该变成第二个 agent。下面每一条都是「本来可以做，但做了就会和 pi 抢职责」。
-
-| 没做 | 为什么 |
-| --- | --- |
-| 会话正文副本 | 正文始终是 pi 原生 JSONL。PiDesk 只另存标记，外加整篇导出成 Markdown 或 HTML 的能力。 |
-| 内置 pi | 安装包里没有 agent。你在设置里指向本机的 pi 可执行文件，PiDesk 探测版本并启动它。 |
-| 账号体系 | 模型鉴权归 pi。不登录 GitHub 也完全能用。 |
-| 聊天气泡 UI | agent 的输出本来就是文档。 |
-| 重造 agent 能力 | 子代理、权限门、沙箱属于 pi 的扩展生态。PiDesk 负责把它们渲染出来，并让扩展通过 SDK 注册视图与访问模式。 |
-| 跨平台 | 只做 Windows 10/11。省下的预算全花在桌面集成上：托盘、原生通知、分场景提示音、自动更新。 |
+应用面向 Windows 10/11，Durable 是唯一执行引擎。旧 JSONL 历史与声明式资源作为数据保留；旧 CLI 启动器、RPC 会话驱动与共享 CLI 凭据管理已经删除。原生 MCP 和独立发布的扩展工厂 SDK 尚未提供。实现与验收边界见 [迁移记录](./DURABLE-MIGRATION/README.md)。
 
 ## 开始使用
 
-1. 安装 pi CLI —— `npm install -g @earendil-works/pi-coding-agent`，并在 pi 里配好模型鉴权。
-2. 从 [Releases](https://github.com/yokii89/Pi-Agent-Desktop/releases) 下载 NSIS 安装包（附 SHA-256 校验和）。
-3. 首次启动在设置里指定 pi 可执行文件路径、选择工作目录，然后新建任务。
-
-![设置 → 配置：pi 可执行文件路径与版本探测](./assets/images/pi-executable.webp)
-
-*设置 → 配置：指向本机的 pi 可执行文件，PiDesk 会探测版本并报告就绪状态。*
+1. 安装包含内置 Durable 运行时的 PiDesk 构建。
+2. 在设置 → 模型中配置网关地址、API Key 和模型。
+3. 选择工作目录并新建任务；需要时在设置 → 环境中配置执行 Shell。
 
 想先看再装？[官网](https://pidesk-web.pages.dev/#demo)有两段录自运行实例的演示：MCP 全流程，以及把网页元素拾取进对话。
 
 ## 本地开发
 
-前置要求：Windows 10/11 · Node.js ≥ 20 · [pnpm](https://pnpm.io)（版本由 `packageManager` 字段锁定）· pi CLI
+前置要求：Windows 10/11 · Node.js ≥ 22.19 · [pnpm](https://pnpm.io)（版本由 `packageManager` 字段锁定）
 
 ```bash
 pnpm install   # node-pty 需要针对 Electron ABI 重编译时，先跑 pnpm run rebuild:native
@@ -127,34 +113,32 @@ pnpm dist      # 产出 Windows NSIS 安装包与 SHA-256 校验和（release/�
 
 | 目录 | 职责 |
 | --- | --- |
-| `src/main` | Electron 主进程：pi RPC 驱动、终端 pty、内嵌浏览器、git、MCP、窗口与设置 |
+| `src/main` | Electron 主进程：Durable 宿主、终端 pty、内嵌浏览器、git、窗口与设置 |
+| `src/agentRuntime` | 内置 ESM utility process：Durable 会话、原生扩展与工具 |
 | `src/preload` | `contextBridge` 白名单 API（`window.pidesk`） |
 | `src/renderer` | React 19 界面：会话区、面板、设置、扩展 View 宿主 |
 | `src/shared` | IPC 协议、i18n 文案表、共享类型 |
 | `packages/view-sdk` | 扩展端 SDK（发布为 `@pidesk/view-sdk`） |
 
-主/渲染通信统一走 `ipcMain.handle`（请求-响应，一律返回 `{ ok, data \| error }`）与 `webContents.send`（推送，如终端流与会话事件流），渲染进程没有 Node 能力。会话推送必带 `sessionId`，多个 pi 进程复用同一条通道。
+主/渲染通信统一走 `ipcMain.handle`（请求-响应，一律返回 `{ ok, data \| error }`）与 `webContents.send`（推送，如终端流与会话事件流），渲染进程没有 Node 能力。会话推送必带 `sessionId`，并行 Durable 会话复用同一条通道。
 
 ## 扩展开发
 
-```bash
-npm install @pidesk/view-sdk
-```
+通过 `pidesk.runtime` 声明 `engine: "durable"`、`apiVersion: 1`、id 和已编译 ESM 入口。默认工厂接收实例专属上下文，返回原生 agent 定义、命令及可选清理函数。
 
 ```ts
-import { connectDesktopView, viewOnDesktop } from "@pidesk/view-sdk";
-
-const desktop = connectDesktopView(); // 同步探测环境变量，socket 懒连接
-if (desktop) {
-  await viewOnDesktop(desktop, {
-    title: "选择模型",
-    root: { type: "list", id: "model", items: [{ value: "a", label: "A" }] },
-    actions: [{ id: "cancel", label: "取消", kind: "submit", variant: "ghost" }],
-  });
+export default function createExtension(context) {
+  return {
+    commands: [{
+      name: `${context.id}:review`,
+      description: "审阅工作区改动",
+      expand: (args) => `审阅 ${args || "当前改动"}`,
+    }],
+  };
 }
 ```
 
-挂载槽位：`modal` · `stream` · `widget` · `panel` · `sidebar` · `header` · `settings` · `access-mode`。在纯终端 pi 里跑时环境变量探测返回 `null`，扩展自动退回自己的 TUI——同一个包在两种宿主下都能用。
+声明 `views` 的工厂使用 `context.views` 和 `context.contributions`，不再从环境变量发现身份与凭据。应用/设置宿主必须由用户级包显式声明。完整规则见 [原生扩展契约](./assets/skills/plugin-creator/references/durable-extension.md) 和 [扩展宿主设计](./DURABLE-MIGRATION/P3-EXTENSION-HOST.md)。工厂契约仍为内部预览 v1，尚未发布为 npm 扩展 SDK。
 
 ## 文档
 

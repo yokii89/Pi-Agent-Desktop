@@ -12,7 +12,7 @@ function fakeSettings(): PideskSettings {
   return {
     projects: [{ id: "p1", name: "demo", dir: "C:/demo" }],
     lastProjectId: "p1",
-    piExecutablePath: "C:/pi/pi.exe",
+    executionShellPath: "C:/Git/bin/bash.exe",
     terminalShell: "powershell",
     terminalTabCompletion: "cycle",
     theme: "dark",
@@ -71,6 +71,7 @@ describe("settingsSync whitelist", () => {
     expect(Object.keys(picked).sort()).toEqual([...SYNCABLE_SETTINGS_KEYS].sort());
     expect(picked).not.toHaveProperty("projects");
     expect(picked).not.toHaveProperty("piExecutablePath");
+    expect(picked).not.toHaveProperty("executionShellPath");
     // 标识图片是本机资产，不进 Gist；其余开屏偏好可同步
     expect(picked).not.toHaveProperty("splashLogoImage");
     // 壁纸路径 / 遮罩都是本机素材的附属状态，同样不进 Gist

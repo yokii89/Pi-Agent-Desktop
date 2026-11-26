@@ -5,10 +5,10 @@ The Extensions page owns the desktop replacement for the archived `/skills` pane
 ## Contract and ownership
 
 - `shared/managedSkills.ts` defines the IPC contract. Only the main window's top frame may call it. The renderer receives an opaque, single-use preview token, not authority to choose destination paths or submit a file list. Tokens expire after five minutes.
-- `managedSkills.ts` owns the approved bundled catalog and operation plans. The only installable sources are the imported `plugin-creator` and `skill-creator` assets in `vendor/MyPiExtension/packages/yoki-skills/skills`. It never loads the archived extension, starts the legacy Pi CLI, downloads skills, or executes bundled scripts.
+- `managedSkills.ts` owns the approved bundled catalog and operation plans. The only installable sources are the desktop-owned `plugin-creator` and `skill-creator` assets in `assets/skills`. They target the bundled Durable runtime and its preview v1 extension contract. It never loads the archived extension, starts the legacy Pi CLI, downloads skills, or executes bundled scripts.
 - `settings/managedSkillsStore.ts` owns manifest validation and atomic persistence. Existing deployments keep `<agentDir>/skills/codex-managed/<name>` and `<agentDir>/codex-skills-manifest.json`, including `PI_CODING_AGENT_DIR` overrides. The old schema's Pi/Codex version fields are retained for compatibility; they are not native runtime requirements.
 - Opening the manager, Doctor, manifest or an operation preview creates no files. Existing manifest ownership is read in place; it is never inferred from a directory's presence. Unmanaged directories are not adopted or overwritten.
-- The bundle's declarative files and license are included explicitly by `electron-builder.yml`, so development and packaged apps use the same assets. No archived extension entrypoint is packaged through this rule.
+- The bundle's declarative files are included explicitly by `electron-builder.yml`, so development and packaged apps use the same assets. No archived extension entrypoint is packaged through this rule.
 
 ## Operations
 

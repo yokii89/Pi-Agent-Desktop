@@ -16,7 +16,7 @@
 
 ## 项目概述
 
-PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户端，基于 Electron + React + TypeScript。
+PiDesk 是内置 [pi-durable](https://github.com/earendil-works/pi) 的 Windows 编程工作台，基于 Electron + React + TypeScript。Durable 是唯一执行引擎；不再支持外部 pi agent CLI、RPC 会话与 TUI 扩展。旧 JSONL 只读保留，声明式技能/模板沿用已有资源目录。
 
 ## 开发与热更新
 
@@ -63,13 +63,15 @@ PiDesk 是 [pi](https://github.com/earendil-works/pi) 的 Windows 桌面客户�
 | 样式 | CSS / CSS Modules | 暂不引入 Tailwind 等框架，如需变更先在本文件登记 |
 | 代码质量 | Biome | 格式化 + Lint 一体，配置沿用 pi 仓库的 `biome.json`，禁止再引入 ESLint/Prettier |
 | 测试 | vitest | 仅用于 `packages/view-sdk` 与可纯测的主进程协议逻辑（如 `viewHostProtocol`）；不引入渲染层测试框架 |
-| agent runtime | 内置 `@earendil-works/pi-durable`（Durable migration P0–P5） | 新会话目标为 Durable；迁移期间旧 pi RPC 仅作尚未替换功能的过渡实现，不能据此新增依赖旧执行器的能力。完成切换后不得保留第二套执行引擎 |
+| agent runtime | 内置 `@earendil-works/pi-durable` 1.6.0 | 唯一执行引擎，ESM utility process + SQLite；禁止恢复外部 CLI/RPC 执行、旧 ExtensionAPI 或从旧凭据文件提供模型鉴权 |
 | 独立终端 | node-pty + @xterm/xterm | 仅用于中央工作区底部的终端面板（Bottom Panel）；禁止用于 agent 会话 |
 | 打包 | electron-builder | 仅针对 Windows：NSIS 安装包，配置进仓库（编排脚本 `scripts/package.mjs`，CI 分发见 `.github/workflows/release.yml`） |
 
 任何新增依赖（运行时或开发时）必须先在此处登记用途，再安装。
 
 - `@earendil-works/pi-durable`、`@earendil-works/pi-ai`、`@earendil-works/chord`（runtime，内置 agent utility process）：三者固定 `1.6.0`；Durable 及其精确版本依赖由独立 ESM runtime 构建承载，不能随意升级。pi-ai 提供模型与 faux model 验证，Chord 提供 Durable Context / SQLite 底层。该运行时要求 Node ≥ 22.19；Electron 内的实际 Node、SQLite、恢复和安装包验证未通过前不得宣称可独立运行。
+
+- `@pidesk/view-sdk`（runtime，本仓库 `link:packages/view-sdk`）：内置 Durable 扩展宿主复用 View 客户端、预算校验与连接清理；每个扩展实例使用宿主签发的独立凭证，不读取或改写进程级 View 环境变量。
 
 - `qrcode`、`@types/qrcode`（devDep，渲染层构建期）：手机配对邀请二维码本地生成；二维码秘密只在内存，不进入 URL、日志、剪贴板或持久设置。
 - `src/shared/remote/` 作为 `@pidesk/remote-protocol` 零依赖源码包供相邻 Pi-Mobile 工程链接；桌面继续相对导入并由现有 tsc 编译，无新增主进程外部依赖。
@@ -138,33 +140,25 @@ import { Play } from "@phosphor-icons/react";
 ## Electron 架构规范
 
 - **进程边界**：主进程（`src/main`）、预加载（`src/preload`）、渲染进程（`src/renderer`）职责不得混用。
-  - 主进程：窗口管理、子进程（pi 会话）管理、文件系统、原生 API。
+  - 主进程：窗口管理、内置 Durable utility process 与会话管理、文件系统、原生 API。
   - 预加载：仅通过 `contextBridge.exposeInMainWorld` 暴露白名单 API，命名空间统一为 `window.pidesk`。
   - 渲染进程：纯 React UI，**禁止**直接 `require` Node 模块、禁止 `nodeIntegration`。
 - 主/渲染通信一律使用 `ipcMain.handle` / `ipcRenderer.invoke`（请求-响应）或 `webContents.send`（主进程推送，如终端流式输出）。
 - IPC channel 命名：`"pidesk:<域>:<动作>"`，如 `"pidesk:session:start"`、`"pidesk:session:output"`。
 - **返回值统一信封**：请求-响应类 handler 一律返回 `{ ok: true, data }` 或 `{ ok: false, error: string }`，渲染层通过统一工具函数（如 `unwrap()`）解包，禁止 handler 直接 throw 或返回裸值。
 - **终端流式输出消息格式固定（仅中央工作区底部的终端面板）**：主进程推送的消息为 `{ type: "data" | "exit" | "error", payload: string | number }`；多实例域（终端 Tab）在此基础上附加 `id` 字段以区分实例，渲染层按 `type` 分发，不得发明其他结构。面板可见性与终端进程生命周期是两个独立概念：隐藏面板不得 kill pty。
-- **会话推送消息格式固定（中央会话区）**：主进程推送的消息为 `{ sessionId, type: "event" | "eventBatch" | "exit" | "error", payload }`（多实例并行：对齐终端条款，**必带** `sessionId`）；`event` 时 `payload` 为单条 pi RPC 事件对象，`eventBatch` 时为约 32ms 合批后的事件数组（边界事件仍走单条 `event` 并立即 flush）；事件经白名单转发，类型见 `src/shared/ipc.ts`，渲染层按 `sessionId` 路由到对应会话桶，不得发明其他结构。同 `sessionFile` 至多一个存活进程；切换 active / 隐藏不 kill，手动结束入口为侧栏行菜单「结束进程」与设置 →「存活会话」；设置入口仅允许结束空闲实例，必须二次确认，并经 `SESSION_IPC.disposeIdle` 在主进程复核 RPC 状态与进程身份，保留会话历史及后台项目进程。
-- **扩展 UI 子协议是独立域（`pidesk:sessionUi:*`）**：pi RPC 的第四个记录族 `extension_ui_request`
-  **不进会话事件白名单**，必须在 `handleProtocolLine` 里先于白名单分流给
-  `src/main/session/extensionUi.ts` 的登记表（协议解析与传输分育：该模块不 import electron，
-  经 `SessionUiSink` 注入，以便纯测）。推送为 `{ sessionId, type: "request" | "settled" | "notice", id, payload }`
-  （`id` 区分同会话并发的多个请求），渲染层经 `pidesk:sessionUi:respond` 作答。
-  **硬约束：`select` / `confirm` / `input` / `editor` 必须得到一次应答**——pi 会始终等
-  `extension_ui_response`，漏应答就是工具永久挂起（docs/design/122 §3、123）。
-  超时（pi 自行结算，**不得再写回**）、中断、进程退出、dispose 四条路径均须推 `settled`
-  撤窗；不认识的方法一律按未答应答一次。渲染层只弹 active 会话的对话框，后台会话保留请求。
+- **会话推送消息格式固定（中央会话区）**：主进程推送的消息为 `{ sessionId, type: "event" | "eventBatch" | "exit" | "error", payload }`（多实例并行：对齐终端条款，**必带** `sessionId`）；`event` 时 `payload` 为 Durable 投影事件，`eventBatch` 为约 32ms 合批数组，边界事件立即 flush。类型见 `src/shared/ipc.ts`，渲染层按 `sessionId` 路由。同一存储会话至多一个写者；切换 active / 隐藏不关闭会话。设置中的结束操作仅允许空闲实例，须二次确认，并经 `SESSION_IPC.disposeIdle` 在主进程与 utility process 复核当前 attachment、任务结算与在途事务，保留历史及后台项目进程。
+- **原生交互**：问卷与 Plan gate 使用 `shared/nativeBuiltins.ts` 和 Durable 持久任务；View 使用实例专属 SDK 客户端。旧 `pidesk:sessionUi:*` 登记表仅保留已有界面/远程适配的内存接口，不再接收 agent RPC 记录，不能作为新扩展 API。超时、中断和退出均须结算原生交互，重开后从权威存储恢复。
 - 渲染进程访问的 API 必须在 `src/preload` 中定义并在 `src/renderer/global.d.ts` 中补充类型声明。
 
 ### 主进程代码组织
 
-- 按功能模块拆分：`src/main/session/`（pi 会话 RPC 驱动）、`src/main/terminal/`（独立终端）、`src/main/window/`（窗口）、`src/main/ipc/`（IPC 注册）等。
+- 按功能模块拆分：`src/main/session/`（会话生命周期与历史适配）、`src/main/agentRuntime/`（内置运行时管理与投影）、`src/main/terminal/`（独立终端）、`src/main/window/`（窗口）、`src/main/ipc/`（IPC 注册）等。
 - 每个 IPC handler 就近放在对应功能模块内，并在 `src/main/ipc/index.ts` 集中注册，禁止把逻辑堆进 `src/main/index.ts`。
 
 ### 中央会话区规范（自研会话 UI）
 
-- **架构**：pi 以 `--mode rpc` 子进程运行（stdin/stdout 严格 JSONL，LF 分隔）。主进程（`src/main/session/`）只负责传输层：进程生命周期、行分割、请求-响应按 `id` 关联、事件白名单转发；消息组装与渲染全部在渲染层。禁止再以内嵌 pty + xterm 方式承载 pi 会话。
+- **架构**：`src/agentRuntime/` 在内置 ESM utility process 中运行 Durable，主进程通过私有 MessagePort 管理会话、扩展宿主与模型配置。`desktopSessions` 和 `DurableProjection` 将权威 SQLite 状态投影到现有 UI 通道。禁止外部 CLI/RPC、stdin/stdout agent 协议以及用 pty/xterm 承载会话。
 - **渲染规则（固定，不允许做成传统聊天 UI）**：
   - 用户消息：**可用气泡**（右对齐、强调底色）。正文超过 **4 行**默认收起（`USER_BUBBLE_COLLAPSED_LINES`）：
     底部 44px **由下向上的渐隐**（渐隐色即气泡底色，禁止用 `mask-image`，会把芯片描边/引用块左边线拆出半截痕迹）
@@ -181,7 +175,9 @@ import { Play } from "@phosphor-icons/react";
     历史装载必须认 pi 的 `custom_message` 行——**pi 不把它写成 `type:"message"`**，
     只按 `type === "message"` 读盘会让通知在重开会话后消失（docs/design/129 §8.4）。
 - **流式渲染数据源**：`message_update`（text/thinking/toolcall delta，按 `contentIndex` 组装）做增量显示；`message_end` 与 `get_messages` 为权威数据，用于对账与会话恢复。用户消息由渲染层发送时乐观插入，忽略 pi 回显的用户角色消息事件，避免重复。
-- 会话历史仍以 pi 原生 JSONL 为准（`~/.pi/agent/sessions/`），恢复会话用 `--session <file>` 启动参数；PiDesk 不自建会话存储。
+- 新会话历史以 Durable SQLite 为准，恢复由 Harness 与应用会话服务负责。旧 `~/.pi/agent/sessions/` JSONL 仅供查看、复制和导出，不能续接、重命名或写入。`SessionRef` 必须明确分发两种存储，禁止把文件路径作为原生数据库定位依据。
+- **原生扩展**：仅执行 `pidesk.runtime` 声明的已编译 ESM 入口，工厂契约为 `shared/durableExtension.ts` 预览 v1。用户包可显式声明 session/app/settings，项目包仅 session；app/settings 为 View 生命周期，不能注册 agent 或会话命令。凭据由宿主按实例签发，扩展使用 `context.views`，禁止从进程环境发现身份。随应用提供的创作技能位于 `assets/skills/`；`vendor/MyPiExtension/` 仅为来源档案，不进入分发包。
+- **构建清理**：生产主进程构建统一经 `pnpm build:main`，先清除 main/preload/shared 旧产物；runtime 构建同样清空自身输出，防止已删除的执行器继续进入 ASAR。原生 MCP 连接/鉴权/工具注册尚未接入，管理页只读，禁止启动旧 CLI 兜底。
 
 ## 文件面板就地编辑（docs/design/141）
 

@@ -125,6 +125,15 @@ export type DurableCommand =
   | { op: "modelPreference"; modelId: string; thinkingLevel?: GatewayThinking }
   | { op: "model"; model: RuntimeModelConfig }
   | { op: "builtins"; config: RuntimeBuiltinToolsConfig }
+  | { op: "executionShell"; shell: string }
+  | {
+      op: "openExtensionHost";
+      hostId: string;
+      hostScope: "app" | "settings";
+      cwd: string;
+      extensions: readonly DurableExtensionSpec[];
+    }
+  | { op: "closeExtensionHost"; hostId: string }
   | {
       op: "open";
       sessionId: string;
@@ -333,9 +342,31 @@ export function parseDurableCommand(value: unknown): DurableCommand | null {
     const model = parseRuntimeModel(value.model);
     return model ? { op: "model", model } : null;
   }
+  if (value.op === "executionShell")
+    return boundedText(value.shell, 32768) ? { op: "executionShell", shell: value.shell } : null;
   if (value.op === "builtins") {
     const config = parseBuiltinToolsConfig(value.config);
     return config ? { op: "builtins", config } : null;
+  }
+  if (value.op === "openExtensionHost" || value.op === "closeExtensionHost") {
+    if (!/^desktop-(?:app|settings)-[a-f0-9-]{36}$/.test(String(value.hostId))) return null;
+    if (value.op === "closeExtensionHost") return { op: value.op, hostId: value.hostId as string };
+    if (
+      (value.hostScope !== "app" && value.hostScope !== "settings") ||
+      !String(value.hostId).startsWith(`desktop-${value.hostScope}-`) ||
+      !boundedText(value.cwd, 32768) ||
+      !Array.isArray(value.extensions) ||
+      value.extensions.length > DURABLE_EXTENSION_LIMIT ||
+      !value.extensions.every(isDurableExtensionSpec)
+    )
+      return null;
+    return {
+      op: value.op,
+      hostId: value.hostId as string,
+      hostScope: value.hostScope,
+      cwd: value.cwd,
+      extensions: value.extensions,
+    };
   }
   if (typeof value.sessionId !== "string" || !DURABLE_SESSION_ID.test(value.sessionId)) return null;
   const sessionId = value.sessionId.toLowerCase();

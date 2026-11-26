@@ -39,16 +39,6 @@ vi.mock("../session/runtimeCoordinator", () => ({
   ensureSessionReady: vi.fn(),
 }));
 vi.mock("../session/extensionUi", () => ({ pendingUiRequests: () => [] }));
-vi.mock("../session/piSession", () => ({
-  liveSessionIdForFile: f.liveId,
-  hasSession: f.hasSession,
-  fetchSessionMessages: f.fetch,
-  abortSession: vi.fn(),
-  fetchSessionState: vi.fn(),
-  promptSession: vi.fn(),
-  respondSessionUi: vi.fn(),
-  setSessionName: vi.fn(),
-}));
 vi.mock("./readAdapter", async (original) => ({
   ...(await original<typeof import("./readAdapter")>()),
   remoteSessionFile: f.guard,

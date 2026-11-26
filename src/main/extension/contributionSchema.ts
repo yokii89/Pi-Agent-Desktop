@@ -209,6 +209,14 @@ export function contributionsFromPackage(
   }
 
   const manifest = parsePideskManifest(input.pideskField);
+  const runtime = (input.pideskField as { runtime?: { engine?: unknown; hosts?: unknown } } | null)
+    ?.runtime;
+  const nativeHosts =
+    runtime?.engine === "durable" && Array.isArray(runtime.hosts)
+      ? runtime.hosts.filter((host): host is "session" | "app" | "settings" =>
+          ["session", "app", "settings"].includes(host),
+        )
+      : undefined;
   const diagnose = (message: string, field?: string): void => {
     diagnostics.push({ packageId: input.packageId, scope: input.scope, message, field });
   };
@@ -300,6 +308,7 @@ export function contributionsFromPackage(
         accent: item.accent ?? "default",
         activation: item.activation ?? parseActivation(undefined, placement),
         workerSafe: manifest.workerSafe,
+        ...(nativeHosts ? { nativeHosts } : {}),
         packageVersion: input.packageVersion,
       });
     }

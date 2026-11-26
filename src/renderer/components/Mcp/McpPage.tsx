@@ -86,8 +86,8 @@ export function McpPage() {
       .catch(() => setPiSupport(null));
   }, []);
 
-  /** 宿主 pi 确定不支持内置 MCP（< 0.99）：配置编辑是静默空操作，全页冻结为只读。 */
-  const mcpFrozen = piSupport?.status === "unsupported";
+  /** Keep controls read-only until the runtime explicitly advertises native MCP support. */
+  const mcpFrozen = piSupport?.status !== "supported";
 
   const refreshList = useCallback(async (): Promise<void> => {
     const seq = ++listSeq.current;
@@ -434,7 +434,7 @@ export function McpPage() {
           </div>
           <div className={styles.reloadActions}>
             <Button
-              disabled={reloading || !hasLiveSession}
+              disabled={mcpFrozen || reloading || !hasLiveSession}
               title={hasLiveSession ? undefined : t("mcp.card.menu.needsLiveSession")}
               onClick={() => void handleReloadAll()}
             >

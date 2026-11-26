@@ -124,7 +124,11 @@ async function runActivation(
     });
   }
   // worker-safe settings 由设置页 lease 覆盖，不经会话 ensureSession 激活
-  if (isOpenAction && contribution.placement === "settings" && contribution.workerSafe) {
+  if (
+    isOpenAction &&
+    contribution.placement === "settings" &&
+    (contribution.workerSafe || contribution.nativeHosts?.some((scope) => scope !== "session"))
+  ) {
     throw new ActivationError({
       code: "activation-rejected",
       message: "该设置来自 Extension Worker，请在「设置 → 来自扩展」中打开",

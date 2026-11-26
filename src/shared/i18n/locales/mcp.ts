@@ -4,10 +4,9 @@ import { defineMessages } from "../types";
 export const mcpMessages = defineMessages({
   "mcp.page.title": { "zh-CN": "MCP 服务器", "en-US": "MCP servers" },
   "mcp.page.subtitle": {
-    "zh-CN":
-      "管理 pi 内置 MCP 支持的服务器连接（~/.pi/agent/mcp.json）。修改后需重载活跃会话生效。",
+    "zh-CN": "查看已有 MCP 配置。内置 Durable 的 MCP 连接尚未接入。",
     "en-US":
-      "Manage servers connected by pi's built-in MCP support (~/.pi/agent/mcp.json). Reload live sessions after changes.",
+      "Inspect existing MCP configuration. MCP connections are not yet integrated with the bundled Durable runtime.",
   },
   "mcp.page.add": { "zh-CN": "添加服务器", "en-US": "Add server" },
   "mcp.page.browseMarket": { "zh-CN": "浏览市场", "en-US": "Browse marketplace" },
@@ -60,10 +59,9 @@ export const mcpMessages = defineMessages({
     "en-US": "No MCP servers configured",
   },
   "mcp.page.empty.description": {
-    "zh-CN":
-      "添加 stdio 或 streamable HTTP 服务器后，其工具即可在会话中使用。配置保存在 pi 的用户级 mcp.json，与 pi CLI 共享。",
+    "zh-CN": "当前没有可查看的 MCP 配置。原生连接能力接入后会开放管理。",
     "en-US":
-      "Add a stdio or streamable HTTP server and its tools become available in sessions. The config lives in pi's user-level mcp.json, shared with the pi CLI.",
+      "There is no MCP configuration to inspect. Management will be available after native connections are implemented.",
   },
   "mcp.page.probeNote": { "zh-CN": "提示：{note}", "en-US": "Note: {note}" },
   "mcp.page.probeError": { "zh-CN": "探测失败：{error}", "en-US": "Probe failed: {error}" },
@@ -85,14 +83,13 @@ export const mcpMessages = defineMessages({
     "en-US": "No live sessions; the new configuration applies when the next session starts.",
   },
   "mcp.degrade.title": {
-    "zh-CN": "当前 pi（{version}）不支持 MCP",
-    "en-US": "pi {version} does not support MCP",
+    "zh-CN": "{version} 尚未接入 MCP",
+    "en-US": "MCP is not yet integrated with {version}",
   },
   "mcp.degrade.description": {
-    "zh-CN":
-      "MCP 服务器管理依赖 pi ≥ 0.99 的内置 MCP 扩展；升级 pi（例如运行 pi update self）后重开此页即可使用。",
+    "zh-CN": "内置 Durable 的 MCP 连接、鉴权与工具注册尚未实现。已有配置仅供查看。",
     "en-US":
-      "MCP server management requires the MCP extension built into pi ≥ 0.99. Upgrade pi (e.g. run `pi update self`) and reopen this page.",
+      "MCP connections, authentication and tool registration are not yet implemented in the bundled Durable runtime. Existing configuration is read-only.",
   },
 
   "mcp.card.tools": { "zh-CN": "{count} 个工具", "en-US": "{count} tools" },

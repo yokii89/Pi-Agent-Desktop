@@ -168,6 +168,7 @@ function fromOpen(message: Extract<ExtensionViewPush, { type: "open" }>): Extens
   return {
     id: message.id,
     sessionId: message.sessionId,
+    hostScope: message.hostScope,
     // Host 未带 sessionId 时，稍后用 open 时刻的 active 认领（subscribe 内处理）
     boundSessionId: null,
     title: message.title,
@@ -298,7 +299,11 @@ function upsertSlotted(
   entry: ExtensionViewEntry,
 ): ExtensionViewEntry[] {
   const panelId = entry.panelId ?? `ext-${entry.id}`;
-  const rest = prev.filter((p) => p.id !== entry.id && (p.panelId ?? `ext-${p.id}`) !== panelId);
+  const rest = prev.filter(
+    (p) =>
+      p.id !== entry.id &&
+      ((p.panelId ?? `ext-${p.id}`) !== panelId || sessionKeyOf(p) !== sessionKeyOf(entry)),
+  );
   return [...rest, entry];
 }
 
@@ -670,7 +675,7 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
       if (message.type === "open") {
         let entry = fromOpen(message);
         // Host 未注入 sessionId 时，认领「open 到达时」的 active，避免表单无归属
-        if (!entry.sessionId && activeViewSessionIdRef.current) {
+        if (!entry.sessionId && !entry.hostScope && activeViewSessionIdRef.current) {
           entry = { ...entry, boundSessionId: activeViewSessionIdRef.current };
         }
         switch (message.placement) {

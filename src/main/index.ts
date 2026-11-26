@@ -5,7 +5,7 @@ import { t } from "../shared/i18n";
 import { disposeAgentRuntime, startAgentRuntime } from "./agentRuntime/agentRuntimeManager";
 import { browserWindowOpenResponse, isBrowserContents } from "./browser/browserPolicy";
 import { registerBrowserLifecycle } from "./browser/browserView";
-import { disposeExtensionWorker } from "./extension/extensionWorkerManager";
+import { disposeExtensionWorker, startAppExtensionHost } from "./extension/extensionWorkerManager";
 import { registerWatcherLifecycle } from "./fs/watcher";
 import { registerIpc } from "./ipc";
 import {
@@ -18,10 +18,7 @@ import { procService } from "./proc/procService";
 import { remoteService } from "./remote/remoteService";
 import { disposeTaskScheduler, initTaskScheduler } from "./scheduler/taskScheduler";
 import { disposeIdleReclaim, initIdleReclaim } from "./session/idleReclaim";
-import { detectPiExecutablePath } from "./session/piLauncher";
-import { disposeAllSessions } from "./session/piSession";
 import { warmPiShellCache } from "./session/piShell";
-import { getSettings, updateSettings } from "./settings/settings";
 import { telegramService } from "./telegram/telegramService";
 import { registerTerminalLifecycle } from "./terminal/terminal";
 import { disposeUpdater, scheduleStartupCheck } from "./updater/updaterService";
@@ -69,21 +66,8 @@ function clearResidualLock(): void {
   }
 }
 
-/**
- * 启动时一次性环境探测：
- * 1. 若用户未手动配置 pi 路径，PATH 上能找到则自动写入 settings；
- * 2. 预热 bash 候选缓存，设置页 shellGet 直接读缓存，不再每次进页全量探测。
- */
+/** Warm the execution shell cache once; the agent runtime is bundled with PiDesk. */
 function bootstrapEnvironmentProbe(): void {
-  try {
-    if (!getSettings().piExecutablePath) {
-      const detected = detectPiExecutablePath();
-      if (detected) updateSettings({ piExecutablePath: detected });
-    }
-  } catch {
-    // 探测失败不阻塞启动；设置页仍可手动浏览
-  }
-  // 预热放在探测之后：shellPath 可能刚被外部改过，且不依赖 pi 路径
   try {
     warmPiShellCache();
   } catch {
@@ -97,9 +81,11 @@ app.whenReady().then(async () => {
   registerImagePreviewProtocol();
   registerMediaPreviewProtocol();
   createMainWindow();
-  void startAgentRuntime().catch((error: unknown) => {
-    console.error("[agent-runtime] Durable utility process failed to start", error);
-  });
+  void startAgentRuntime()
+    .then(() => startAppExtensionHost())
+    .catch((error: unknown) => {
+      console.error("[agent-runtime] Durable utility process failed to start", error);
+    });
   bootstrapEnvironmentProbe();
   bootstrapResidualNotice();
   // 上次运行留下的后台进程先验存活收进待认领池，用户打开对应会话时才成行（docs/design/133 §3）
@@ -175,10 +161,13 @@ app.on("before-quit", (event) => {
   if (durableShutdownStarted) return;
   durableShutdownStarted = true;
   telegramService.disconnect();
-  void disposeAgentRuntime().finally(() => {
-    durableShutdownFinished = true;
-    app.quit();
-  });
+  void disposeExtensionWorker()
+    .catch(() => {})
+    .then(() => disposeAgentRuntime())
+    .finally(() => {
+      durableShutdownFinished = true;
+      app.quit();
+    });
 });
 
 app.on("will-quit", () => {
@@ -189,15 +178,12 @@ app.on("will-quit", () => {
   disposeUpdater();
   // 检查器浮窗：退出前强制销毁，避免残留独立窗
   disposeInspectorWindow();
-  // 多实例并行：遍历全部 pi 会话进程 dispose（各实例 3s kill 兜底）
-  disposeAllSessions();
   // 后台进程：按用户选择一并结束或保留（保留只放弃登记）
   if (getQuitProcPolicy() !== "keep") {
     procService.prepareQuit("kill");
   } else {
     procService.prepareQuit("keep");
   }
-  disposeExtensionWorker();
   disposeViewHost();
   // 干净退出（含「保留后台」）：删掉残留锁，下次启动不提示
   clearResidualLock();

@@ -13,6 +13,10 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
+import type {
+  DurableExtensionHostScope,
+  DurableExtensionViewBinding,
+} from "../../shared/durableExtension";
 import {
   isNotificationScenarioId,
   isNotificationSoundId,
@@ -54,6 +58,7 @@ import {
 import { showSystemToast } from "../notification/toastService";
 import { getSettings } from "../settings/settings";
 import { getMainWindow } from "../window/createMainWindow";
+import { registerNativeViewCleanup } from "./nativeViewLifecycle";
 import {
   applyPatch,
   buildOpenedPayload,
@@ -106,6 +111,7 @@ interface ViewConnection {
   sessionId?: string;
   /** 连接角色：Extension Worker 不得绑定 access-mode / session widget（docs/design/16 §9）。 */
   role?: "session" | "worker";
+  native?: NativeViewOwner & { contributionKeys: ReadonlySet<string> };
   /** 每连接同时最多一个 widget 槽；新 open 顶替旧的。 */
   widgetViewId: string | null;
   /** access-mode：每连接最多一个模式注册；新 open 顶替旧的（docs/design/14）。 */
@@ -124,6 +130,45 @@ function headerSideViewKey(
   if (side === "center") return "headerCenterViewId";
   if (side === "right") return "headerRightViewId";
   return "headerLeftViewId";
+}
+
+export interface NativeViewOwner {
+  ownerId: string;
+  sessionId?: string;
+  extensionId: string;
+  hostScope: DurableExtensionHostScope;
+  projectDir?: string;
+}
+
+const nativeBindings = new Map<
+  string,
+  NativeViewOwner & { contributionKeys: ReadonlySet<string> }
+>();
+
+/** Issue credentials tied to a single extension; never publish them in rendezvous or renderer DTOs. */
+export function issueNativeViewBinding(
+  owner: NativeViewOwner,
+  contributions: Record<string, string>,
+): DurableExtensionViewBinding {
+  if (!hostEnv) throw new Error("View host is unavailable.");
+  const token = randomBytes(24).toString("hex");
+  nativeBindings.set(token, { ...owner, contributionKeys: new Set(Object.values(contributions)) });
+  return { endpoint: hostEnv.endpoint, token, protocol: hostEnv.protocol, contributions };
+}
+
+/** Revoke credentials and sockets, including settings Views, when their owning runtime closes. */
+export function revokeNativeExtensionViews(ownerId?: string): void {
+  for (const [token, owner] of nativeBindings) {
+    if (ownerId === undefined || owner.ownerId === ownerId) nativeBindings.delete(token);
+  }
+  for (const conn of [...connections.values()]) {
+    if (!conn.native || (ownerId !== undefined && conn.native.ownerId !== ownerId)) continue;
+    connections.delete(conn.id);
+    for (const view of [...views.values()]) {
+      if (view.connectionId === conn.id) destroyView(view, "session", true);
+    }
+    conn.socket.destroy();
+  }
 }
 
 let server: net.Server | null = null;
@@ -153,6 +198,8 @@ const contributionWaiters = new Map<
     timer: NodeJS.Timeout;
   }>
 >();
+
+registerNativeViewCleanup(() => revokeNativeExtensionViews());
 
 function contributionIndexKey(sessionId: string | undefined, contributionKey: string): string {
   return `${sessionId ?? ""}::${contributionKey}`;
@@ -241,6 +288,27 @@ export function getViewModeState(viewId: string): {
 
 function push(message: ExtensionViewPush): void {
   getMainWindow()?.webContents.send(VIEW_IPC.output, message);
+}
+
+function publishOpenView(view: OpenView): void {
+  push({
+    type: "open",
+    id: view.id,
+    sessionId: view.sessionId,
+    hostScope: connections.get(view.connectionId)?.native?.hostScope,
+    title: view.title,
+    root: view.root,
+    actions: view.actions,
+    placement: view.placement,
+    placementHint: view.placementHint,
+    panelId: view.panelId,
+    contributionKey: view.contributionKey,
+  });
+}
+
+/** Replay current Views after the renderer subscribes, without reconnecting extensions. */
+export function replayViewState(): void {
+  for (const view of views.values()) publishOpenView(view);
 }
 
 function sendEnvelope(conn: ViewConnection, envelope: Omit<ViewEnvelope, "v">): void {
@@ -340,8 +408,9 @@ function handleNotify(conn: ViewConnection, id: string, raw: unknown): void {
     return;
   }
 
-  const sessionId =
-    typeof payload.sessionId === "string" && payload.sessionId.length > 0
+  const sessionId = conn.native
+    ? conn.sessionId
+    : typeof payload.sessionId === "string" && payload.sessionId.length > 0
       ? payload.sessionId
       : conn.sessionId;
 
@@ -475,6 +544,17 @@ async function handleOpen(conn: ViewConnection, id: string, payload: unknown): P
 
   // Extension Worker 只允许全局、安全声明能力（settings 等）；
   // access-mode / widget 属于会话真值，拒绝绑定（docs/design/16 §9.1）。
+  if (conn.native && conn.native.hostScope !== "session") {
+    const allowed =
+      conn.native.hostScope === "settings"
+        ? ["settings"]
+        : ["settings", "header", "panel", "sidebar", "modal"];
+    if (!allowed.includes(resolved.placement)) {
+      sendError(conn, id, "This View placement requires a session host.", "placement");
+      sendEnvelope(conn, { id, type: "closed", payload: { reason: "placement" } });
+      return;
+    }
+  }
   if (conn.role === "worker") {
     if (resolved.placement !== "settings") {
       sendError(conn, id, "Extension Worker 不允许注册会话级 View", "placement");
@@ -543,7 +623,10 @@ async function handleOpen(conn: ViewConnection, id: string, payload: unknown): P
   let panelId: string | undefined;
   let slot: string | undefined;
   if (SLOTTED_VIEW_PLACEMENTS.has(placement)) {
-    panelId = resolvePanelId(id, placementHint?.panelId);
+    const slotId = resolvePanelId(id, placementHint?.panelId);
+    panelId = conn.native
+      ? `${conn.native.hostScope}:${conn.native.extensionId}:${slotId}`
+      : slotId;
     slot = slotKey(placement, panelId);
     const oldViewId = conn.slotViews.get(slot);
     if (oldViewId) {
@@ -554,9 +637,12 @@ async function handleOpen(conn: ViewConnection, id: string, payload: unknown): P
 
   // 归属优先连接 auth 的 sessionId（spawn 时注入，与 start 返回值一致）；
   // open payload 仅在连接未绑定时兜底，避免 payload 与进程 env 不一致导致串会话。
-  const openSessionId =
-    conn.sessionId ??
-    (typeof open.sessionId === "string" && open.sessionId.length > 0 ? open.sessionId : undefined);
+  const openSessionId = conn.native
+    ? conn.sessionId
+    : (conn.sessionId ??
+      (typeof open.sessionId === "string" && open.sessionId.length > 0
+        ? open.sessionId
+        : undefined));
 
   const rawContributionKey = sanitizeContributionKey(open.contributionKey);
   let contributionKey: string | undefined;
@@ -571,8 +657,14 @@ async function handleOpen(conn: ViewConnection, id: string, payload: unknown): P
     if (stale && rawContributionKey) throw new Error("扩展配置待重载，当前进程无法绑定新目录");
     if (open.contributionKey !== undefined && !rawContributionKey)
       throw new Error("无效的 contributionKey");
+    if (conn.native && rawContributionKey && !conn.native.contributionKeys.has(rawContributionKey))
+      throw new Error("Contribution belongs to another extension instance.");
     contributionKey = resolveContributionBinding({
-      entries: stale ? [] : getCatalogSnapshot(getSessionCwd(openSessionId)).entries,
+      entries: stale
+        ? []
+        : getCatalogSnapshot(
+            conn.native?.projectDir ?? getSessionCwd(openSessionId),
+          ).entries.filter((entry) => !conn.native || conn.native.contributionKeys.has(entry.key)),
       contributionKey: rawContributionKey,
       placement,
       hint: placementHint,
@@ -618,19 +710,7 @@ async function handleOpen(conn: ViewConnection, id: string, payload: unknown): P
   if (slot) conn.slotViews.set(slot, id);
   registerContribution(view);
 
-  push({
-    type: "open",
-    id,
-    sessionId: view.sessionId,
-    title: view.title,
-    root: view.root,
-    actions: view.actions,
-    placement,
-    placementHint: view.placementHint,
-    panelId,
-    timeoutMs,
-    contributionKey: view.contributionKey,
-  });
+  publishOpenView(view);
 
   // Open ack：Client 可读最终 placement（降级后的真实槽位）。
   // 老 SDK 忽略此消息；协议向后兼容。header 槽附带最终 side。
@@ -773,7 +853,8 @@ function handleEnvelope(conn: ViewConnection, line: string): void {
 
   if (!conn.authenticated) {
     const token = (parsed as { token?: unknown }).token;
-    if (typeof token !== "string" || token !== hostEnv?.token) {
+    const native = typeof token === "string" ? nativeBindings.get(token) : undefined;
+    if (typeof token !== "string" || (!native && token !== hostEnv?.token)) {
       conn.socket.destroy();
       return;
     }
@@ -786,6 +867,11 @@ function handleEnvelope(conn: ViewConnection, line: string): void {
     const authRole = (parsed as { role?: unknown }).role;
     if (authRole === "worker") conn.role = "worker";
     else if (authRole === "session") conn.role = "session";
+    if (native) {
+      conn.native = native;
+      conn.sessionId = native.sessionId;
+      conn.role = native.hostScope === "session" ? "session" : undefined;
+    }
     // capability 广告：便于扩展决定是否 placementRequired / contribution binding
     const hello: ViewHelloPayload = {
       protocol: VIEW_PROTOCOL_VERSION,
@@ -1160,6 +1246,7 @@ export function retainSessionViews(
 
 /** 应用退出：发 closed 并断开全部连接。 */
 export function disposeViewHost(): void {
+  revokeNativeExtensionViews();
   for (const view of [...views.values()]) {
     destroyView(view, "dispose", true);
   }

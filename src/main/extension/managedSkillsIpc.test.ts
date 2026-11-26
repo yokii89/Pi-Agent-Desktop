@@ -58,11 +58,7 @@ beforeEach(() => {
   host.handlers.clear();
   vi.clearAllMocks();
   for (const name of ["plugin-creator", "skill-creator"]) {
-    const directory = path.join(
-      host.root,
-      "vendor/MyPiExtension/packages/yoki-skills/skills",
-      name,
-    );
+    const directory = path.join(host.root, "assets/skills", name);
     fs.mkdirSync(directory, { recursive: true });
     fs.writeFileSync(
       path.join(directory, "SKILL.md"),

@@ -38,11 +38,9 @@ import {
 /**
  * 配置目录决策：PiDesk 自身设置落在 Electron `userData`（Windows 即
  * `%APPDATA%/pidesk/settings.json`），**不**放进 pi 的 `~/.pi`。
- * - `~/.pi` 是 pi 的数据域（会话 JSONL / auth.json / pi settings.json），
- *   混入 PiDesk 主题、侧栏、托盘等 UI 状态会污染 pi 命名空间；
- * - `userData` 是 Electron 平台约定，卸载、便携版、多用户行为正确；
- * - 需要写给 pi 的配置（默认模型、shellPath）走 `session/piSettings.ts`
- *   写到 `~/.pi/agent/settings.json`，职责边界保持清晰。
+ * - Existing ~/.pi resources and read-only JSONL history remain in their data directory.
+ * - Desktop preferences, execution shell and encrypted model credentials belong to userData.
+ * - Resource package settings use settings/packageSettings.ts; no agent CLI config is written.
  */
 
 import { revokeRemoteForProjectChanges } from "./remoteStore";
@@ -100,15 +98,21 @@ function settingsFilePath(): string {
  */
 export function getSettings(): PideskSettings {
   if (cache) return cache;
-  let loaded: Partial<PideskSettings> & { sessionTitles?: unknown } = {};
+  let loaded: Partial<PideskSettings> & { sessionTitles?: unknown; piExecutablePath?: unknown } =
+    {};
   try {
     loaded = JSON.parse(fs.readFileSync(settingsFilePath(), "utf8")) as Partial<PideskSettings> & {
       sessionTitles?: unknown;
+      piExecutablePath?: unknown;
     };
   } catch {
     // 首次运行或文件损坏：使用默认值，下次写入时覆盖
   }
-  const { sessionTitles: rawSessionTitles, ...settings } = loaded;
+  const {
+    sessionTitles: rawSessionTitles,
+    piExecutablePath: _retiredExecutable,
+    ...settings
+  } = loaded;
   if (rawSessionTitles !== undefined) {
     legacySessionTitles = sanitizeLegacySessionTitles(rawSessionTitles);
     legacySessionTitlesPresent = true;
@@ -116,6 +120,10 @@ export function getSettings(): PideskSettings {
   cache = {
     ...DEFAULT_SETTINGS,
     ...settings,
+    executionShellPath:
+      typeof loaded.executionShellPath === "string" && loaded.executionShellPath.trim()
+        ? loaded.executionShellPath
+        : null,
     locale: normalizeLocalePreference(loaded.locale),
     closeAction: isCloseAction(loaded.closeAction) ? loaded.closeAction : "ask",
     // 不把 closeAction==="tray" 当成 showInTray 的依据：托盘图标只在「隐藏那一刻」按需创建

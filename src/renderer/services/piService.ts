@@ -2,12 +2,11 @@ import type { PiInfo, PiShellProbe } from "../../shared/ipc";
 import { unwrap } from "./ipc";
 import { pideskApi } from "./pideskApi";
 
-/** pi 信息（版本 + 配置的默认模型），只读。 */
+/** Bundled runtime and execution shell information. */
 export const piService = {
-  /** path 为空时按当前设置解析；refresh 跳过版本缓存（设置页手动校验用）。 */
-  info(path?: string | null, options?: { refresh?: boolean }): Promise<PiInfo | null> {
+  info(): Promise<PiInfo | null> {
     const api = pideskApi();
-    return api ? unwrap(api.pi.info(path, options)).catch(() => null) : Promise.resolve(null);
+    return api ? unwrap(api.pi.info()).catch(() => null) : Promise.resolve(null);
   },
   shell: {
     /** 探测 pi 将使用的 bash；失败返回 null。 */

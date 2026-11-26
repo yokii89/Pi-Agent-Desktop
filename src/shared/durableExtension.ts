@@ -1,5 +1,6 @@
 import type { Message } from "@earendil-works/pi-ai";
 import type { EntryRecord, Extension } from "@earendil-works/pi-durable";
+import type { DesktopViewClient } from "@pidesk/view-sdk";
 
 export const DURABLE_EXTENSION_API_VERSION = 1;
 export const DURABLE_COMMAND_ENTRY = "pidesk.prompt-command";
@@ -31,7 +32,16 @@ export const DURABLE_EXTENSION_ID = /^[a-z][a-z0-9-]{0,63}$/;
 export const DURABLE_COMMAND_NAME = /^[a-z][a-z0-9-]{0,63}:[a-z][a-z0-9-]{0,63}$/;
 export const DURABLE_EXTENSION_LIMIT = 64;
 
-export type DurableExtensionCapability = "agent" | "commands";
+export type DurableExtensionCapability = "agent" | "commands" | "views";
+export type DurableExtensionHostScope = "session" | "app" | "settings";
+
+/** Private, memory-only View credentials issued for one extension and host instance. */
+export interface DurableExtensionViewBinding {
+  endpoint: string;
+  token: string;
+  protocol: string;
+  contributions: Record<string, string>;
+}
 
 /** Resolved only by main; renderer requests cannot supply module paths. */
 export interface DurableExtensionSpec {
@@ -40,6 +50,8 @@ export interface DurableExtensionSpec {
   entry: string;
   scope: "user" | "project";
   capabilities: DurableExtensionCapability[];
+  hosts?: DurableExtensionHostScope[];
+  view?: DurableExtensionViewBinding;
 }
 
 /** Preview v1 context. Never use module globals or process.env to store session identity. */
@@ -49,6 +61,10 @@ export interface DurableExtensionContext {
   readonly cwd: string;
   readonly scope: "user" | "project";
   readonly signal: AbortSignal;
+  readonly hostScope: DurableExtensionHostScope;
+  /** One client per extension instance; the host always disposes it. */
+  readonly views?: DesktopViewClient;
+  readonly contributions: Readonly<Record<string, string>>;
 }
 
 /** Pure prompt expansion; external side effects belong in Durable tools/tasks. */
@@ -58,9 +74,16 @@ export interface DurablePromptCommand {
   expand(args: string): string | Promise<string>;
 }
 
+export interface DurableHostCommand {
+  readonly name: string;
+  readonly description: string;
+  /** Return a prompt to admit model work, or no value when the operation is handled. */
+  execute(args: string): string | void | Promise<string | void>;
+}
+
 export interface DurableExtensionInstance {
   readonly agent?: Extension;
-  readonly commands?: readonly DurablePromptCommand[];
+  readonly commands?: readonly (DurablePromptCommand | DurableHostCommand)[];
   dispose?(): void | Promise<void>;
 }
 
@@ -84,6 +107,27 @@ export function durableExtensionError(code: DurableExtensionErrorCode, name: str
   return new Error(`PIDESK_EXTENSION:${code}:${name.slice(0, 160)}`);
 }
 
+/** Validate credentials only on the private runtime boundary; renderer APIs never accept them. */
+function isViewBinding(value: unknown): value is DurableExtensionViewBinding {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item.endpoint === "string" &&
+    item.endpoint.length > 0 &&
+    item.endpoint.length <= 32768 &&
+    typeof item.token === "string" &&
+    /^[a-f0-9]{48}$/.test(item.token) &&
+    item.protocol === "view/v1" &&
+    typeof item.contributions === "object" &&
+    item.contributions !== null &&
+    !Array.isArray(item.contributions) &&
+    Object.entries(item.contributions).length <= 64 &&
+    Object.entries(item.contributions).every(
+      ([key, entry]) => key.length <= 160 && typeof entry === "string" && entry.length <= 512,
+    )
+  );
+}
+
 /** Validate the private MessagePort DTO independently of filesystem access. */
 export function isDurableExtensionSpec(value: unknown): value is DurableExtensionSpec {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
@@ -101,8 +145,17 @@ export function isDurableExtensionSpec(value: unknown): value is DurableExtensio
     (item.scope === "user" || item.scope === "project") &&
     Array.isArray(item.capabilities) &&
     item.capabilities.length > 0 &&
-    item.capabilities.length <= 2 &&
+    item.capabilities.length <= 3 &&
     new Set(item.capabilities).size === item.capabilities.length &&
-    item.capabilities.every((capability) => capability === "agent" || capability === "commands")
+    item.capabilities.every((capability) =>
+      ["agent", "commands", "views"].includes(String(capability)),
+    ) &&
+    (item.hosts === undefined ||
+      (Array.isArray(item.hosts) &&
+        item.hosts.length > 0 &&
+        item.hosts.length <= 3 &&
+        new Set(item.hosts).size === item.hosts.length &&
+        item.hosts.every((host) => ["session", "app", "settings"].includes(String(host))))) &&
+    (item.view === undefined || isViewBinding(item.view))
   );
 }

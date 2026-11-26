@@ -33,6 +33,7 @@ import {
 import { DURABLE_SESSION_ID, sessionRefFromKey, sessionRefKey } from "../../shared/sessionRef";
 import { discoverDurableExtensions } from "../extension/durableExtensions";
 import { discoverDurableResources } from "../extension/durableResources";
+import { prepareExtensionViews } from "../extension/nativeViewBindings";
 import { resolveBashForTerminal } from "../session/piShell";
 import {
   markRuntimeActivity,
@@ -54,6 +55,7 @@ import {
 } from "../settings/durableStore";
 import { loadGatewayCatalog } from "../settings/newApiStore";
 import { getSettings } from "../settings/settings";
+import { revokeNativeExtensionViews } from "../view/viewHost";
 import { getMainWindow } from "../window/createMainWindow";
 import { agentRuntimeManager } from "./agentRuntimeManager";
 import { DurableProjection } from "./durableProjection";
@@ -274,7 +276,12 @@ class DesktopSessions {
           sessionName: null,
         });
       }
-      const extensions = discoverDurableExtensions(cwd);
+      const extensions = await prepareExtensionViews(discoverDurableExtensions(cwd), {
+        ownerId: storedId,
+        sessionId: id,
+        hostScope: "session",
+        projectDir: cwd,
+      });
       await agentRuntimeManager.request({
         op: "open",
         sessionId: storedId,
@@ -288,6 +295,7 @@ class DesktopSessions {
       if (!attachment.settled) markRuntimeActivity(id, "busy");
       return id;
     } catch (error) {
+      revokeNativeExtensionViews(storedId);
       markRuntimeExit(id);
       clearSessionCwd(id);
       if (!known) removeDurableSummary(storedId);
@@ -325,7 +333,16 @@ class DesktopSessions {
     }
     const epoch = attachment.epoch;
     try {
-      return await agentRuntimeManager.request(command);
+      const result = await agentRuntimeManager.request(command);
+      if (
+        working &&
+        wasSettled &&
+        attachment.epoch === epoch &&
+        record(result) &&
+        result.disposition === "handled"
+      )
+        attachment.settled = true;
+      return result;
     } catch (error) {
       // A rejected command expansion admitted no work and will not produce a settled update.
       if (
@@ -350,8 +367,6 @@ class DesktopSessions {
     images?: readonly PiImageContent[],
   ): Promise<"started" | "queued" | "handled"> {
     const attachment = this.require(id);
-    if (!readDurableModel())
-      throw new Error("Configure a model in Settings → Models before sending.");
     const result = await this.command(id, {
       op: "submit",
       sessionId: attachment.storedId,
@@ -425,6 +440,7 @@ class DesktopSessions {
     const operation = agentRuntimeManager
       .request({ op: "close", sessionId: attachment.storedId })
       .then(() => {
+        revokeNativeExtensionViews(attachment.storedId);
         this.flush(attachment);
         this.attachments.delete(id);
         this.byStoredId.delete(attachment.storedId);
@@ -440,7 +456,12 @@ class DesktopSessions {
   }
 
   has(id: string): boolean {
-    return this.attachments.has(id);
+    const attachment = this.attachments.get(id);
+    return attachment !== undefined && !attachment.closing;
+  }
+
+  list(): SessionId[] {
+    return [...this.attachments.keys()].filter((id) => this.has(id));
   }
 
   liveId(key: string): string | null {
@@ -472,6 +493,7 @@ class DesktopSessions {
       .then((closed) => {
         if (closed !== true) return;
         ended = true;
+        revokeNativeExtensionViews(attachment.storedId);
         this.flush(attachment);
         this.attachments.delete(id);
         this.byStoredId.delete(attachment.storedId);
@@ -577,6 +599,17 @@ class DesktopSessions {
     } finally {
       this.changingModel = false;
     }
+  }
+
+  async updateExecutionShell(): Promise<void> {
+    if (!this.initialized) return;
+    await this.initialized;
+    await agentRuntimeManager.request({
+      op: "executionShell",
+      shell:
+        resolveBashForTerminal() ??
+        (process.platform === "win32" ? "C:\\Program Files\\Git\\bin\\bash.exe" : "/bin/bash"),
+    });
   }
 
   async updateBuiltinTools(): Promise<void> {

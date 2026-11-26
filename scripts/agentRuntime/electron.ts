@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, realpathSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -37,6 +37,38 @@ const timeout = setTimeout(() => {
 
 async function main(): Promise<void> {
   await app.whenReady();
+  for (const retired of [
+    "session/piSession",
+    "session/piLauncher",
+    "session/piModelList",
+    "session/sessionIpc",
+    "session/piAuth",
+    "session/piCredentials",
+    "session/piSettings",
+    "extension/packageCli",
+    "extension/extensionWorkerArgs",
+    "extension/workerSafe",
+    "mcp/mcpProbe",
+    "mcp/piVersion",
+    "models/modelOverridesIpc",
+  ])
+    assert(
+      !existsSync(path.join(app.getAppPath(), "dist/main", `${retired}.js`)),
+      `Retired executor was packaged: ${retired}`,
+    );
+  for (const name of ["plugin-creator", "skill-creator"])
+    assert(
+      readFileSync(path.join(app.getAppPath(), "assets/skills", name, "SKILL.md"), "utf8").includes(
+        "Durable",
+      ),
+    );
+  assert(
+    readFileSync(
+      path.join(app.getAppPath(), "assets/skills/plugin-creator/references/durable-extension.md"),
+      "utf8",
+    ).includes('"engine": "durable"'),
+  );
+  if (app.isPackaged) assert(!existsSync(path.join(app.getAppPath(), "vendor/MyPiExtension")));
   const aiRequire = createRequire(
     realpathSync(path.join(app.getAppPath(), "node_modules/@earendil-works/pi-ai/package.json")),
   );
@@ -78,6 +110,11 @@ async function main(): Promise<void> {
     assert(Number.isSafeInteger(result.conversationId));
     if (app.isPackaged) assert(app.getAppPath().endsWith("app.asar"));
     const workbench = await checkWorkbench(reportPath, () => writer);
+    await (
+      hostRequire(path.join(app.getAppPath(), "dist/main/extension/extensionWorkerManager.js")) as {
+        disposeExtensionWorker(): Promise<void>;
+      }
+    ).disposeExtensionWorker();
     await manager.disposeAgentRuntime();
     await assert.rejects(manager.startAgentRuntime(), /closing/);
     const report = `${JSON.stringify(
@@ -87,6 +124,11 @@ async function main(): Promise<void> {
         electron: process.versions.electron,
         utilityNode: first.nodeVersion,
         dependencies: { googleGenaiImport: "passed", protobufRoundTrip: "passed" },
+        nativeBoundary: {
+          retiredExecutors: "absent",
+          bundledDurableSkills: "passed",
+          archivedExtensions: app.isPackaged ? "excluded" : "source-only",
+        },
         ...result,
         workbench,
         shutdown: "passed",

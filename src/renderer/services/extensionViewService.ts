@@ -19,6 +19,8 @@ export const extensionViewService = {
   subscribe(listener: (message: ExtensionViewPush) => void): () => void {
     ensureBound();
     pushListeners.add(listener);
+    const api = pideskApi();
+    if (api?.view.replay) void unwrap(api.view.replay()).catch(() => {});
     return () => {
       pushListeners.delete(listener);
     };

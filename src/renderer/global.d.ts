@@ -81,16 +81,11 @@ import type {
   McpReloadResult,
   McpSaveServerRequest,
   McpSessionCommandRequest,
-  PiApiKeyProviderOption,
-  PiAuthSnapshot,
   PiChatMessage,
   PideskSettings,
   PiInfo,
   PiLocalResourceSetEnabledRequest,
   PiModelOption,
-  PiModelOverrideSetRequest,
-  PiModelOverrideSetResult,
-  PiModelOverridesSnapshot,
   PiModelState,
   PiPackageInstallRequest,
   PiPackageRemoveRequest,
@@ -221,27 +216,10 @@ export interface PideskGlobalApi {
     pick(defaultPath?: string | null): Promise<IpcResult<string | null>>;
   };
   pi: {
-    info(path?: string | null, options?: { refresh?: boolean }): Promise<IpcResult<PiInfo>>;
+    info(): Promise<IpcResult<PiInfo>>;
     shell: {
       get(): Promise<IpcResult<PiShellProbe>>;
       set(path: string | null): Promise<IpcResult<PiShellProbe>>;
-    };
-    auth: {
-      list(): Promise<IpcResult<PiAuthSnapshot>>;
-      listApiKeyProviders(): Promise<IpcResult<PiApiKeyProviderOption[]>>;
-      upsert(req: {
-        id?: string | null;
-        name: string;
-        provider: string;
-        apiKey?: string | null;
-        baseUrl?: string | null;
-        api?: string | null;
-        preferredModel?: string | null;
-      }): Promise<IpcResult<PiAuthSnapshot>>;
-      setActive(id: string): Promise<IpcResult<PiAuthSnapshot>>;
-      remove(id: string): Promise<IpcResult<PiAuthSnapshot>>;
-      /** 导入 auth.json 中已有的 provider（origin=pi，不改写 auth.json）。 */
-      import(provider: string): Promise<IpcResult<PiAuthSnapshot>>;
     };
   };
   mcp: {
@@ -261,12 +239,6 @@ export interface PideskGlobalApi {
     getPiSupport(): Promise<IpcResult<McpPiSupport>>;
     /** MCP 市场搜索：空 query 走内置精选清单，非空走官方注册表（docs/design/41）。 */
     marketSearch(req: McpMarketSearchRequest): Promise<IpcResult<McpMarketSearchResult>>;
-  };
-  modelOverrides: {
-    /** 读取 models.json 覆盖快照（~/.pi/agent/models.json，docs/design/49）。 */
-    get(): Promise<IpcResult<PiModelOverridesSnapshot>>;
-    /** 写入一条覆盖补丁（字段 null = 删除回到默认）并重载存活会话。 */
-    set(req: PiModelOverrideSetRequest): Promise<IpcResult<PiModelOverrideSetResult>>;
   };
   durable: DurableDesktopApi;
   telegram: TelegramDesktopApi;
@@ -464,6 +436,7 @@ export interface PideskGlobalApi {
     syncPreview(): Promise<IpcResult<GitHubSyncPreview>>;
   };
   view: {
+    replay(): Promise<IpcResult<null>>;
     onOutput(callback: (message: ExtensionViewPush) => void): () => void;
     sendEvent(req: { id: string; event: ViewEvent }): Promise<IpcResult<null>>;
     reportLayout(req: { id: string; width: number; height?: number }): Promise<IpcResult<null>>;

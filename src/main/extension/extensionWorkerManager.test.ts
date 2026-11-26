@@ -1,94 +1,136 @@
-import { EventEmitter } from "node:events";
-import { PassThrough, Writable } from "node:stream";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { DurableExtensionSpec } from "../../shared/durableExtension";
+import { NativeExtensionHosts } from "./nativeExtensionHosts";
 
-const fake = vi.hoisted(() => ({ spawn: vi.fn(), paths: vi.fn(), close: vi.fn() }));
-vi.mock("node:child_process", () => ({ spawn: fake.spawn }));
-vi.mock("../session/piLauncher", () => ({ resolvePiCommand: () => ({ file: "pi", args: [] }) }));
-vi.mock("../settings/settings", () => ({ getSettings: () => ({}) }));
-vi.mock("../view/viewHost", () => ({
-  ensureViewHost: async () => ({}),
-  getViewHostRendezvousPath: () => "fake",
-  closeSessionViews: fake.close,
-}));
-vi.mock("./workerSafe", () => ({ listWorkerSafeExtensionPaths: fake.paths }));
-vi.mock("./contributionCatalog", () => ({ getCatalogSnapshot: () => ({ entries: [] }) }));
-
-import {
-  __resetWorkerForTests,
-  acquireWorkerLease,
-  getWorkerStatus,
-  releaseWorkerLease,
-} from "./extensionWorkerManager";
-
-function child(answer: boolean) {
-  const process = Object.assign(new EventEmitter(), {
-    stdout: new PassThrough(),
-    stderr: new PassThrough(),
-    exitCode: null as number | null,
-    signalCode: null,
-    stdin: new Writable(),
-    kill: vi.fn(),
-  });
-  const close = () => {
-    process.exitCode = 0;
-    process.emit("exit", 0);
-    process.emit("close", 0);
+const spec = {
+  id: "settings",
+  root: "/package",
+  entry: "/package/desktop.mjs",
+  scope: "user",
+  capabilities: ["views"],
+  hosts: ["app", "settings"],
+} satisfies DurableExtensionSpec;
+function host() {
+  const request = vi.fn().mockResolvedValue(null);
+  const discover = vi.fn(() => [spec]);
+  const revoke = vi.fn();
+  const bind = vi.fn(async (specs: DurableExtensionSpec[]) => specs);
+  return {
+    request,
+    discover,
+    revoke,
+    bind,
+    host: new NativeExtensionHosts({ request, discover, revoke, bind, cwd: "/home" }),
   };
-  process.kill.mockImplementation(close);
-  process.stdin = new Writable({
-    write(chunk, _encoding, callback) {
-      const request = JSON.parse(String(chunk)) as { id: number };
-      if (answer)
-        queueMicrotask(() =>
-          process.stdout.write(
-            `${JSON.stringify({ type: "response", id: request.id, success: true, data: {} })}\n`,
-          ),
-        );
-      callback();
-    },
-    final(callback) {
-      close();
-      callback();
-    },
-  });
-  return process;
 }
+afterEach(() => vi.useRealTimers());
 
-beforeEach(() => {
-  vi.useFakeTimers();
-  vi.clearAllMocks();
-  fake.paths.mockReturnValue(["safe.ts"]);
-});
-afterEach(async () => {
-  __resetWorkerForTests();
-  await vi.runOnlyPendingTimersAsync();
-  vi.useRealTimers();
-});
-describe("Extension Worker lifecycle", () => {
-  it("does not spawn until leased, probes before ready, shares leases and exits after grace", async () => {
-    fake.spawn.mockReturnValue(child(true));
-    expect(fake.spawn).not.toHaveBeenCalled();
-    const results = await Promise.all([acquireWorkerLease(), acquireWorkerLease()]);
-    expect(fake.spawn).toHaveBeenCalledTimes(1);
-    expect(results[0]?.status).toMatchObject({ ready: true, leases: 2 });
-    releaseWorkerLease();
-    await vi.advanceTimersByTimeAsync(45_000);
-    expect(getWorkerStatus().running).toBe(true);
-    releaseWorkerLease();
-    await vi.advanceTimersByTimeAsync(45_000);
-    expect(getWorkerStatus().running).toBe(false);
+describe("native app/settings extension lifecycle", () => {
+  it("shares the settings host until the last lease expires, without opening a conversation", async () => {
+    vi.useFakeTimers();
+    const f = host();
+    await Promise.all([f.host.acquire(), f.host.acquire()]);
+    expect(f.request).toHaveBeenCalledTimes(1);
+    expect(f.request.mock.calls[0][0]).toMatchObject({
+      op: "openExtensionHost",
+      hostScope: "settings",
+    });
+    expect(f.host.status()).toMatchObject({ ready: true, leases: 2 });
+    f.host.release();
+    await vi.advanceTimersByTimeAsync(45000);
+    expect(f.host.status().running).toBe(true);
+    f.host.release();
+    await vi.advanceTimersByTimeAsync(45000);
+    expect(f.host.status().running).toBe(false);
+    expect(f.revoke).toHaveBeenCalledTimes(1);
+    await f.host.dispose();
   });
-  it("does not spawn an empty worker", async () => {
-    fake.paths.mockReturnValue([]);
-    expect((await acquireWorkerLease()).status.running).toBe(false);
-    expect(fake.spawn).not.toHaveBeenCalled();
+  it("keeps app lifetime separate, serializes reloads, and revokes credentials before close", async () => {
+    const f = host();
+    await f.host.startApp();
+    await f.host.acquire();
+    await Promise.all([f.host.reload(), f.host.reload()]);
+    expect(f.host.status().ready).toBe(true);
+    const scopes = f.request.mock.calls
+      .filter(([command]) => command.op === "openExtensionHost")
+      .map(([command]) => command.hostScope);
+    expect(scopes).toEqual(["app", "settings", "app", "settings", "app", "settings"]);
+    await f.host.dispose();
+    expect(f.host.status()).toMatchObject({ running: false, leases: 0 });
+    expect(f.revoke).toHaveBeenCalledTimes(6);
   });
-  it("unanswered RPC fails within the deadline", async () => {
-    fake.spawn.mockReturnValue(child(false));
-    const acquired = acquireWorkerLease();
-    await vi.advanceTimersByTimeAsync(15_000);
-    expect((await acquired).status).toMatchObject({ ready: false, running: false });
-    expect(getWorkerStatus().errorMessage).toContain("超时");
+  it("retries failed cleanup before replacing a settings host", async () => {
+    const f = host();
+    f.request.mockImplementation(async (command) => {
+      if (command.op === "openExtensionHost") throw new Error("factory failed");
+      if (command.op === "closeExtensionHost") throw new Error("cleanup failed");
+      return null;
+    });
+    expect((await f.host.acquire()).status).toMatchObject({ running: true, ready: false });
+    const retained = f.request.mock.calls[0][0].hostId;
+    f.request.mockResolvedValue(null);
+    await f.host.acquire();
+    expect(f.request.mock.calls[2][0]).toEqual({ op: "closeExtensionHost", hostId: retained });
+    expect(f.request.mock.calls[3][0]).toMatchObject({ op: "openExtensionHost" });
+    expect(f.request.mock.calls[3][0].hostId).not.toBe(retained);
+    await f.host.dispose();
+  });
+
+  it("retries recovery failures with a bound and keeps the other lifetime available", async () => {
+    vi.useFakeTimers();
+    const f = host();
+    await f.host.startApp();
+    await f.host.acquire();
+    f.request.mockImplementation(async (command) => {
+      if (command.op === "openExtensionHost" && command.hostScope === "app")
+        throw new Error("unavailable");
+      return null;
+    });
+    f.host.fault();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(f.host.status().ready).toBe(true);
+    await vi.advanceTimersByTimeAsync(5000);
+    const opens = f.request.mock.calls.filter(([command]) => command.op === "openExtensionHost");
+    expect(opens.filter(([command]) => command.hostScope === "app")).toHaveLength(4);
+    expect(opens.filter(([command]) => command.hostScope === "settings")).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(
+      f.request.mock.calls.filter(([command]) => command.op === "openExtensionHost"),
+    ).toHaveLength(opens.length);
+    await f.host.dispose();
+  });
+
+  it("revokes pending bindings when the runtime faults before a factory starts", async () => {
+    vi.useFakeTimers();
+    const f = host();
+    let finish!: (specs: DurableExtensionSpec[]) => void;
+    f.bind.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const acquiring = f.host.acquire();
+    await Promise.resolve();
+    f.host.fault();
+    finish([spec]);
+    await acquiring;
+    expect(f.request).not.toHaveBeenCalled();
+    expect(f.revoke).toHaveBeenCalledTimes(1);
+    await f.host.dispose();
+  });
+
+  it("does not load legacy or undeclared settings code, and recovers from a runtime fault", async () => {
+    const f = host();
+    f.discover.mockReturnValueOnce([]);
+    expect((await f.host.acquire()).status.running).toBe(false);
+    expect(f.request).not.toHaveBeenCalled();
+    await f.host.reload();
+    expect(f.host.status().ready).toBe(true);
+    f.host.fault();
+    expect(f.host.status()).toMatchObject({ running: false, ready: false });
+    await f.host.reload();
+    expect(f.host.status().ready).toBe(true);
+    await f.host.dispose();
   });
 });

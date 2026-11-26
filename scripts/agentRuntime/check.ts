@@ -11,7 +11,11 @@ const projectRoot = path.resolve(import.meta.dirname, "../..");
 const output = path.join(
   projectRoot,
   "temp/agent-runtime-check",
-  process.argv.includes("--newapi") ? "newapi" : "",
+  process.argv.includes("--newapi")
+    ? "newapi"
+    : process.argv.includes("--extensions")
+      ? "extensions"
+      : "",
 );
 const hostOutput = path.join(projectRoot, "dist/runtimeCheck");
 const tsc = require.resolve("typescript/bin/tsc");
@@ -37,7 +41,7 @@ function run(command: string, args: string[], extraEnv: NodeJS.ProcessEnv = {}):
 await mkdir(output, { recursive: true });
 try {
   if (!process.argv.includes("--reuse-build")) {
-    await run(process.execPath, [tsc, "-p", "tsconfig.main.json"]);
+    await run(process.execPath, [path.join(projectRoot, "scripts/buildMain.ts")]);
     await run(process.execPath, [path.join(projectRoot, "scripts/buildRuntime.ts")]);
     await run(process.execPath, [
       path.join(path.dirname(require.resolve("vite/package.json")), "bin/vite.js"),
@@ -68,7 +72,7 @@ try {
     path.join(developmentRoot, "package.json"),
     JSON.stringify({ name: "pidesk-runtime-check", main: hostEntry }),
   );
-  for (const directory of ["dist", "node_modules"]) {
+  for (const directory of ["dist", "node_modules", "assets"]) {
     const link = path.join(developmentRoot, directory);
     if (!existsSync(link)) await symlink(path.join(projectRoot, directory), link, "junction");
   }
@@ -77,6 +81,7 @@ try {
   await run(electron, [developmentRoot], {
     PIDESK_RUNTIME_CHECK_REPORT: developmentReport,
     PIDESK_RUNTIME_CHECK_LIVE_AUTH: live ? path.join(homedir(), ".pi/agent/auth.json") : "",
+    PIDESK_RUNTIME_CHECK_EXTENSIONS_ONLY: process.argv.includes("--extensions") ? "1" : "",
     PIDESK_RUNTIME_CHECK_NEWAPI_ONLY: process.argv.includes("--newapi") ? "1" : "",
   });
   console.log("Electron utility process verification:", await readFile(developmentReport, "utf8"));
@@ -101,6 +106,7 @@ try {
   await run(path.join(packageOutput, "win-unpacked/PiDesk.exe"), [], {
     PIDESK_RUNTIME_CHECK_REPORT: packagedReport,
     PIDESK_RUNTIME_CHECK_LIVE_AUTH: "",
+    PIDESK_RUNTIME_CHECK_EXTENSIONS_ONLY: process.argv.includes("--extensions") ? "1" : "",
     PIDESK_RUNTIME_CHECK_NEWAPI_ONLY: process.argv.includes("--newapi") ? "1" : "",
   });
   const report = JSON.parse(await readFile(packagedReport, "utf8")) as { packaged?: boolean };

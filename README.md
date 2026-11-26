@@ -16,17 +16,17 @@
 
 </div>
 
-> There are many agent clients — this one runs on your own pi.
+> A desktop workbench powered by bundled pi-durable.
 
-PiDesk is the Windows desktop client for the open-source coding agent [pi](https://github.com/earendil-works/pi). It does not reimplement the agent: pi runs as a `--mode rpc` child process (JSONL over stdio) and PiDesk drives it. Session history stays in pi's native JSONL files, so the pi in your terminal and the pi in PiDesk are the same data. The **[official website](https://pidesk-web.pages.dev/)** carries the visual tour and two recorded walkthroughs.
+PiDesk is a Windows coding-agent workbench built on [pi-durable](https://github.com/earendil-works/pi). The runtime ships with the application and runs in an Electron utility process. Models, credentials, tools and extension lifetimes are managed by PiDesk; an external pi CLI is not required.
 
-## The client, not a second agent
+## Runtime and data
 
-- The agent loop, model auth, context compaction and tool execution all happen inside the pi process. What PiDesk adds is the desktop workbench around them: the event stream rendered as a readable document, and the project, terminal, browser and git changes kept within reach.
-- **Session history stays in pi's own files.** No transcript copy, no second sync, no question of which copy wins — PiDesk keeps only markers such as titles, archive flags and pins. Uninstall it and your sessions still open in the terminal.
-- **MCP config lives in pi's user-level `mcp.json`**, shared with the CLI.
-- **No PiDesk account and no PiDesk model quota.** Model auth stays in pi's own config; GitHub sign-in is optional and exists to sync settings.
-- When pi evolves the protocol, there is no second implementation to chase.
+- The bundled Durable runtime owns the agent loop, tool execution and recoverable tasks. The desktop renders its output alongside projects, terminals, the browser and git changes.
+- New conversations use Durable SQLite storage. Existing pi JSONL history remains available for viewing, copying and export; it cannot be resumed or modified as a Durable conversation.
+- Configure an OpenAI-compatible gateway and model in Settings. Model credentials are stored with OS encryption by the desktop.
+- Native extensions declare `pidesk.runtime` and run in the bundled utility process. Old coding-agent extensions and RPC execution are unsupported.
+- MCP configuration is currently available for read-only inspection. Native MCP connections, authentication and tool registration remain to be implemented.
 
 ## Features
 
@@ -34,11 +34,11 @@ PiDesk is the Windows desktop client for the open-source coding agent [pi](https
 
 - AI replies render as **document-flow Markdown** — GFM tables, numbered lists, inline code chips, one-click code block copy. No chat bubbles: a 200-line answer is a document, not twenty colored blocks.
 - Tool calls collapse into compact status rows, and consecutive calls group into a summary header ("Ran 2 commands · Read 3 files"). Thinking folds into a single row until you expand it.
-- **Parallel sessions**: 8 live pi processes by default, tunable from 1 to 32. Switching never kills one, and hitting the ceiling refuses the new session instead of evicting an old one.
+- **Parallel sessions**: 8 open Durable conversations by default, tunable from 1 to 32, sharing the bundled utility process. Switching preserves running work; hitting the ceiling refuses the new session.
 - `@` file references as atomic tokens with read-only file chips; paste or drop images, attach any file.
 - A **question rail** — one anchor per question, so you can jump straight back after fifty turns.
-- Context usage next to the composer; a **per-turn file-edit summary** with undo and review on the same row; whole-session **Markdown or HTML export** (Markdown puts bodies in order, folds thinking and tool calls, and counts images rather than embedding them; HTML uses pi's native exporter).
-- Access modes: full access is built in, and extensions can register their own (plan mode ships as an extension example) through the SDK.
+- Context usage next to the composer; a **per-turn file-edit summary** with undo and review on the same row; whole-session **Markdown or HTML export** (Markdown puts bodies in order, folds thinking and tool calls, and counts images rather than embedding them; both formats are generated from saved conversation history).
+- Built-in plan mode and questionnaires use persistent Durable interactions. Native extensions can contribute desktop Views through their instance-owned client.
 - Streaming is a ~32ms-batched event stream routed by `sessionId`, so parallel chats never bleed into each other.
 
 ![Session area: user bubble, run header, collapsed thinking and tool-call summary rows](./assets/images/session-flow.webp)
@@ -61,13 +61,12 @@ Audio and video previews include seeking, volume and playback speed, and pause w
 
 Splitting reuses a terminal that is already running rather than starting another session, and hiding the panel never kills the pty — panes are a way of looking at terminals, not a way of killing them.
 
-### pi's ecosystem, hosted in a panel
+### Native extensions and resources
 
-PiDesk doesn't invent an ecosystem, it hosts one.
-
-- **Extensions** — manage pi packages: install, uninstall, enable, globally or per project, with resource-level toggles for extensions, skills, prompt templates and themes.
-- **MCP servers** — edit configs, probe status, hot-reload into running sessions; the market offers official-registry search plus curated one-click templates, so you never hand-type JSON. `mcp__*` calls render in the transcript with the same status rows. (Requires pi ≥ 0.99.0.)
-- **View SDK** (`@pidesk/view-sdk`) — a serializable View protocol with capability negotiation and graceful degradation, so extensions ship UI into 8 placement slots while pi itself stays untouched.
+- **Extensions** — install native Durable packages globally or per project, with package and resource toggles. Package installation uses desktop-owned pnpm/Git operations and skips install scripts. Ship compiled ESM output with the package.
+- **Skills and prompts** — declarative resources use the native loader. The managed skill catalog ships desktop-owned guidance for creating Durable extensions and skills.
+- **MCP servers** — existing configuration is read-only until a native transport is implemented.
+- **View SDK** (`@pidesk/view-sdk`) — a serializable View protocol with capability negotiation. Native factories receive their own authenticated View client, scoped to session, app or settings lifetime.
 - **Scheduled tasks** and **usage statistics** (summary cards, daily / monthly trends, per-model breakdown).
 
 | ![Extensions page managing pi packages](./assets/images/extensions.webp) | ![MCP market with registry search and curated list](./assets/images/mcp-market.webp) |
@@ -78,34 +77,21 @@ PiDesk doesn't invent an ecosystem, it hosts one.
 
 zh-CN / en-US interfaces, light and dark themes, custom title bar, system tray, a one-shot startup animation with a replaceable logo, splash copy and font, Windows toasts with per-scenario sounds, optional GitHub sign-in for settings sync, and in-app auto-update from GitHub Releases — an **Update** button appears beside *Settings* when there is something new.
 
-## Six things we deliberately didn't build
+## Current scope
 
-A client should not become a second agent. Each of these was buildable, and each would have competed with pi for the same job.
-
-| Not built | Why |
-| --- | --- |
-| A copy of the transcript | Message bodies stay in pi's native JSONL; PiDesk keeps markers plus whole-session export as Markdown or HTML. |
-| Bundled pi | No agent in the installer. You point PiDesk at your local pi executable; it probes the version and launches it. |
-| An account system | Model auth belongs to pi. Skip GitHub sign-in and everything still works. |
-| Chat bubbles | Agent output was always a document. |
-| Reinvented agent features | Sub-agents, permission gates and sandboxing belong to pi's extension ecosystem — PiDesk renders them, and lets extensions register views and access modes through the SDK. |
-| Cross-platform | Windows 10/11 only. The saved budget went into desktop integration: tray, native toasts, scenario sounds, auto-update. |
+The application targets Windows 10/11. Durable is the only execution engine. Old JSONL history and declarative resources are retained as data, while the former CLI launcher, RPC session driver and shared CLI credential management have been removed. Native MCP integration and a published extension-factory SDK are not yet available. See the [migration records](./DURABLE-MIGRATION/README.md) for implementation and validation boundaries.
 
 ## Get started
 
-1. Install the pi CLI — `npm install -g @earendil-works/pi-coding-agent` — and configure model auth in pi.
-2. Download the NSIS installer from [Releases](https://github.com/yokii89/Pi-Agent-Desktop/releases) (SHA-256 checksums included).
-3. On first launch, set the pi executable path and a working directory in Settings, then create a task.
-
-![Settings → Configuration: pi executable path and probed version](./assets/images/pi-executable.webp)
-
-*Settings → Configuration: point PiDesk at your local pi executable — it probes the version and reports readiness.*
+1. Install a PiDesk build containing the bundled Durable runtime.
+2. Configure your gateway URL, API key and model in Settings → Models.
+3. Select a working directory and create a task. Configure the execution shell in Settings → Environment if needed.
 
 Prefer to watch before you install? The [website](https://pidesk-web.pages.dev/#demo) has two walkthroughs captured from a running build: the full MCP flow, and picking a page element into the chat.
 
 ## Local development
 
-Requirements: Windows 10/11 · Node.js ≥ 20 · [pnpm](https://pnpm.io) (locked by `packageManager`) · pi CLI
+Requirements: Windows 10/11 · Node.js ≥ 22.19 · [pnpm](https://pnpm.io) (locked by `packageManager`)
 
 ```bash
 pnpm install   # run pnpm run rebuild:native first if node-pty needs an Electron ABI rebuild
@@ -127,34 +113,32 @@ Pushing a `v*` tag triggers GitHub Actions to build and publish to Releases. Rel
 
 | Directory | Role |
 | --- | --- |
-| `src/main` | Electron main process: pi RPC driver, terminal pty, embedded browser, git, MCP, window & settings |
+| `src/main` | Electron main process: Durable host, terminal pty, embedded browser, git, window & settings |
+| `src/agentRuntime` | Bundled ESM utility process: Durable sessions, native extensions and built-in tools |
 | `src/preload` | `contextBridge` whitelisted API (`window.pidesk`) |
 | `src/renderer` | React 19 UI: session area, panels, settings, extension view host |
 | `src/shared` | IPC protocol, i18n message tables, shared types |
 | `packages/view-sdk` | Extension-facing SDK, published as `@pidesk/view-sdk` |
 
-Main ↔ renderer talk over `ipcMain.handle` (request-response, always `{ ok, data \| error }`) and `webContents.send` (pushes such as terminal and session streams). The renderer has no Node capabilities. Session pushes carry `sessionId`, so multiple pi processes multiplex over one channel.
+Main ↔ renderer talk over `ipcMain.handle` (request-response, always `{ ok, data \| error }`) and `webContents.send` (pushes such as terminal and session streams). The renderer has no Node capabilities. Session pushes carry `sessionId`, so parallel Durable conversations share one channel.
 
 ## Extension development
 
-```bash
-npm install @pidesk/view-sdk
-```
+Declare `pidesk.runtime` with `engine: "durable"`, `apiVersion: 1`, an id and compiled ESM entry. Its default factory receives an instance-scoped context and returns native agent definitions, commands and optional cleanup.
 
 ```ts
-import { connectDesktopView, viewOnDesktop } from "@pidesk/view-sdk";
-
-const desktop = connectDesktopView(); // sync env probe, socket is lazy
-if (desktop) {
-  await viewOnDesktop(desktop, {
-    title: "Pick a model",
-    root: { type: "list", id: "model", items: [{ value: "a", label: "A" }] },
-    actions: [{ id: "cancel", label: "Cancel", kind: "submit", variant: "ghost" }],
-  });
+export default function createExtension(context) {
+  return {
+    commands: [{
+      name: `${context.id}:review`,
+      description: "Review workspace changes",
+      expand: (args) => `Review ${args || "the current changes"}`,
+    }],
+  };
 }
 ```
 
-Placement slots: `modal` · `stream` · `widget` · `panel` · `sidebar` · `header` · `settings` · `access-mode`. Under plain terminal pi the env probe returns `null`, so an extension falls back to its TUI — the same package runs in both hosts.
+Factories declaring `views` use `context.views` and `context.contributions`; session identity and credentials do not come from environment discovery. App/settings hosts are explicitly declared user-scoped View lifetimes. See the [native extension contract](./assets/skills/plugin-creator/references/durable-extension.md) and [extension-host design](./DURABLE-MIGRATION/P3-EXTENSION-HOST.md). The factory contract is preview v1, not a published npm extension SDK.
 
 ## Documentation
 

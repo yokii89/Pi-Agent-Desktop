@@ -15,7 +15,7 @@ import { markExtensionStale } from "../session/runtimeCoordinator";
 import { invalidateCatalog } from "./contributionCatalog";
 import { reloadWorkerForExtensionChange } from "./extensionWorkerManager";
 import { setLocalResourceEnabled } from "./localResources";
-import { installPackage, removePackage } from "./packageCli";
+import { installPackage, removePackage } from "./packageService";
 import { listPackages, setPackageEnabled, setPackageResourceEnabled } from "./packageStore";
 
 /** 扩展变更后：刷新 Catalog、标记 stale、按需重启 Worker。 */

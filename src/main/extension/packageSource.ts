@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +22,7 @@ export interface ParsedPackageSource {
 }
 
 const NPM_PREFIX = /^npm:/i;
-const GIT_PREFIX = /^git:/i;
+const GIT_PREFIX = /^git:(?!\/\/)/i;
 const PROTOCOL_URL = /^(https?|ssh|git):\/\//i;
 
 /** Mirror pi's local-path normalization before resolving against a settings file. */
@@ -71,41 +72,70 @@ function hasRef(spec: string): boolean {
   return stripRef(spec) !== spec;
 }
 
-/** 从 git 源提取 host/owner/repo 形态的相对安装路径。 */
-function gitIdentityToRelPath(identity: string): string {
-  let rest = identity;
-  rest = rest.replace(/^(https?|ssh|git):\/\//i, "");
-  rest = rest.replace(/^git@/, "");
-  // git@github.com:user/repo → github.com/user/repo
-  rest = rest.replace(/^([^/:]+):/, "$1/");
-  // 去掉末尾 .git
-  rest = rest.replace(/\.git$/i, "");
-  return rest.replace(/\/+/g, "/").replace(/^\/+|\/+$/g, "");
+/** Resolve Git transport and optional ref without confusing an SSH user with a ref. */
+export function gitPackageLocation(input: string): { url: string; ref?: string } {
+  let spec = input.replace(GIT_PREFIX, "");
+  if (!/^(?:https?|ssh|git):\/\//i.test(spec)) {
+    spec = spec.startsWith("git@")
+      ? spec.replace(/^git@([^:]+):/, "ssh://git@$1/")
+      : `https://${spec}`;
+  }
+  const pathStart = spec.indexOf("/", spec.indexOf("://") + 3);
+  const refAt = spec.lastIndexOf("@");
+  const ref = refAt > pathStart && pathStart > 0 ? spec.slice(refAt + 1) : undefined;
+  const url = ref === undefined ? spec : spec.slice(0, refAt);
+  const parsed = new URL(url);
+  if (
+    !["https:", "ssh:", "git:"].includes(parsed.protocol) ||
+    parsed.password ||
+    (parsed.username && parsed.protocol !== "ssh:") ||
+    parsed.search ||
+    parsed.hash ||
+    !parsed.hostname ||
+    !parsed.pathname.replace(/^\/+|\/+$/g, "") ||
+    /(?:^|\/)\.{1,2}(?:\/|$)|%2e|%2f|%5c|[\\\s]/i.test(url.slice(url.indexOf("://") + 3)) ||
+    (ref !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._/+-]{0,199}$/.test(ref))
+  )
+    throw new Error("Invalid Git package source or ref.");
+  return { url, ...(ref === undefined ? {} : { ref }) };
+}
+
+/** Stable host/path identity, restricted to a child of the managed Git directory. */
+function gitIdentityToRelPath(url: string): string {
+  const parsed = new URL(url);
+  const parts = [
+    parsed.host.replace(/:/g, "_"),
+    ...parsed.pathname
+      .replace(/\.git\/?$/i, "")
+      .split("/")
+      .filter(Boolean),
+  ];
+  if (parts.some((part) => !/^[A-Za-z0-9._-]+$/.test(part) || part === "." || part === ".."))
+    throw new Error("Invalid Git package path.");
+  return parts.join("/");
 }
 
 export function parsePackageSource(input: string): ParsedPackageSource {
   const raw = (input ?? "").trim();
-  if (!raw) throw new Error("请填写包来源");
+  if (!raw || raw.length > 32768 || /[\0\r\n]/.test(raw))
+    throw new Error("Invalid package source.");
 
   if (NPM_PREFIX.test(raw)) {
     const spec = raw.replace(NPM_PREFIX, "");
     const name = stripRef(spec);
-    if (!name) throw new Error("npm 包名无效");
+    const version = spec.slice(name.length);
+    if (
+      !/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(name) ||
+      (version && !/^@[A-Za-z0-9*^~<>=][A-Za-z0-9.*+_^~<>=| -]{0,159}$/.test(version))
+    )
+      throw new Error("Invalid npm package name or version.");
     return { kind: "npm", name, identity: name, pinned: hasRef(spec), raw };
   }
 
-  if (GIT_PREFIX.test(raw)) {
-    const spec = raw.replace(GIT_PREFIX, "");
-    const withoutRef = stripRef(spec);
-    const identity = gitIdentityToRelPath(withoutRef);
-    if (!identity) throw new Error("git 来源无效");
-    return { kind: "git", name: identity, identity, pinned: hasRef(spec), raw };
-  }
-
-  if (PROTOCOL_URL.test(raw)) {
-    const withoutRef = stripRef(raw);
-    const identity = gitIdentityToRelPath(withoutRef);
-    return { kind: "git", name: identity, identity, pinned: hasRef(raw), raw };
+  if (GIT_PREFIX.test(raw) || PROTOCOL_URL.test(raw)) {
+    const location = gitPackageLocation(raw);
+    const identity = gitIdentityToRelPath(location.url);
+    return { kind: "git", name: identity, identity, pinned: location.ref !== undefined, raw };
   }
 
   // Local paths follow pi's expand-tilde, file-URL, and Windows shell-path rules.
@@ -128,6 +158,20 @@ export function resolveInstallPath(
   parsed: ParsedPackageSource,
   options: { agentDir: string; local: boolean; cwd: string | null },
 ): string | null {
+  if (parsed.kind === "local" && /\.(?:tgz|tar\.gz)$/i.test(parsed.identity)) {
+    const root = options.local
+      ? options.cwd
+        ? path.join(options.cwd, ".pi")
+        : null
+      : options.agentDir;
+    return root
+      ? path.join(
+          root,
+          "archives",
+          createHash("sha256").update(parsed.identity).digest("hex").slice(0, 32),
+        )
+      : null;
+  }
   if (parsed.kind === "local") {
     const sourcePath = parsed.identity;
     if (path.isAbsolute(sourcePath)) return path.normalize(sourcePath);

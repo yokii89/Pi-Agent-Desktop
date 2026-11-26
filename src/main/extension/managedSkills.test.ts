@@ -326,9 +326,7 @@ describe("native managed skill maintenance", () => {
   });
 
   it("installs the actual shipped assets and exposes both skills through the native loader", async () => {
-    const bundled = fileURLToPath(
-      new URL("../../../vendor/MyPiExtension/packages/yoki-skills/skills", import.meta.url),
-    );
+    const bundled = fileURLToPath(new URL("../../../assets/skills", import.meta.url));
     manager = new ManagedSkills({
       agentDir: fixture.agentDir,
       sourceRoot: bundled,
@@ -342,7 +340,13 @@ describe("native managed skill maintenance", () => {
       "skill:plugin-creator",
       "skill:skill-creator",
     ]);
-    expect(fs.existsSync(path.join(target(), "assets/plugin-creator.png"))).toBe(true);
+    expect(fs.existsSync(path.join(target(), "references/durable-extension.md"))).toBe(true);
+    const expanded = await result.commands
+      .find((entry) => entry.name === "skill:plugin-creator")
+      ?.expand("");
+    expect(expanded).toContain("PiDesk Durable extension creator");
+    expect(expanded).toContain("pidesk.runtime");
+    expect(expanded).not.toContain("Use Pi's `ExtensionAPI`");
     expect(manager.snapshot(project).diagnostics).toEqual([]);
     expect(manager.snapshot(project).items.every((item) => item.diagnostics.length === 0)).toBe(
       true,

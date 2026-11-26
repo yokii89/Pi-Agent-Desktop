@@ -13,6 +13,7 @@ import { checkInteractionsWorkbench } from "./interactionsWorkbench";
 import { checkNewApiWorkbench } from "./newApiWorkbench";
 import { checkP2Workbench } from "./p2Workbench";
 import { checkP3ResourcesWorkbench } from "./p3ResourcesWorkbench";
+import { checkP3ViewsWorkbench } from "./p3ViewsWorkbench";
 import { checkP3Workbench } from "./p3Workbench";
 
 interface HostManager {
@@ -217,6 +218,8 @@ export async function checkWorkbench(
       );
     };
     await ready();
+    if (process.env.PIDESK_RUNTIME_CHECK_EXTENSIONS_ONLY === "1")
+      return { extensions: await checkP3ViewsWorkbench(window, reportPath) };
     if (process.env.PIDESK_RUNTIME_CHECK_NEWAPI_ONLY === "1")
       return { newapi: await checkNewApiWorkbench(window, reportPath) };
     await newTask();
@@ -344,6 +347,7 @@ export async function checkWorkbench(
     result.images = await checkImageWorkbench(window, reportPath);
     result.p3 = await checkP3Workbench(window, reportPath);
     result.p3Resources = await checkP3ResourcesWorkbench(window, reportPath);
+    result.p3Views = await checkP3ViewsWorkbench(window, reportPath);
     result.builtins = await checkBuiltinsWorkbench(window, reportPath);
     result.interactions = await checkInteractionsWorkbench(window, reportPath, getWriter);
     result.newapi = await checkNewApiWorkbench(window, reportPath);

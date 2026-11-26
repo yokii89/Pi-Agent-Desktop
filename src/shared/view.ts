@@ -609,6 +609,7 @@ export interface ExtensionViewState {
   id: string;
   /** 归属会话 SessionId（多会话时按此过滤）；未绑定为 undefined。 */
   sessionId?: string;
+  hostScope?: "session" | "app" | "settings";
   title?: string;
   root: ViewNode;
   actions: ViewAction[];
@@ -626,6 +627,7 @@ export type ExtensionViewPush =
       id: string;
       /** 归属会话 SessionId（多会话路由）。 */
       sessionId?: string;
+      hostScope?: "session" | "app" | "settings";
       title?: string;
       root: ViewNode;
       actions?: ViewAction[];
@@ -651,6 +653,7 @@ export type ExtensionViewPush =
 export const VIEW_IPC = {
   /** 主进程推送：扩展视图 open / update / closed。 */
   output: "pidesk:view:output",
+  replay: "pidesk:view:replay",
   /** 渲染层回写用户事件（change / action / dismiss）。 */
   sendEvent: "pidesk:view:sendEvent",
   /** 渲染层回传面板内容盒尺寸（docs/06 R5），主进程转成 `layout` envelope。 */

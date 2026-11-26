@@ -11,6 +11,7 @@ import type {
   PiPackagesSnapshot,
 } from "../../shared/ipc";
 import { getPiAgentDir } from "../session/piInfo";
+import { readPackageSettings, writePackageSettings } from "../settings/packageSettings";
 import { listLocalResourceDirs } from "./localResources";
 import {
   applyResourceEnabled,
@@ -25,8 +26,7 @@ import {
 } from "./packageSource";
 
 /**
- * pi settings.packages / 本地资源目录的读写与快照组装。
- * 不 spawn pi；安装/卸载见 packageCli。
+ * 桌面包服务与本地资源的读写、快照组装。安装/卸载由 packageManager 执行。
  */
 
 function readJsonFile(file: string): Record<string, unknown> | null {
@@ -42,8 +42,7 @@ function readJsonFile(file: string): Record<string, unknown> | null {
 }
 
 function writeJsonFile(file: string, data: Record<string, unknown>): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  writePackageSettings(file, data);
 }
 
 function packagesArray(settings: Record<string, unknown> | null): unknown[] {
@@ -332,14 +331,7 @@ export function setPackageEnabled(req: PiPackageSetEnabledRequest): void {
     ? path.join(req.cwd as string, ".pi", "settings.json")
     : path.join(agentDir, "settings.json");
 
-  let settings = readJsonFile(file);
-  if (!settings) {
-    // 项目 settings 可能不存在；全局损坏则拒绝写
-    if (!isProject && fs.existsSync(file)) {
-      throw new Error(`pi 配置文件损坏（${file}），请手动修复后再试`);
-    }
-    settings = {};
-  }
+  const settings = readPackageSettings(file);
 
   const nextPackages: unknown[] = [];
   let matched = false;
@@ -371,14 +363,8 @@ function resolveSettingsFile(scope: PiPackageScope, cwd: string | null | undefin
   return path.join(agentDir, "settings.json");
 }
 
-function readSettingsOrEmpty(file: string, scope: PiPackageScope): Record<string, unknown> {
-  const settings = readJsonFile(file);
-  if (settings) return settings;
-  // 项目 settings 可能不存在；全局损坏则拒绝写
-  if (scope === "user" && fs.existsSync(file)) {
-    throw new Error(`pi 配置文件损坏（${file}），请手动修复后再试`);
-  }
-  return {};
+function readSettingsOrEmpty(file: string, _scope: PiPackageScope): Record<string, unknown> {
+  return readPackageSettings(file);
 }
 
 /**

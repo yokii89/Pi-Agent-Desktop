@@ -80,6 +80,21 @@ describe("Durable package discovery", () => {
     expect(discoverDurableExtensions(project)).toHaveLength(2);
   });
 
+  it("discovers app/settings lifetimes only when explicitly declared and refuses project-global hosts", async () => {
+    const settings = await packageAt("settings", {
+      ...nativeRuntime,
+      capabilities: ["views"],
+      hosts: ["app", "settings"],
+    });
+    const session = await packageAt("session", { ...nativeRuntime, id: "session" });
+    await configure([settings, session]);
+    expect(discoverDurableExtensions(project).map((item) => item.id)).toEqual(["session"]);
+    expect(discoverDurableExtensions(null, "settings").map((item) => item.id)).toEqual(["native"]);
+    expect(discoverDurableExtensions(null, "app").map((item) => item.id)).toEqual(["native"]);
+    await configure([], [settings]);
+    expect(() => discoverDurableExtensions(project)).toThrow();
+  });
+
   it("reports legacy compatibility without executing or blocking legacy packages", async () => {
     const legacy = await packageAt("legacy", null);
     await configure([legacy]);

@@ -3,10 +3,26 @@ import type { IpcResult } from "../../shared/ipc";
 import type { ViewEvent } from "../../shared/view";
 import { VIEW_IPC } from "../../shared/view";
 import { envelope } from "../ipc/envelope";
-import { reportViewLayout, sendViewEvent } from "./viewHost";
+import { getMainWindow } from "../window/createMainWindow";
+import { replayViewState, reportViewLayout, sendViewEvent } from "./viewHost";
 
 /** 注册扩展 View IPC（docs/design/08 §9）。 */
 export function registerViewIpc(): void {
+  ipcMain.handle(
+    VIEW_IPC.replay,
+    (event): IpcResult<null> =>
+      envelope(() => {
+        const window = getMainWindow();
+        if (
+          !window ||
+          event.sender !== window.webContents ||
+          event.senderFrame !== window.webContents.mainFrame
+        )
+          throw new Error("Untrusted View requester.");
+        replayViewState();
+        return null;
+      }),
+  );
   ipcMain.handle(
     VIEW_IPC.sendEvent,
     (_event, req: { id: string; event: ViewEvent }): IpcResult<null> =>

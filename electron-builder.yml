@@ -8,9 +8,8 @@ directories:
   output: release
 files:
   - dist/**/*
-  # Declarative skill sources only; the archived extension implementation is never loaded.
-  - vendor/MyPiExtension/packages/yoki-skills/skills/**/*
-  - vendor/MyPiExtension/LICENSE
+  # Desktop-owned Durable guidance; archived CLI extensions are not distribution assets.
+  - assets/skills/**/*
   # electron-builder 使用经典 build/icon.ico 嵌入安装 EXE；运行时可选变体由 build/app-icons 提供。
   - build/icon.ico
   - build/icon.png

@@ -11,7 +11,6 @@ import { registerFsIpc } from "../fs/fsIpc";
 import { registerGitIpc } from "../git/gitIpc";
 import { registerGitHubIpc } from "../github/githubIpc";
 import { registerMcpIpc } from "../mcp/mcpIpc";
-import { registerModelOverridesIpc } from "../models/modelOverridesIpc";
 import { registerNotificationIpc } from "../notification/notificationIpc";
 import { registerProcIpc } from "../proc/processIpc";
 import { registerProjectIpc } from "../project/projectIpc";
@@ -55,7 +54,6 @@ export function registerIpc(): void {
     registerGitIpc,
     registerGitHubIpc,
     registerMcpIpc,
-    registerModelOverridesIpc,
     registerBrowserIpc,
     registerExtensionIpc,
     registerManagedSkillsIpc,

@@ -3,9 +3,8 @@ import path from "node:path";
 import type { SessionPushMessage } from "../../shared/ipc";
 import { sessionRefFromKey, sessionRefKey } from "../../shared/sessionRef";
 import { desktopSessions } from "../agentRuntime/desktopSessions";
-import { pendingUiRequests } from "../session/extensionUi";
+import { getSessionUiLedger, pendingUiRequests } from "../session/extensionUi";
 import { getPiAgentDir } from "../session/piInfo";
-import { respondSessionUi } from "../session/piSession";
 import { ensureSessionReady, listRuntimeSnapshots } from "../session/runtimeCoordinator";
 import { encodeCwdToSessionDir } from "../session/sessionHistory";
 import { SESSION_PREVIEW_MAX_LENGTH } from "../session/sessionMeta";
@@ -276,7 +275,7 @@ export class DesktopReadOnlySource implements ReadOnlySource {
     const pending = pendingUiRequests(liveId).find((entry) => entry.id === interactionId);
     if (!pending) return { settled: false };
     const answer = remoteInteractionAnswer(pending.request, value);
-    return { settled: respondSessionUi(liveId, interactionId, answer) };
+    return { settled: getSessionUiLedger()?.respond(liveId, interactionId, answer) ?? false };
   }
   isViewingLive(sessionId: string, viewing: (publicId: string) => boolean): boolean {
     for (const [id, ref] of this.refs)

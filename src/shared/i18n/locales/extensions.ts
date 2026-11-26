@@ -91,8 +91,10 @@ export const extensionMessages = defineMessages({
     "en-US": "Remove package",
   },
   "extensions.removeDialog.message": {
-    "zh-CN": "确定卸载「{name}」？\n\n将执行 pi remove，并从设置中移除。",
-    "en-US": "Remove “{name}”?\n\nThis runs pi remove and removes it from settings.",
+    "zh-CN":
+      "确定卸载「{name}」？\n\n桌面会移除安装记录及受管理的包文件。本地目录或源码文件会保留。",
+    "en-US":
+      "Remove “{name}”?\n\nThe desktop removes its registration and managed package files. Local source folders and files are retained.",
   },
   "extensions.kind.local": { "zh-CN": "本地", "en-US": "Local" },
   "extensions.dirMissing": { "zh-CN": "目录缺失", "en-US": "Folder missing" },
@@ -165,12 +167,12 @@ export const extensionMessages = defineMessages({
     "en-US": "Local resources are global; project scope does not affect them",
   },
   "extensions.section.packagesNote": {
-    "zh-CN": "包来源与启停由 pi 管理",
-    "en-US": "Sources and toggles are managed by pi",
+    "zh-CN": "包来源、安装卸载与启停由桌面管理",
+    "en-US": "Sources, installation and toggles are managed by the desktop",
   },
   "extensions.section.localNote": {
-    "zh-CN": "pi 自动发现 · 改动对新建会话生效",
-    "en-US": "Discovered by pi · changes apply to new sessions",
+    "zh-CN": "桌面自动发现 · 改动对新建会话生效",
+    "en-US": "Discovered by the desktop · changes apply to new sessions",
   },
   "extensions.package.detailHint": {
     "zh-CN": "关闭后不会加载",

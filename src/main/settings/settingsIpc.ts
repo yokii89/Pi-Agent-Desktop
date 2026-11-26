@@ -158,7 +158,7 @@ function sanitizePatch(patch: unknown): Partial<PideskSettings> {
         break;
       }
       case "lastProjectId":
-      case "piExecutablePath":
+      case "executionShellPath":
       case "defaultProjectDir":
         clean[key] = asString(value);
         break;

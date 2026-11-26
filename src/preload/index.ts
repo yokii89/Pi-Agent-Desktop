@@ -86,16 +86,11 @@ import type {
   McpReloadResult,
   McpSaveServerRequest,
   McpSessionCommandRequest,
-  PiApiKeyProviderOption,
-  PiAuthSnapshot,
   PiChatMessage,
   PideskSettings,
   PiInfo,
   PiLocalResourceSetEnabledRequest,
   PiModelOption,
-  PiModelOverrideSetRequest,
-  PiModelOverrideSetResult,
-  PiModelOverridesSnapshot,
   PiModelState,
   PiPackageInstallRequest,
   PiPackageRemoveRequest,
@@ -140,7 +135,6 @@ import type {
 } from "../shared/ipc";
 import {
   APP_ICON_IPC,
-  AUTH_IPC,
   BROWSER_IPC,
   CLIPBOARD_IPC,
   EXTENSION_IPC,
@@ -149,7 +143,6 @@ import {
   GIT_IPC,
   INSPECTOR_FLOAT_IPC,
   MCP_IPC,
-  MODEL_OVERRIDES_IPC,
   PI_IPC,
   PROC_IPC,
   PROJECT_IPC,
@@ -337,41 +330,14 @@ contextBridge.exposeInMainWorld("pidesk", {
   },
 
   pi: {
-    /** 读取 pi 版本与默认模型配置；path 用于设置页校验候选路径，refresh 绕过版本缓存。 */
-    info: (path?: string | null, options?: { refresh?: boolean }): Promise<IpcResult<PiInfo>> =>
-      ipcRenderer.invoke(PI_IPC.info, { path: path ?? null, refresh: options?.refresh === true }),
+    /** Read the bundled Durable version and desktop model configuration. */
+    info: (): Promise<IpcResult<PiInfo>> => ipcRenderer.invoke(PI_IPC.info),
     shell: {
       /** 探测 pi 将使用的 bash（按 pi 查找顺序）。 */
       get: (): Promise<IpcResult<PiShellProbe>> => ipcRenderer.invoke(PI_IPC.shellGet),
       /** 写入 / 清除 pi 自身的 shellPath 配置；path 为 null 表示清除。 */
       set: (path: string | null): Promise<IpcResult<PiShellProbe>> =>
         ipcRenderer.invoke(PI_IPC.shellSet, { path }),
-    },
-    auth: {
-      /** 读取命名凭据列表（密钥掩码；同 provider 可多条）。 */
-      list: (): Promise<IpcResult<PiAuthSnapshot>> => ipcRenderer.invoke(AUTH_IPC.list),
-      /** 常见 API Key provider 选项。 */
-      listApiKeyProviders: (): Promise<IpcResult<PiApiKeyProviderOption[]>> =>
-        ipcRenderer.invoke(AUTH_IPC.listApiKeyProviders),
-      /** 新增 / 更新命名凭据。 */
-      upsert: (req: {
-        id?: string | null;
-        name: string;
-        provider: string;
-        apiKey?: string | null;
-        baseUrl?: string | null;
-        api?: string | null;
-        preferredModel?: string | null;
-      }): Promise<IpcResult<PiAuthSnapshot>> => ipcRenderer.invoke(AUTH_IPC.upsert, req),
-      /** 激活凭据（写入 auth.json 标准键 + pi defaultProvider）。 */
-      setActive: (id: string): Promise<IpcResult<PiAuthSnapshot>> =>
-        ipcRenderer.invoke(AUTH_IPC.setActive, { id }),
-      /** 移除命名凭据。 */
-      remove: (id: string): Promise<IpcResult<PiAuthSnapshot>> =>
-        ipcRenderer.invoke(AUTH_IPC.remove, { id }),
-      /** 导入 auth.json 中已有的 provider（origin=pi，不改写 auth.json）。 */
-      import: (provider: string): Promise<IpcResult<PiAuthSnapshot>> =>
-        ipcRenderer.invoke(AUTH_IPC.import, { provider }),
     },
   },
 
@@ -398,15 +364,6 @@ contextBridge.exposeInMainWorld("pidesk", {
     /** MCP 市场搜索：空 query 走内置精选清单，非空走官方注册表（docs/design/41）。 */
     marketSearch: (req: McpMarketSearchRequest): Promise<IpcResult<McpMarketSearchResult>> =>
       ipcRenderer.invoke(MCP_IPC.marketSearch, req),
-  },
-
-  modelOverrides: {
-    /** 读取 models.json 覆盖快照（~/.pi/agent/models.json，docs/design/49）。 */
-    get: (): Promise<IpcResult<PiModelOverridesSnapshot>> =>
-      ipcRenderer.invoke(MODEL_OVERRIDES_IPC.get),
-    /** 写入一条覆盖补丁（字段 null = 删除回到默认）并重载存活会话。 */
-    set: (req: PiModelOverrideSetRequest): Promise<IpcResult<PiModelOverrideSetResult>> =>
-      ipcRenderer.invoke(MODEL_OVERRIDES_IPC.set, req),
   },
 
   managedSkills: {
@@ -750,10 +707,10 @@ contextBridge.exposeInMainWorld("pidesk", {
       ipcRenderer.invoke(EXTENSION_IPC.list, {
         projectDir: projectDir ?? null,
       }),
-    /** 安装 package（spawn `pi install`）。 */
+    /** 安装 package（桌面包服务）。 */
     install: (req: PiPackageInstallRequest): Promise<IpcResult<null>> =>
       ipcRenderer.invoke(EXTENSION_IPC.install, req),
-    /** 卸载 package（spawn `pi remove`）。 */
+    /** 卸载 package（桌面包服务）。 */
     remove: (req: PiPackageRemoveRequest): Promise<IpcResult<null>> =>
       ipcRenderer.invoke(EXTENSION_IPC.remove, req),
     /** 启停 package（写 settings.packages）。 */
@@ -878,6 +835,7 @@ contextBridge.exposeInMainWorld("pidesk", {
   },
 
   view: {
+    replay: (): Promise<IpcResult<null>> => ipcRenderer.invoke(VIEW_IPC.replay),
     /** 订阅扩展视图 open / update / closed 推送。 */
     onOutput: (callback: (message: ExtensionViewPush) => void): (() => void) =>
       subscribe<ExtensionViewPush>(VIEW_IPC.output, callback),

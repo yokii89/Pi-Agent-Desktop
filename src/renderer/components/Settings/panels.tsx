@@ -178,76 +178,29 @@ interface ConfigPanelProps {
   onNavigateSection?: (id: SettingsSectionId) => void;
 }
 
-/**
- * 配置：原设置页「pi」区（可执行路径、版本、bash 状态）。
- * bash 的选择入口移到「环境」页；这里只展示状态并提供跳转。
- */
+/** Bundled runtime and execution shell status; shell selection lives in Environment. */
 export function ConfigPanel({ onNavigateSection }: ConfigPanelProps) {
   const t = useT();
-  const { showToast } = useUiStore();
-  const [piPath, setPiPath] = useState<string | null>(null);
   const [piInfo, setPiInfo] = useState<PiInfo | null>(null);
-  const [validating, setValidating] = useState(false);
   const [shellProbe, setShellProbe] = useState<PiShellProbe | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [settings, info, probe] = await Promise.all([
-        settingsService.get(),
-        piService.info(),
-        piService.shell.get(),
-      ]);
+      const [info, probe] = await Promise.all([piService.info(), piService.shell.get()]);
       if (cancelled) return;
-      if (settings) setPiPath(settings.piExecutablePath);
       setPiInfo(info);
       setShellProbe(probe);
-      // 启动探测未写入时（如刚装好 pi 再打开设置），再自动补写一次
-      if (!settings?.piExecutablePath && info?.executablePath) {
-        await settingsService.set({ piExecutablePath: info.executablePath });
-        if (!cancelled) setPiPath(info.executablePath);
-      }
     })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const browsePi = async (): Promise<void> => {
-    const file = await fsService.pickFile();
-    if (!file) return;
-    setValidating(true);
-    const info = await piService.info(file, { refresh: true });
-    setValidating(false);
-    if (!info?.version) {
-      showToast(t("settings.config.piPath.invalid"));
-      return;
-    }
-    setPiPath(file);
-    await settingsService.set({ piExecutablePath: file });
-    showToast(t("settings.config.piPath.validated", { version: info.version }));
-    setPiInfo(info);
-  };
-
-  const piPathDescription = piPath
-    ? t("settings.config.piPath.configured", { path: piPath })
-    : piInfo?.executablePath
-      ? t("settings.config.piPath.detected", { path: piInfo.executablePath })
-      : t("settings.config.piPath.missing");
-
   return (
     <div className={styles.panel}>
       <h2 className={styles.panelTitle}>{t("settings.section.config")}</h2>
       <SettingsSection title={t("settings.config.group.runtime")}>
-        <SettingRow
-          label={t("settings.config.piPath")}
-          description={piPathDescription}
-          control={
-            <Button onClick={() => browsePi()} disabled={validating}>
-              {validating ? t("settings.config.validating") : t("settings.config.browse")}
-            </Button>
-          }
-        />
         <SettingRow
           label={t("settings.config.piVersion")}
           description={
@@ -553,11 +506,7 @@ export function AboutPanel() {
         />
         <SettingRow
           label={t("settings.config.piVersion")}
-          description={
-            piInfo?.executablePath
-              ? t("settings.about.executablePath", { path: piInfo.executablePath })
-              : undefined
-          }
+          description={t("settings.config.runtimeDescription")}
           control={
             <span className={styles.valueText}>
               {piInfo?.version ? `v${piInfo.version}` : t("settings.config.notConnected")}

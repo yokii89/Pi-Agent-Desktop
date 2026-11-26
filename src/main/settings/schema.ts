@@ -36,7 +36,7 @@ export { clampSessionStreamFontPx, DEFAULT_SESSION_STREAM_FONT_PX };
 export const DEFAULT_SETTINGS: PideskSettings = {
   projects: [],
   lastProjectId: null,
-  piExecutablePath: null,
+  executionShellPath: null,
   terminalShell: "powershell",
   terminalTabCompletion: "cycle",
   theme: "dark",
@@ -148,7 +148,7 @@ export function sanitizeSessionOrder(value: unknown): Record<string, string[]> |
 export const SETTABLE_KEYS = [
   "projects",
   "lastProjectId",
-  "piExecutablePath",
+  "executionShellPath",
   "terminalShell",
   "terminalTabCompletion",
   "theme",

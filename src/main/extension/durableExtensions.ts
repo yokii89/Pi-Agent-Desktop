@@ -76,6 +76,7 @@ export function inspectDurablePackages(
       entry: typeof value.entry === "string" ? path.resolve(entry.installPath, value.entry) : null,
       scope,
       capabilities: value.capabilities,
+      ...(value.hosts === undefined ? {} : { hosts: value.hosts }),
     };
     if (
       value.engine !== "durable" ||
@@ -83,7 +84,9 @@ export function inspectDurablePackages(
       !isDurableExtensionSpec(spec) ||
       typeof value.entry !== "string" ||
       path.isAbsolute(value.entry) ||
-      !/\.(?:js|mjs)$/.test(value.entry)
+      !/\.(?:js|mjs)$/.test(value.entry) ||
+      (scope === "project" && spec.hosts?.some((host) => host !== "session")) ||
+      (spec.hosts?.some((host) => host !== "session") && !spec.capabilities?.includes("views"))
     ) {
       diagnose("invalid");
       continue;
@@ -109,11 +112,16 @@ export function inspectDurablePackages(
 }
 
 /** Snapshot scope at open; changes take effect after the existing session is closed. */
-export function discoverDurableExtensions(cwd: string): DurableExtensionSpec[] {
+export function discoverDurableExtensions(
+  cwd: string | null,
+  hostScope: "session" | "app" | "settings" = "session",
+): DurableExtensionSpec[] {
   const entries = listPackageEntries(cwd);
   const user = inspectDurablePackages(entries.user, "user");
   const project = inspectDurablePackages(entries.project, "project");
-  const extensions = [...user.extensions, ...project.extensions];
+  const extensions = [...user.extensions, ...project.extensions].filter((spec) =>
+    (spec.hosts ?? ["session"]).includes(hostScope),
+  );
   if (user.errors.length || project.errors.length)
     throw new Error([...user.errors, ...project.errors].join("\n"));
   if (

@@ -4,6 +4,7 @@ import { desktopSessions } from "../agentRuntime/desktopSessions";
 
 /** Application lifecycle adapter. Stored identities are resolved only by DesktopSessions/repository. */
 export const hasSession = (id: SessionId): boolean => desktopSessions.has(id);
+export const listLiveSessions = (): SessionId[] => desktopSessions.list();
 export const getSessionPid = (id: SessionId): number | null =>
   hasSession(id) ? agentRuntimeManager.pid() : null;
 export const getSessionProcessToken = (id: SessionId): object | null => desktopSessions.token(id);
