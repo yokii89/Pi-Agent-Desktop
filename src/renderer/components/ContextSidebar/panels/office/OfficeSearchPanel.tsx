@@ -1,4 +1,3 @@
-import { MagnifyingGlass, Stop, X } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { OFFICE_PARSE_TIMEOUT_MS } from "../../../../../shared/officePreview";
 import { useT } from "../../../../hooks/useT";
@@ -7,7 +6,7 @@ import type {
   OfficeSearchScope,
   OfficeSearchUpdate,
 } from "../../../../office/officeSearchTypes";
-import { IconButton } from "../../../ui/IconButton";
+import { PreviewFindBar } from "../PreviewFindBar";
 import styles from "./OfficeSearchPanel.module.css";
 
 const EMPTY: OfficeSearchUpdate = { hits: [], processed: 0, total: 0, limited: false };
@@ -23,7 +22,6 @@ export function OfficeSearchPanel({
   onClose: () => void;
 }) {
   const t = useT();
-  const input = useRef<HTMLInputElement>(null);
   const controller = useRef<AbortController | null>(null);
   const providerRef = useRef(provider);
   providerRef.current = provider;
@@ -35,12 +33,6 @@ export function OfficeSearchPanel({
   const [retry, setRetry] = useState(0);
   const search = provider?.search;
   const previewKey = scope === "preview" ? provider?.previewKey : undefined;
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Repeated Ctrl+F should select the existing query.
-  useEffect(() => {
-    input.current?.focus();
-    input.current?.select();
-  }, [focusTick]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: previewKey and retry explicitly restart a file-scoped search.
   useEffect(() => {
@@ -118,38 +110,21 @@ export function OfficeSearchPanel({
         }
       }}
     >
-      <div className={styles.field}>
-        <MagnifyingGlass size={16} weight="regular" />
-        <input
-          ref={input}
-          value={query}
-          placeholder={t("panels.files.office.searchPlaceholder")}
-          aria-label={t("panels.files.office.searchTitle")}
-          onChange={(event) => {
-            setScope("preview");
-            setQuery(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              event.stopPropagation();
-              onClose();
-            }
-            if (event.key === "Enter") {
-              event.preventDefault();
-              step(event.shiftKey ? -1 : 1);
-            }
-          }}
-        />
-        {state === "running" && (
-          <IconButton title={t("panels.files.office.cancelSearch")} onClick={cancel}>
-            <Stop size={16} weight="regular" />
-          </IconButton>
-        )}
-        <IconButton title={t("common.close")} onClick={onClose}>
-          <X size={16} weight="regular" />
-        </IconButton>
-      </div>
+      <PreviewFindBar
+        query={query}
+        count={result.hits.length}
+        current={result.hits.findIndex((hit) => hit.id === selected) + 1}
+        focusTick={focusTick}
+        floating
+        busy={state === "running"}
+        onQuery={(value) => {
+          setScope("preview");
+          setQuery(value);
+        }}
+        onStep={step}
+        onClose={onClose}
+        onCancel={cancel}
+      />
       <div className={styles.status} aria-live="polite">
         <span>
           {!provider

@@ -9,6 +9,7 @@ import {
   Globe,
   MagnifyingGlass,
   PencilSimple,
+  SquareSplitHorizontal,
   X,
 } from "@phosphor-icons/react";
 import {
@@ -31,7 +32,7 @@ import type { TranslateFn } from "../../../../shared/i18n";
 import type { FsPreviewResult, FsSearchHit } from "../../../../shared/ipc";
 import { applyLineEnding, toSavedContent } from "../../../../shared/lineEndings";
 import type { CodeEditorHandle, CodeScrollAnchor } from "../../../editor/codeEditorTypes";
-import { usePreviewFind } from "../../../hooks/usePreviewFind";
+import { type PreviewFindState, usePreviewFind } from "../../../hooks/usePreviewFind";
 import { useT } from "../../../hooks/useT";
 import type { OfficePreviewHandle } from "../../../office/officeSearchTypes";
 import { fsService } from "../../../services/fsService";
@@ -77,13 +78,14 @@ import type { MenuItem } from "../../ui/Menu";
 import styles from "../ContextSidebar.module.css";
 import { DelimitedPreview } from "./DelimitedPreview";
 import panelStyles from "./FilePanel.module.css";
+import { FilePanelLayout } from "./FilePanelLayout";
 import { FileTree } from "./FileTree";
 import { ImagePreview } from "./ImagePreview";
 import { MarkdownPreview, type MarkdownViewMode } from "./MarkdownPreview";
 import { MediaPreview } from "./MediaPreview";
 import { NotebookPreview } from "./NotebookPreview";
 import { OfficePreview } from "./office/OfficePreview";
-import { PdfPreview } from "./PdfPreview";
+import { PdfPreview, type PdfPreviewHandle } from "./PdfPreview";
 import { PreviewFindBar } from "./PreviewFindBar";
 
 interface PreviewState {
@@ -159,6 +161,10 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   const rootDir = currentProject?.dir ?? null;
 
   const [query, setQuery] = useState("");
+  const [openBesideTree, setOpenBesideTree] = useState(false);
+  /** 异步打开读取最新布局，切换布局本身不取消已消费的打开请求。 */
+  const openBesideTreeRef = useRef(openBesideTree);
+  openBesideTreeRef.current = openBesideTree;
   const [matches, setMatches] = useState<MatchState | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewState | null>(null);
@@ -191,7 +197,8 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   const selfWriteAtRef = useRef(0);
   /** 预览内容落在 panelBody 里：划选工具条容器、全选与右键菜单都按它取范围。 */
   const panelBodyRef = useRef<HTMLDivElement>(null);
-  /** 文件树与预览共用滚动容器；打开文件会暂时替换内容，因此要保留树的位置。 */
+  /** 目录独立滚动，切换预览和搜索结果时保留原位置。 */
+  const fileListBodyRef = useRef<HTMLDivElement>(null);
   const fileTreeScrollRef = useRef({ root: rootDir, top: 0 });
   /** 预览区右键菜单（光标坐标 + 右键时已有的选区文本）。 */
   const [previewMenu, setPreviewMenu] = useState<{
@@ -230,7 +237,9 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     activePreview.result.format !== "spreadsheet";
   const officeReady =
     activePreview?.result.kind === "office" && activePreview.result.status === "ready";
+  const pdfPreview = activePreview?.result.kind === "pdf";
   const officeRef = useRef<OfficePreviewHandle>(null);
+  const pdfRef = useRef<PdfPreviewHandle>(null);
   const officeSelection = useMemo(() => officeSelectionSource(panelBodyRef), []);
   const sourceSelection = useMemo<TextSelectionSource>(
     () => ({
@@ -264,11 +273,12 @@ export function FilePanel({ active = true }: { active?: boolean }) {
       event.preventDefault();
       if (sourcePreview) editorRef.current?.openFind();
       else if (officeReady) officeRef.current?.openSearch();
+      else if (pdfPreview) pdfRef.current?.openSearch();
       else openFind();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [active, hasActivePreview, openFind, sourcePreview, officeReady]);
+  }, [active, hasActivePreview, openFind, sourcePreview, officeReady, pdfPreview]);
 
   // Ctrl+P 打开/重复触发时聚焦搜索框（fileSearchTick 每次触发都递增）
   useEffect(() => {
@@ -638,15 +648,17 @@ export function FilePanel({ active = true }: { active?: boolean }) {
 
   const activeMatches = matches && matches.root === (rootDir ?? "") ? matches.hits : null;
   const fileTreeVisible =
-    !!rootDir && activePreview === null && !previewLoading && activeMatches === null;
+    !!rootDir &&
+    (openBesideTree || (activePreview === null && !previewLoading)) &&
+    activeMatches === null;
 
   // 树始终挂载，展开状态仍在；重新显示时在绘制前恢复滚动，且不沿用其他项目的位置。
   useLayoutEffect(() => {
     if (fileTreeScrollRef.current.root !== rootDir) {
       fileTreeScrollRef.current = { root: rootDir, top: 0 };
     }
-    if (fileTreeVisible && panelBodyRef.current) {
-      panelBodyRef.current.scrollTop = fileTreeScrollRef.current.top;
+    if (fileTreeVisible && fileListBodyRef.current) {
+      fileListBodyRef.current.scrollTop = fileTreeScrollRef.current.top;
     }
   }, [fileTreeVisible, rootDir]);
 
@@ -675,10 +687,12 @@ export function FilePanel({ active = true }: { active?: boolean }) {
   /** 多命中时退回快速打开列表，不瞎开第一个。 */
   const showSearchMatches = useCallback(
     (hits: FsSearchHit[], keyword: string): void => {
-      setPreview(null);
-      setHistory(emptyPreviewHistory);
+      if (!openBesideTreeRef.current) {
+        setPreview(null);
+        setHistory(emptyPreviewHistory);
+        setSelectedPath(null);
+      }
       setPreviewLoading(false);
-      setSelectedPath(null);
       setQuery(keyword);
       setMatches({ root: rootDir ?? "", hits });
       window.setTimeout(() => {
@@ -718,9 +732,10 @@ export function FilePanel({ active = true }: { active?: boolean }) {
         }
         setPreviewLoading(false);
         if (resolved.status === "ambiguous") {
-          guardLeave(() =>
-            showSearchMatches(resolved.hits, pathBasename(resolvePath(raw, sessionWorkingDir))),
-          );
+          const showMatches = (): void =>
+            showSearchMatches(resolved.hits, pathBasename(resolvePath(raw, sessionWorkingDir)));
+          if (openBesideTreeRef.current) showMatches();
+          else guardLeave(showMatches);
           return;
         }
         setPreviewLoading(false);
@@ -750,19 +765,24 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     guardLeave,
   ]);
 
-  // 树定位请求（命令面板目录命中）：退回树视图（预览/搜索列表让位），由 FileTree 展开定位
+  // 树定位请求：双栏仅定位目录，单栏经离开保护退回树视图。
   const revealTick = fileRevealRequest?.tick;
   const lastRevealTickRef = useRef<number | null>(null);
   useEffect(() => {
     if (revealTick === undefined || revealTick === lastRevealTickRef.current) return;
     lastRevealTickRef.current = revealTick;
+    if (openBesideTree) {
+      setMatches(null);
+      setQuery("");
+      return;
+    }
     guardLeave(() => {
       setPreview(null);
       setMatches(null);
       setQuery("");
       dropEditing();
     });
-  }, [revealTick, guardLeave, dropEditing]);
+  }, [revealTick, openBesideTree, guardLeave, dropEditing]);
 
   const onSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.key === "Enter" && matches && matches.root === rootDir && matches.hits.length > 0) {
@@ -897,145 +917,81 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     [activePreview, activeSessionId, phase, quoteComposer, rootDir],
   );
 
+  const layoutToggle = (
+    <IconButton
+      title={t("panels.files.openBesideTree")}
+      className={panelStyles.layoutToggle}
+      active={openBesideTree}
+      aria-pressed={openBesideTree}
+      disabled={!rootDir}
+      onClick={() => setOpenBesideTree((current) => !current)}
+    >
+      <SquareSplitHorizontal size={20} weight={openBesideTree ? "fill" : "regular"} />
+    </IconButton>
+  );
+
+  const navigation = (
+    <div
+      className={styles.panelBody}
+      ref={fileListBodyRef}
+      onScroll={(event) => {
+        if (fileTreeVisible) {
+          fileTreeScrollRef.current = { root: rootDir, top: event.currentTarget.scrollTop };
+        }
+      }}
+    >
+      {!rootDir ? (
+        <p className={panelStyles.noMatch}>{t("panels.files.selectProject")}</p>
+      ) : activeMatches !== null ? (
+        activeMatches.length > 0 ? (
+          <ul className={panelStyles.matchList}>
+            {activeMatches.map((hit) => (
+              <li key={hit.path}>
+                <button
+                  type="button"
+                  className={[
+                    panelStyles.matchItem,
+                    selectedPath !== null &&
+                    normalizePathKey(selectedPath) === normalizePathKey(hit.path)
+                      ? panelStyles.selected
+                      : "",
+                  ].join(" ")}
+                  onClick={() => guardLeave(() => openPreview(hit.path))}
+                >
+                  <span className={panelStyles.matchName}>{hit.displayPath.split("/").at(-1)}</span>
+                  <span className={panelStyles.matchPath}>{hit.displayPath}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={panelStyles.noMatch}>{t("panels.files.noMatch")}</p>
+        )
+      ) : null}
+      {rootDir && (
+        <div hidden={!fileTreeVisible}>
+          <FileTree
+            rootDir={rootDir}
+            selectedPath={selectedPath}
+            onSelectFile={(path) => guardLeave(() => openPreview(path))}
+            active={active && fileTreeVisible}
+            revealRequest={fileRevealRequest}
+          />
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
-      {activePreview ? (
-        <div className={panelStyles.previewHeader}>
-          {!editing && (
-            <>
-              <IconButton
-                title={
-                  canGoBack(history) ? t("panels.files.backPrevious") : t("panels.files.backToTree")
-                }
-                onClick={() =>
-                  guardLeave(() => (canGoBack(history) ? navigateHistory(-1) : closePreview()))
-                }
-              >
-                <ArrowLeft size={16} weight="regular" />
-              </IconButton>
-              <IconButton
-                title={t("panels.files.forwardNext")}
-                disabled={!canGoForward(history)}
-                onClick={() => guardLeave(() => navigateHistory(1))}
-              >
-                <ArrowRight size={16} weight="regular" />
-              </IconButton>
-            </>
-          )}
-          <span className={panelStyles.previewPath} title={activePreview.path}>
-            {activePreview.path}
-          </span>
-          <span
-            className={[
-              panelStyles.previewMeta,
-              editing && externalChanged
-                ? panelStyles.warnMeta
-                : editing && dirty
-                  ? panelStyles.dirtyMeta
-                  : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            {editing
-              ? externalChanged
-                ? t("panels.files.externalChanged")
-                : dirty
-                  ? t("panels.files.unsaved")
-                  : ""
-              : previewMeta(activePreview.result, imageSize, t)}
-          </span>
-          {editing ? (
-            <>
-              <IconButton
-                title={t("panels.files.saveHint")}
-                disabled={saveBusy || !dirty}
-                onClick={() => void saveDraft()}
-              >
-                <FloppyDisk size={16} weight="regular" />
-              </IconButton>
-              <IconButton title={t("panels.files.exitEdit")} onClick={requestExitEdit}>
-                <X size={16} weight="regular" />
-              </IconButton>
-            </>
-          ) : (
-            <>
-              {isMarkdownPath(activePreview.path) && (
-                <IconButton
-                  title={t("panels.files.mdToggle", {
-                    mode:
-                      mdViewMode === "preview"
-                        ? t("panels.files.mdSource")
-                        : t("panels.files.mdPreview"),
-                  })}
-                  onClick={() => {
-                    previewScrollAnchorRef.current = undefined;
-                    setMdViewMode(mdViewMode === "preview" ? "source" : "preview");
-                  }}
-                >
-                  {mdViewMode === "preview" ? (
-                    <Eye size={16} weight="regular" />
-                  ) : (
-                    <EyeSlash size={16} weight="regular" />
-                  )}
-                </IconButton>
-              )}
-              {isMermaidPath(activePreview.path) && !mermaidLimited && (
-                <IconButton
-                  title={t(
-                    mermaidViewMode === "preview"
-                      ? "common.mermaid.showSource"
-                      : "common.mermaid.showGraph",
-                  )}
-                  onClick={() => {
-                    previewScrollAnchorRef.current = undefined;
-                    setMermaidViewMode(mermaidViewMode === "preview" ? "source" : "preview");
-                  }}
-                >
-                  {mermaidViewMode === "preview" ? (
-                    <Eye size={16} weight="regular" />
-                  ) : (
-                    <EyeSlash size={16} weight="regular" />
-                  )}
-                </IconButton>
-              )}
-              {isHtmlPath(activePreview.path) && browserEnabled && (
-                <IconButton
-                  title={t("panels.files.openInBrowser")}
-                  onClick={() => openInSideBrowser(activePreview.path)}
-                >
-                  <Globe size={16} weight="regular" />
-                </IconButton>
-              )}
-              {previewText !== null && (
-                <IconButton
-                  title={t("panels.files.copyContent")}
-                  onClick={() => copyToClipboard(previewText)}
-                >
-                  <Copy size={16} weight="regular" />
-                </IconButton>
-              )}
-              {editablePreview && (
-                <IconButton title={t("panels.files.edit")} onClick={beginEdit}>
-                  <PencilSimple size={16} weight="regular" />
-                </IconButton>
-              )}
-              <IconButton
-                title={t("panels.files.openInSystem")}
-                onClick={() => openInSystem(activePreview.path)}
-              >
-                <ArrowSquareOut size={16} weight="regular" />
-              </IconButton>
-            </>
-          )}
-        </div>
-      ) : (
+      {(!activePreview || openBesideTree) && (
         <div className={panelStyles.searchToolbar}>
           <div className={panelStyles.searchRow}>
             <MagnifyingGlass size={16} weight="regular" className={panelStyles.searchIcon} />
             <input
               ref={searchRef}
               className={panelStyles.searchInput}
+              aria-label={t("panels.files.quickOpenPlaceholder")}
               placeholder={t("panels.files.quickOpenPlaceholder")}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -1043,111 +999,212 @@ export function FilePanel({ active = true }: { active?: boolean }) {
               disabled={!rootDir}
             />
           </div>
+          {layoutToggle}
           {rootDir && <WorkdirChip dir={rootDir} />}
         </div>
       )}
-      {activePreview && find.open && !sourcePreview && (
-        <PreviewFindBar
-          query={find.query}
-          count={find.count}
-          current={find.current}
-          onQuery={find.setQuery}
-          onStep={find.step}
-          onClose={find.close}
-        />
-      )}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: 预览是只读阅读面，右键只用来开复制菜单/抑制浏览器默认菜单，不伪装成交互 role */}
-      <div
-        className={[styles.panelBody, sourcePreview ? panelStyles.panelBodySource : ""]
-          .filter(Boolean)
-          .join(" ")}
-        ref={panelBodyRef}
-        onScroll={(event) => {
-          // 只记录目录滚动，避免预览与搜索结果覆盖返回位置。
-          if (fileTreeVisible) {
-            fileTreeScrollRef.current = { root: rootDir, top: event.currentTarget.scrollTop };
-          }
-        }}
-        onContextMenu={openPreviewMenu}
+      <FilePanelLayout
+        split={openBesideTree}
+        showPreview={activePreview !== null || previewLoading}
+        active={active}
+        navigation={navigation}
       >
-        {sourcePreview && activePreview?.result.kind === "text" ? (
-          <>
-            {activePreview.result.truncated && (
-              <p className={panelStyles.truncatedNote}>{t("panels.files.truncatedNote")}</p>
+        {activePreview ? (
+          <div className={panelStyles.previewHeader}>
+            {!editing && (
+              <>
+                <IconButton
+                  title={
+                    canGoBack(history)
+                      ? t("panels.files.backPrevious")
+                      : t(openBesideTree ? "panels.files.closePreview" : "panels.files.backToTree")
+                  }
+                  onClick={() =>
+                    guardLeave(() => (canGoBack(history) ? navigateHistory(-1) : closePreview()))
+                  }
+                >
+                  <ArrowLeft size={16} weight="regular" />
+                </IconButton>
+                <IconButton
+                  title={t("panels.files.forwardNext")}
+                  disabled={!canGoForward(history)}
+                  onClick={() => guardLeave(() => navigateHistory(1))}
+                >
+                  <ArrowRight size={16} weight="regular" />
+                </IconButton>
+              </>
             )}
-            {mermaidLimited && !activePreview.result.truncated && (
-              <p className={panelStyles.truncatedNote}>{t("panels.files.mermaid.tooLarge")}</p>
-            )}
-            <CodeEditor
-              key={`${activePreview.root}:${activePreview.path}#${editorReloadTick}`}
-              ref={editorRef}
-              filePath={activePreview.path}
-              doc={toEditorText(activePreview.result.content)}
-              readOnly={!editing}
-              baseline={editorBaseline}
-              focusLine={activePreview.focusLine}
-              scrollAnchor={previewScrollAnchorRef.current}
-              loadingLabel={t("panels.files.editorLoading")}
-              failedLabel={t("panels.files.editorFailed")}
-              ariaLabel={t("panels.files.editorAria", { path: activePreview.path })}
-              onDirtyChange={setDirty}
-              onSave={() => void saveDraftRef.current()}
-            />
-          </>
-        ) : !rootDir && !activePreview ? (
-          <p className={panelStyles.noMatch}>{t("panels.files.selectProject")}</p>
-        ) : activePreview ? (
-          <FilePreviewBody
-            key={`${activePreview.root}:${activePreview.path}#${editorReloadTick}`}
-            active={active}
-            preview={activePreview}
-            officeRef={officeRef}
-            onImageSize={setImageSize}
-            onOpenInSystem={() => openInSystem(activePreview.path)}
-            onShowMermaidSource={() => setMermaidViewMode("source")}
-          />
-        ) : previewLoading ? (
-          <p className={panelStyles.noMatch}>{t("panels.files.loading")}</p>
-        ) : activeMatches !== null ? (
-          activeMatches.length > 0 ? (
-            <ul className={panelStyles.matchList}>
-              {activeMatches.map((hit) => (
-                <li key={hit.path}>
-                  <button
-                    type="button"
-                    className={[
-                      panelStyles.matchItem,
-                      selectedPath !== null &&
-                      normalizePathKey(selectedPath) === normalizePathKey(hit.path)
-                        ? panelStyles.selected
-                        : "",
-                    ].join(" ")}
-                    onClick={() => guardLeave(() => openPreview(hit.path))}
+            <span className={panelStyles.previewPath} title={activePreview.path}>
+              {activePreview.path}
+            </span>
+            <span
+              className={[
+                panelStyles.previewMeta,
+                editing && externalChanged
+                  ? panelStyles.warnMeta
+                  : editing && dirty
+                    ? panelStyles.dirtyMeta
+                    : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              {editing
+                ? externalChanged
+                  ? t("panels.files.externalChanged")
+                  : dirty
+                    ? t("panels.files.unsaved")
+                    : ""
+                : previewMeta(activePreview.result, imageSize, t)}
+            </span>
+            {editing ? (
+              <>
+                <IconButton
+                  title={t("panels.files.saveHint")}
+                  disabled={saveBusy || !dirty}
+                  onClick={() => void saveDraft()}
+                >
+                  <FloppyDisk size={16} weight="regular" />
+                </IconButton>
+                <IconButton title={t("panels.files.exitEdit")} onClick={requestExitEdit}>
+                  <X size={16} weight="regular" />
+                </IconButton>
+              </>
+            ) : (
+              <>
+                {isMarkdownPath(activePreview.path) && (
+                  <IconButton
+                    title={t("panels.files.mdToggle", {
+                      mode:
+                        mdViewMode === "preview"
+                          ? t("panels.files.mdSource")
+                          : t("panels.files.mdPreview"),
+                    })}
+                    onClick={() => {
+                      previewScrollAnchorRef.current = undefined;
+                      setMdViewMode(mdViewMode === "preview" ? "source" : "preview");
+                    }}
                   >
-                    <span className={panelStyles.matchName}>
-                      {hit.displayPath.split("/").at(-1)}
-                    </span>
-                    <span className={panelStyles.matchPath}>{hit.displayPath}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className={panelStyles.noMatch}>{t("panels.files.noMatch")}</p>
-          )
-        ) : null}
-        {rootDir && (
-          <div hidden={!fileTreeVisible}>
-            <FileTree
-              rootDir={rootDir}
-              selectedPath={selectedPath}
-              onSelectFile={(path) => guardLeave(() => openPreview(path))}
-              active={active && fileTreeVisible}
-              revealRequest={fileRevealRequest}
-            />
+                    {mdViewMode === "preview" ? (
+                      <Eye size={16} weight="regular" />
+                    ) : (
+                      <EyeSlash size={16} weight="regular" />
+                    )}
+                  </IconButton>
+                )}
+                {isMermaidPath(activePreview.path) && !mermaidLimited && (
+                  <IconButton
+                    title={t(
+                      mermaidViewMode === "preview"
+                        ? "common.mermaid.showSource"
+                        : "common.mermaid.showGraph",
+                    )}
+                    onClick={() => {
+                      previewScrollAnchorRef.current = undefined;
+                      setMermaidViewMode(mermaidViewMode === "preview" ? "source" : "preview");
+                    }}
+                  >
+                    {mermaidViewMode === "preview" ? (
+                      <Eye size={16} weight="regular" />
+                    ) : (
+                      <EyeSlash size={16} weight="regular" />
+                    )}
+                  </IconButton>
+                )}
+                {isHtmlPath(activePreview.path) && browserEnabled && (
+                  <IconButton
+                    title={t("panels.files.openInBrowser")}
+                    onClick={() => openInSideBrowser(activePreview.path)}
+                  >
+                    <Globe size={16} weight="regular" />
+                  </IconButton>
+                )}
+                {previewText !== null && (
+                  <IconButton
+                    title={t("panels.files.copyContent")}
+                    onClick={() => copyToClipboard(previewText)}
+                  >
+                    <Copy size={16} weight="regular" />
+                  </IconButton>
+                )}
+                {editablePreview && (
+                  <IconButton title={t("panels.files.edit")} onClick={beginEdit}>
+                    <PencilSimple size={16} weight="regular" />
+                  </IconButton>
+                )}
+                <IconButton
+                  title={t("panels.files.openInSystem")}
+                  onClick={() => openInSystem(activePreview.path)}
+                >
+                  <ArrowSquareOut size={16} weight="regular" />
+                </IconButton>
+              </>
+            )}
+            {!openBesideTree && layoutToggle}
           </div>
+        ) : null}
+        {activePreview && find.open && !sourcePreview && activePreview.result.kind !== "pdf" && (
+          <PreviewFindBar
+            query={find.query}
+            count={find.count}
+            current={find.current}
+            onQuery={find.setQuery}
+            onStep={find.step}
+            onClose={find.close}
+          />
         )}
-      </div>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: 预览是只读阅读面，右键只用来开复制菜单/抑制浏览器默认菜单，不伪装成交互 role */}
+        <div
+          className={[styles.panelBody, sourcePreview ? panelStyles.panelBodySource : ""]
+            .filter(Boolean)
+            .join(" ")}
+          ref={panelBodyRef}
+          data-selectable-text=""
+          onContextMenu={openPreviewMenu}
+        >
+          {sourcePreview && activePreview?.result.kind === "text" ? (
+            <>
+              {activePreview.result.truncated && (
+                <p className={panelStyles.truncatedNote}>{t("panels.files.truncatedNote")}</p>
+              )}
+              {mermaidLimited && !activePreview.result.truncated && (
+                <p className={panelStyles.truncatedNote}>{t("panels.files.mermaid.tooLarge")}</p>
+              )}
+              <CodeEditor
+                key={`${activePreview.root}:${activePreview.path}#${editorReloadTick}`}
+                ref={editorRef}
+                filePath={activePreview.path}
+                doc={toEditorText(activePreview.result.content)}
+                readOnly={!editing}
+                baseline={editorBaseline}
+                focusLine={activePreview.focusLine}
+                scrollAnchor={previewScrollAnchorRef.current}
+                loadingLabel={t("panels.files.editorLoading")}
+                failedLabel={t("panels.files.editorFailed")}
+                ariaLabel={t("panels.files.editorAria", { path: activePreview.path })}
+                onDirtyChange={setDirty}
+                onSave={() => void saveDraftRef.current()}
+              />
+            </>
+          ) : activePreview ? (
+            <FilePreviewBody
+              key={`${activePreview.root}:${activePreview.path}#${editorReloadTick}`}
+              active={active}
+              preview={activePreview}
+              officeRef={officeRef}
+              pdfRef={pdfRef}
+              find={find}
+              onImageSize={setImageSize}
+              onOpenInSystem={() => openInSystem(activePreview.path)}
+              onShowMermaidSource={() => setMermaidViewMode("source")}
+            />
+          ) : previewLoading ? (
+            <p className={panelStyles.noMatch}>{t("panels.files.loading")}</p>
+          ) : (
+            <p className={panelStyles.noMatch}>{t("panels.files.empty")}</p>
+          )}
+        </div>
+      </FilePanelLayout>
       {previewMenu && (
         <ContextMenu
           position={{ x: previewMenu.x, y: previewMenu.y }}
@@ -1231,11 +1288,15 @@ function FilePreviewBody({
   onImageSize,
   onOpenInSystem,
   officeRef,
+  pdfRef,
+  find,
   onShowMermaidSource,
 }: {
   active: boolean;
   preview: PreviewState;
   officeRef: Ref<OfficePreviewHandle>;
+  pdfRef: Ref<PdfPreviewHandle>;
+  find: PreviewFindState;
   onImageSize: (size: string | null) => void;
   onOpenInSystem: () => void;
   onShowMermaidSource: () => void;
@@ -1269,7 +1330,7 @@ function FilePreviewBody({
   }
 
   if (result.kind === "pdf") {
-    return <PdfPreview result={result} />;
+    return <PdfPreview ref={pdfRef} result={result} find={find} />;
   }
 
   if (result.kind === "office") {

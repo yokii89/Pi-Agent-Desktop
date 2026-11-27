@@ -1,4 +1,4 @@
-import { CaretDown, CaretUp, X } from "@phosphor-icons/react";
+import { CaretDown, CaretUp, MagnifyingGlass, Stop, X } from "@phosphor-icons/react";
 import { useEffect, useRef } from "react";
 import { useT } from "../../../hooks/useT";
 import { IconButton } from "../../ui/IconButton";
@@ -8,39 +8,45 @@ interface PreviewFindBarProps {
   query: string;
   /** 命中总数。 */
   count: number;
-  /** 当前命中序号（1-based）；无命中时为 0。 */
+  /** 当前命中序号（1-based）；无命中或尚未选择结果时为 0。 */
   current: number;
+  focusTick?: number;
+  floating?: boolean;
+  busy?: boolean;
   onQuery: (value: string) => void;
   /** 前后跳转：正数向下、负数向上。 */
   onStep: (delta: number) => void;
   onClose: () => void;
+  onCancel?: () => void;
 }
 
-/**
- * 文件面板内查找条（Ctrl+F）：输入即查、Enter / Shift+Enter 跳命中、Esc 收起。
- * 只管交互与计数展示，命中计算与高亮在 usePreviewFind。
- */
+/** Shared find field for preview-level searches. */
 export function PreviewFindBar({
   query,
   count,
   current,
+  focusTick = 0,
+  floating = false,
+  busy = false,
   onQuery,
   onStep,
   onClose,
+  onCancel,
 }: PreviewFindBarProps) {
   const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 打开即聚焦并全选：连续 Ctrl+F 可以改关键词而不是长出一段
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Repeated Ctrl+F refocuses and selects the current query.
   useEffect(() => {
     const input = inputRef.current;
     if (!input) return;
     input.focus();
     input.select();
-  }, []);
+  }, [focusTick]);
 
   return (
-    <search className={styles.bar}>
+    <search className={styles.bar} data-floating={floating || undefined}>
+      <MagnifyingGlass className={styles.icon} size={16} weight="regular" />
       <input
         ref={inputRef}
         className={styles.input}
@@ -55,7 +61,6 @@ export function PreviewFindBar({
             return;
           }
           if (event.key === "Escape") {
-            // 查找条消费 Esc：别同时触发「Esc 停止会话」等更外层快捷键
             event.preventDefault();
             event.stopPropagation();
             onClose();
@@ -66,9 +71,16 @@ export function PreviewFindBar({
         {query.length === 0
           ? ""
           : count > 0
-            ? `${current}/${count}`
+            ? current > 0
+              ? `${current}/${count}`
+              : String(count)
             : t("panels.files.findNoMatch")}
       </span>
+      {busy && onCancel && (
+        <IconButton title={t("panels.files.office.cancelSearch")} onClick={onCancel}>
+          <Stop size={16} weight="regular" />
+        </IconButton>
+      )}
       <IconButton
         title={t("panels.files.findPrev")}
         disabled={count === 0}

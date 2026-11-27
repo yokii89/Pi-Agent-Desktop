@@ -48,9 +48,43 @@
   height: 0;
 }
 
+.sheetToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+}
+
 .sheetSelect {
   flex: 1;
   min-width: 0;
+}
+
+.sheetActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.sheetMetadata {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin: 0 0 var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.sheetSize,
+.sheetRange {
+  margin: 0;
+}
+
+.sheetRange {
+  color: var(--color-text-muted);
 }
 
 .sheetTable {
@@ -65,7 +99,18 @@
 }
 
 .rowNumber.rowNumber {
-  position: static;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 48px;
   min-width: 0;
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  text-align: right;
   user-select: none;
+}
+
+.sheetTable thead th:first-child {
+  left: 0;
+  z-index: 2;
 }

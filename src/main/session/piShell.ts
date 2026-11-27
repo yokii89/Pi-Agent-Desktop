@@ -36,6 +36,7 @@ function locateBashOnPath(): string[] {
       encoding: "utf8",
       timeout: 5000,
       windowsHide: true,
+      stdio: "pipe",
     });
     return out
       .split(/\r?\n/)
@@ -54,6 +55,8 @@ function readBashVersion(candidatePath: string): string | null {
       encoding: "utf8",
       timeout: 5000,
       windowsHide: true,
+      // 可选候选探测失败由 version: null 表达，避免 WSL 的 UTF-16 stderr 泄漏到启动日志。
+      stdio: "pipe",
     });
     return out.trim().split(/\r?\n/)[0] || null;
   } catch {
@@ -155,6 +158,7 @@ export function validateBash(candidatePath: string): string {
       encoding: "utf8",
       timeout: 8000,
       windowsHide: true,
+      stdio: "pipe",
     });
   } catch {
     throw new Error("无法作为 bash 运行（--version 校验未通过）");

@@ -73,6 +73,20 @@ export const panelMessages = defineMessages({
     "zh-CN": "搜索文件…",
     "en-US": "Search files…",
   },
+  "panels.files.openBesideTree": {
+    "zh-CN": "在目录右侧打开",
+    "en-US": "Open beside file tree",
+  },
+  "panels.files.closePreview": { "zh-CN": "关闭文件预览", "en-US": "Close file preview" },
+  "panels.files.resizePanes": {
+    "zh-CN": "调整目录与预览宽度",
+    "en-US": "Resize file tree and preview",
+  },
+  "panels.files.resizePanesHint": {
+    "zh-CN": "拖动调整宽度，双击复位；方向键调整，Home / End 移至边界",
+    "en-US":
+      "Drag to resize, double-click to reset; use arrow keys to adjust or Home / End for limits",
+  },
   "panels.files.empty": {
     "zh-CN": "在文件树中选择文件进行预览",
     "en-US": "Select a file in the tree to preview",

@@ -1,0 +1,10 @@
+.root {
+  flex-shrink: 0;
+}
+
+.panel {
+  width: min(360px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  padding: 0;
+  overflow: hidden;
+}
