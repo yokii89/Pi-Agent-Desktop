@@ -1,11 +1,13 @@
 import type { Icon } from "@phosphor-icons/react";
 import { CaretDown, CaretRight, PuzzlePiece, Terminal } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useCollapseAnimation } from "../../hooks/useCollapseAnimation";
 import { useT } from "../../hooks/useT";
 import { customNoticeSummary } from "../../stores/customMessage";
 import type { CustomEntry } from "../../stores/sessionTranscript";
+import { parseTaskNotifications } from "../../stores/taskNotification";
 import styles from "./CustomNotice.module.css";
+import { TaskNotice } from "./TaskNotice";
 
 /**
  * 扩展通知条目（docs/design/129 §8.4）：`role: "custom"` 的扩展消息在文档流里的一行落点。
@@ -21,6 +23,24 @@ const KNOWN_TYPES: Record<string, { labelKey: string; icon: Icon }> = {
 };
 
 export function CustomNotice({ entry }: { entry: CustomEntry }) {
+  const tasks = useMemo(
+    () =>
+      entry.customType === "subagent-notification" ? parseTaskNotifications(entry.text) : null,
+    [entry.customType, entry.text],
+  );
+  if (tasks) {
+    return (
+      <>
+        {tasks.map((task) => (
+          <TaskNotice key={task.taskId} task={task} />
+        ))}
+      </>
+    );
+  }
+  return <GenericCustomNotice entry={entry} />;
+}
+
+function GenericCustomNotice({ entry }: { entry: CustomEntry }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const known = KNOWN_TYPES[entry.customType];

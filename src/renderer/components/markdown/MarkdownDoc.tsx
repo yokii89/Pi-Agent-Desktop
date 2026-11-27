@@ -171,7 +171,7 @@ function FenceShell({
     >
       {!singleLine && (knownLang || codeCopy) && (
         <div className={styles.fenceHeader}>
-          <span className={styles.fenceLang}>{knownLang ? lang : ""}</span>
+          <span className={styles.fenceLang}>{knownLang ? lang : t("common.codePlainText")}</span>
           {tools}
         </div>
       )}

@@ -195,6 +195,20 @@
   overflow: hidden;
 }
 
+.workspacePlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.workspacePlaceholder p {
+  margin: 0;
+}
+
 .panelFooter {
   display: flex;
   flex-wrap: wrap;

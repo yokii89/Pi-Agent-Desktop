@@ -1,0 +1,202 @@
+/* 通知沿用会话流的排版；正文只在用户展开后挂载。 */
+.notice {
+  --notice-tone: var(--color-text-muted);
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.notice + .notice {
+  margin-top: var(--spacing-xs);
+}
+
+.notice[data-status="complete"] {
+  --notice-tone: var(--color-success);
+}
+
+.notice[data-status="partial"] {
+  --notice-tone: var(--color-warning);
+}
+
+.notice[data-status="failed"] {
+  --notice-tone: var(--color-danger);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: 0 var(--spacing-sm) 0 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: var(--session-stream-font-md);
+  line-height: 1.7;
+  text-align: left;
+  cursor: pointer;
+}
+
+.head:hover {
+  background: var(--color-bg-hover);
+}
+
+.head > svg,
+.state > svg,
+.truncation > svg {
+  flex: none;
+}
+
+.label {
+  flex: none;
+  font-weight: 600;
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.state {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  margin-left: auto;
+  color: var(--notice-tone);
+}
+
+.duration {
+  flex: none;
+  font-size: var(--session-stream-font-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 高度补间由 useCollapseAnimation 接管，内层用 padding 留白以保证测量完整。 */
+.bodyWrap {
+  overflow: hidden;
+}
+
+.body {
+  padding: var(--spacing-xs) 0 var(--spacing-sm) var(--spacing-sm);
+}
+
+.content {
+  min-width: 0;
+  padding: var(--spacing-xs) 0 var(--spacing-xs) calc(var(--spacing-md) + var(--spacing-xs));
+  border-left: 1px solid var(--color-border-strong);
+}
+
+.resultTools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.heading {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--session-stream-font-sm);
+  font-weight: 500;
+}
+
+.copyButton {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  min-height: var(--spacing-lg);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 0;
+  border-radius: var(--radius-overlay-item);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: var(--session-stream-font-sm);
+  cursor: pointer;
+}
+
+.copyButton:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-strong);
+}
+
+.copyButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.empty,
+.truncation {
+  margin: var(--spacing-sm) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--session-stream-font-sm);
+  line-height: 1.8;
+}
+
+.truncation {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+}
+
+.truncation > svg {
+  align-self: flex-start;
+  margin-top: var(--spacing-xs);
+}
+
+.textAction {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.textAction:hover {
+  text-decoration: underline;
+  text-underline-offset: var(--spacing-xs);
+}
+
+.usage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-md);
+  margin-top: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: var(--session-stream-font-sm);
+}
+
+.metric {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.head:focus-visible,
+.copyButton:focus-visible,
+.textAction:focus-visible {
+  outline: 1px solid var(--color-accent-border);
+  outline-offset: -1px;
+}
+
+@container (max-width: 28rem) {
+  .head {
+    gap: var(--spacing-xs);
+  }
+
+  .label,
+  .duration {
+    display: none;
+  }
+}

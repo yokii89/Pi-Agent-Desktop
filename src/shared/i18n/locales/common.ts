@@ -24,6 +24,7 @@ export const commonMessages = defineMessages({
   "common.removeFailed": { "zh-CN": "移除失败", "en-US": "Remove failed" },
   "common.copyFailed": { "zh-CN": "复制失败", "en-US": "Copy failed" },
   "common.copyCode": { "zh-CN": "复制代码", "en-US": "Copy code" },
+  "common.codePlainText": { "zh-CN": "纯文本", "en-US": "Plain text" },
   "common.copyCodeImage": { "zh-CN": "复制为图片", "en-US": "Copy as image" },
   "common.copyCodeText": { "zh-CN": "复制为文本", "en-US": "Copy as text" },
   "common.codeImageCopied": {

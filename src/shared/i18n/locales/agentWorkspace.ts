@@ -8,20 +8,43 @@ export const agentWorkspaceMessages = defineMessages({
   },
   "agentWorkspace.graph": { "zh-CN": "协作关系", "en-US": "Agent graph" },
   "agentWorkspace.detail": { "zh-CN": "任务详情", "en-US": "Task details" },
+  "agentWorkspace.resize": {
+    "zh-CN": "调整协作关系与任务详情的比例",
+    "en-US": "Resize agent graph and task details",
+  },
+  "agentWorkspace.resizeHint": {
+    "zh-CN": "拖动调整比例，双击恢复默认；聚焦后可用方向键调整",
+    "en-US": "Drag to resize, double-click to reset; use arrow keys when focused",
+  },
+  "agentWorkspace.splitValue": {
+    "zh-CN": "协作关系 {graph}% · 任务详情 {detail}%",
+    "en-US": "Agent graph {graph}% · Task details {detail}%",
+  },
   "agentWorkspace.stream": { "zh-CN": "会话信息流", "en-US": "Conversation stream" },
-  "agentWorkspace.expand": { "zh-CN": "展开工作区", "en-US": "Expand workspace" },
-  "agentWorkspace.collapse": { "zh-CN": "收回面板", "en-US": "Return to panel" },
+  "agentWorkspace.expand": {
+    "zh-CN": "在独立窗口中打开",
+    "en-US": "Open in floating window",
+  },
+  "agentWorkspace.collapse": { "zh-CN": "返回侧栏", "en-US": "Dock to sidebar" },
+  "agentWorkspace.floatingHint": {
+    "zh-CN": "Agent 工作区已在独立窗口中打开。",
+    "en-US": "Agent workspace is open in a floating window.",
+  },
   "agentWorkspace.hint": {
     "zh-CN": "点击节点查看信息流",
     "en-US": "Select an agent to view its stream",
   },
   "agentWorkspace.gestures": {
-    "zh-CN": "拖动平移 · 滚轮缩放 · 方向键浏览节点",
-    "en-US": "Drag to pan · Scroll to zoom · Arrow keys to navigate",
+    "zh-CN": "滚动浏览 · 拖动平移 · Ctrl + 滚轮缩放 · 方向键切换节点",
+    "en-US": "Scroll to browse · Drag to pan · Ctrl + scroll to zoom · Arrow keys to navigate",
   },
   "agentWorkspace.zoomIn": { "zh-CN": "放大画布", "en-US": "Zoom in" },
   "agentWorkspace.zoomOut": { "zh-CN": "缩小画布", "en-US": "Zoom out" },
-  "agentWorkspace.fit": { "zh-CN": "适应画布", "en-US": "Fit graph" },
+  "agentWorkspace.fit": { "zh-CN": "查看全图", "en-US": "Show entire graph" },
+  "agentWorkspace.reset": {
+    "zh-CN": "恢复 100% 并回到顶部",
+    "en-US": "Reset to 100% and return to top",
+  },
   "agentWorkspace.ancestry": { "zh-CN": "当前 Agent 路径", "en-US": "Agent ancestry" },
   "agentWorkspace.empty": {
     "zh-CN": "当前会话暂无子 Agent",
@@ -40,8 +63,6 @@ export const agentWorkspaceMessages = defineMessages({
     "en-US": "This agent has no conversation entries yet.",
   },
   "agentWorkspace.earlier": { "zh-CN": "加载更早记录", "en-US": "Load earlier entries" },
-  "agentWorkspace.follow": { "zh-CN": "跟随最新", "en-US": "Follow latest" },
-  "agentWorkspace.latest": { "zh-CN": "回到最新", "en-US": "Jump to latest" },
   "agentWorkspace.retained": {
     "zh-CN": "仅展示当前 Agent 的会话",
     "en-US": "Conversation for the selected agent",

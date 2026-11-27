@@ -1,5 +1,5 @@
-import { ArrowDown, CaretRight, ChatCircleText, Robot } from "@phosphor-icons/react";
-import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { CaretRight, ChatCircleText, Robot } from "@phosphor-icons/react";
+import { Fragment, useLayoutEffect, useMemo, useRef } from "react";
 import type { ViewAgentEvent, ViewAgentNode } from "../../../shared/view";
 import { useT } from "../../hooks/useT";
 import { AssistantMessage } from "../SessionArea/AssistantMessage";
@@ -40,7 +40,6 @@ export function AgentConversation({
   const streamRef = useRef<HTMLElement>(null);
   const previousRef = useRef<{ first?: string; height: number } | null>(null);
   const programmedTop = useRef<number | null>(null);
-  const [following, setFollowing] = useState(memory.follow);
   const entries = useMemo(() => agentConversationEntries(events), [events]);
 
   useLayoutEffect(() => {
@@ -73,17 +72,6 @@ export function AgentConversation({
     previousRef.current = { first: events[0]?.id, height: stream.scrollHeight };
   });
 
-  const followLatest = (): void => {
-    const stream = streamRef.current;
-    memory.follow = !memory.follow;
-    if (stream && memory.follow) {
-      stream.scrollTop = stream.scrollHeight;
-      memory.top = stream.scrollTop;
-      programmedTop.current = stream.scrollTop;
-    }
-    setFollowing(memory.follow);
-  };
-
   return (
     <section className={styles.detailPanel} aria-label={t("agentWorkspace.detail")}>
       <div className={styles.panelHeading}>
@@ -97,7 +85,7 @@ export function AgentConversation({
             {agentAncestry(agents, agent.id).map((ancestor, index) => (
               <Fragment key={ancestor.id}>
                 {index ? <CaretRight size={16} weight="regular" /> : null}
-                {ancestor.id === agent.id ? (
+                {ancestor.id === agent.id || ancestor.kind === "main" ? (
                   <span>{ancestor.label}</span>
                 ) : (
                   <button type="button" onClick={() => onSelect(ancestor.id)}>
@@ -145,7 +133,6 @@ export function AgentConversation({
           }
           programmedTop.current = null;
           memory.follow = stream.scrollHeight - stream.clientHeight - stream.scrollTop < 40;
-          setFollowing(memory.follow);
         }}
       >
         {!agent ? (
@@ -161,7 +148,6 @@ export function AgentConversation({
                 className={styles.earlierButton}
                 onClick={() => {
                   memory.follow = false;
-                  setFollowing(false);
                   onLoadEarlier();
                 }}
               >
@@ -209,15 +195,6 @@ export function AgentConversation({
       </section>
       <div className={styles.conversationFooter}>
         <span>{t("agentWorkspace.retained")}</span>
-        <button
-          type="button"
-          className={styles.followButton}
-          aria-pressed={following}
-          onClick={followLatest}
-        >
-          <ArrowDown size={16} weight="regular" />
-          {t(following ? "agentWorkspace.follow" : "agentWorkspace.latest")}
-        </button>
       </div>
     </section>
   );
