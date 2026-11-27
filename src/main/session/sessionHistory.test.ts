@@ -17,6 +17,7 @@ import {
   collectSessionFiles,
   encodeCwdToSessionDir,
   getSessionMeta,
+  invalidateSessionMeta,
   listAllSessions,
   listSessions,
   resolveSessionFile,
@@ -338,6 +339,87 @@ describe("listAllSessions", () => {
     expect(second[0].sessionName).toBe("追加后");
     expect(second[0].firstUserMessage).toBeNull();
     expect(second[0].latestUserMessage).toBe("追加后的用户提示");
+  });
+});
+
+describe("getSessionMeta configuration", () => {
+  it("缓存命中与无配置追加保留旧值，独立增量变更只覆盖对应字段", async () => {
+    const sessionDir = await makeAgentDir();
+    const file = await writeSession(sessionDir, "config.jsonl", [
+      header("config"),
+      JSON.stringify({ type: "model_change", modelId: "saved-model" }),
+      JSON.stringify({ type: "thinking_level_change", thinkingLevel: "medium" }),
+    ]);
+    await listAllSessions();
+    const initial = await getSessionMeta(file);
+    expect(initial.configuration).toEqual({ modelLabel: "saved-model", thinkingLevel: "medium" });
+    expect(await getSessionMeta(file)).toBe(initial);
+
+    await fsp.appendFile(
+      file,
+      `${JSON.stringify({ type: "thinking_level_change", thinkingLevel: "xhigh" })}\n`,
+    );
+    expect((await getSessionMeta(file)).configuration).toEqual({
+      modelLabel: "saved-model",
+      thinkingLevel: "xhigh",
+    });
+
+    await fsp.appendFile(
+      file,
+      `${nameEntry("renamed", "2026-10-26T10:01:00.000Z")}\n{"type":"model_change","modelId":false}\n{"type":"thinking_level_change","thinkingLevel":"invalid"}\nmalformed\n`,
+    );
+    expect((await getSessionMeta(file)).configuration).toEqual({
+      modelLabel: "saved-model",
+      thinkingLevel: "xhigh",
+    });
+
+    await fsp.appendFile(
+      file,
+      `${JSON.stringify({ type: "model_change", modelId: "new-model" })}\n`,
+    );
+    expect((await getSessionMeta(file)).configuration).toEqual({
+      modelLabel: "new-model",
+      thinkingLevel: "xhigh",
+    });
+  });
+
+  it("截断与缓存失效后重读清除旧配置", async () => {
+    const sessionDir = await makeAgentDir();
+    const file = await writeSession(sessionDir, "truncate.jsonl", [
+      header("config"),
+      JSON.stringify({ type: "model_change", modelId: "saved" }),
+      JSON.stringify({ type: "thinking_level_change", thinkingLevel: "high" }),
+    ]);
+    expect((await getSessionMeta(file)).configuration).toEqual({
+      modelLabel: "saved",
+      thinkingLevel: "high",
+    });
+    await fsp.writeFile(file, `${header("config")}\n`);
+    expect((await getSessionMeta(file)).configuration).toEqual({});
+    await fsp.appendFile(file, '{"type":"model_change","modelId":"current"}\n');
+    expect((await getSessionMeta(file)).configuration).toEqual({ modelLabel: "current" });
+    await fsp.writeFile(file, `${header("replacement")}\n`);
+    invalidateSessionMeta(file);
+    expect((await getSessionMeta(file)).configuration).toEqual({});
+    await fsp.rm(file);
+    expect((await getSessionMeta(file)).configuration).toEqual({});
+  });
+
+  it("同大小文件重写时清除原思考档位", async () => {
+    const sessionDir = await makeAgentDir();
+    const file = await writeSession(sessionDir, "rewrite.jsonl", [
+      header("config"),
+      JSON.stringify({ type: "model_change", modelId: "old-model" }),
+      JSON.stringify({ type: "thinking_level_change", thinkingLevel: "high" }),
+    ]);
+    const before = await getSessionMeta(file);
+    expect(before.configuration.thinkingLevel).toBe("high");
+    const oldText = await fsp.readFile(file, "utf8");
+    const newText = `${header("config")}\n${JSON.stringify({ type: "model_change", modelId: "new-model" })}\n`;
+    await fsp.writeFile(file, newText.padEnd(Buffer.byteLength(oldText), "\n"));
+    const changed = new Date(Date.now() + 2_000);
+    await fsp.utimes(file, changed, changed);
+    expect((await getSessionMeta(file)).configuration).toEqual({ modelLabel: "new-model" });
   });
 });
 

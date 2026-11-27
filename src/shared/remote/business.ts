@@ -5,6 +5,23 @@ export const MAX_PROMPT_LENGTH = 16_000;
 export const MAX_REQUESTS = 64;
 export const PROJECT_PAGE_SIZE = 20;
 
+export const REMOTE_THINKING_LEVELS = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
+export type RemoteThinkingLevel = (typeof REMOTE_THINKING_LEVELS)[number];
+
+/** Visible session configuration, without provider credentials or runtime internals. */
+export interface RemoteSessionConfiguration {
+  modelLabel?: string;
+  thinkingLevel?: RemoteThinkingLevel;
+}
+
 export const COMMANDS = [
   "projects.list",
   "sessions.list",

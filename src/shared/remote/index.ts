@@ -1,6 +1,7 @@
 export * from "./account";
 export * from "./accountProfile";
 export * from "./authorization";
+export * from "./business";
 export * from "./client";
 export * from "./connectionRenewal";
 export * from "./contract";
