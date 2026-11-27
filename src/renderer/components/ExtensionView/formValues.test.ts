@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ViewNode } from "../../../shared/view";
+import type { ViewAgentWorkspaceNode, ViewNode } from "../../../shared/view";
 import { collectFormValues } from "./formValues";
 
 function tabsTree(overrides?: { q0Value?: string; text1Value?: string }): ViewNode {
@@ -37,6 +37,104 @@ function tabsTree(overrides?: { q0Value?: string; text1Value?: string }): ViewNo
     ],
   };
 }
+
+function workspace(overrides: Partial<ViewAgentWorkspaceNode> = {}): ViewAgentWorkspaceNode {
+  return {
+    type: "agent-workspace",
+    id: "agents",
+    agents: [
+      { id: "main", label: "Main", description: "Coordinate", state: "running", kind: "main" },
+      { id: "child", parentId: "main", label: "Child", description: "Task", state: "queued" },
+    ],
+    streamAgentId: "main",
+    events: [{ id: "event", kind: "assistant", content: "Update" }],
+    ...overrides,
+  };
+}
+
+describe("collectFormValues — workspace selection", () => {
+  it("collects only the workspace selection, not Agents or event data", () => {
+    expect(collectFormValues(workspace({ value: "child" }))).toEqual({ agents: "child" });
+  });
+
+  it("defaults to empty without implicitly selecting the first Agent or stream owner", () => {
+    expect(collectFormValues(workspace())).toEqual({ agents: "" });
+    expect(collectFormValues(workspace({ agents: [] }))).toEqual({ agents: "" });
+  });
+
+  it("preserves a still-valid local selection across full-tree updates", () => {
+    expect(collectFormValues(workspace(), { agents: "child" })).toEqual({ agents: "child" });
+    expect(collectFormValues(workspace({ value: "main" }), { agents: "child" })).toEqual({
+      agents: "main",
+    });
+  });
+
+  it("drops removed, non-string and explicitly invalid selections", () => {
+    for (const selected of ["gone", 3, ["main"], null]) {
+      expect(collectFormValues(workspace(), { agents: selected })).toEqual({ agents: "" });
+    }
+    expect(collectFormValues(workspace({ value: "gone" }), { agents: "main" })).toEqual({
+      agents: "",
+    });
+    expect(collectFormValues(workspace({ agents: [] }), { agents: "child" })).toEqual({
+      agents: "",
+    });
+    expect(collectFormValues({ type: "column", children: [] }, { agents: "main" })).toEqual({});
+  });
+
+  it("keeps the selected Agent when the stream still belongs to the previous Agent", () => {
+    expect(collectFormValues(workspace({ value: "child", streamAgentId: "main" }))).toEqual({
+      agents: "child",
+    });
+  });
+
+  it("collects workspaces in inactive tabs and preserves unrelated fields", () => {
+    const root: ViewNode = {
+      type: "tabs",
+      id: "tabs",
+      activeTab: "one",
+      tabs: [
+        { id: "one", label: "One", children: [{ type: "input", id: "query", value: "live" }] },
+        { id: "two", label: "Two", children: [workspace()] },
+      ],
+    };
+    expect(collectFormValues(root, { agents: "child", query: "old" })).toEqual({
+      query: "live",
+      agents: "child",
+    });
+  });
+
+  it("uses the first form control for a duplicate ID, including an empty selection", () => {
+    expect(
+      collectFormValues({ type: "column", children: [workspace(), workspace({ value: "child" })] }),
+    ).toEqual({ agents: "" });
+    expect(
+      collectFormValues({
+        type: "column",
+        children: [{ type: "input", id: "agents", value: "first" }, workspace({ value: "child" })],
+      }),
+    ).toEqual({ agents: "first" });
+    expect(
+      collectFormValues({
+        type: "column",
+        children: [
+          workspace({ value: "child" }),
+          { type: "list", id: "agents", items: [], value: "second" },
+        ],
+      }),
+    ).toEqual({ agents: "child" });
+  });
+
+  it("treats opaque IDs as own values even when they name Object prototype properties", () => {
+    for (const id of ["__proto__", "constructor", "toString"]) {
+      const values = collectFormValues(workspace({ id, value: "child" }));
+      expect(Object.hasOwn(values, id)).toBe(true);
+      expect(values[id]).toBe("child");
+      expect(Object.getPrototypeOf(values)).toBe(Object.prototype);
+      expect(collectFormValues(workspace({ id }), values)[id]).toBe("child");
+    }
+  });
+});
 
 describe("collectFormValues", () => {
   it("collects values from every tab, including inactive ones", () => {

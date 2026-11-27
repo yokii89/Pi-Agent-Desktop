@@ -32,10 +32,11 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
   const bridge = useMemo<ViewFormBridge>(
     () => ({
       values: entry.values,
+      actions: entry.actions,
       onChange: (nodeId, value) => changeValue(entry.id, nodeId, value),
       onButtonAction: (buttonId) => sendAction(entry.id, buttonId, entry.values),
     }),
-    [entry.id, entry.values, changeValue, sendAction],
+    [entry.id, entry.values, entry.actions, changeValue, sendAction],
   );
 
   // 内容盒尺寸回传（docs/06 R5）：挂载即发第一帧，resize 走 150ms 去抖。
@@ -75,6 +76,7 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
   };
 
   const header = entry.placementHint?.panelHeader;
+  const isAgentWorkspace = entry.root.type === "agent-workspace";
 
   return (
     <div className={styles.panel}>
@@ -85,8 +87,13 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
           ))}
         </div>
       ) : null}
-      <div ref={bodyRef} className={styles.panelBody} data-panel-scroll="" data-selectable-text="">
-        <ViewNodeRenderer node={entry.root} bridge={bridge} />
+      <div
+        ref={bodyRef}
+        className={[styles.panelBody, isAgentWorkspace ? styles.workspaceBody : ""].join(" ")}
+        data-panel-scroll=""
+        data-selectable-text=""
+      >
+        <ViewNodeRenderer key={entry.id} node={entry.root} bridge={bridge} />
       </div>
       {entry.actions.length > 0 ? (
         <div className={styles.panelFooter}>
@@ -110,11 +117,13 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
           })}
         </div>
       ) : null}
-      <div className={styles.panelCloseRow}>
-        <Button variant="default" className={styles.ghostAction} onClick={endPanel}>
-          {t("ui.view.closePanel")}
-        </Button>
-      </div>
+      {!isAgentWorkspace ? (
+        <div className={styles.panelCloseRow}>
+          <Button variant="default" className={styles.ghostAction} onClick={endPanel}>
+            {t("ui.view.closePanel")}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

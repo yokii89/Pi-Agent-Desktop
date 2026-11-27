@@ -191,6 +191,10 @@
   padding: var(--spacing-sm);
 }
 
+.workspaceBody {
+  overflow: hidden;
+}
+
 .panelFooter {
   display: flex;
   flex-wrap: wrap;

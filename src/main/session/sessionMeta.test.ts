@@ -2,6 +2,7 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { VIEW_SESSION_OWNER_ENTRY_TYPE } from "../../shared/view";
 import { normalizeSessionName, scanSessionFile } from "./sessionMeta";
 
 const dirs: string[] = [];
@@ -45,6 +46,19 @@ function messageEntry(id: string, timestamp: string, role = "assistant"): string
   });
 }
 
+const VIEW_OWNER = { panelId: "extension.review.children", rootSessionId: "root-session" };
+
+function ownerEntry(data: unknown = VIEW_OWNER): string {
+  return JSON.stringify({
+    type: "custom",
+    id: "owner",
+    parentId: null,
+    timestamp: "2026-10-26T01:00:00.000Z",
+    customType: VIEW_SESSION_OWNER_ENTRY_TYPE,
+    data,
+  });
+}
+
 function userMessageEntry(id: string, content: unknown): string {
   return JSON.stringify({
     type: "message",
@@ -72,7 +86,80 @@ describe("scanSessionFile", () => {
     expect(result.firstUserMessage).toBe("你好\n世界");
     expect(result.latestUserMessage).toEqual({ found: true, value: "你好\n世界" });
     expect(result.sessionName).toEqual({ found: true, value: "第二个" });
+    expect(result.viewOwner).toBeNull();
     expect(result.scannedBytes).toBe((await fsp.stat(file)).size);
+  });
+
+  it("读取通用 custom 面板归属，不把标记时间当成消息活跃时间", async () => {
+    const file = await writeSession([
+      HEADER,
+      ownerEntry(),
+      messageEntry("m1", "2026-10-26T00:00:05.000Z", "user"),
+      ownerEntry({ ...VIEW_OWNER, panelId: "another.extension.panel" }),
+    ]);
+
+    const result = await scanSessionFile(file);
+
+    expect(result.viewOwner).toEqual({ ...VIEW_OWNER, panelId: "another.extension.panel" });
+    expect(result.lastActivityAt).toBe(Date.parse("2026-10-26T00:00:05.000Z"));
+  });
+
+  it.each([
+    null,
+    {},
+    [],
+    "",
+    { panelId: "", rootSessionId: "root" },
+    { panelId: " \t", rootSessionId: "root" },
+    { panelId: "panel", rootSessionId: "" },
+    { panelId: "panel", rootSessionId: " \n" },
+    { panelId: 123, rootSessionId: "root" },
+    { panelId: "panel", rootSessionId: false },
+  ])("忽略空或无效的面板归属数据：%j", async (data) => {
+    const file = await writeSession([HEADER, ownerEntry(data)]);
+
+    const result = await scanSessionFile(file);
+
+    expect(result.viewOwner).toBeNull();
+    expect(result.lastActivityAt).toBeNull();
+  });
+
+  it("只有顶层同名 custom 条目可声明归属，损坏或伪造标记不隐藏会话", async () => {
+    const marker = JSON.parse(ownerEntry());
+    const file = await writeSession([
+      HEADER,
+      JSON.stringify({ type: "custom", customType: VIEW_SESSION_OWNER_ENTRY_TYPE }),
+      JSON.stringify({ ...marker, type: "custom_message" }),
+      JSON.stringify({ ...marker, customType: "another:owner" }),
+      JSON.stringify({ type: "custom", customType: "extension:data", data: marker }),
+      JSON.stringify({ type: "session_info", name: VIEW_SESSION_OWNER_ENTRY_TYPE }),
+      ownerEntry().slice(0, -1),
+    ]);
+
+    expect((await scanSessionFile(file)).viewOwner).toBeNull();
+  });
+
+  it("增量扫描等归属标记换行后生效，无效后续标记不覆盖有效值", async () => {
+    const file = await writeSession([HEADER, USER]);
+    const before = await scanSessionFile(file);
+    expect(before.viewOwner).toBeNull();
+
+    await fsp.appendFile(file, ownerEntry(), "utf8");
+    const partial = await scanSessionFile(file, before.scannedBytes);
+    expect(partial.viewOwner).toBeNull();
+    expect(partial.scannedBytes).toBe(before.scannedBytes);
+
+    await fsp.appendFile(file, `\n${ownerEntry({})}\n`, "utf8");
+    const complete = await scanSessionFile(file, partial.scannedBytes);
+    expect(complete.viewOwner).toEqual(VIEW_OWNER);
+    expect(complete.lastActivityAt).toBeNull();
+  });
+
+  it("归属标记不受 JSON 键序或字段空白影响", async () => {
+    const marker = `{ "data": ${JSON.stringify(VIEW_OWNER)}, "customType": "${VIEW_SESSION_OWNER_ENTRY_TYPE}", "type": "custom" }`;
+    const file = await writeSession([HEADER, marker]);
+
+    expect((await scanSessionFile(file)).viewOwner).toEqual(VIEW_OWNER);
   });
 
   it("提取最新用户消息的文本块，但保留首条用户消息不变", async () => {

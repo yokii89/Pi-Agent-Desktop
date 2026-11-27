@@ -1,6 +1,31 @@
 # @pidesk/view-sdk
 
-## Unreleased
+## 0.6.0 — Unreleased (local source only)
+
+- Add the optional `agent-workspace` node and public `ViewAgentState`,
+  `ViewAgentNode`, `ViewAgentEvent`, `ViewAgentWorkspaceNode` types. Agent
+  selection uses ordinary change events and form values; `streamAgentId`
+  explicitly owns the event window so renderers can hide stale streams.
+- Add capability `view-agent-workspace` and `supportsAgentWorkspace(client)`.
+  Probe after handshake; older Hosts require an existing-node/TUI fallback.
+  Existing nodes and `view/v1` envelopes retain their meanings.
+- Host validation drops malformed/duplicate entries and unknown fields,
+  truncates strings, caps each array at `maxOptionItems` and meta at eight
+  entries, and cuts missing/self/cyclic parent links into a deterministic
+  forest. The workspace and each capped raw Agent/event entry cost one node,
+  including discarded data; SDK preflight mirrors the exact accounting.
+- Form collection preserves only selections still present in the graph.
+  Host control-ID validation now degrades later duplicates across the View,
+  including inactive tabs, matching the existing first-value rule. Assign
+  unique stable control IDs if an extension relied on ambiguous duplicates.
+- Export `VIEW_SESSION_OWNER_ENTRY_TYPE = "pidesk:view-owner"` and
+  `ViewSessionOwner { panelId; rootSessionId }` for pi JSONL custom-entry
+  presentation ownership. The marker retains history and carries no authority;
+  it is not a new View message or helper. Host history filtering and extension
+  child-session marking are coordinated integration work.
+- Design: PiDesk docs/design/149. Renderer/extension visual acceptance is
+  separate from the protocol tests. Version 0.6.0 is local and unpublished;
+  no root application version change or package publication is performed.
 
 - Preserve Chinese and emoji when UTF-8 bytes arrive in separate socket chunks.
 - Clean coalesced `flushNow()` calls preserve the Host tree instead of replaying

@@ -293,12 +293,20 @@ interface ExtensionViewStoreValue {
   sendBlockedReason: string | null;
 }
 
-function upsertSlotted(
+/** 合并槽位注册；会话级面板保留各自实例，设置页维持全局单槽。 */
+export function upsertSlotted(
   prev: ExtensionViewEntry[],
   entry: ExtensionViewEntry,
 ): ExtensionViewEntry[] {
   const panelId = entry.panelId ?? `ext-${entry.id}`;
-  const rest = prev.filter((p) => p.id !== entry.id && (p.panelId ?? `ext-${p.id}`) !== panelId);
+  const sessionId = entry.sessionId ?? entry.boundSessionId ?? null;
+  const rest = prev.filter((p) => {
+    if (p.id === entry.id) return false;
+    if ((p.panelId ?? `ext-${p.id}`) !== panelId) return true;
+    return (
+      entry.placement !== "settings" && (p.sessionId ?? p.boundSessionId ?? null) !== sessionId
+    );
+  });
   return [...rest, entry];
 }
 

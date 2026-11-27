@@ -23,7 +23,7 @@ export interface ViewTreeBudget {
   depth: number;
   /** Nodes dropped by `maxTableRows` before the Host ever counts them. */
   truncatedRows: number;
-  /** Nodes dropped by `maxOptionItems` (select options / list items / tabs). */
+  /** Items dropped by `maxOptionItems` (options / tabs / workspace agents and events). */
   truncatedOptionItems: number;
   /** Whether any container child was dropped because the node budget was hit. */
   hitNodeBudget: boolean;
@@ -115,6 +115,23 @@ export function measureViewTree(root: ViewNode, limits: ViewBudgetLimits): ViewT
         if (budget.nodes > limits.maxNodes) {
           budget.hitNodeBudget = true;
           return;
+        }
+      }
+      return;
+    }
+
+    if (type === "agent-workspace") {
+      // Charge raw entries before validation/deduplication, exactly as the Host
+      // does, even for malformed workspaces or streams without an owner.
+      for (const key of ["agents", "events"] as const) {
+        const items = Array.isArray(record[key]) ? record[key] : [];
+        budget.truncatedOptionItems += Math.max(0, items.length - limits.maxOptionItems);
+        for (let i = 0; i < Math.min(items.length, limits.maxOptionItems); i += 1) {
+          budget.nodes += 1;
+          if (budget.nodes > limits.maxNodes) {
+            budget.hitNodeBudget = true;
+            return;
+          }
         }
       }
       return;

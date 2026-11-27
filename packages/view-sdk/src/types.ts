@@ -29,6 +29,18 @@ export type ViewPlacement =
   | "settings"
   | "access-mode";
 
+/** pi JSONL custom-entry type；仅标记子会话的展示归属，不是 wire 消息或权限。 */
+export const VIEW_SESSION_OWNER_ENTRY_TYPE = "pidesk:view-owner";
+
+/**
+ * pi JSONL custom-entry data（docs/design/149）。显式面板归属用于隐藏主会话列表中的
+ * 子会话；历史仍保留。该标记不授予项目、会话或面板的任何访问/执行权限。
+ */
+export interface ViewSessionOwner {
+  panelId: string;
+  rootSessionId: string;
+}
+
 export interface ViewResult {
   action?: string;
   values: Record<string, unknown>;
@@ -91,7 +103,59 @@ export interface ViewTableRow {
   cells: Record<string, string | number | boolean | null>;
 }
 
+/** Agent 执行状态；状态文案可由 stateLabel 补充，不能只靠颜色（docs/design/149）。 */
+export type ViewAgentState = "idle" | "queued" | "running" | "completed" | "stopped" | "error";
+
+/** 协作图中的稳定 Agent 身份；根 Agent 也由扩展提供。 */
+export interface ViewAgentNode {
+  id: string;
+  parentId?: string;
+  label: string;
+  description: string;
+  state: ViewAgentState;
+  stateLabel?: string;
+  /** 最多 8 项纯文本元信息。 */
+  meta?: string[];
+  kind?: "main" | "agent";
+}
+
+/** 单个 Agent 的稳定事件；文本是数据，不接受 HTML、函数或文件访问权限。 */
+export interface ViewAgentEvent {
+  id: string;
+  kind: "user" | "assistant" | "thinking" | "tool" | "notice" | "error";
+  title?: string;
+  content: string;
+  /** Unix 时间戳，毫秒；只接受有限数字。 */
+  timestamp?: number;
+  toolName?: string;
+  input?: string;
+  state?: ViewAgentState;
+}
+
+/**
+ * 协作图 + 选中 Agent 的事件流（docs/design/149）；需 view-agent-workspace。
+ * 选择发送已有 change：nodeId=id、value=Agent id，并进入 values[id]。
+ * events 只属于 streamAgentId；它与本地选择不同时 Renderer 必须隐藏旧流。
+ * agents/events 各截到 maxOptionItems，每个原始条目计 1 节点（含无效/重复项），
+ * 工作区自身另计 1 节点；条目不是 View 子树，不增加 maxDepth。
+ */
+export interface ViewAgentWorkspaceNode {
+  type: "agent-workspace";
+  id: string;
+  agents: ViewAgentNode[];
+  /** 显式选择；缺省时保留仍有效的本地选择，否则为空。 */
+  value?: string;
+  /** 事件流的归属；缺省或无效时 Host 清空 events。 */
+  streamAgentId?: string;
+  events: ViewAgentEvent[];
+  emptyText?: string;
+  notice?: string;
+  /** 加载更早记录时发送的已有 action id，不是函数或路径。 */
+  loadEarlierActionId?: string;
+}
+
 export type ViewNode =
+  | ViewAgentWorkspaceNode
   | {
       type: "text";
       content: string;
@@ -372,6 +436,9 @@ export interface ViewHelloPayload {
  * `panel-tab-badge`：`placementHint.panelBadge` 会渲染到侧栏页签与启动页
  * （docs/06 R7）。旧 Host 忽略字段，页签条不变。
  *
+ * `view-agent-workspace`：声明式 Agent 协作图与单 Agent 事件流（docs/design/149）。
+ * 旧 Host 会降级为 unknown，扩展必须先探测并保留基础节点/TUI 回退。
+ *
  * `panel-header`：`placementHint.panelHeader` 会渲染在面板滚动容器之上
  * （docs/06 R9）。旧 Host 忽略字段，状态行继续随正文滚动。
  */
@@ -384,6 +451,7 @@ export type ViewHostCapability =
   | "panel-launcher"
   | "view-option-preview"
   | "view-readonly-list"
+  | "view-agent-workspace"
   | "view-layout"
   | "panel-tab-badge"
   | "panel-header";
@@ -402,6 +470,7 @@ export const VIEW_HOST_CAPABILITIES: readonly ViewHostCapability[] = [
   "panel-launcher",
   "view-option-preview",
   "view-readonly-list",
+  "view-agent-workspace",
   "view-layout",
   "panel-tab-badge",
   "panel-header",

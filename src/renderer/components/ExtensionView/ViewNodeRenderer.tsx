@@ -1,11 +1,12 @@
 import { type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
-import type { ViewNode } from "../../../shared/view";
+import type { ViewAction, ViewNode } from "../../../shared/view";
 import { useT } from "../../hooks/useT";
 import { MarkdownContent } from "../SessionArea/MarkdownContent";
 import { Button } from "../ui/Button";
 import { OptionList, type OptionRow } from "../ui/OptionList";
 import { Segmented } from "../ui/Segmented";
 import { Select } from "../ui/Select";
+import { AgentWorkspaceView } from "./AgentWorkspaceView";
 import {
   formatCell,
   resolveAlign,
@@ -24,6 +25,7 @@ import styles from "./ViewNodeRenderer.module.css";
 
 export interface ViewFormBridge {
   values: Record<string, unknown>;
+  actions?: ViewAction[];
   onChange: (nodeId: string, value: unknown) => void;
   onButtonAction: (buttonId: string) => void;
 }
@@ -206,6 +208,8 @@ export function ViewNodeRenderer({ node, bridge }: ViewNodeRendererProps) {
       return <TabsView node={node} bridge={bridge} />;
     case "table":
       return <TableView node={node} />;
+    case "agent-workspace":
+      return <AgentWorkspaceView node={node} bridge={bridge} />;
     case "unknown":
       return (
         <div className={styles.unknownNode} role="note">

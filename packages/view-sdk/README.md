@@ -2,6 +2,10 @@
 
 Client SDK for the **PiDesk extension View protocol** (`view/v1`).
 
+The local source version is **0.6.0 (unpublished)**. The Agent workspace additions
+require a Host advertising `view-agent-workspace`; the package version alone
+does not establish Host support. This source change does not publish a package.
+
 **Maintainers:** changes to public APIs, protocols, placements, and extension
 lifecycle must follow the SDK development standards (Chinese), including the
 design template and delivery checklist.
@@ -143,6 +147,9 @@ await desktop.open(spec, {
 | `session.patch(payload)` | Partial update (`hello.capabilities` includes `view-patch`); soft `false` → fall back to `update()` |
 | `supportsPanelLauncher(client)` | `hello.capabilities` includes `panel-launcher` (launcher + closable panel tabs, see below) |
 | `supportsOptionPreview(client)` | `hello.capabilities` includes `view-option-preview` (`ViewListOption.preview`, see below) |
+| `supportsAgentWorkspace(client)` | `hello.capabilities` includes `view-agent-workspace` (Agent graph and owned event stream) |
+| `ViewAgentState` / `ViewAgentNode` / `ViewAgentEvent` / `ViewAgentWorkspaceNode` | Serializable Agent workspace contract; exported from the public entry |
+| `VIEW_SESSION_OWNER_ENTRY_TYPE` / `ViewSessionOwner` | pi JSONL custom-entry metadata for a child session’s explicit panel/root-session presentation owner; not a View message or authority |
 | `ACCESS_MODE_ACTIONS` | `mode:activate` / `mode:deactivate` action ids the Host sends back |
 | `viewOnDesktop(client, spec, options?)` | One-shot form shortcut |
 | `column` / `row` / `card` | Tiny ViewNode builders |
@@ -457,6 +464,125 @@ returns a `column`/`row` tree that keeps **all** cells of every row (the leading
 cell is `body`, the rest `caption`); `labelKey` only decides which column leads
 and no longer drops the other columns. If a genuinely narrow rail only has room
 for one cell per row, pass `compact: true` instead of relying on `labelKey`.
+
+### Agent workspace (`agent-workspace`)
+
+A semantic collaboration graph and the selected Agent’s event waterfall
+(PiDesk docs/design/149). SDK 0.6.0 exports `ViewAgentState`, `ViewAgentNode`,
+`ViewAgentEvent`, `ViewAgentWorkspaceNode` and `supportsAgentWorkspace`.
+The Host owns layout, theme and accessible interaction. Extensions provide
+serializable data, including the root Agent; no HTML, CSS, functions, graph
+coordinates or filesystem-access fields are accepted.
+
+```ts
+import {
+  connectDesktopView, supportsAgentWorkspace,
+  type ViewAgentWorkspaceNode,
+} from "@pidesk/view-sdk";
+
+const desktop = connectDesktopView();
+if (desktop) {
+  try {
+    await desktop.ensureConnected();
+    if (supportsAgentWorkspace(desktop)) {
+      const root: ViewAgentWorkspaceNode = {
+        type: "agent-workspace", id: "agents",
+        agents: [
+          { id: "main", label: "Main", description: "Coordinate", state: "running", kind: "main" },
+          { id: "review", parentId: "main", label: "Review", description: "Check changes", state: "queued" },
+        ],
+        value: "main", streamAgentId: "main",
+        events: [{ id: "started", kind: "notice", content: "Task started" }],
+      };
+      const session = await desktop.openLive({ root, placement: "panel" }, {
+        onEvent(event, view) {
+          if (event.type === "change" && event.nodeId === root.id &&
+              typeof event.value === "string" && root.agents.some(a => a.id === event.value)) {
+            // Supply this Agent’s real event window; asynchronous reads must
+            // discard results superseded by a more recent selection.
+            root.value = event.value;
+            root.streamAgentId = event.value;
+            root.events = [];
+            view.update({ root });
+          }
+        },
+      });
+      // Temporary demo: close when finished. Resident panels use superviseSlot.
+      session.close();
+      await session.closed;
+    } else {
+      // Use an existing list/markdown/table projection or a TUI fallback.
+    }
+  } finally {
+    desktop.dispose(); // only for a private client; release shared clients instead
+  }
+}
+```
+
+- **Identity and fields.** `id` is the workspace’s unique form-control ID. Each
+  Agent requires a nonempty string `id`, string `label`/`description`, and a valid
+  `state`; the text fields may be empty. Optional
+  fields are `parentId`, `stateLabel`, `meta` (up to eight strings), and
+  `kind: "main" | "agent"`. States are `idle | queued | running | completed |
+  stopped | error`. IDs must remain stable across updates.
+- **Selection.** The ordinary event is `{ type: "change", nodeId: workspace.id,
+  value: agent.id }`; only selection enters `values[workspace.id]`. An explicit
+  valid `value` wins. When omitted, a previous selection survives only while
+  that Agent is present; otherwise it becomes `""`. There is no automatic first
+  selection. Agents and events do not create separate form values.
+- **Stream ownership.** Events belong only to `streamAgentId`. A valid stream
+  owner may differ from `value` while a selection is being processed; the
+  Renderer hides that stream until its owner equals the local selection. A
+  missing/invalid owner clears events rather than treating them as the selected
+  Agent’s history. `value` and `streamAgentId` must reference retained Agents.
+- **Events.** Each requires a nonempty string `id`, string `content` (which may
+  be empty), and `kind` from `user | assistant | thinking | tool | notice | error`;
+  optional `title`, finite
+  `timestamp` (Unix milliseconds), `toolName`, `input` and `state` are data only.
+  Event and Agent IDs are deduplicated separately after truncation, keeping
+  their first valid entry. Missing/self parents are removed and parent cycles
+  are cut deterministically into a forest.
+- **Empty/loading/history.** `emptyText` and `notice` describe empty or partial
+  state; `loadEarlierActionId` requests an ordinary action with current values.
+  The extension handles history windows, errors and retries, and sends the
+  next complete snapshot. No new file-read or execution permission is added.
+- **Budget.** Workspace = one node; each raw Agent/event entry in the capped
+  arrays = one more, including entries later discarded as invalid, duplicate
+  or unowned. Each array is independently capped at `maxOptionItems` (1000),
+  with the entire View still subject to `maxNodes` (512). Parent edges/events do
+  not increase View depth. Strings use the existing UTF-8 `truncateString` rule
+  and message bytes still count toward `maxMessageBytes`.
+- **Updates/lifecycle.** Update replaces the whole workspace; patch can replace
+  it as a subtree, but cannot descend into agents/events. Keep IDs stable,
+  coalesce frequent projections, flush change before action, and release the
+  View/client with existing lifecycle APIs. Hiding a panel or selecting another
+  Agent does not stop execution.
+- **Compatibility.** Probe after handshake. No hello/capability means false; an
+  old Host renders this unknown node as a diagnostic placeholder, so use a real
+  fallback. Existing nodes continue to work. Duplicate control IDs across the
+  View (including inactive tabs) now keep the first control and degrade later
+  ones; assign unique IDs instead of depending on ambiguous value routing.
+
+The protocol and pure-logic tests cover this contract. Full graph/waterfall
+Renderer and extension integration acceptance is tracked by the consuming
+implementation; protocol checks alone are not UI acceptance.
+
+#### Child session presentation metadata
+
+`VIEW_SESSION_OWNER_ENTRY_TYPE` is `"pidesk:view-owner"`. Its data type is
+`ViewSessionOwner { panelId: string; rootSessionId: string }`. Both are exported
+from `@pidesk/view-sdk`. The extension writes this as a **pi JSONL custom-entry**
+on newly created child sessions, with an explicit owner panel and root session.
+The Host history reader uses the marker to suppress child sessions from the
+primary conversation list while retaining their history for the owner panel.
+The rule uses metadata, never a hardcoded extension package name.
+
+This is persistence metadata, **not a ViewNode, wire message, helper API or
+permission grant**. It does not authorize reading/stopping sessions, owning a
+panel or accessing files. Existing trusted connection/session checks remain
+independent. Older Hosts may continue to list marked sessions; their history is
+not deleted. This SDK change only exports the shared marker/type; Host history
+filtering and child-session writes are separate integration work.
 
 ### Read-only list (`list.readonly`)
 
@@ -796,6 +922,8 @@ patch ops ≤ 32 · option preview ≤ 4000 chars. Unknown `type` becomes a diag
 
 A `table` row counts as **one** node against `maxNodes` (cells are not nodes), so
 a full 200-row table costs ~201 nodes. Each `tabs` entry also costs one.
+An `agent-workspace` costs one plus one per capped raw Agent/event entry,
+including invalid/duplicate entries; its arrays each use `maxOptionItems`.
 
 **These numbers are exported, not prose.** `VIEW_LIMITS` is the compile-time
 default; `client.limits` returns the Host's live budget from `hello.limits` and

@@ -3,6 +3,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { shell } from "electron";
 import type { SessionSummary } from "../../shared/ipc";
+import type { ViewSessionOwner } from "../../shared/view";
 import { getSettings, updateSettings } from "../settings/settings";
 import { getPiAgentDir } from "./piInfo";
 import { type SessionHeader, scanSessionFile } from "./sessionMeta";
@@ -27,6 +28,7 @@ interface SessionMeta {
   firstUserMessage: string | null;
   latestUserMessage: string | null;
   sessionName: string | null;
+  viewOwner: ViewSessionOwner | null;
   lastActivityAt: number | null;
 }
 
@@ -45,11 +47,12 @@ const EMPTY_META: SessionMeta = {
   firstUserMessage: null,
   latestUserMessage: null,
   sessionName: null,
+  viewOwner: null,
   lastActivityAt: null,
 };
 
 /**
- * 解析 JSONL 元数据：头部 + 用户消息 + 最后一个 session_info 名字。
+ * 解析 JSONL 元数据：头部 + 用户消息 + 会话名 + 面板归属。
  *
  * pi 自己的会话列表本来就是整文件读取（session-manager buildSessionInfo），
  * 这里首次遇到文件时也全量扫一次；之后按 mtime/size 缓存，只消费追加区间。
@@ -80,6 +83,7 @@ export async function getSessionMeta(file: string): Promise<SessionMeta> {
           ? scan.latestUserMessage.value
           : cached.latestUserMessage,
         sessionName: scan.sessionName.found ? scan.sessionName.value : cached.sessionName,
+        viewOwner: scan.viewOwner ?? cached.viewOwner,
         lastActivityAt: scan.lastActivityAt ?? cached.lastActivityAt,
         scannedBytes: Math.max(cached.scannedBytes, scan.scannedBytes),
       };
@@ -95,6 +99,7 @@ export async function getSessionMeta(file: string): Promise<SessionMeta> {
       firstUserMessage: scan.firstUserMessage,
       latestUserMessage: scan.latestUserMessage.value,
       sessionName: scan.sessionName.found ? scan.sessionName.value : null,
+      viewOwner: scan.viewOwner,
       lastActivityAt: scan.lastActivityAt,
       scannedBytes: scan.scannedBytes,
     };
@@ -136,17 +141,24 @@ const SUMMARY_CONCURRENCY = 8;
  * 把会话文件解析为摘要列表（cwd 取自 JSONL 头部）。
  * updatedAt 优先取最后一条消息条目的时间（pi 的 `modified` 同口径），
  * 改名 / 切思考档这类元数据追加不动排序；没有消息时间时回退文件 mtime。
+ * 面板拥有的会话不占候选名额；凑齐 limit 后停止扫描，更旧的冷文件不必读取。
  * 解析走有限并发，避免侧栏刷新在大量冷文件上串行阻塞。
  */
-async function toSummaries(files: { file: string; mtime: number }[]): Promise<SessionSummary[]> {
-  const summaries: SessionSummary[] = new Array(files.length);
+async function toSummaries(
+  files: { file: string; mtime: number }[],
+  limit = Number.POSITIVE_INFINITY,
+): Promise<SessionSummary[]> {
+  const summaries: (SessionSummary | undefined)[] = [];
   let next = 0;
+  let visibleCount = 0;
   async function worker(): Promise<void> {
-    while (next < files.length) {
+    while (next < files.length && visibleCount < limit) {
       const index = next;
       next += 1;
       const { file, mtime } = files[index];
       const meta = await getSessionMeta(file);
+      if (meta.viewOwner) continue;
+      visibleCount += 1;
       const startedAt = meta.header ? Date.parse(meta.header.timestamp) : mtime;
       summaries[index] = {
         file,
@@ -164,7 +176,11 @@ async function toSummaries(files: { file: string; mtime: number }[]): Promise<Se
     worker(),
   );
   await Promise.all(workers);
-  return summaries.sort((a, b) => b.updatedAt - a.updatedAt);
+  // 在途 worker 可能多读几个候选；先按原始 mtime 顺序截断，再按消息时间排序。
+  return summaries
+    .filter((summary): summary is SessionSummary => summary !== undefined)
+    .slice(0, limit)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 /** 枚举会话根目录下的全部 JSONL 文件（跳过无法读取的目录），按修改时间倒序截断。 */
@@ -207,7 +223,7 @@ export async function collectSessionFiles(
 }
 
 /**
- * 列出某项目目录下的 pi 会话历史（候选按文件 mtime 取最近 30 个，
+ * 列出某项目目录下的 pi 会话历史（排除面板归属后，候选按文件 mtime 取最近 30 个，
  * 返回顺序按最后消息时间倒序，改名不改变展示位置）。
  * 目录不存在（该项目从未跑过 pi）时返回空数组。
  */
@@ -231,11 +247,11 @@ export async function listSessions(cwd: string): Promise<SessionSummary[]> {
     }
   }
   sorted.sort((a, b) => b.mtime - a.mtime);
-  return toSummaries(sorted.slice(0, MAX_SESSIONS));
+  return toSummaries(sorted, MAX_SESSIONS);
 }
 
 /**
- * 列出全部 pi 会话历史（候选按文件 mtime 取最近 MAX_ALL_SESSIONS 个，
+ * 列出全部 pi 会话历史（排除面板归属后，候选按文件 mtime 取最近 MAX_ALL_SESSIONS 个，
  * 返回顺序按最后消息时间倒序）。
  * 每条带会话自身的工作目录 cwd，渲染层据此把历史归入对应项目或"任务"。
  *
@@ -244,7 +260,10 @@ export async function listSessions(cwd: string): Promise<SessionSummary[]> {
  * 归档条目会从归档面板里凭空消失。文件已不存在的登记视为僵尸，顺手清掉。
  */
 export async function listAllSessions(): Promise<SessionSummary[]> {
-  const summaries = await toSummaries(await collectSessionFiles(MAX_ALL_SESSIONS));
+  const summaries = await toSummaries(
+    await collectSessionFiles(Number.POSITIVE_INFINITY),
+    MAX_ALL_SESSIONS,
+  );
   const archived = getSettings().archivedSessions;
   const files = Object.keys(archived);
   if (files.length === 0) return summaries;

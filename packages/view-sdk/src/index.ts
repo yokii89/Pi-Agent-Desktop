@@ -34,6 +34,7 @@ export {
   defineAccessMode,
 } from "./accessMode.js";
 export {
+  supportsAgentWorkspace,
   supportsCapability,
   supportsOptionPreview,
   supportsPanelLauncher,
@@ -130,7 +131,12 @@ export {
   VIEW_LIMITS,
   VIEW_OPTION_PREVIEW_MAX_CHARS,
   VIEW_PROTOCOL_VERSION,
+  VIEW_SESSION_OWNER_ENTRY_TYPE,
   type ViewAction,
+  type ViewAgentEvent,
+  type ViewAgentNode,
+  type ViewAgentState,
+  type ViewAgentWorkspaceNode,
   type ViewClosedPayload,
   type ViewClosedReason,
   type ViewClosePayload,
@@ -160,6 +166,7 @@ export {
   type ViewPlacement,
   type ViewPlacementHint,
   type ViewResult,
+  type ViewSessionOwner,
   type ViewSpec,
   type ViewTab,
   type ViewTableColumn,

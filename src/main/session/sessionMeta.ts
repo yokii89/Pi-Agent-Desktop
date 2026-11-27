@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs";
+import { VIEW_SESSION_OWNER_ENTRY_TYPE, type ViewSessionOwner } from "../../shared/view";
 
 export interface SessionHeader {
   type: "session";
@@ -26,6 +27,8 @@ export interface SessionScanResult {
   /** 最新用户消息；增量扫描时只包含本次新增部分。 */
   latestUserMessage: UserMessageScan;
   sessionName: SessionNameScan;
+  /** 本次扫描区间内最后一个有效的面板归属；无效条目不会清除已有归属。 */
+  viewOwner: ViewSessionOwner | null;
   /**
    * 本次扫描区间内最后一条 message 条目的时间（Unix ms）。
    * 只用来表示「会话最近活跃」，改名 / 切模型这类元数据追加不算。
@@ -44,6 +47,7 @@ export const SESSION_PREVIEW_MAX_LENGTH = 256;
  * 绝大多数既不解析也不生成字符串。针与 pi 的 JSON.stringify 键序一致。
  */
 const SESSION_INFO_NEEDLE = Buffer.from('"type":"session_info"');
+const VIEW_OWNER_NEEDLE = Buffer.from(VIEW_SESSION_OWNER_ENTRY_TYPE);
 const USER_ROLE_NEEDLE = Buffer.from('"role":"user"');
 const MESSAGE_PREFIX = Buffer.from('{"type":"message"');
 const TIMESTAMP_FIELD = '"timestamp":"';
@@ -102,7 +106,7 @@ function readEntryTimestamp(line: Buffer): string | null {
 }
 
 /**
- * 流式扫描 JSONL 元数据（header / 首条与最新用户消息 / 会话名 / 最后消息时间）。
+ * 流式扫描 JSONL 元数据（header / 用户消息 / 会话名 / 面板归属 / 最后消息时间）。
  *
  * `startOffset > 0` 时只解析追加区间：header 与首条用户消息不重复提取，
  * latestUserMessage 返回该区间内最新用户提示词（found=false 表示未新增）。
@@ -118,6 +122,7 @@ export async function scanSessionFile(file: string, startOffset = 0): Promise<Se
   const latestUserMessageLine: { value: Buffer | null } = { value: null };
   let nameFound = false;
   let nameValue: string | null = null;
+  let viewOwner: ViewSessionOwner | null = null;
   let lastMessageTimestamp: string | null = null;
   let scannedBytes = offset;
   let lineStart = offset;
@@ -162,6 +167,30 @@ export async function scanSessionFile(file: string, startOffset = 0): Promise<Se
         }
       } catch {
         // 跳过无法解析的行
+      }
+    }
+    if (line.includes(VIEW_OWNER_NEEDLE)) {
+      try {
+        const entry = JSON.parse(line.toString("utf8")) as {
+          type?: unknown;
+          customType?: unknown;
+          data?: { panelId?: unknown; rootSessionId?: unknown } | null;
+        };
+        if (
+          entry.type === "custom" &&
+          entry.customType === VIEW_SESSION_OWNER_ENTRY_TYPE &&
+          typeof entry.data?.panelId === "string" &&
+          entry.data.panelId.trim().length > 0 &&
+          typeof entry.data.rootSessionId === "string" &&
+          entry.data.rootSessionId.trim().length > 0
+        ) {
+          viewOwner = {
+            panelId: entry.data.panelId,
+            rootSessionId: entry.data.rootSessionId,
+          };
+        }
+      } catch {
+        // 损坏或不完整的归属标记不能隐藏普通会话
       }
     }
     if (
@@ -227,6 +256,7 @@ export async function scanSessionFile(file: string, startOffset = 0): Promise<Se
     firstUserMessage,
     latestUserMessage,
     sessionName: { found: nameFound, value: nameValue },
+    viewOwner,
     lastActivityAt: Number.isNaN(parsedActivity) ? null : parsedActivity,
     scannedBytes,
   };

@@ -16,8 +16,14 @@ export function collectFormValues(root: ViewNode, previous?: FormValues): FormVa
   const values: FormValues = {};
   // 同一子树内 id 必须唯一；重复时取先出现的（docs/design/08 §5.2）
   const take = (id: string, assign: () => unknown): void => {
-    if (id in values) return;
-    values[id] = assign();
+    if (Object.hasOwn(values, id)) return;
+    // Protocol IDs are opaque, including names inherited from Object.prototype.
+    Object.defineProperty(values, id, {
+      value: assign(),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   };
   const walk = (node: ViewNode): void => {
     switch (node.type) {
@@ -66,6 +72,20 @@ export function collectFormValues(root: ViewNode, previous?: FormValues): FormVa
           }
           if (previous && node.id in previous) return previous[node.id];
           return node.multiple ? [] : "";
+        });
+        return;
+      }
+      case "agent-workspace": {
+        take(node.id, () => {
+          const selected =
+            node.value !== undefined
+              ? node.value
+              : previous && Object.hasOwn(previous, node.id)
+                ? previous[node.id]
+                : undefined;
+          return typeof selected === "string" && node.agents.some((agent) => agent.id === selected)
+            ? selected
+            : "";
         });
         return;
       }

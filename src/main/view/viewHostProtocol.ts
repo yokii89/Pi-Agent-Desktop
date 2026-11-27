@@ -21,6 +21,7 @@ import {
   VIEW_LIMITS,
   VIEW_OPTION_PREVIEW_MAX_CHARS,
 } from "../../shared/view";
+import { sanitizeAgentWorkspace } from "./viewAgentWorkspace";
 
 /**
  * 已知槽位表。写成 `Record<ViewPlacement, true>` 而不是 `||` 比较链：给
@@ -303,6 +304,22 @@ function sanitizeTableCells(
   return cells;
 }
 
+/** First control wins, matching form collection, including controls in inactive tabs. */
+function deduplicateControlIds(node: ViewNode, seen: Set<string>): ViewNode {
+  if ("id" in node && node.type !== "table") {
+    if (seen.has(node.id)) return { type: "unknown", originalType: node.type };
+    seen.add(node.id);
+  }
+  if (node.type === "column" || node.type === "row" || node.type === "card") {
+    node.children = node.children.map((child) => deduplicateControlIds(child, seen));
+  } else if (node.type === "tabs") {
+    for (const tab of node.tabs) {
+      tab.children = tab.children.map((child) => deduplicateControlIds(child, seen));
+    }
+  }
+  return node;
+}
+
 /** 已记过日志的未知节点 type，避免同一 type 在 update 循环里刷屏。 */
 const loggedUnknownTypes = new Set<string>();
 
@@ -506,6 +523,21 @@ export function sanitizeTree(raw: unknown): { root: ViewNode } | { error: string
             typeof record.activeTab === "string" ? truncateString(record.activeTab) : undefined,
         };
       }
+      case "agent-workspace": {
+        // Charge capped raw entries before validation, deduplication, or
+        // stream-owner filtering; SDK measureViewTree mirrors this order.
+        for (const key of ["agents", "events"] as const) {
+          const items = Array.isArray(record[key]) ? record[key] : [];
+          for (let i = 0; i < Math.min(items.length, VIEW_LIMITS.maxOptionItems); i += 1) {
+            nodeCount += 1;
+            if (nodeCount > VIEW_LIMITS.maxNodes) {
+              overflow = "nodes";
+              return null;
+            }
+          }
+        }
+        return sanitizeAgentWorkspace(record, truncateString);
+      }
       case "table": {
         if (typeof record.id !== "string") {
           return { type: "unknown", originalType: "table" };
@@ -568,7 +600,9 @@ export function sanitizeTree(raw: unknown): { root: ViewNode } | { error: string
     }
     return { error: `视图树深度超过上限 ${VIEW_LIMITS.maxDepth}` };
   }
-  return { root };
+  // Do this after budget accounting so duplicate controls cannot hide entries
+  // from the limit or make SDK preflight disagree with the Host.
+  return { root: deduplicateControlIds(root, new Set()) };
 }
 
 // ---------------------------------------------------------------------------

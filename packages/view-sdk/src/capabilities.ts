@@ -68,6 +68,14 @@ export function supportsReadonlyList(client: DesktopViewClient | null | undefine
 }
 
 /**
+ * Agent graphs with a selected Agent event stream (docs/design/149).
+ * Older Hosts render this node as unknown; use a basic-node or TUI fallback.
+ */
+export function supportsAgentWorkspace(client: DesktopViewClient | null | undefined): boolean {
+  return supportsCapability(client, "view-agent-workspace");
+}
+
+/**
  * The Host renders panel contributions as launcher features + closable tabs
  * (docs/design/66).
  *
