@@ -77,6 +77,12 @@
   margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-xs));
 }
 
+/* 助手回复后紧接子任务通知时，压掉条目大间距，只留紧凑通知间距。 */
+.entry[data-kind="assistant"]
++ .entry[data-kind="custom"]:has(> [data-custom-type="subagent-notification"]) {
+  margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-xs));
+}
+
 /* 独立子任务通知与同一条通知内的任务都沿用文档流的紧排间距。 */
 .entry[data-kind="custom"]:has(> [data-custom-type="subagent-notification"])
 + .entry[data-kind="custom"]:has(> [data-custom-type="subagent-notification"]) {
