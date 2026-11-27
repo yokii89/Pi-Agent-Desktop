@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { WindowCloseDecision, WindowCloseRequest } from "../../../shared/windowClose";
+import type { WindowClosePromptRequest, WindowCloseRequest } from "../../../shared/windowClose";
 import { useGlidePill } from "../../hooks/useGlidePill";
 import { useT } from "../../hooks/useT";
 import { browserService } from "../../services/browserService";
@@ -16,6 +16,7 @@ import { windowService } from "../../services/windowService";
 import { PiMark } from "../Splash/PiMark";
 import { Modal } from "../ui/Modal";
 import styles from "./CloseRequestDialog.module.css";
+import { QuitProcDialog } from "./QuitProcDialog";
 
 type Action = "tray" | "quit";
 
@@ -25,7 +26,7 @@ function CloseRequestDialog({
   open,
   onSettled,
 }: {
-  request: WindowCloseRequest;
+  request: WindowClosePromptRequest;
   open: boolean;
   onSettled: (id: number) => void;
 }) {
@@ -56,13 +57,14 @@ function CloseRequestDialog({
     };
   }, [open, request.id]);
 
-  const decide = async (action: WindowCloseDecision["action"]): Promise<void> => {
+  const decide = async (action: "cancel" | "tray" | "quit"): Promise<void> => {
     if (!open || submitting.current) return;
     submitting.current = true;
     setBusy(true);
     setError(null);
     try {
       await windowService.closeDecision({
+        kind: "window",
         id: request.id,
         action,
         remember: action !== "cancel" && remember,
@@ -242,6 +244,10 @@ export function CloseRequestDialogHost() {
     };
   }, [settle]);
   return request ? (
-    <CloseRequestDialog key={request.id} request={request} open={open} onSettled={settle} />
+    request.kind === "process-quit" ? (
+      <QuitProcDialog key={request.id} request={request} open={open} onSettled={settle} />
+    ) : (
+      <CloseRequestDialog key={request.id} request={request} open={open} onSettled={settle} />
+    )
   ) : null;
 }

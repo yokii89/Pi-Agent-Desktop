@@ -8,17 +8,24 @@ import { getSettings, updateSettings } from "../settings/settings";
 import { liveTerminalCount } from "../terminal/terminal";
 import { ClosePromptProtocol } from "./closePromptProtocol";
 import { setQuitProcPolicy } from "./quitPolicy";
-import { applyTrayEnabled, ensureTrayForHide, isQuittingApp, markQuitting } from "./tray";
+import {
+  applyTrayEnabled,
+  cancelQuitting,
+  ensureTrayForHide,
+  isQuittingApp,
+  markQuitting,
+} from "./tray";
 
 const prompts = new WeakMap<BrowserWindow, ClosePromptProtocol>();
+let processQuitPrompt: (() => boolean) | null = null;
 
-function quit(): void {
-  setQuitProcPolicy("kill");
+function quit(policy: "kill" | "keep" = "kill"): void {
+  setQuitProcPolicy(policy);
   markQuitting();
   app.quit();
 }
 
-/** 只对主窗口接管用户关窗；应用主动退出仍走原退出链路。 */
+/** 只对主窗口接管用户关窗；应用主动退出仍由 before-quit 流程处理。 */
 export function attachClosePrompt(win: BrowserWindow): void {
   const send = (channel: string, payload: unknown): void => {
     if (!win.isDestroyed() && !win.webContents.isDestroyed())
@@ -39,18 +46,41 @@ export function attachClosePrompt(win: BrowserWindow): void {
     quit();
   };
   const protocol = new ClosePromptProtocol({
-    request: (id) => {
-      const snapshot: WindowCloseRequest = {
-        id,
-        sessions: listLiveSessions().length,
-        terminals: liveTerminalCount(),
-        procs: procService.listAllAlive().length,
-        trayAvailable: ensureTrayForHide(),
-      };
+    request: (id, kind) => {
+      let snapshot: WindowCloseRequest;
+      if (kind === "process-quit") {
+        const alive = procService.listAllAlive();
+        snapshot = {
+          id,
+          kind,
+          procs: alive.length,
+          commands: alive
+            .slice(0, 5)
+            .map((proc) => ({ pid: proc.pid, command: proc.commandLine || proc.name })),
+        };
+      } else {
+        snapshot = {
+          id,
+          kind,
+          sessions: listLiveSessions().length,
+          terminals: liveTerminalCount(),
+          procs: procService.listAllAlive().length,
+          trayAvailable: ensureTrayForHide(),
+        };
+      }
       send(WINDOW_IPC.closeRequest, snapshot);
     },
     settled: (id) => send(WINDOW_IPC.closeSettled, id),
-    execute: (action, remember) => {
+    execute: (decision) => {
+      if (decision.kind === "process-quit") {
+        if (decision.action === "cancel") {
+          cancelQuitting();
+          return;
+        }
+        quit(decision.action);
+        return;
+      }
+      const { action, remember } = decision;
       if (action === "cancel") {
         applyTrayEnabled(getSettings().showInTray);
       } else if (action === "tray") {
@@ -60,9 +90,24 @@ export function attachClosePrompt(win: BrowserWindow): void {
         quit();
       }
     },
-    fallback,
+    fallback: (kind) => {
+      if (kind === "process-quit") {
+        quit();
+        return;
+      }
+      fallback();
+    },
   });
   prompts.set(win, protocol);
+  const requestProcessQuit = (): boolean => {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) return false;
+    // 托盘菜单可在主窗口隐藏时触发退出；自绘询问必须先回到可见窗口。
+    if (!win.isVisible()) win.show();
+    win.focus();
+    protocol.request("process-quit");
+    return true;
+  };
+  processQuitPrompt = requestProcessQuit;
   win.on("close", (event) => {
     if (isQuittingApp()) return;
     event.preventDefault();
@@ -87,7 +132,13 @@ export function attachClosePrompt(win: BrowserWindow): void {
   win.once("closed", () => {
     protocol.dispose();
     prompts.delete(win);
+    if (processQuitPrompt === requestProcessQuit) processQuitPrompt = null;
   });
+}
+
+/** 应用退出时接管原生后台进程确认，改由主窗口的自绘界面作答。 */
+export function requestProcessQuitPrompt(): boolean {
+  return processQuitPrompt?.() ?? false;
 }
 
 /** 主窗口的显示回执；其他窗口不能确认本窗口的关闭询问。 */

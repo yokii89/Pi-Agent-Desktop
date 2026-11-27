@@ -6,8 +6,9 @@ export function isCloseAction(value: unknown): value is CloseAction {
   return value === "ask" || value === "tray" || value === "quit";
 }
 
-/** 一次关闭询问的主进程快照；id 隔离超时后到达的旧应答。 */
-export interface WindowCloseRequest {
+/** 主窗口常规关窗时的询问快照。 */
+export interface WindowClosePromptRequest {
+  kind: "window";
   id: number;
   sessions: number;
   terminals: number;
@@ -15,9 +16,18 @@ export interface WindowCloseRequest {
   trayAvailable: boolean;
 }
 
-/** ready 只确认弹窗已挂载，用户作答没有时间限制。 */
-export interface WindowCloseDecision {
+/** 应用退出时处理仍运行后台进程的快照。 */
+export interface ProcessQuitRequest {
+  kind: "process-quit";
   id: number;
-  action: "cancel" | "tray" | "quit";
-  remember: boolean;
+  procs: number;
+  commands: Array<{ pid: number; command: string }>;
 }
+
+/** 所有关窗与退出流程共用的主进程推送。 */
+export type WindowCloseRequest = WindowClosePromptRequest | ProcessQuitRequest;
+
+/** 关闭窗口或应用退出时用户的一次选择。 */
+export type WindowCloseDecision =
+  | { kind: "window"; id: number; action: "cancel" | "tray" | "quit"; remember: boolean }
+  | { kind: "process-quit"; id: number; action: "cancel" | "kill" | "keep" };

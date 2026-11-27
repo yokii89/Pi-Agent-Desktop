@@ -6,7 +6,7 @@ export function getQuitProcPolicy(): "kill" | "keep" | null {
   return policy;
 }
 
-/** 关闭询问已解释进程处置代价时，跳过第二次原生确认。 */
+/** 退出询问已包含进程处置选择时，跳过重复确认。 */
 export function setQuitProcPolicy(next: "kill" | "keep"): void {
   policy = next;
 }

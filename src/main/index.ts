@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, dialog, shell } from "electron";
-import { t } from "../shared/i18n";
+import { app, BrowserWindow, shell } from "electron";
 import { browserWindowOpenResponse, isBrowserContents } from "./browser/browserPolicy";
 import { registerBrowserLifecycle } from "./browser/browserView";
 import { disposeExtensionWorker } from "./extension/extensionWorkerManager";
@@ -26,10 +25,11 @@ import { registerTerminalLifecycle } from "./terminal/terminal";
 import { disposeUpdater, scheduleStartupCheck } from "./updater/updaterService";
 import { disposeViewHost, ensureViewHost } from "./view/viewHost";
 import { registerWallpaperProtocol } from "./wallpaper/wallpaperProtocol";
-import { createMainWindow, getMainWindow } from "./window/createMainWindow";
+import { requestProcessQuitPrompt } from "./window/closePrompt";
+import { createMainWindow } from "./window/createMainWindow";
 import { disposeInspectorWindow } from "./window/inspectorWindow";
 import { getQuitProcPolicy, setQuitProcPolicy } from "./window/quitPolicy";
-import { cancelQuitting, disposeTray, initTrayFromSettings, markQuitting } from "./window/tray";
+import { disposeTray, initTrayFromSettings, markQuitting } from "./window/tray";
 
 if (!registerToastActivation()) app.exit(0);
 
@@ -142,30 +142,12 @@ app.on("before-quit", (event) => {
     return;
   }
   event.preventDefault();
-  const names = alive
-    .slice(0, 5)
-    .map((p) => `· ${p.commandLine || p.name}`)
-    .join("\n");
-  const more = alive.length > 5 ? `\n${t("proc.quit.more", { count: alive.length })}` : "";
-  const parent = getMainWindow();
-  const options = {
-    type: "warning" as const,
-    buttons: [t("proc.quit.kill"), t("proc.quit.keep"), t("proc.quit.cancel")],
-    defaultId: 0,
-    cancelId: 2,
-    title: t("proc.quit.title"),
-    message: t("proc.quit.message", { count: alive.length }),
-    detail: `${names}${more}`,
-  };
-  const result = parent
-    ? dialog.showMessageBoxSync(parent, options)
-    : dialog.showMessageBoxSync(options);
-  if (result === 2) {
-    cancelQuitting();
-    return;
+  if (!requestProcessQuitPrompt()) {
+    // 没有可接管询问的主窗口时保留既有的默认退出策略，不创建原生对话框。
+    setQuitProcPolicy("kill");
+    markQuitting();
+    app.quit();
   }
-  setQuitProcPolicy(result === 0 ? "kill" : "keep");
-  app.quit();
 });
 
 app.on("will-quit", () => {
