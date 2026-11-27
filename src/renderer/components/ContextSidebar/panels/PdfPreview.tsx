@@ -1,8 +1,7 @@
 import { CaretLeft, CaretRight, Copy } from "@phosphor-icons/react";
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask, TextLayer } from "pdfjs-dist";
-import { type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FsReadPdfResult } from "../../../../shared/ipc";
-import type { PreviewFindState } from "../../../hooks/usePreviewFind";
 import { useT } from "../../../hooks/useT";
 import { useUiStore } from "../../../stores/uiStore";
 import { copyTextToClipboard } from "../../../utils/clipboard";
@@ -11,17 +10,10 @@ import { getPdfResourceOptions } from "../../../utils/pdfResources";
 import { previewPageStep } from "../../../utils/previewPageKeys";
 import panelStyles from "./FilePanel.module.css";
 import styles from "./PdfPreview.module.css";
-import { PreviewFindBar } from "./PreviewFindBar";
-import { SearchPopover, type SearchPopoverHandle } from "./SearchPopover";
 
 interface PdfPreviewProps {
   result: FsReadPdfResult;
-  find: PreviewFindState;
-  ref?: Ref<PdfPreviewHandle>;
-}
-
-export interface PdfPreviewHandle {
-  openSearch(): void;
+  onCloseSearch: () => void;
 }
 
 /** 单页文本项（含字形定位的那一支；标记内容项会被过滤掉）。 */
@@ -62,7 +54,7 @@ function pageText(items: readonly PdfTextItem[]): string {
  * PDF 只读预览：按页把页面画进 canvas，再叠一层透明文本层（pdfjs TextLayer）
  * ——没有文本层就只能看不能选，也复制不出任何内容。
  */
-export function PdfPreview({ result, find, ref }: PdfPreviewProps) {
+export function PdfPreview({ result, onCloseSearch }: PdfPreviewProps) {
   const t = useT();
   const { showToast } = useUiStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -73,12 +65,9 @@ export function PdfPreview({ result, find, ref }: PdfPreviewProps) {
   const [page, setPage] = useState(1);
   const [availableWidth, setAvailableWidth] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const searchRef = useRef<SearchPopoverHandle>(null);
-  useImperativeHandle(ref, () => ({ openSearch: () => searchRef.current?.openSearch() }), []);
-
   useEffect(() => {
-    if (error) find.close();
-  }, [error, find.close]);
+    if (error) onCloseSearch();
+  }, [error, onCloseSearch]);
 
   useEffect(() => {
     const element = canvasWrapRef.current;
@@ -250,24 +239,6 @@ export function PdfPreview({ result, find, ref }: PdfPreviewProps) {
             </button>
           </>
         )}
-        <SearchPopover
-          ref={searchRef}
-          title={t("panels.files.office.searchTitle")}
-          onOpenChange={(open) => (open ? find.openFind() : find.close())}
-        >
-          {(close, focusTick) => (
-            <PreviewFindBar
-              query={find.query}
-              count={find.count}
-              current={find.current}
-              focusTick={focusTick}
-              floating
-              onQuery={find.setQuery}
-              onStep={find.step}
-              onClose={close}
-            />
-          )}
-        </SearchPopover>
       </div>
       <div className={styles.canvasWrap} ref={canvasWrapRef}>
         {documentState ? (

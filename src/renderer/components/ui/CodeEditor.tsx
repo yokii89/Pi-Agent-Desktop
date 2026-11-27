@@ -3,9 +3,13 @@ import type {
   CodeEditorHandle,
   CodeEditorMountHandle,
   CodeScrollAnchor,
+  CodeSearchQuery,
+  CodeSearchResult,
 } from "../../editor/codeEditorTypes";
 import { useResolvedTheme } from "../../hooks/useResolvedTheme";
 import styles from "./CodeEditor.module.css";
+
+const EMPTY_SEARCH_RESULT: CodeSearchResult = { count: 0, current: 0, valid: false };
 
 interface CodeEditorProps {
   /** 文档身份（路径）：只用于推断语法高亮语言。 */
@@ -26,6 +30,7 @@ interface CodeEditorProps {
   ariaLabel: string;
   onDirtyChange: (dirty: boolean) => void;
   onSave: () => void;
+  onFind: () => void;
 }
 
 /**
@@ -46,11 +51,14 @@ export function CodeEditor({
   ariaLabel,
   onDirtyChange,
   onSave,
+  onFind,
   ref,
 }: CodeEditorProps & { ref?: Ref<CodeEditorHandle> }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<CodeEditorMountHandle | null>(null);
   const selectionListeners = useRef(new Set<() => void>());
+  const searchListeners = useRef(new Set<() => void>());
+  const searchQueryRef = useRef<CodeSearchQuery | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
   const theme = useResolvedTheme();
   const themeRef = useRef(theme);
@@ -66,6 +74,7 @@ export function CodeEditor({
     ariaLabel,
     onDirtyChange,
     onSave,
+    onFind,
   });
   mountRef.current = {
     doc,
@@ -76,6 +85,7 @@ export function CodeEditor({
     ariaLabel,
     onDirtyChange,
     onSave,
+    onFind,
   };
 
   // 生命周期只与挂载相关：换文件由 key 重建，主题 / 基线走下面的独立同步效果
@@ -102,8 +112,14 @@ export function CodeEditor({
           onSelectionChange: () => {
             for (const listener of selectionListeners.current) listener();
           },
+          onFind: () => mountRef.current.onFind(),
+          onSearchChange: () => {
+            for (const listener of searchListeners.current) listener();
+          },
         });
+        if (searchQueryRef.current) handleRef.current.setSearchQuery(searchQueryRef.current);
         setStatus("ready");
+        for (const listener of searchListeners.current) listener();
       })
       .catch(() => {
         if (!cancelled) setStatus("failed");
@@ -142,7 +158,25 @@ export function CodeEditor({
       },
       selectAll: () => handleRef.current?.selectAll(),
       clearSelection: () => handleRef.current?.clearSelection(),
-      openFind: () => handleRef.current?.openFind(),
+      openFind: () => mountRef.current.onFind(),
+      getSearchResult: () => handleRef.current?.getSearchResult() ?? EMPTY_SEARCH_RESULT,
+      subscribeSearch: (listener) => {
+        searchListeners.current.add(listener);
+        return () => {
+          searchListeners.current.delete(listener);
+        };
+      },
+      setSearchQuery: (query) => {
+        searchQueryRef.current = query;
+        handleRef.current?.setSearchQuery(query);
+      },
+      stepSearch: (delta) => handleRef.current?.stepSearch(delta),
+      replaceSearch: (all) => handleRef.current?.replaceSearch(all),
+      selectSearchMatches: () => handleRef.current?.selectSearchMatches(),
+      closeFind: () => {
+        searchQueryRef.current = null;
+        handleRef.current?.closeFind();
+      },
       resetDocument: (text) => handleRef.current?.resetDocument(text),
       isDirty: () => handleRef.current?.isDirty() ?? false,
       recomputeDirty: () => handleRef.current?.recomputeDirty(),

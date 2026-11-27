@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { OfficePreview } from "../../../src/renderer/components/ContextSidebar/panels/office/OfficePreview";
+import { OfficeSearchPanel } from "../../../src/renderer/components/ContextSidebar/panels/office/OfficeSearchPanel";
 import { PreviewFindBar } from "../../../src/renderer/components/ContextSidebar/panels/PreviewFindBar";
+import {
+  SearchPopover,
+  type SearchPopoverHandle,
+} from "../../../src/renderer/components/ContextSidebar/panels/SearchPopover";
 import { SelectionToolbar } from "../../../src/renderer/components/SessionArea/SelectionToolbar";
+import { useOfficeSearchProvider } from "../../../src/renderer/hooks/useOfficeSearchProvider";
 import { usePreviewFind } from "../../../src/renderer/hooks/usePreviewFind";
-import type { OfficePreviewHandle } from "../../../src/renderer/office/officeSearchTypes";
-import { UiProvider } from "../../../src/renderer/stores/uiStore";
+import { useT } from "../../../src/renderer/hooks/useT";
+import { UiProvider, useUiStore } from "../../../src/renderer/stores/uiStore";
 import { officeSelectionSource } from "../../../src/renderer/utils/officeSelection";
 import { setI18nLocale } from "../../../src/shared/i18n";
 import type { FsReadOfficeResult } from "../../../src/shared/ipc";
@@ -36,6 +42,9 @@ const paint = () =>
   );
 
 function App() {
+  const t = useT();
+  const { dispatch } = useUiStore();
+  useEffect(() => dispatch({ type: "setLocalePreference", preference: "zh-CN" }), [dispatch]);
   const [current, setCurrent] = useState<{
     id: number;
     name: string;
@@ -43,7 +52,10 @@ function App() {
   } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const selection = useMemo(() => officeSelectionSource(ref), []);
-  const officeRef = useRef<OfficePreviewHandle>(null);
+  const officeRef = useRef<SearchPopoverHandle>(null);
+  const [searchProvider, setSearchProvider] = useOfficeSearchProvider();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const closeSearch = useCallback(() => officeRef.current?.closeSearch(), []);
   const find = usePreviewFind(ref, String(current?.id));
   useEffect(() => {
     Object.assign(window, {
@@ -55,10 +67,12 @@ function App() {
           sampleStart = performance.now();
           const result = await window.officeBenchmark.read(name);
           readMs = performance.now() - sampleStart;
+          setSearchOpen(false);
           setCurrent({ id: ++sequence, name, result });
         },
         async close() {
           setCurrent(null);
+          setSearchOpen(false);
           find.close();
           await paint();
           sampleStart = 0;
@@ -73,7 +87,7 @@ function App() {
           officeRef.current?.openSearch();
           await paint();
           const input = document.querySelector<HTMLInputElement>(
-            'input[aria-label="搜索文档（Ctrl+F）"]',
+            'input[aria-label="在文件中查找（Enter 下一个）"]',
           );
           if (!input) throw new Error("Office search input is not mounted");
           const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
@@ -181,16 +195,30 @@ function App() {
         color: "var(--color-text)",
       }}
     >
+      {current && (
+        <SearchPopover
+          key={current.id}
+          ref={officeRef}
+          title={t("panels.files.findTitle")}
+          onOpenChange={setSearchOpen}
+        >
+          {(close, focusTick) => (
+            <OfficeSearchPanel provider={searchProvider} focusTick={focusTick} onClose={close} />
+          )}
+        </SearchPopover>
+      )}
       {find.open && (
         <PreviewFindBar {...find} onQuery={find.setQuery} onStep={find.step} onClose={find.close} />
       )}
       <div ref={ref} style={{ overflow: "auto", minHeight: 0, padding: 8 }}>
         {current && (
           <OfficePreview
-            ref={officeRef}
             key={current.id}
             result={current.result}
             onOpenInSystem={() => {}}
+            onSearchProvider={setSearchProvider}
+            searchOpen={searchOpen}
+            onCloseSearch={closeSearch}
           />
         )}
       </div>

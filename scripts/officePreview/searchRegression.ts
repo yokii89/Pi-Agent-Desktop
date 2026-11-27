@@ -53,7 +53,9 @@ export async function checkOfficeSearch(): Promise<void> {
     await evaluate(
       `${doc}.dispatchEvent(new KeyboardEvent('keydown',{key:'f',ctrlKey:true,bubbles:true,cancelable:true}))`,
     );
-    await wait("document.activeElement?.getAttribute('aria-label')==='搜索文档（Ctrl+F）'");
+    await wait(
+      "document.activeElement?.getAttribute('aria-label')==='在文件中查找（Enter 下一个）'",
+    );
     checks.push("iframe 内 Ctrl+F 打开并聚焦全文搜索");
     await search("Target-预算-2026");
     await check(
@@ -126,7 +128,7 @@ export async function checkOfficeSearch(): Promise<void> {
       "window.benchmarkQuote.includes('deck-long.pptx')&&window.benchmarkQuote.includes('幻灯片 117')&&window.benchmarkQuote.includes('PERFORMANCE-117')",
     );
     await evaluate(
-      "document.querySelector('input[aria-label=\"搜索文档（Ctrl+F）\"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',shiftKey:true,bubbles:true,cancelable:true}))",
+      "document.querySelector('input[aria-label=\"在文件中查找（Enter 下一个）\"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',shiftKey:true,bubbles:true,cancelable:true}))",
     );
     await wait(`${results}[43].getAttribute('aria-current')==='true'`);
     checks.push("Shift+Enter 循环到上一个结果");

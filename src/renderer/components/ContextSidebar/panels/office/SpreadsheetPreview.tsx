@@ -1,5 +1,5 @@
 import { Copy } from "@phosphor-icons/react";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   OFFICE_PARSE_TIMEOUT_MS,
   OFFICE_SEARCH_MAX_RESULTS,
@@ -40,13 +40,11 @@ export function SpreadsheetPreview({
   onFailure,
   onSearchProvider,
   searchOpen,
-  searchControl,
 }: {
   data: Uint8Array;
   onFailure: (issue: OfficePreviewIssue) => void;
   onSearchProvider: (provider: OfficeSearchProvider | null) => void;
   searchOpen: boolean;
-  searchControl: ReactNode;
 }) {
   const t = useT();
   const { showToast } = useUiStore();
@@ -213,7 +211,6 @@ export function SpreadsheetPreview({
           />
         )}
         <div className={styles.sheetActions}>
-          {searchControl}
           <IconButton
             title={t("panels.files.office.copyCells")}
             disabled={!sheet?.rows.length}

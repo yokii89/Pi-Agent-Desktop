@@ -1,44 +1,34 @@
 import { ArrowSquareOut } from "@phosphor-icons/react";
-import { type Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { FsReadOfficeResult } from "../../../../../shared/ipc";
 import { OFFICE_MAX_BYTES, type OfficePreviewIssue } from "../../../../../shared/officePreview";
 import { useT } from "../../../../hooks/useT";
-import type {
-  OfficePreviewHandle,
-  OfficeSearchProvider,
-} from "../../../../office/officeSearchTypes";
+import type { OfficeSearchProvider } from "../../../../office/officeSearchTypes";
 import panelStyles from "../FilePanel.module.css";
 import { OfficeDocumentPreview } from "./OfficeDocumentPreview";
 import styles from "./OfficePreview.module.css";
-import { OfficeSearchPopover, type OfficeSearchPopoverHandle } from "./OfficeSearchPopover";
 import { SpreadsheetPreview } from "./SpreadsheetPreview";
 
 /** Read-only Office surface. Key it by the read result so reloads discard stale pages and failures. */
 export function OfficePreview({
   result,
   onOpenInSystem,
-  ref,
+  onSearchProvider,
+  searchOpen,
+  onCloseSearch,
 }: {
   result: FsReadOfficeResult;
   onOpenInSystem: () => void;
-  ref?: Ref<OfficePreviewHandle>;
+  onSearchProvider: (provider: OfficeSearchProvider | null) => void;
+  searchOpen: boolean;
+  onCloseSearch: () => void;
 }) {
   const t = useT();
   const [failure, setFailure] = useState<OfficePreviewIssue | null>(null);
-  const [provider, setProvider] = useState<OfficeSearchProvider | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const searchRef = useRef<OfficeSearchPopoverHandle>(null);
-  const openSearch = useCallback(() => {
-    searchRef.current?.openSearch();
-  }, []);
-  const closeSearch = useCallback(() => {
-    searchRef.current?.closeSearch();
-  }, []);
-  useImperativeHandle(ref, () => ({ openSearch }), [openSearch]);
   const issue = result.status === "unavailable" ? result.reason : failure;
   useEffect(() => {
-    if (issue) setSearchOpen(false);
-  }, [issue]);
+    if (issue) onCloseSearch();
+  }, [issue, onCloseSearch]);
   if (issue || result.status !== "ready") {
     return (
       <div className={panelStyles.binaryWrap} data-selectable-text="">
@@ -61,7 +51,7 @@ export function OfficePreview({
         if (event.key === "Escape" && searchOpen) {
           event.preventDefault();
           event.stopPropagation();
-          closeSearch();
+          onCloseSearch();
         }
       }}
     >
@@ -69,25 +59,19 @@ export function OfficePreview({
         <SpreadsheetPreview
           data={result.data}
           onFailure={setFailure}
-          onSearchProvider={setProvider}
+          onSearchProvider={onSearchProvider}
           searchOpen={searchOpen}
-          searchControl={
-            <OfficeSearchPopover ref={searchRef} provider={provider} onOpenChange={setSearchOpen} />
-          }
         />
       ) : (
         <>
-          <div className={styles.searchAction}>
-            <OfficeSearchPopover ref={searchRef} provider={provider} onOpenChange={setSearchOpen} />
-          </div>
           <p className={styles.note}>{t("panels.files.office.layoutNote")}</p>
           <OfficeDocumentPreview
             data={result.data}
             format={result.format}
             onFailure={setFailure}
-            onSearchProvider={setProvider}
+            onSearchProvider={onSearchProvider}
             searchOpen={searchOpen}
-            onCloseSearch={closeSearch}
+            onCloseSearch={onCloseSearch}
           />
         </>
       )}

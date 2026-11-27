@@ -12,15 +12,7 @@ import {
   SquareSplitHorizontal,
   X,
 } from "@phosphor-icons/react";
-import {
-  type Ref,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   isHtmlPath,
   isMarkdownPath,
@@ -32,9 +24,10 @@ import type { TranslateFn } from "../../../../shared/i18n";
 import type { FsPreviewResult, FsSearchHit } from "../../../../shared/ipc";
 import { applyLineEnding, toSavedContent } from "../../../../shared/lineEndings";
 import type { CodeEditorHandle, CodeScrollAnchor } from "../../../editor/codeEditorTypes";
-import { type PreviewFindState, usePreviewFind } from "../../../hooks/usePreviewFind";
+import { useOfficeSearchProvider } from "../../../hooks/useOfficeSearchProvider";
+import { usePreviewFind } from "../../../hooks/usePreviewFind";
 import { useT } from "../../../hooks/useT";
-import type { OfficePreviewHandle } from "../../../office/officeSearchTypes";
+import type { OfficeSearchProvider } from "../../../office/officeSearchTypes";
 import { fsService } from "../../../services/fsService";
 import { useBrowserStore } from "../../../stores/browserStore";
 import { composerDraftKey } from "../../../stores/composerDrafts";
@@ -85,8 +78,11 @@ import { MarkdownPreview, type MarkdownViewMode } from "./MarkdownPreview";
 import { MediaPreview } from "./MediaPreview";
 import { NotebookPreview } from "./NotebookPreview";
 import { OfficePreview } from "./office/OfficePreview";
-import { PdfPreview, type PdfPreviewHandle } from "./PdfPreview";
+import { OfficeSearchPanel } from "./office/OfficeSearchPanel";
+import { PdfPreview } from "./PdfPreview";
 import { PreviewFindBar } from "./PreviewFindBar";
+import { SearchPopover, type SearchPopoverHandle } from "./SearchPopover";
+import { SourceSearchPanel } from "./SourceSearchPanel";
 
 interface PreviewState {
   /** 所属项目根目录：项目切换后旧预览/搜索结果直接失效，避免误展示。 */
@@ -237,9 +233,9 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     activePreview.result.format !== "spreadsheet";
   const officeReady =
     activePreview?.result.kind === "office" && activePreview.result.status === "ready";
-  const pdfPreview = activePreview?.result.kind === "pdf";
-  const officeRef = useRef<OfficePreviewHandle>(null);
-  const pdfRef = useRef<PdfPreviewHandle>(null);
+  const [officeSearchProvider, setOfficeSearchProvider] = useOfficeSearchProvider();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const fileFindRef = useRef<SearchPopoverHandle>(null);
   const officeSelection = useMemo(() => officeSelectionSource(panelBodyRef), []);
   const sourceSelection = useMemo<TextSelectionSource>(
     () => ({
@@ -249,36 +245,44 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     }),
     [],
   );
-  /** 内容身份：换文件 / md 预览与源码切换时查找条自行收起并重算。 */
-  const findContentKey =
-    !sourcePreview &&
-    !officeReady &&
-    preview &&
-    preview.result.kind !== "media" &&
-    preview.root === rootKey
-      ? `${preview.path}:${mdViewMode}:${mermaidViewMode}`
-      : null;
-  const find = usePreviewFind(panelBodyRef, findContentKey);
+  /** A single header control owns search visibility for every searchable file surface. */
+  const searchablePreview =
+    activePreview !== null &&
+    (activePreview.result.kind === "text" || activePreview.result.kind === "pdf" || officeReady);
+  const searchContentKey = activePreview
+    ? `${activePreview.root}:${activePreview.path}:${sourcePreview ? "source" : "preview"}#${editorReloadTick}`
+    : null;
+  const documentSearch = searchablePreview && !sourcePreview && !officeReady;
+  const find = usePreviewFind(panelBodyRef, documentSearch ? searchContentKey : null);
+  const openFind = useCallback(() => fileFindRef.current?.openSearch(), []);
+  const closeFind = useCallback(() => fileFindRef.current?.closeSearch(), []);
+  const handleSearchOpenChange = useCallback(
+    (open: boolean): void => {
+      setSearchOpen(open);
+      if (documentSearch && open) find.openFind();
+      else find.close();
+    },
+    [documentSearch, find.openFind, find.close],
+  );
 
-  // Ctrl+F 在预览内容里查找（渲染层没有浏览器级查找条，不抢就没人接这个键）
-  const openFind = find.openFind;
-  const hasActivePreview =
-    preview !== null && preview.root === rootKey && preview.result.kind !== "media";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Content identity and visibility reset the shared search lifecycle.
   useEffect(() => {
-    if (!active || !hasActivePreview) return;
+    setSearchOpen(false);
+    find.close();
+  }, [active, searchContentKey, find.close]);
+
+  useEffect(() => {
+    if (!active || !searchablePreview) return;
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.defaultPrevented) return;
-      if (!event.ctrlKey || event.altKey || event.metaKey) return;
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
       if (event.key.toLowerCase() !== "f") return;
       event.preventDefault();
-      if (sourcePreview) editorRef.current?.openFind();
-      else if (officeReady) officeRef.current?.openSearch();
-      else if (pdfPreview) pdfRef.current?.openSearch();
-      else openFind();
+      openFind();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [active, hasActivePreview, openFind, sourcePreview, officeReady, pdfPreview]);
+  }, [active, searchablePreview, openFind]);
 
   // Ctrl+P 打开/重复触发时聚焦搜索框（fileSearchTick 每次触发都递增）
   useEffect(() => {
@@ -1140,19 +1144,44 @@ export function FilePanel({ active = true }: { active?: boolean }) {
                 </IconButton>
               </>
             )}
+            {active && searchablePreview && (
+              <SearchPopover
+                key={searchContentKey}
+                ref={fileFindRef}
+                title={t("panels.files.findTitle")}
+                onOpenChange={handleSearchOpenChange}
+              >
+                {(close, focusTick) =>
+                  sourcePreview ? (
+                    <SourceSearchPanel
+                      editorRef={editorRef}
+                      readOnly={!editing}
+                      focusTick={focusTick}
+                      onClose={close}
+                    />
+                  ) : officeReady ? (
+                    <OfficeSearchPanel
+                      provider={officeSearchProvider}
+                      focusTick={focusTick}
+                      onClose={close}
+                    />
+                  ) : (
+                    <PreviewFindBar
+                      query={find.query}
+                      count={find.count}
+                      current={find.current}
+                      focusTick={focusTick}
+                      onQuery={find.setQuery}
+                      onStep={find.step}
+                      onClose={close}
+                    />
+                  )
+                }
+              </SearchPopover>
+            )}
             {!openBesideTree && layoutToggle}
           </div>
         ) : null}
-        {activePreview && find.open && !sourcePreview && activePreview.result.kind !== "pdf" && (
-          <PreviewFindBar
-            query={find.query}
-            count={find.count}
-            current={find.current}
-            onQuery={find.setQuery}
-            onStep={find.step}
-            onClose={find.close}
-          />
-        )}
         {/* biome-ignore lint/a11y/noStaticElementInteractions: 预览是只读阅读面，右键只用来开复制菜单/抑制浏览器默认菜单，不伪装成交互 role */}
         <div
           className={[styles.panelBody, sourcePreview ? panelStyles.panelBodySource : ""]
@@ -1184,6 +1213,7 @@ export function FilePanel({ active = true }: { active?: boolean }) {
                 ariaLabel={t("panels.files.editorAria", { path: activePreview.path })}
                 onDirtyChange={setDirty}
                 onSave={() => void saveDraftRef.current()}
+                onFind={openFind}
               />
             </>
           ) : activePreview ? (
@@ -1191,9 +1221,9 @@ export function FilePanel({ active = true }: { active?: boolean }) {
               key={`${activePreview.root}:${activePreview.path}#${editorReloadTick}`}
               active={active}
               preview={activePreview}
-              officeRef={officeRef}
-              pdfRef={pdfRef}
-              find={find}
+              onOfficeSearchProvider={setOfficeSearchProvider}
+              searchOpen={searchOpen}
+              onCloseSearch={closeFind}
               onImageSize={setImageSize}
               onOpenInSystem={() => openInSystem(activePreview.path)}
               onShowMermaidSource={() => setMermaidViewMode("source")}
@@ -1287,16 +1317,16 @@ function FilePreviewBody({
   preview,
   onImageSize,
   onOpenInSystem,
-  officeRef,
-  pdfRef,
-  find,
+  onOfficeSearchProvider,
+  searchOpen,
+  onCloseSearch,
   onShowMermaidSource,
 }: {
   active: boolean;
   preview: PreviewState;
-  officeRef: Ref<OfficePreviewHandle>;
-  pdfRef: Ref<PdfPreviewHandle>;
-  find: PreviewFindState;
+  onOfficeSearchProvider: (provider: OfficeSearchProvider | null) => void;
+  searchOpen: boolean;
+  onCloseSearch: () => void;
   onImageSize: (size: string | null) => void;
   onOpenInSystem: () => void;
   onShowMermaidSource: () => void;
@@ -1330,11 +1360,19 @@ function FilePreviewBody({
   }
 
   if (result.kind === "pdf") {
-    return <PdfPreview ref={pdfRef} result={result} find={find} />;
+    return <PdfPreview result={result} onCloseSearch={onCloseSearch} />;
   }
 
   if (result.kind === "office") {
-    return <OfficePreview ref={officeRef} result={result} onOpenInSystem={onOpenInSystem} />;
+    return (
+      <OfficePreview
+        result={result}
+        onOpenInSystem={onOpenInSystem}
+        onSearchProvider={onOfficeSearchProvider}
+        searchOpen={searchOpen}
+        onCloseSearch={onCloseSearch}
+      />
+    );
   }
 
   if (result.kind === "binary") {

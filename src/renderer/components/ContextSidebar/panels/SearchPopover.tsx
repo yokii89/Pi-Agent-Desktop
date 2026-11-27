@@ -58,6 +58,8 @@ export const SearchPopover = forwardRef<SearchPopoverHandle, SearchPopoverProps>
         rootClassName={styles.root}
         panelClassName={styles.panel}
         onOpenChange={handleOpenChange}
+        closeOnOutsideClick={false}
+        closeOnScroll={false}
         trigger={({ open, onClick, close }) => {
           openRef.current = open;
           closeRef.current = close;

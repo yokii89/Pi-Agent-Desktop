@@ -44,9 +44,6 @@ export interface OfficePageText {
   headingPath: string[];
   headings: { offset: number; path: string[] }[];
 }
-export interface OfficePreviewHandle {
-  openSearch(): void;
-}
 export interface SpreadsheetSearchRequest {
   data: Uint8Array;
   query: string;

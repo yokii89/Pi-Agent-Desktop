@@ -3,8 +3,8 @@
 }
 
 .panel {
-  width: min(360px, calc(100vw - 16px));
-  max-height: calc(100vh - 16px);
+  width: min(var(--file-search-width), calc(100vw - var(--spacing-md)));
+  max-height: calc(100vh - var(--spacing-md));
   padding: 0;
-  overflow: hidden;
+  overflow: auto;
 }

@@ -115,7 +115,6 @@ export function OfficeSearchPanel({
         count={result.hits.length}
         current={result.hits.findIndex((hit) => hit.id === selected) + 1}
         focusTick={focusTick}
-        floating
         busy={state === "running"}
         onQuery={(value) => {
           setScope("preview");

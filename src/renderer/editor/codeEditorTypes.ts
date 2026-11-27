@@ -16,6 +16,21 @@ export interface CodeScrollAnchor {
   offset: number;
 }
 
+/** Shared search controls use these options without loading the CodeMirror implementation. */
+export interface CodeSearchQuery {
+  search: string;
+  replace: string;
+  caseSensitive: boolean;
+  regexp: boolean;
+  wholeWord: boolean;
+}
+
+export interface CodeSearchResult {
+  count: number;
+  current: number;
+  valid: boolean;
+}
+
 /** 父组件持有的编辑器句柄。 */
 export interface CodeEditorHandle {
   /** 当前文档内容（保存时以此为准，父组件不维护受控文本）。 */
@@ -29,6 +44,13 @@ export interface CodeEditorHandle {
   selectAll(): void;
   clearSelection(): void;
   openFind(): void;
+  getSearchResult(): CodeSearchResult;
+  subscribeSearch(listener: () => void): () => void;
+  setSearchQuery(query: CodeSearchQuery): void;
+  stepSearch(delta: number): void;
+  replaceSearch(all: boolean): void;
+  selectSearchMatches(): void;
+  closeFind(): void;
   /** 丢弃草稿时重置文档、基线与撤销历史，保留同一个视图。 */
   resetDocument(text: string): void;
   /** 当前内容是否与基线不同。 */
@@ -63,6 +85,8 @@ export interface CodeEditorMountOptions {
   /** Ctrl+S / Cmd+S。 */
   onSave: () => void;
   onSelectionChange: () => void;
+  onFind: () => void;
+  onSearchChange: () => void;
 }
 
 /** 实现侧句柄：比对外契约多出主题与销毁。 */

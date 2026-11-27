@@ -272,6 +272,22 @@ export const panelMessages = defineMessages({
     "zh-CN": "复制本页文本",
     "en-US": "Copy page text",
   },
+  "panels.files.findTitle": {
+    "zh-CN": "在文件中查找（Ctrl+F）",
+    "en-US": "Find in file (Ctrl+F)",
+  },
+  "panels.files.findSearching": { "zh-CN": "搜索中…", "en-US": "Searching…" },
+  "panels.files.findMatchCase": { "zh-CN": "区分大小写", "en-US": "Match case" },
+  "panels.files.findWholeWord": { "zh-CN": "全字匹配", "en-US": "Whole word" },
+  "panels.files.findRegex": { "zh-CN": "正则表达式", "en-US": "Regular expression" },
+  "panels.files.findSelectAll": { "zh-CN": "全选匹配", "en-US": "Select all matches" },
+  "panels.files.findInvalidRegex": {
+    "zh-CN": "正则表达式无效",
+    "en-US": "Invalid regular expression",
+  },
+  "panels.files.replacePlaceholder": { "zh-CN": "替换为", "en-US": "Replace with" },
+  "panels.files.replaceNext": { "zh-CN": "替换", "en-US": "Replace" },
+  "panels.files.replaceAll": { "zh-CN": "全部替换", "en-US": "Replace all" },
   "panels.files.findPlaceholder": {
     "zh-CN": "在文件中查找（Enter 下一个）",
     "en-US": "Find in file (Enter for next)",

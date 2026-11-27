@@ -12,16 +12,7 @@ import {
   indentOnInput,
   syntaxHighlighting,
 } from "@codemirror/language";
-import {
-  closeSearchPanel,
-  getSearchQuery,
-  highlightSelectionMatches,
-  openSearchPanel,
-  search,
-  searchKeymap,
-  searchPanelOpen,
-  setSearchQuery,
-} from "@codemirror/search";
+import { getSearchQuery, highlightSelectionMatches, setSearchQuery } from "@codemirror/search";
 import { Compartment, EditorSelection, EditorState, Text } from "@codemirror/state";
 import {
   Decoration,
@@ -35,6 +26,7 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
+import { createCodeEditorSearch } from "./codeEditorSearch";
 import type {
   CodeEditorMountHandle,
   CodeEditorMountOptions,
@@ -136,21 +128,14 @@ function buildTheme(dark: boolean): ReturnType<typeof EditorView.theme> {
       ".cm-nonmatchingBracket": { color: "var(--color-danger)" },
       ".cm-selectionMatch": { backgroundColor: "var(--color-accent-soft)" },
       ".cm-specialChar": { color: "var(--color-warning)" },
-      // 源码读写共用查找面板。
+
+      // Go-to-line and other native editor dialogs still share these controls.
       ".cm-panels": {
         backgroundColor: "var(--color-bg-surface)",
         color: "var(--color-text)",
         borderBottom: "1px solid var(--color-border)",
       },
       ".cm-panels.cm-panels-top": { borderBottom: "1px solid var(--color-border)" },
-      ".cm-panel.cm-search": {
-        padding: "var(--spacing-xs) var(--spacing-sm)",
-        fontFamily: "var(--font-body, inherit)",
-        fontSize: "var(--font-size-sm)",
-      },
-      ".cm-panel.cm-search input, .cm-panel.cm-search button, .cm-panel.cm-search label": {
-        fontSize: "var(--font-size-sm)",
-      },
       ".cm-textfield": {
         backgroundColor: "var(--color-bg)",
         border: "1px solid var(--color-border)",
@@ -173,7 +158,6 @@ function buildTheme(dark: boolean): ReturnType<typeof EditorView.theme> {
         outline: "1px solid var(--color-border-strong)",
       },
       ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--color-selection)" },
-      ".cm-panel.cm-search [name=close]": { color: "var(--color-text-muted)", cursor: "pointer" },
       ".cm-tooltip": {
         backgroundColor: "var(--color-bg-surface)",
         border: "1px solid var(--color-border)",
@@ -199,6 +183,11 @@ export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMoun
   const focusLineCompartment = new Compartment();
   const initialTheme = options.dark;
   let readOnly = options.readOnly;
+  const searchListeners = new Set<() => void>();
+  const editorSearch = createCodeEditorSearch(() => {
+    options.onSearchChange();
+    for (const listener of searchListeners) listener();
+  }, options.onFind);
   const selectionListeners = new Set<() => void>();
   const notifySelection = (): void => {
     options.onSelectionChange();
@@ -261,7 +250,7 @@ export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMoun
         bracketMatching(),
         highlightActiveLine(),
         highlightSelectionMatches(),
-        search({ top: true }),
+        editorSearch.extension,
         EditorView.lineWrapping,
         syntaxHighlighting(highlightStyle),
         languageCompartment.of([]),
@@ -278,7 +267,6 @@ export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMoun
             },
           },
           ...defaultKeymap,
-          ...searchKeymap,
         ]),
         EditorView.contentAttributes.of({ "aria-label": options.ariaLabel, spellcheck: "false" }),
         EditorView.updateListener.of((update) => {
@@ -356,15 +344,24 @@ export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMoun
     clearSelection() {
       view.dispatch({ selection: { anchor: view.state.selection.main.head } });
     },
-    openFind: () => {
-      openSearchPanel(view);
+    openFind: options.onFind,
+    getSearchResult: editorSearch.getResult,
+    subscribeSearch(listener) {
+      searchListeners.add(listener);
+      return () => {
+        searchListeners.delete(listener);
+      };
     },
+    setSearchQuery: (query) => editorSearch.setQuery(view, query),
+    stepSearch: (delta) => editorSearch.step(view, delta),
+    replaceSearch: (all) => editorSearch.replace(view, all),
+    selectSearchMatches: () => editorSearch.selectMatches(view),
+    closeFind: () => editorSearch.clear(view),
     resetDocument(text) {
       if (destroyed) return;
       const anchor = readScrollAnchor(view);
       const selection = view.state.selection;
       const query = getSearchQuery(view.state);
-      const finding = searchPanelOpen(view.state);
       baseline = Text.of(text.split("\n"));
       if (view.state.doc.eq(baseline)) {
         reportDirty(false);
@@ -391,7 +388,6 @@ export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMoun
           themeCompartment.reconfigure(buildTheme(dark)),
         ],
       });
-      if (finding) openSearchPanel(view);
       view.dispatch({ effects: setSearchQuery.of(query) });
       restoreScrollAnchor(view, anchor);
       reportDirty(false);
@@ -421,10 +417,6 @@ export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMoun
     },
     setReadOnly(nextReadOnly: boolean) {
       if (destroyed || nextReadOnly === readOnly) return;
-      const finding = searchPanelOpen(view.state);
-      const query = getSearchQuery(view.state);
-      // The built-in search panel creates its replace controls at mount time.
-      if (finding) closeSearchPanel(view);
       readOnly = nextReadOnly;
       view.dispatch({
         effects: [
@@ -432,9 +424,7 @@ export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMoun
           focusLineCompartment.reconfigure([]),
         ],
       });
-      if (finding) openSearchPanel(view);
-      else if (!readOnly) view.focus();
-      view.dispatch({ effects: setSearchQuery.of(query) });
+      if (!readOnly) view.focus();
       notifySelection();
     },
     focus: () => view.focus(),
@@ -443,6 +433,7 @@ export function mountCodeEditor(options: CodeEditorMountOptions): CodeEditorMoun
       if (dirtyTimer !== null) window.clearTimeout(dirtyTimer);
       dirtyTimer = null;
       selectionListeners.clear();
+      searchListeners.clear();
       view.destroy();
     },
   };

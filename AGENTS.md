@@ -207,7 +207,7 @@ import { Play } from "@phosphor-icons/react";
   少了这一步，改一行就会在 git 里显示成「整个文件都改了」。
 - **外部改动靠目录 watch**（复用 `fsService.watch` 引用计数）：无脏内容静默换版本，有脏内容只标「磁盘已更新」不打断输入；
   自家保存的目录回推用 `SELF_WRITE_GRACE_MS` 跳过，否则每次保存都自弹冲突。
-- **编辑态的交互差异**：右键回 Chromium 原生菜单（剪切/粘贴刚需），划选工具条与自绘右键菜单撤掉；源码两种模式的 Ctrl+F 共用 CodeMirror 查找，替换入口仅在编辑态出现。
+- **编辑态的交互差异**：右键回 Chromium 原生菜单（剪切/粘贴刚需），划选工具条与自绘右键菜单撤掉；所有支持文本查找的文件统一由 `FilePanel` 标题栏的 `SearchPopover` + `PreviewFindBar` 承接 Ctrl+F；源码匹配仍走 CodeMirror 全文状态，替换入口仅在编辑态出现。Office 搜索 Provider 经 `useOfficeSearchProvider` 的可撤销引用转发，关闭预览后不得保留 iframe 与页面缓存。
 
 ## 音视频与独立 Mermaid 预览（docs/design/148）
 

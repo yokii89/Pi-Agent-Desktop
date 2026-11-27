@@ -46,6 +46,9 @@ interface PopoverProps {
   matchTriggerWidth?: boolean;
   /** 逻辑开合变化；关闭回调在退场动画与卸载完成后触发（解除抑制的时机）。 */
   onOpenChange?: (open: boolean) => void;
+  /** Persistent tools such as file search remain available while reading their results. */
+  closeOnOutsideClick?: boolean;
+  closeOnScroll?: boolean;
 }
 
 /**
@@ -71,6 +74,8 @@ export function Popover({
   beforeOpen,
   matchTriggerWidth = false,
   onOpenChange,
+  closeOnOutsideClick = true,
+  closeOnScroll = true,
 }: PopoverProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -171,6 +176,7 @@ export function Popover({
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: MouseEvent): void => {
+      if (!closeOnOutsideClick) return;
       const target = event.target as Node;
       // 面板已不在 root 的 DOM 子树里，两边都要判，否则点面板内部会把它关掉
       if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return;
@@ -186,6 +192,7 @@ export function Popover({
     };
     // 面板自身（如模型菜单列表）内部滚动不应关闭；只收起「锚点已移走」的外部滚动
     const onScroll = (event: Event): void => {
+      if (!closeOnScroll) return;
       const target = event.target;
       if (target instanceof Node && panelRef.current?.contains(target)) return;
       requestClose();
@@ -198,7 +205,7 @@ export function Popover({
       document.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("scroll", onScroll, true);
     };
-  }, [open, requestClose]);
+  }, [open, requestClose, closeOnOutsideClick, closeOnScroll]);
 
   useLayoutEffect(() => {
     if (!open || !mounted) return;
@@ -254,8 +261,13 @@ export function Popover({
     // 模型列表等异步灌入会改变面板高度：不重算的话 fixed 坐标仍是「打开瞬间」的小面板
     const observer = new ResizeObserver(place);
     observer.observe(panel);
-    return () => observer.disconnect();
-  }, [open, mounted, align, direction, overlay, matchTriggerWidth]);
+    if (!closeOnScroll && root.parentElement) observer.observe(root.parentElement);
+    if (!closeOnScroll) window.addEventListener("resize", place);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", place);
+    };
+  }, [open, mounted, align, direction, overlay, matchTriggerWidth, closeOnScroll]);
 
   useEffect(
     () => () => {

@@ -11,7 +11,6 @@ interface PreviewFindBarProps {
   /** 当前命中序号（1-based）；无命中或尚未选择结果时为 0。 */
   current: number;
   focusTick?: number;
-  floating?: boolean;
   busy?: boolean;
   onQuery: (value: string) => void;
   /** 前后跳转：正数向下、负数向上。 */
@@ -26,7 +25,6 @@ export function PreviewFindBar({
   count,
   current,
   focusTick = 0,
-  floating = false,
   busy = false,
   onQuery,
   onStep,
@@ -45,7 +43,7 @@ export function PreviewFindBar({
   }, [focusTick]);
 
   return (
-    <search className={styles.bar} data-floating={floating || undefined}>
+    <search className={styles.bar} aria-label={t("panels.files.findTitle")} aria-busy={busy}>
       <MagnifyingGlass className={styles.icon} size={16} weight="regular" />
       <input
         ref={inputRef}
@@ -53,6 +51,8 @@ export function PreviewFindBar({
         value={query}
         placeholder={t("panels.files.findPlaceholder")}
         aria-label={t("panels.files.findPlaceholder")}
+        autoComplete="off"
+        spellCheck={false}
         onChange={(event) => onQuery(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
@@ -74,7 +74,7 @@ export function PreviewFindBar({
             ? current > 0
               ? `${current}/${count}`
               : String(count)
-            : t("panels.files.findNoMatch")}
+            : t(busy ? "panels.files.findSearching" : "panels.files.findNoMatch")}
       </span>
       {busy && onCancel && (
         <IconButton title={t("panels.files.office.cancelSearch")} onClick={onCancel}>
