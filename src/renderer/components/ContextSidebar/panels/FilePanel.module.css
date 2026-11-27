@@ -164,11 +164,21 @@
 
 /* 图片预览：棋盘格衬底便于辨认透明像素，contain 适配侧栏宽度 */
 .imageWrap {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--spacing-sm);
   min-height: 120px;
+}
+
+/* 与文件读取阶段共用提示位置，解码完成前不闪现棋盘格或挤压原生图片。 */
+.imageWrap[data-status="loading"] > .noMatch {
+  position: absolute;
+  inset: 0 0 auto;
+}
+
+.imageWrap[data-status="loaded"] {
   background-color: var(--color-bg-surface);
   background-image:
     linear-gradient(45deg, var(--color-bg-hover) 25%, transparent 25%),

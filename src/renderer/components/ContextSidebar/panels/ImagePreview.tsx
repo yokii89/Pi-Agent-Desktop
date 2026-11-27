@@ -114,7 +114,12 @@ export function ImagePreview({
   }, [native, result.url, result.mime, onImageSize]);
 
   return (
-    <div ref={wrapRef} className={panelStyles.imageWrap} aria-busy={status === "loading"}>
+    <div
+      ref={wrapRef}
+      className={panelStyles.imageWrap}
+      data-status={status}
+      aria-busy={status === "loading"}
+    >
       {status !== "failed" &&
         (native ? (
           <img
@@ -123,6 +128,7 @@ export function ImagePreview({
             alt={path}
             decoding="async"
             draggable={false}
+            hidden={status !== "loaded"}
             onLoad={(event) => {
               onImageSize(
                 `${event.currentTarget.naturalWidth}×${event.currentTarget.naturalHeight}`,
@@ -143,16 +149,19 @@ export function ImagePreview({
             hidden={status !== "loaded"}
           />
         ))}
-      {status !== "loaded" && (
+      {status === "loading" && (
+        <p className={panelStyles.noMatch} role="status">
+          {t("panels.files.loading")}
+        </p>
+      )}
+      {status === "failed" && (
         <div className={panelStyles.binaryWrap} data-selectable-text="">
           <p className={panelStyles.binaryMeta} role="status">
-            {status === "failed" ? t("common.imageLoadFailed", { src: path }) : t("common.loading")}
+            {t("common.imageLoadFailed", { src: path })}
           </p>
-          {status === "failed" && (
-            <button type="button" className={panelStyles.binaryAction} onClick={onOpenInSystem}>
-              {t("panels.files.openInSystem")}
-            </button>
-          )}
+          <button type="button" className={panelStyles.binaryAction} onClick={onOpenInSystem}>
+            {t("panels.files.openInSystem")}
+          </button>
         </div>
       )}
     </div>

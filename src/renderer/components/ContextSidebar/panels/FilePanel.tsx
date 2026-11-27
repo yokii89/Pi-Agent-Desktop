@@ -511,10 +511,10 @@ export function FilePanel({ active = true }: { active?: boolean }) {
     const latest = activePreviewRef.current;
     if (!latest || latest !== target) return;
 
-    // URL 已绑定路径、大小与 mtime；目录通知可能来自相邻文件，版本相同就保留播放器。
+    // URL 已绑定路径、大小与 mtime；同版本目录通知不重建图片或播放器。
     if (
-      latest.result.kind === "media" &&
-      result.kind === "media" &&
+      ((latest.result.kind === "media" && result.kind === "media") ||
+        (latest.result.kind === "image" && result.kind === "image")) &&
       result.url === latest.result.url
     ) {
       return;
