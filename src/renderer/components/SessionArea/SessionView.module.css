@@ -77,6 +77,12 @@
   margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-xs));
 }
 
+/* 独立子任务通知与同一条通知内的任务都沿用文档流的紧排间距。 */
+.entry[data-kind="custom"]:has(> [data-custom-type="subagent-notification"])
++ .entry[data-kind="custom"]:has(> [data-custom-type="subagent-notification"]) {
+  margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-xs));
+}
+
 /* run 头后紧接工作流：压掉 flex 大间距，只留一小口气 */
 .entry[data-kind="run"] + .entry[data-kind="assistant"] {
   margin-top: calc(-1 * var(--spacing-lg) + var(--spacing-sm));

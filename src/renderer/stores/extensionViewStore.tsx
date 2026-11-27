@@ -22,6 +22,10 @@ import type {
   ViewPlacementHint,
 } from "../../shared/view";
 import { ACCESS_MODE_ACTIONS } from "../../shared/view";
+import {
+  type AgentWorkspaceMemory,
+  createAgentWorkspaceMemory,
+} from "../components/ExtensionView/agentWorkspaceMemory";
 import { collectFormValues, type FormValues } from "../components/ExtensionView/formValues";
 import {
   activateContribution as activateContributionIpc,
@@ -249,6 +253,12 @@ interface ExtensionViewStoreValue {
   /** 仅 active 会话可见的 modal / panel / sidebar。 */
   visibleModals: ExtensionViewEntry[];
   visiblePanels: ExtensionViewEntry[];
+  /** 当前会话根工作区的非模态浮窗；与侧栏挂载生命周期独立。 */
+  floatingWorkspaces: ExtensionViewEntry[];
+  floatingWorkspaceIds: ReadonlySet<string>;
+  floatWorkspace: (id: string) => void;
+  dockWorkspace: (id: string) => void;
+  getWorkspaceMemory: (id: string, nodeId: string) => AgentWorkspaceMemory;
   visibleSidebars: ExtensionViewEntry[];
   /**
    * 仅当 blocking 视图归属该 sessionId（或未绑定会话）时阻断发送。
@@ -330,6 +340,12 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
   const [modals, setModals] = useState<ExtensionViewEntry[]>([]);
   const [streams, setStreams] = useState<ExtensionViewEntry[]>([]);
   const [panels, setPanels] = useState<ExtensionViewEntry[]>([]);
+  const [floatingWorkspaceIds, setFloatingWorkspaceIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const workspaceMemories = useRef(
+    new Map<string, { nodeId: string; memory: AgentWorkspaceMemory }>(),
+  );
   const [sidebars, setSidebars] = useState<ExtensionViewEntry[]>([]);
   const [settingsViews, setSettingsViews] = useState<ExtensionViewEntry[]>([]);
   /** access-mode 注册表：按视图 id 去重，随会话回收（docs/design/14）。 */
@@ -375,10 +391,63 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
   }, [modals, widgetSlots]);
   /** SessionProvider 同步的 active 运行时 SessionId。 */
   const [activeViewSessionId, setActiveViewSessionId] = useState<string | null>(null);
-  const { openSidebarTab, hiddenSidebarPanelIds } = useUiStore();
+  const { openSidebarTab, hiddenSidebarPanelIds, dispatch } = useUiStore();
   const knownPanelIdsRef = useRef(new Set<string>());
   const activeViewSessionIdRef = useRef(activeViewSessionId);
   activeViewSessionIdRef.current = activeViewSessionId;
+
+  const getWorkspaceMemory = useCallback((id: string, nodeId: string): AgentWorkspaceMemory => {
+    const cached = workspaceMemories.current.get(id);
+    if (cached?.nodeId === nodeId) return cached.memory;
+    const memory = createAgentWorkspaceMemory();
+    workspaceMemories.current.set(id, { nodeId, memory });
+    return memory;
+  }, []);
+
+  const floatWorkspace = useCallback(
+    (id: string): void => {
+      const panel = panels.find((entry) => entry.id === id);
+      if (panel?.root.type !== "agent-workspace") return;
+      setFloatingWorkspaceIds((previous) => new Set(previous).add(id));
+      dispatch({
+        type: "closeSidebarTab",
+        tab: extensionPanelTabId(panel.panelId ?? `ext-${id}`),
+      });
+    },
+    [panels, dispatch],
+  );
+
+  const dockWorkspace = useCallback(
+    (id: string): void => {
+      setFloatingWorkspaceIds((previous) => {
+        const next = new Set(previous);
+        next.delete(id);
+        return next;
+      });
+      const panel = panels.find((entry) => entry.id === id);
+      if (panel) openSidebarTab(extensionPanelTabId(panel.panelId ?? `ext-${id}`));
+    },
+    [panels, openSidebarTab],
+  );
+
+  // 只在 View 存活期间保留 UI 记忆；关闭、替换或断线不会遗留浮窗。
+  useEffect(() => {
+    const workspaces = new Map(
+      panels
+        .filter((entry) => entry.root.type === "agent-workspace")
+        .map((entry) => [entry.id, entry.root]),
+    );
+    for (const [id, cached] of workspaceMemories.current) {
+      const root = workspaces.get(id);
+      if (root?.type !== "agent-workspace" || root.id !== cached.nodeId) {
+        workspaceMemories.current.delete(id);
+      }
+    }
+    setFloatingWorkspaceIds((previous) => {
+      const next = new Set([...previous].filter((id) => workspaces.has(id)));
+      return next.size === previous.size ? previous : next;
+    });
+  }, [panels]);
 
   const bindActiveViewSession = useCallback((sessionId: string | null) => {
     activeViewSessionIdRef.current = sessionId;
@@ -866,6 +935,9 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
     const active = activeViewSessionId;
     const visibleModals = filterViewsForSession(modals, active);
     const visiblePanels = filterViewsForSession(panels, active);
+    const floatingWorkspaces = visiblePanels.filter(
+      (entry) => floatingWorkspaceIds.has(entry.id) && entry.root.type === "agent-workspace",
+    );
     const visibleSidebars = filterViewsForSession(sidebars, active);
     const visibleWidgets = filterSlotsForSession(widgetSlots, active);
     const widgetAboveList = visibleWidgets
@@ -977,6 +1049,11 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
       widgetBelowList,
       visibleModals,
       visiblePanels,
+      floatingWorkspaces,
+      floatingWorkspaceIds,
+      floatWorkspace,
+      dockWorkspace,
+      getWorkspaceMemory,
       visibleSidebars,
       catalogPanelRows,
       sendBlockedReason,
@@ -1007,6 +1084,10 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
     modals,
     streams,
     panels,
+    floatingWorkspaceIds,
+    floatWorkspace,
+    dockWorkspace,
+    getWorkspaceMemory,
     sidebars,
     settingsViews,
     accessModes,

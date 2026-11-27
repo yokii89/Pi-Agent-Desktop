@@ -37,6 +37,88 @@ describe("agent workspace graph geometry", () => {
     }
   });
 
+  it("wraps large sibling groups to the available width while keeping full-size cards", () => {
+    const agents = [
+      agent("main"),
+      ...Array.from({ length: 20 }, (_, index) => agent(`child-${index}`, "main")),
+    ];
+    for (const [width, columns] of [
+      [360, 1],
+      [640, 2],
+      [960, 3],
+    ] as const) {
+      const graph = layoutAgentGraph(agents, width);
+      expect(graph.nodes).toHaveLength(agents.length);
+      expect(graph.edges).toHaveLength(20);
+      expect(graph.width).toBeLessThanOrEqual(width);
+      const rows = new Map<number, number>();
+      for (const { agent: item, y } of graph.nodes) {
+        if (item.id !== "main") rows.set(y, (rows.get(y) ?? 0) + 1);
+      }
+      expect(rows.size).toBe(Math.ceil(20 / columns));
+      expect(Math.max(...rows.values())).toBe(columns);
+    }
+  });
+
+  it("keeps nested subtrees and forest roots apart and routes edges around every card", () => {
+    const agents = [
+      agent("main"),
+      ...Array.from({ length: 8 }, (_, index) => agent(`child-${index}`, "main")),
+      ...Array.from({ length: 7 }, (_, index) => agent(`nested-${index}`, "child-1")),
+      agent("deep", "nested-3"),
+      ...Array.from({ length: 6 }, (_, index) => agent(`deep-${index}`, "deep")),
+      agent("other-root"),
+      agent("other-child", "other-root"),
+    ];
+    for (const width of [360, 640, 960]) {
+      const graph = layoutAgentGraph(agents, width);
+      expect(graph.nodes).toHaveLength(agents.length);
+      for (const node of graph.nodes) {
+        expect(node.x + AGENT_NODE_WIDTH).toBeLessThanOrEqual(graph.width);
+        expect(node.y + AGENT_NODE_HEIGHT).toBeLessThanOrEqual(graph.height);
+        for (const other of graph.nodes) {
+          if (node === other) continue;
+          const overlapX =
+            node.x < other.x + AGENT_NODE_WIDTH && other.x < node.x + AGENT_NODE_WIDTH;
+          const overlapY =
+            node.y < other.y + AGENT_NODE_HEIGHT && other.y < node.y + AGENT_NODE_HEIGHT;
+          expect(overlapX && overlapY).toBe(false);
+        }
+      }
+      for (const edge of graph.edges) {
+        expect(edge.child.y).toBeGreaterThan(edge.parent.y + AGENT_NODE_HEIGHT);
+        for (let index = 1; index < edge.points.length; index++) {
+          const start = edge.points[index - 1];
+          const end = edge.points[index];
+          expect(start.x === end.x || start.y === end.y).toBe(true);
+          for (const node of graph.nodes) {
+            const overlapsX =
+              Math.max(start.x, end.x) > node.x &&
+              Math.min(start.x, end.x) < node.x + AGENT_NODE_WIDTH;
+            const overlapsY =
+              Math.max(start.y, end.y) > node.y &&
+              Math.min(start.y, end.y) < node.y + AGENT_NODE_HEIGHT;
+            expect(overlapsX && overlapsY).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it("lays out very narrow or initially unmeasured viewports without losing nodes", () => {
+    const agents = [agent("main"), agent("a", "main"), agent("b", "main")];
+    for (const width of [0, 120, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const graph = layoutAgentGraph(agents, width);
+      expect(graph.nodes).toHaveLength(3);
+      expect(Number.isFinite(graph.width)).toBe(true);
+      expect(Number.isFinite(graph.height)).toBe(true);
+      for (const node of graph.nodes) {
+        expect(node.x).toBeGreaterThanOrEqual(0);
+        expect(node.x + AGENT_NODE_WIDTH).toBeLessThanOrEqual(graph.width);
+      }
+    }
+  });
+
   it("preserves every node in a forest, including a missing parent and cycles", () => {
     const graph = layoutAgentGraph([
       agent("a", "b"),

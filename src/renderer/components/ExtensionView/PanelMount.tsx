@@ -1,16 +1,14 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import type { ViewNode } from "../../../shared/view";
+import { useExtensionViewLayout } from "../../hooks/useExtensionViewLayout";
 import { useT } from "../../hooks/useT";
-import { extensionViewService } from "../../services/extensionViewService";
 import type { ExtensionViewEntry } from "../../stores/extensionViewStore";
 import { extensionPanelTabId, useExtensionViewStore } from "../../stores/extensionViewStore";
 import { useUiStore } from "../../stores/uiStore";
 import { Button } from "../ui/Button";
+import { AgentWorkspaceView } from "./AgentWorkspaceView";
 import styles from "./ExtensionView.module.css";
 import { type ViewFormBridge, ViewNodeRenderer } from "./ViewNodeRenderer";
-
-/** 面板尺寸回传的去抖窗口（docs/06 R5）；拖动侧栏时合并成最后一帧。 */
-const LAYOUT_DEBOUNCE_MS = 150;
 
 /** 头部槽节点没有稳定 id 时用类型 + 下标，整组随 placementHint 一起替换。 */
 function headerNodeKey(node: ViewNode, index: number): string {
@@ -25,9 +23,20 @@ function headerNodeKey(node: ViewNode, index: number): string {
  */
 export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
   const t = useT();
-  const { dismiss, changeValue, sendAction } = useExtensionViewStore();
+  const {
+    dismiss,
+    changeValue,
+    sendAction,
+    floatingWorkspaceIds,
+    floatWorkspace,
+    dockWorkspace,
+    getWorkspaceMemory,
+  } = useExtensionViewStore();
   const { dispatch } = useUiStore();
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  const isAgentWorkspace = entry.root.type === "agent-workspace";
+  const floating = isAgentWorkspace && floatingWorkspaceIds.has(entry.id);
+  useExtensionViewLayout(entry.id, bodyRef, !floating);
 
   const bridge = useMemo<ViewFormBridge>(
     () => ({
@@ -39,34 +48,6 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
     [entry.id, entry.values, entry.actions, changeValue, sendAction],
   );
 
-  // 内容盒尺寸回传（docs/06 R5）：挂载即发第一帧，resize 走 150ms 去抖。
-  // 用 clientWidth/Height 而不是 borderBox：扩展排版关心的是可用内容宽，
-  // 纵向滚动条出现导致 8px 收窄也要如实上报。
-  useEffect(() => {
-    const body = bodyRef.current;
-    if (!body) return;
-    let timer: number | undefined;
-    let last: { width: number; height: number } | null = null;
-    const send = (): void => {
-      const width = body.clientWidth;
-      const height = body.clientHeight;
-      if (width <= 0) return;
-      if (last && last.width === width && last.height === height) return;
-      last = { width, height };
-      extensionViewService.reportLayout(entry.id, width, height);
-    };
-    send();
-    const observer = new ResizeObserver(() => {
-      if (timer !== undefined) window.clearTimeout(timer);
-      timer = window.setTimeout(send, LAYOUT_DEBOUNCE_MS);
-    });
-    observer.observe(body);
-    return () => {
-      observer.disconnect();
-      if (timer !== undefined) window.clearTimeout(timer);
-    };
-  }, [entry.id]);
-
   const endPanel = (): void => {
     dispatch({
       type: "closeSidebarTab",
@@ -76,7 +57,15 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
   };
 
   const header = entry.placementHint?.panelHeader;
-  const isAgentWorkspace = entry.root.type === "agent-workspace";
+
+  if (floating) {
+    return (
+      <div className={styles.workspacePlaceholder}>
+        <p data-selectable-text="">{t("agentWorkspace.floatingHint")}</p>
+        <Button onClick={() => dockWorkspace(entry.id)}>{t("agentWorkspace.collapse")}</Button>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.panel}>
@@ -93,7 +82,18 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
         data-panel-scroll=""
         data-selectable-text=""
       >
-        <ViewNodeRenderer key={entry.id} node={entry.root} bridge={bridge} />
+        {entry.root.type === "agent-workspace" ? (
+          <AgentWorkspaceView
+            key={entry.id}
+            node={entry.root}
+            bridge={bridge}
+            memory={getWorkspaceMemory(entry.id, entry.root.id)}
+            floating={false}
+            onToggleFloating={() => floatWorkspace(entry.id)}
+          />
+        ) : (
+          <ViewNodeRenderer key={entry.id} node={entry.root} bridge={bridge} />
+        )}
       </div>
       {entry.actions.length > 0 ? (
         <div className={styles.panelFooter}>

@@ -1,16 +1,20 @@
 import { useExtensionViewStore } from "../../stores/extensionViewStore";
+import { AgentWorkspaceWindowMount } from "./AgentWorkspaceWindowMount";
 import { ModalMount } from "./ModalMount";
 import { WidgetMount } from "./WidgetMount";
 
 /**
- * 扩展 View 宿主（modal 栈）：挂在 App 根，覆盖在中央区之上。
- * 只渲染 **active 会话** 的 modal（多会话隔离）。
+ * 扩展 View 宿主：modal 栈与工作区非模态浮窗挂在 App 根。
+ * 只渲染 active 会话的视图，浮窗不依赖侧栏页签是否挂载。
  * widget 由 SessionArea 的 WidgetMountAbove/Below 承载（同样按 active 过滤）。
  */
 export function ExtensionViewHost() {
-  const { visibleModals } = useExtensionViewStore();
+  const { visibleModals, floatingWorkspaces } = useExtensionViewStore();
   return (
     <>
+      {floatingWorkspaces.map((entry) => (
+        <AgentWorkspaceWindowMount key={entry.id} entry={entry} />
+      ))}
       {visibleModals.map((entry) => (
         <ModalMount key={entry.id} entry={entry} />
       ))}
