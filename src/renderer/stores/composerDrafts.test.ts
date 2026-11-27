@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PromptDisposition } from "../../shared/ipc";
+import { MAX_PROMPT_IMAGES, readPromptImages } from "../../shared/promptImages";
 import type { BrowserContextItem } from "../services/browserService";
+import { toPiImageContent } from "../utils/imageAttach";
 import {
   type ComposerDraft,
   type ComposerDraftPart,
@@ -363,6 +365,74 @@ describe("browser context belongs to its draft", () => {
     const before = store.get("session:b");
     store.markChatElementsStale();
     expect(store.get("session:b")).toBe(before);
+  });
+});
+
+describe("recovered attachment boundaries", () => {
+  it("keeps every recovered image when merged drafts exceed the single-message send limit", async () => {
+    const store = new ComposerDraftStore();
+    const draft = store.bind("session:a");
+    const sample = saveAttachments(store, "session:a").imageAttachments[0];
+    draft.update((current) => ({
+      ...current,
+      imageAttachments: Array.from({ length: MAX_PROMPT_IMAGES }, (_, index) => ({
+        ...sample,
+        id: `current-${index}`,
+      })),
+    }));
+    draft.restore({
+      content: [{ kind: "text", text: "recovered" }],
+      fileMentions: [],
+      imageAttachments: [{ ...sample, id: "recovered" }],
+      fileAttachments: [],
+      chatElements: [],
+    });
+    const recovered = draft.getSnapshot().imageAttachments;
+    expect(recovered).toHaveLength(MAX_PROMPT_IMAGES + 1);
+    await expect(
+      draft.submit(async () => {
+        readPromptImages(draft.getSnapshot().imageAttachments.map(toPiImageContent));
+        return "queued";
+      }),
+    ).rejects.toThrow();
+    expect(draft.getSnapshot().imageAttachments).toEqual(recovered);
+    expect(draft.getSnapshot().sending).toBe(false);
+    draft.update((current) => ({
+      ...current,
+      imageAttachments: current.imageAttachments.slice(1),
+    }));
+    expect(await draft.submit(async () => "queued")).toBe(true);
+    expect(draft.getSnapshot().imageAttachments).toEqual([]);
+  });
+
+  it("marks recovered browser references stale after navigation while the draft was queued", async () => {
+    const store = new ComposerDraftStore();
+    const draft = store.bind("session:a");
+    draft.addChatElement(contextItem("element"));
+    const captured = draft.capture();
+    expect(await draft.submit(async () => "queued")).toBe(true);
+    store.markChatElementsStale();
+    // Queue conversion replaces the content object while retaining attachment identities.
+    draft.restore({ ...captured, content: [{ kind: "element", id: "element" }] });
+    expect(draft.getSnapshot().chatElements[0].stale).toBe(true);
+    expect(captured.chatElements[0].stale).toBe(false);
+    expect(draft.getSnapshot().content).toEqual([{ kind: "element", id: "element" }]);
+  });
+
+  it("retains browser freshness without navigation and after a draft is remapped", async () => {
+    const store = new ComposerDraftStore();
+    const draft = store.bind("session:temporary");
+    draft.addChatElement(contextItem("element"));
+    const captured = draft.capture();
+    expect(await draft.submit(async () => "queued")).toBe(true);
+    store.move("session:temporary", "session:real", draft);
+    draft.restore(captured);
+    expect(draft.getSnapshot().chatElements[0].stale).toBe(false);
+    const recaptured = draft.capture();
+    expect(await draft.submit(async () => "queued")).toBe(true);
+    store.markChatElementsStale();
+    draft.restore(recaptured);
+    expect(store.get("session:real").chatElements[0].stale).toBe(true);
   });
 });
 

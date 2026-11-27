@@ -64,7 +64,7 @@ export interface ComposerHandle {
   };
   /** 清空编辑器。 */
   clear: () => void;
-  focus: () => void;
+  focus: (atEnd?: boolean) => void;
   /** 编辑器是否真空（无文字也无芯片）：决定 ↑ 是否接管为历史召回。 */
   isBlank: () => boolean;
   /**
@@ -502,7 +502,19 @@ export function Composer({
         onTextChange?.("");
         reportDraft();
       },
-      focus: () => rootRef.current?.focus(),
+      focus: (atEnd = false) => {
+        const root = rootRef.current;
+        if (!root) return;
+        root.focus();
+        if (!atEnd) return;
+        const range = document.createRange();
+        range.selectNodeContents(root);
+        range.collapse(false);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        scrollCaretIntoView(root);
+      },
       isBlank: () => {
         const root = rootRef.current;
         return !root || !hasVisibleContent(root);

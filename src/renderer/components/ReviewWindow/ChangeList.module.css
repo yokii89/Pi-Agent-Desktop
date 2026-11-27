@@ -142,7 +142,8 @@
 }
 
 /* 悬停时淡出统计，给动作簇让位 */
-.rowWrap:hover .stats {
+.rowWrap:hover .stats,
+.rowWrap:focus-within .stats {
   opacity: 0;
 }
 

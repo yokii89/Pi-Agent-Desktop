@@ -1,0 +1,669 @@
+.hierarchyCanvas {
+  container-type: size;
+  container-name: agent-graph;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+.canvasRuler {
+  height: 48px;
+  overflow: hidden;
+  flex: none;
+}
+.canvasRulerInner {
+  position: relative;
+  height: 100%;
+}
+.canvasLevel {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  top: 0;
+  height: 34px;
+  font-size: var(--font-size-sm);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.canvasLevelNumber {
+  font: calc(var(--font-size-sm) - 2px) var(--font-family-mono);
+  color: var(--color-accent-fg);
+}
+.canvasLevelCount {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font: calc(var(--font-size-sm) - 2px) var(--font-family-mono);
+}
+.canvasViewport {
+  overscroll-behavior: contain;
+  isolation: isolate;
+  touch-action: pan-x pan-y;
+  cursor: grab;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overflow-anchor: none;
+}
+.canvasPlane {
+  position: absolute;
+  transform-origin: 0 0;
+}
+.canvasTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: none;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+.canvasTool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  min-height: 28px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+.canvasTool:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+.canvasTool[aria-pressed="true"] {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-fg);
+}
+.canvasTool > span {
+  font-family: var(--font-family-mono);
+  color: var(--color-text-muted);
+}
+.canvasLocators {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-left: auto;
+}
+.canvasEmpty {
+  position: sticky;
+  z-index: 4;
+  top: var(--spacing-md);
+  left: var(--spacing-md);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: fit-content;
+  max-width: calc(100% - var(--spacing-xl));
+  margin: 0 var(--spacing-md);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated-solid);
+  font-size: var(--font-size-sm);
+}
+.canvasEmpty strong {
+  font-weight: 500;
+}
+.canvasEmpty button {
+  color: var(--color-accent-fg);
+}
+.canvasLane {
+  position: absolute;
+  top: var(--spacing-sm);
+  bottom: var(--spacing-lg);
+  border-left: 1px dashed var(--color-border);
+  border-right: 1px dashed var(--color-border);
+  opacity: 0.28;
+  pointer-events: none;
+}
+.canvasConnection {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  color: var(--color-border-strong);
+}
+.canvasConnection[data-traced="true"] {
+  /* Shared trunks must stay above every unselected sibling connection. */
+  z-index: 1;
+  color: var(--color-accent-border);
+}
+.wireStart,
+.wireEnd,
+.wireTurn,
+.wirePort {
+  position: absolute;
+  pointer-events: none;
+}
+.wireStart,
+.wireEnd {
+  border-top: 1px solid currentColor;
+}
+.wireTurn {
+  border-left: 1px solid currentColor;
+}
+.wirePort {
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+  z-index: 2;
+}
+.wireStart,
+.wireTurn,
+.wireEnd,
+.wirePort,
+.canvasNode {
+  transform-origin: 0 0;
+}
+.wireSignal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  color: var(--color-accent-fg);
+  box-shadow: 0 0 var(--spacing-sm) currentColor;
+  offset-rotate: 0deg;
+  offset-anchor: center;
+  opacity: 0;
+  z-index: 3;
+}
+.wireSignal[data-direction="return"] {
+  color: var(--color-success);
+}
+.wireSignal[data-arrived="true"] {
+  visibility: hidden;
+}
+.canvasNode {
+  --canvas-state-color: var(--color-text-muted);
+  position: absolute;
+  z-index: 2;
+}
+.canvasNode[data-state="running"] {
+  --canvas-state-color: var(--color-accent-fg);
+}
+.canvasNode[data-state="completed"] {
+  --canvas-state-color: var(--color-success);
+}
+.canvasNode[data-state="error"] {
+  --canvas-state-color: var(--color-danger);
+}
+.canvasNode[data-state="stopped"] {
+  --canvas-state-color: var(--color-warning);
+}
+.canvasCard {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  width: 100%;
+  height: 100%;
+  padding: var(--spacing-md);
+  border: 1px solid color-mix(in srgb, var(--canvas-state-color) 65%, var(--color-border));
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated-solid);
+  color: var(--color-text);
+}
+.canvasCard:hover {
+  border-color: var(--canvas-state-color);
+}
+.canvasNode[data-state="error"] .canvasCard {
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 3%, var(--color-bg-elevated-solid));
+}
+.canvasNode[data-state="queued"] .canvasCard,
+.canvasNode[data-state="stopped"] .canvasCard {
+  border-style: dashed;
+}
+:where(.canvasNode[data-main="false"]) .canvasCardEyebrow > svg {
+  color: var(--canvas-state-color);
+}
+.canvasStateFrame {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+}
+.canvasStateFrame[data-state="running"] {
+  overflow: hidden;
+  padding: 2px;
+  /* Only the narrow border reveals the rotating light; card text stays still. */
+  mask:
+    linear-gradient(var(--color-text-strong) 0 0) content-box,
+    linear-gradient(var(--color-text-strong) 0 0);
+  mask-composite: exclude;
+}
+.canvasStateLight {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 160%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  background: conic-gradient(
+    from 0deg,
+    transparent 0% 60%,
+    color-mix(in srgb, var(--color-accent-fg) 25%, transparent) 72%,
+    var(--color-accent-fg) 87%,
+    var(--color-spark) 92%,
+    transparent 96%
+  );
+}
+.canvasStateFrame[data-state="error"] {
+  border: 2px solid var(--color-danger);
+  box-shadow:
+    0 0 var(--spacing-md) var(--color-danger-soft),
+    inset 0 0 var(--spacing-sm) var(--color-danger-soft);
+}
+.canvasStateFrame[data-state="queued"] {
+  border: 1px dashed var(--color-text-muted);
+  box-shadow: 0 0 var(--spacing-sm) var(--color-muted-soft);
+}
+.canvasCardEyebrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font: calc(var(--font-size-sm) - 2px) var(--font-family-mono);
+  letter-spacing: 0.1em;
+  margin-bottom: var(--spacing-sm);
+}
+.canvasCard > strong {
+  color: var(--color-text-strong);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.canvasCardDescription {
+  color: var(--color-text-muted);
+  font-size: calc(var(--font-size-sm) - 1px);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: var(--spacing-xs);
+}
+.canvasCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  margin-top: auto;
+  padding-top: var(--spacing-sm);
+}
+.canvasCardFooter > span:last-child {
+  color: var(--color-text-muted);
+  font: calc(var(--font-size-sm) - 2px) var(--font-family-mono);
+}
+.canvasCardFooter [data-agent-state] {
+  font-size: calc(var(--font-size-sm) - 1px);
+}
+.canvasCardFooter [data-agent-state] > svg {
+  width: 16px;
+  height: 16px;
+}
+.canvasNode[data-selected="true"] .canvasCard {
+  /* Selection sits outside the state border, including the red border of a failed task. */
+  outline: 2px solid var(--color-accent-border);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 4px var(--color-bg);
+  background: color-mix(in srgb, var(--color-accent-fg) 8%, var(--color-bg-elevated-solid));
+}
+.canvasNode[data-selected="true"] :where(.canvasCardEyebrow) {
+  color: var(--color-accent-fg);
+}
+.canvasNode[data-selected="true"] {
+  z-index: 3;
+}
+.canvasNode[data-context="true"] .canvasCardDescription {
+  opacity: 0.65;
+}
+:where(.hierarchyCanvas[data-compact="true"]) .canvasCardEyebrow {
+  display: none;
+}
+.hierarchyCanvas[data-compact="true"] .canvasCard {
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+.hierarchyCanvas[data-compact="true"] {
+  --canvas-main-font-size: var(--font-size-md);
+}
+.canvasNode[data-collapsed="true"] .canvasCard,
+.canvasNode[data-collapsed="true"] .canvasStateFrame {
+  height: calc(100% - 48px);
+}
+.canvasNode[data-collapsed="true"]::before,
+.canvasNode[data-collapsed="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 12px 6px -6px;
+  z-index: -1;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface-solid);
+}
+.canvasNode[data-collapsed="true"]::after {
+  inset: 18px 12px -12px;
+  z-index: -2;
+  border-color: var(--color-border);
+}
+.canvasBranchSummary {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  height: 48px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border-strong);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--color-bg-surface-solid);
+  color: var(--color-text-muted);
+  font-size: calc(var(--font-size-sm) - 1px);
+}
+.canvasBranchSummary > strong {
+  font-weight: 500;
+  color: var(--color-text);
+}
+.canvasBranchStates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--spacing-sm);
+  font-size: calc(var(--font-size-sm) - 2px);
+}
+.canvasBranchStates > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+.canvasBranchStates i {
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.canvasBranchStates [data-state="running"] {
+  color: var(--color-accent-fg);
+}
+.canvasBranchStates [data-state="completed"] {
+  color: var(--color-success);
+}
+.canvasBranchStates [data-state="error"] {
+  color: var(--color-danger);
+}
+.canvasBranchStates [data-state="stopped"] {
+  color: var(--color-warning);
+}
+.mainCard {
+  border-color: var(--color-text-muted);
+  background: var(--color-bg-surface-solid);
+}
+.mainCard .canvasCardEyebrow {
+  font-size: calc(var(--font-size-sm) - 3px);
+  color: var(--color-text);
+}
+.mainCard > strong {
+  font-size: var(--canvas-main-font-size, var(--font-size-lg));
+}
+
+.canvasBranchToggle {
+  position: absolute;
+  bottom: -12px;
+  right: var(--spacing-md);
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 0 var(--spacing-sm);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg-surface-solid);
+  color: var(--color-text-muted);
+  font: calc(var(--font-size-sm) - 2px) var(--font-family-mono);
+}
+.canvasBranchToggle:hover {
+  color: var(--color-accent-fg);
+  border-color: var(--color-accent-border);
+}
+.canvasSelectedCaption {
+  position: absolute;
+  top: -23px;
+  left: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: calc(var(--font-size-sm) - 2px);
+  color: var(--color-accent-fg);
+}
+.canvasSelectedCaption > span {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.canvasPlane[data-trace-only="true"] > [data-traced="false"] {
+  opacity: 0.22;
+}
+.canvasFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: var(--color-text-muted);
+  font-size: calc(var(--font-size-sm) - 2px);
+}
+.canvasTransferLegend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-accent-fg);
+}
+.canvasTransferLegend[data-direction="return"] {
+  color: var(--color-success);
+}
+.canvasTraceToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.canvasTraceToggle:hover,
+.canvasTraceToggle[aria-pressed="true"] {
+  color: var(--color-accent-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wireSignal {
+    display: none;
+  }
+  .canvasStateLight {
+    display: none;
+  }
+  .canvasStateFrame[data-state="error"],
+  .canvasStateFrame[data-state="queued"] {
+    opacity: 0.65;
+  }
+}
+@media (max-width: 760px) {
+  .canvasTools {
+    padding-left: var(--spacing-md);
+    padding-right: var(--spacing-md);
+  }
+  .canvasLocators {
+    margin-left: 0;
+  }
+  .canvasTraceToggle {
+    font-size: calc(var(--font-size-sm) - 2px);
+  }
+  .canvasFooter {
+    padding: var(--spacing-md);
+  }
+}
+
+.canvasSurface {
+  position: relative;
+  overflow: hidden;
+}
+.canvasViewport[data-dragging="true"] {
+  cursor: grabbing;
+}
+.canvasTool:disabled,
+.canvasTraceToggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.canvasTool:focus-visible,
+.canvasCard:focus-visible,
+.canvasBranchToggle:focus-visible,
+.canvasTraceToggle:focus-visible {
+  outline: 2px solid var(--color-accent-border);
+  outline-offset: 4px;
+}
+.graphControls {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  flex: none;
+}
+.zoom {
+  min-width: 4em;
+  color: var(--color-text-muted);
+  font: var(--font-size-sm) var(--font-family-mono);
+}
+.graphSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs) var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.graphSummary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+.completionTrack {
+  width: 48px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+  overflow: hidden;
+}
+.completionTrack > span {
+  display: block;
+  height: 100%;
+  background: var(--color-success);
+}
+.graphHeading {
+  flex-wrap: wrap;
+}
+.graphHeading > span {
+  white-space: nowrap;
+}
+@container (max-width: 420px) {
+  .canvasFooter {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+  .canvasTools {
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+  .graphSummary {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+  .canvasRuler {
+    height: 36px;
+  }
+  .canvasLocators {
+    margin-left: 0;
+  }
+}
+
+@container agent-graph (max-height: 320px) {
+  .canvasSelectedCaption {
+    display: none;
+  }
+  .graphSummary {
+    display: none;
+  }
+  .canvasTools {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    min-height: 36px;
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+  .canvasTools > * {
+    flex: none;
+  }
+  .canvasLocators {
+    margin-left: auto;
+  }
+  .canvasRuler {
+    height: 34px;
+  }
+  .canvasFooter {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+  .graphHeading {
+    min-height: 36px;
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+}
+
+.canvasCardFooter > span:last-child {
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.canvasCardFooter [data-agent-state] {
+  min-width: 0;
+  flex-shrink: 1;
+}
+.canvasCardFooter [data-agent-state] > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.canvasLevel {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.canvasSmallTrace {
+  display: none;
+}
+@container agent-graph (max-height: 240px) {
+  .canvasRuler,
+  .canvasFooter {
+    display: none;
+  }
+  .canvasSmallTrace {
+    display: inline-flex;
+  }
+}

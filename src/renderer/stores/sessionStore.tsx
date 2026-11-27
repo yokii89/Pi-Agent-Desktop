@@ -39,7 +39,11 @@ import { prefetchService } from "../services/workerService";
 import { buildUserHistory } from "../utils/composerHistory";
 import { piImageFromDisplay, type UserMessageImage } from "../utils/imageAttach";
 import { buildPageContext } from "../utils/pageContext";
-import { type ComposerDraftHandle, composerDraftKey } from "./composerDrafts";
+import {
+  type ComposerDraftContent,
+  type ComposerDraftHandle,
+  composerDraftKey,
+} from "./composerDrafts";
 import { getComposerThinkingLevel, useComposerStore } from "./composerStore";
 import { createContextUsageRefresh } from "./contextUsageRefresh";
 import { isModeTransitioning } from "./modeTransitionBarrier";
@@ -52,7 +56,6 @@ import {
   clearStartPending,
   convertQueueItem,
   createBucketsState,
-  deliveredQueueTexts,
   deriveRunningFiles,
   dropFileIndex,
   emptyBucket,
@@ -74,9 +77,25 @@ import {
   setAttention,
 } from "./sessionBuckets";
 import { notifySessionRuntimeContext } from "./sessionContextBridge";
+import {
+  type QueuedMessage,
+  type QueuedMessagePayloads,
+  restoreQueuedMessages,
+  SessionQueuePayloads,
+  withQueueIntent,
+} from "./sessionQueuePayloads";
 import type { SessionEntry } from "./sessionTranscript";
 import { type PageId, useUiStore } from "./uiStore";
 import { useRuntimeReconciliation } from "./useRuntimeReconciliation";
+
+interface SessionPromptContext {
+  items?: BrowserContextItem[];
+  consoleErrors?: BrowserConsoleError[];
+  images?: PiImageContent[];
+  displayImages?: UserMessageImage[];
+  /** 仅窗口内保留，用于排队消息撤回编辑，不进入 IPC 或 prompt。 */
+  draft?: ComposerDraftContent;
+}
 
 /** 低频会话元数据与动作：侧栏、标题、输入栏、run 头按钮等；不订阅 entries。 */
 interface SessionMetaValue {
@@ -182,17 +201,10 @@ interface SessionMetaValue {
    */
   send: (
     text: string,
-    context?: {
-      items?: BrowserContextItem[];
-      consoleErrors?: BrowserConsoleError[];
-      /** 发给 pi 的 ImageContent（base64 无 data: 前缀）。 */
-      images?: PiImageContent[];
-      /** 气泡/历史展示图。 */
-      displayImages?: UserMessageImage[];
-    },
+    context?: SessionPromptContext,
     intent?: QueueIntent,
   ) => Promise<PromptDisposition | null>;
-  /** 停止：队列非空时先取回文本（回填输入框），再 abort active 实例。 */
+  /** 停止：队列非空时先取回完整草稿，再 abort active 实例。 */
   stop: () => void;
   canRetryLastUser: boolean;
   retryLastUserMessage: () => Promise<void>;
@@ -230,7 +242,7 @@ interface SessionQueueValue {
   queue: PiQueuedMessages;
   /** 正在执行 clear_queue 重写（单条动作的瞬态空快照不算最后一条离开）。 */
   queueClearing: boolean;
-  /** 编辑：全清后取回该条文本到主输入栏，其余按原序重新排队。 */
+  /** 编辑：全清后取回该条完整草稿到主输入栏，其余按原序重新排队。 */
   takeBackQueuedItem: (kind: QueueIntent, index: number, source: string) => Promise<boolean>;
   /** 删除：全清后移除该条，不回填输入栏。 */
   discardQueuedItem: (kind: QueueIntent, index: number, source: string) => Promise<boolean>;
@@ -240,10 +252,10 @@ interface SessionQueueValue {
   moveQueuedItem: (kind: QueueIntent, from: number, to: number, source: string) => Promise<boolean>;
 }
 
-/** 队列重排结果：removed 是目标条原文（排序动作为 null），null 表示队列已变化。 */
+/** 队列重排结果：removed 保留目标条的完整载荷（排序动作为 null）。 */
 type QueueRewrite = (
-  cleared: PiQueuedMessages,
-) => { steering: string[]; followUp: string[]; removed: string | null } | null;
+  cleared: QueuedMessagePayloads,
+) => (QueuedMessagePayloads & { removed: QueuedMessage | null }) | null;
 
 /** 无队列时的稳定空快照（避免队列 context 每次渲染换引用）。 */
 const EMPTY_QUEUE: PiQueuedMessages = { steering: [], followUp: [] };
@@ -448,6 +460,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * 否则 clear_queue 与重排交错，取回文本后 stop 的 abort 又让重排消息开了新一轮。
    */
   const queueStopsRef = useRef(0);
+  const queuePayloads = useRef(new SessionQueuePayloads());
 
   const activeBucket = getActiveBucket(bucketsState);
   const phase = activeBucket?.phase ?? "empty";
@@ -1023,6 +1036,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // 队列变化：queue_update 是全量快照；收缩 = 交付（主动 clear_queue 时除外）
       if (message.type === "event" && message.payload.type === "queue_update") {
         const { steering, followUp } = message.payload;
+        const delivered = queuePayloads.current.update(sessionId, { steering, followUp });
         setState((prev) => {
           const bucket = prev.buckets.get(sessionId);
           if (!bucket) return prev;
@@ -1032,8 +1046,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           let next = prev;
           if (!bucket.queueClearing) {
             // 交付的排队消息落成普通用户气泡；文本取服务端（与写进 JSONL 的展开文本一致）
-            for (const text of deliveredQueueTexts(bucket.queue, nextQueue)) {
-              next = applyEntries(next, sessionId, { type: "userMessage", text });
+            for (const queued of delivered) {
+              next = applyEntries(next, sessionId, {
+                type: "userMessage",
+                text: queued.text,
+                images: queued.displayImages,
+              });
             }
           }
           return patchBucket(next, sessionId, { queue: nextQueue });
@@ -1058,6 +1076,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (message.type === "exit") {
+        const recovered = queuePayloads.current.release(sessionId);
+        if (recovered.length > 0) {
+          restoreQueuedMessages(drafts.bind(composerDraftKey(sessionId, null)), recovered);
+        }
         contextUsageRefresh.cancel(sessionId);
         // 运行中进程消失 = 崩溃：侧栏按「未正常结束」标记（idle 后手动结束不打扰）
         const crashed = bucketsStateRef.current.buckets.get(sessionId)?.phase === "running";
@@ -1112,6 +1134,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     refreshContextUsage,
     contextUsageRefresh,
     syncThinkingState,
+    drafts,
   ]);
 
   // 回到会话页且 active 的 file 有待读标记 → 清除该条（不误清其它文件）
@@ -1509,12 +1532,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const send = useCallback(
     async (
       text: string,
-      context?: {
-        items?: BrowserContextItem[];
-        consoleErrors?: BrowserConsoleError[];
-        images?: PiImageContent[];
-        displayImages?: UserMessageImage[];
-      },
+      context?: SessionPromptContext,
       intent: QueueIntent = "followUp",
     ): Promise<PromptDisposition | null> => {
       const trimmed = text.trim();
@@ -1670,11 +1688,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           : trimmed;
       scheduleClaim(targetId);
       try {
-        const disposition = await sessionService.prompt(
-          promptText,
-          targetId,
-          images.length > 0 ? images : undefined,
-          intent,
+        const disposition = await queuePayloads.current.submit(
+          sid,
+          { text: promptText, intent, images, displayImages, draft: context?.draft },
+          () =>
+            sessionService.prompt(promptText, sid, images.length > 0 ? images : undefined, intent),
         );
         setState((prev) => {
           if (!prev.buckets.has(sid)) return prev;
@@ -1748,11 +1766,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   /**
-   * 清空 pi 队列并取回文本（RPC clear_queue）。
+   * 清空 pi 队列，将 RPC clear_queue 的文本与本地完整载荷对账。
    * 队列为空或失败返回 null；失败会自行 toast，调用方不必重复提示。
    */
   const clearQueue = useCallback(
-    async (targetId?: SessionId): Promise<PiQueuedMessages | null> => {
+    async (targetId?: SessionId): Promise<QueuedMessagePayloads | null> => {
       const id = targetId ?? activeKeyRef.current;
       if (!id) return null;
       const bucket = bucketsStateRef.current.buckets.get(id);
@@ -1764,7 +1782,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         prev.buckets.has(id) ? patchBucket(prev, id, { queueClearing: true }) : prev,
       );
       try {
+        queuePayloads.current.beginClear(id);
         const result = await sessionService.clearQueue(id);
+        const recovered = queuePayloads.current.finishClear(id, result);
         setState((prev) => {
           if (!prev.buckets.has(id)) return prev;
           const current = prev.buckets.get(id);
@@ -1777,16 +1797,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             queueClearing: false,
           });
         });
-        return result;
+        return recovered;
       } catch (err) {
-        setState((prev) =>
-          prev.buckets.has(id) ? patchBucket(prev, id, { queueClearing: false }) : prev,
+        const failed = queuePayloads.current.cancelClear(id);
+        if (failed.recovered.length > 0) {
+          restoreQueuedMessages(drafts.bind(composerDraftKey(id, null)), failed.recovered);
+        }
+        setState((prev) => {
+          if (!prev.buckets.has(id)) return prev;
+          let next = prev;
+          for (const delivered of failed.delivered) {
+            next = applyEntries(next, id, {
+              type: "userMessage",
+              text: delivered.text,
+              images: delivered.displayImages,
+            });
+          }
+          return patchBucket(next, id, { queueClearing: false });
+        });
+        const error = err instanceof Error ? err.message : t("session.queue.clearFailed");
+        showToast(
+          failed.recovered.length > 0 ? t("session.queue.recoveredAfterFailure", { error }) : error,
         );
-        showToast(err instanceof Error ? err.message : t("session.queue.clearFailed"));
         return null;
       }
     },
-    [setState, showToast],
+    [drafts, setState, showToast],
   );
 
   const stop = useCallback((): void => {
@@ -1802,7 +1838,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       sessionService.stop(id);
       return;
     }
-    // pi 的 abort 不清队列：先取回排队文本（回填输入框），再中止，避免停止后继续跑。
+    // pi 的 abort 不清队列：先取回完整排队消息，再中止，避免停止后继续跑。
     // 队列动作在途时等它落定：重排会把队列重新排入，先 abort 会让重排的消息在停止后开新一轮。
     queueStopsRef.current += 1;
     void (async () => {
@@ -1812,8 +1848,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (still && still.queue.steering.length + still.queue.followUp.length > 0) {
           const cleared = await clearQueue(id);
           if (cleared) {
-            const texts = [...cleared.steering, ...cleared.followUp];
-            if (texts.length > 0) draft.enqueue({ kind: "text", text: texts.join("\n\n") });
+            restoreQueuedMessages(draft, [...cleared.steering, ...cleared.followUp]);
           } else {
             const again = bucketsStateRef.current.buckets.get(id);
             if (again && again.queue.steering.length + again.queue.followUp.length > 0) {
@@ -1834,12 +1869,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * `prompt(streamingBehavior)`（与托盘展示顺序一致）。
    * 重新排队期间保持 queueClearing：清空的迟到空快照不会被当成交付；
    * 入队事件先于 prompt 响应写出（pi 单线程 stdout），循环结束时快照已全部就位。
-   * `onSuccess` 收到的 removed 是目标条原文（排序动作为 null）。
+   * `onSuccess` 收到的 removed 是目标条完整载荷（排序动作为 null）。
    */
   const applyQueueRewrite = useCallback(
     async (
       rewrite: QueueRewrite,
-      onSuccess: (removed: string | null, draft: ComposerDraftHandle) => void,
+      onSuccess: (removed: QueuedMessage | null, draft: ComposerDraftHandle) => void,
     ): Promise<boolean> => {
       const id = activeKeyRef.current;
       if (!id) return false;
@@ -1848,15 +1883,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!cleared) return false;
       const next = rewrite(cleared);
       if (!next) {
-        // 清空往返期间该条已交付、下标指到了别人：整队文本回填输入框，一条都不能丢
-        const texts = [...cleared.steering, ...cleared.followUp];
-        if (texts.length > 0) draft.enqueue({ kind: "text", text: texts.join("\n\n") });
+        // 清空往返期间该条已交付、下标指到了别人：整队消息回填输入框，一条都不能丢
+        restoreQueuedMessages(draft, [...cleared.steering, ...cleared.followUp]);
         showToast(t("session.queue.stale"));
         return false;
       }
-      const toQueue: Array<{ kind: QueueIntent; text: string }> = [
-        ...next.steering.map((text) => ({ kind: "steer" as const, text })),
-        ...next.followUp.map((text) => ({ kind: "followUp" as const, text })),
+      const toQueue = [
+        ...next.steering.map((message) => withQueueIntent(message, "steer")),
+        ...next.followUp.map((message) => withQueueIntent(message, "followUp")),
       ];
 
       setState((prev) =>
@@ -1867,16 +1901,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         for (let i = 0; i < toQueue.length; i += 1) {
           const item = toQueue[i];
           try {
-            await sessionService.prompt(item.text, id, undefined, item.kind);
+            await queuePayloads.current.submit(id, item, () =>
+              sessionService.prompt(item.text, id, item.images, item.intent),
+            );
           } catch {
             failedAt = i;
             break;
           }
         }
         if (failedAt >= 0) {
-          // 部分失败：尚未排回的文本回填输入框，已排回的留在 pi 队列
-          const rest = toQueue.slice(failedAt).map((item) => item.text);
-          if (rest.length > 0) draft.enqueue({ kind: "text", text: rest.join("\n\n") });
+          // 部分失败：尚未排回的消息及撤回目标保留在草稿，已排回的留在 pi 队列
+          const rest = toQueue.slice(failedAt);
+          if (next.removed && ![...next.steering, ...next.followUp].includes(next.removed)) {
+            rest.push(next.removed);
+          }
+          restoreQueuedMessages(draft, rest);
           showToast(t("session.queue.editFailed"));
           return false;
         }
@@ -1895,7 +1934,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const runQueueAction = useCallback(
     (
       rewrite: QueueRewrite,
-      onSuccess: (removed: string | null, draft: ComposerDraftHandle) => void,
+      onSuccess: (removed: QueuedMessage | null, draft: ComposerDraftHandle) => void,
     ): Promise<boolean> => {
       if (queueActionInFlightRef.current || queueStopsRef.current > 0) {
         return Promise.resolve(false);
@@ -1910,13 +1949,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [applyQueueRewrite],
   );
 
-  /** 编辑：取回该条文本到主输入栏，其余按原序重新排队。 */
+  /** 编辑：取回该条完整草稿到主输入栏，其余按原序重新排队。 */
   const takeBackQueuedItem = useCallback(
     (kind: QueueIntent, index: number, source: string): Promise<boolean> =>
       runQueueAction(
         (cleared) => removeQueueItem(cleared, kind, index, source),
         (removed, draft) => {
-          if (removed) draft.enqueue({ kind: "text", text: removed });
+          if (removed) restoreQueuedMessages(draft, [removed]);
           showToast(t("session.queue.editingReturned"));
         },
       ),

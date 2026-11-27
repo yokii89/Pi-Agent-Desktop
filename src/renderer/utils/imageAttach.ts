@@ -5,9 +5,10 @@
 
 import { t } from "../../shared/i18n";
 import type { PiImageContent } from "../../shared/ipc";
+import { MAX_PROMPT_IMAGES } from "../../shared/promptImages";
 
 /** 单条消息最多附图张数。 */
-export const MAX_ATTACH_IMAGES = 8;
+export const MAX_ATTACH_IMAGES = MAX_PROMPT_IMAGES;
 /** 长边上限（对齐 pi images.autoResize 默认 2000）。 */
 export const MAX_IMAGE_EDGE = 2000;
 /** 处理后单张字节上限（JSONL 单行 8MB 内留余量）。 */
@@ -356,7 +357,7 @@ export async function loadComposerImage(source: Blob, name?: string): Promise<Lo
   };
 }
 
-/** 仅测试用：从 base64 构造附件（不走解码）。 */
+/** 从已规范化的 base64 恢复附件；保持原始图片字节，不重复转码。 */
 export function attachmentFromBase64(
   data: string,
   mimeType: string,
@@ -364,7 +365,7 @@ export function attachmentFromBase64(
 ): ComposerImageAttachment {
   const bytes = base64ToBytes(data);
   return {
-    id: `img_test_${Math.random().toString(36).slice(2, 8)}`,
+    id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     name,
     mimeType,
     width: 0,

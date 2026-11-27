@@ -75,6 +75,15 @@ export const sessionMessages = defineMessages({
     "zh-CN": "目标会话已有未发送草稿，请先处理后重试",
     "en-US": "The target session has an unsent draft. Resolve it before trying again.",
   },
+  "session.queue.processExited": {
+    "zh-CN": "会话进程已退出，排队消息未能保留在运行队列中",
+    "en-US": "The session process exited before the queued messages could be retained.",
+  },
+  "session.queue.recoveredAfterFailure": {
+    "zh-CN": "队列操作未完成（{error}）。状态未确认的消息和附件已放回输入栏，请确认后再发送。",
+    "en-US":
+      "The queue operation did not complete ({error}). Messages and attachments with unconfirmed status are back in the input. Review them before sending again.",
+  },
   "session.queue.clearFailed": {
     "zh-CN": "清空队列失败",
     "en-US": "Couldn't clear the queue",
@@ -393,6 +402,10 @@ export const sessionMessages = defineMessages({
   "session.input.maxImages": {
     "zh-CN": "最多附 {count} 张图片",
     "en-US": "Attach at most {count} images",
+  },
+  "session.input.tooManyImages": {
+    "zh-CN": "每条消息最多发送 {count} 张图片，请移除部分图片后再发送",
+    "en-US": "Each message supports at most {count} images. Remove some images before sending.",
   },
   "session.input.loadingSlash": {
     "zh-CN": "正在加载 pi 命令…",

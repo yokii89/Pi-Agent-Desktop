@@ -15,16 +15,19 @@ export type ComposerDraftPart =
 export const MAX_CHAT_ELEMENTS = 12;
 
 export interface ComposerDraftEdit {
-  kind: "text" | "quote";
+  kind: "text" | "quote" | "focus";
   text: string;
 }
 
-export interface ComposerDraft {
+export interface ComposerDraftContent {
   content: ComposerDraftPart[];
   fileMentions: FileMention[];
   imageAttachments: ComposerImageAttachment[];
   fileAttachments: ComposerFileAttachment[];
   chatElements: BrowserContextItem[];
+}
+
+export interface ComposerDraft extends ComposerDraftContent {
   edits: ComposerDraftEdit[];
   sending: boolean;
 }
@@ -38,6 +41,17 @@ const EMPTY_DRAFT: ComposerDraft = {
   edits: [],
   sending: false,
 };
+
+/** 入队时保留可编辑内容；不把发送锁或待消费的编辑操作带回输入栏。 */
+export function snapshotComposerDraft(draft: ComposerDraftContent): ComposerDraftContent {
+  return {
+    content: draft.content.map((part) => ({ ...part })),
+    fileMentions: [...draft.fileMentions],
+    imageAttachments: [...draft.imageAttachments],
+    fileAttachments: [...draft.fileAttachments],
+    chatElements: [...draft.chatElements],
+  };
+}
 
 /** 首页按项目隔离；会话按运行时桶隔离，认领 JSONL 不改变草稿身份。 */
 export function composerDraftKey(
@@ -74,10 +88,31 @@ export function sameComposerContent(a: ComposerDraftPart[], b: ComposerDraftPart
 export class ComposerDraftHandle {
   private snapshot = EMPTY_DRAFT;
   private submitting = false;
+  private browserRevision = 0;
+  private readonly capturedElements = new WeakMap<BrowserContextItem, number>();
+  private readonly restoredDrafts = new WeakSet<ComposerDraftContent>();
 
   constructor(private readonly notify: () => void) {}
 
   getSnapshot = (): ComposerDraft => this.snapshot;
+
+  /** 记录引用采集时的导航版本，排队期间发生导航后取回也能保留过期状态。 */
+  capture(): ComposerDraftContent {
+    const content = snapshotComposerDraft(this.snapshot);
+    for (const item of content.chatElements) {
+      this.capturedElements.set(item, this.browserRevision);
+    }
+    return content;
+  }
+
+  markChatElementsStale(): void {
+    this.browserRevision += 1;
+    this.update((draft) =>
+      draft.chatElements.some((item) => !item.stale)
+        ? { ...draft, chatElements: draft.chatElements.map((item) => ({ ...item, stale: true })) }
+        : draft,
+    );
+  }
 
   update = (update: (draft: ComposerDraft) => ComposerDraft): void => {
     const next = update(this.snapshot);
@@ -123,6 +158,82 @@ export class ComposerDraftHandle {
           }
         : draft,
     );
+  }
+
+  /** 撤回消息时合并完整草稿，保留用户随后输入的正文和附件。 */
+  restore(recovered: ComposerDraftContent): void {
+    if (this.restoredDrafts.has(recovered)) return;
+    this.restoredDrafts.add(recovered);
+    const contains = <T>(current: T[], incoming: T[], key: (item: T) => string): boolean => {
+      const existing = new Set(current.map(key));
+      return incoming.every((item) => existing.has(key(item)));
+    };
+    const merge = <T>(current: T[], incoming: T[], key: (item: T) => string): T[] => {
+      const seen = new Set(current.map(key));
+      return [
+        ...current,
+        ...incoming.filter((item) => {
+          const id = key(item);
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        }),
+      ];
+    };
+    this.update((draft) => {
+      const inlineFiles = new Set(
+        draft.content.filter((part) => part.kind === "file").map((part) => part.path),
+      );
+      const inlineElements = new Set(
+        draft.content.filter((part) => part.kind === "element").map((part) => part.id),
+      );
+      // 退出事件可能先于 queued 回执；原输入尚在时不能再追加一份，也不能让迟到回执清空它。
+      const alreadyPresent =
+        sameComposerContent(draft.content, recovered.content) &&
+        contains(draft.fileMentions, recovered.fileMentions, (item) => item.path) &&
+        contains(draft.imageAttachments, recovered.imageAttachments, (item) => item.id) &&
+        contains(draft.fileAttachments, recovered.fileAttachments, (item) => item.path) &&
+        contains(draft.chatElements, recovered.chatElements, (item) => item.id);
+      const content = alreadyPresent
+        ? []
+        : recovered.content.filter(
+            (part) =>
+              (part.kind !== "file" || !inlineFiles.has(part.path)) &&
+              (part.kind !== "element" || !inlineElements.has(part.id)),
+          );
+      return {
+        ...draft,
+        content: [
+          ...draft.content,
+          ...(draft.content.length > 0 && content.length > 0
+            ? [{ kind: "text" as const, text: "\n\n" }]
+            : []),
+          ...content,
+        ],
+        fileMentions: merge(draft.fileMentions, recovered.fileMentions, (item) => item.path),
+        imageAttachments: merge(
+          draft.imageAttachments,
+          recovered.imageAttachments,
+          (item) => item.id,
+        ),
+        fileAttachments: merge(
+          draft.fileAttachments,
+          recovered.fileAttachments,
+          (item) => item.path,
+        ),
+        chatElements: merge(
+          draft.chatElements,
+          recovered.chatElements.map((item) => {
+            const revision = this.capturedElements.get(item);
+            return revision !== undefined && revision < this.browserRevision
+              ? { ...item, stale: true }
+              : item;
+          }),
+          (item) => item.id,
+        ),
+        edits: [...draft.edits, { kind: "focus", text: "" }],
+      };
+    });
   }
 
   enqueue(edit: ComposerDraftEdit): void {
@@ -205,14 +316,7 @@ export class ComposerDraftStore {
   /** 浏览器发生真实导航时，所有会话中引用旧页面的元素都应标记过期。 */
   markChatElementsStale(): void {
     for (const draft of this.drafts.values()) {
-      draft.update((current) =>
-        current.chatElements.some((item) => !item.stale)
-          ? {
-              ...current,
-              chatElements: current.chatElements.map((item) => ({ ...item, stale: true })),
-            }
-          : current,
-      );
+      draft.markChatElementsStale();
     }
   }
 }

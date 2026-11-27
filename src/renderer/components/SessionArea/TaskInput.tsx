@@ -1,6 +1,6 @@
 import { Folder } from "@phosphor-icons/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { FsSearchHit, PiSlashCommand, QueueIntent } from "../../../shared/ipc";
+import type { FsSearchHit, PiSlashCommand } from "../../../shared/ipc";
 import { FileIcon } from "../../fileIcons/FileIcon";
 import { useGlideOverlay } from "../../hooks/useGlideOverlay";
 import { useGlidePill } from "../../hooks/useGlidePill";
@@ -13,20 +13,19 @@ import { useProjectStore } from "../../stores/projectStore";
 import { useSessionMeta, useSessionQueue } from "../../stores/sessionStore";
 import { useUiStore } from "../../stores/uiStore";
 import { useComposerDraft } from "../../stores/useComposerDraft";
+import { buildComposerPrompt } from "../../utils/composerPrompt";
 import {
   createFileAttachmentId,
   MAX_ATTACH_FILES,
   routeAttachFiles,
   toDisplayPath,
 } from "../../utils/fileAttach";
-import { formatFileMentionPrompt } from "../../utils/fileMentionFormat";
 import { loadComposerImage, MAX_ATTACH_IMAGES, toPiImageContent } from "../../utils/imageAttach";
 import {
   imageCapabilityFromInput,
   imageCapabilityHint,
   imageCapabilityToast,
 } from "../../utils/imageCapability";
-import { parseSteerCommand } from "../../utils/steerCommand";
 import { Button } from "../ui/Button";
 import glideStyles from "../ui/GlideList.module.css";
 import { Composer, type ComposerHandle } from "./Composer";
@@ -339,7 +338,8 @@ export function TaskInput({
     if (!composer || edits.length === 0) return;
     for (const edit of takeEdits()) {
       if (edit.kind === "quote") composer.appendQuote(edit.text);
-      else composer.appendText(edit.text);
+      else if (edit.kind === "text") composer.appendText(edit.text);
+      else composer.focus(true);
     }
   }, [edits, takeEdits]);
 
@@ -500,10 +500,21 @@ export function TaskInput({
       buddyRef.current?.nudge("angry");
       return;
     }
+    // 多条消息取回后可超过单条上限；保留全部附件，发送前明确要求用户调整。
+    if (record.getSnapshot().imageAttachments.length > MAX_ATTACH_IMAGES) {
+      showToast(t("session.input.tooManyImages", { count: MAX_ATTACH_IMAGES }));
+      return;
+    }
     const { text: rawText, itemIds, filePaths, fileMentions: orderedFiles } = composer.read();
-    // `/steer <内容>` 是 PiDesk 输入栏命令（docs/design/73）：命中时只把正文发给 pi
-    const parsed = parseSteerCommand(rawText);
-    const text = parsed.text;
+    const {
+      text: finalText,
+      body: text,
+      intent,
+    } = buildComposerPrompt(
+      rawText,
+      orderedFiles,
+      fileAttachments.map((file) => file.path),
+    );
     const ordered = itemIds
       .map((id) => chatElements.find((item) => item.id === id))
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
@@ -515,14 +526,9 @@ export function TaskInput({
       imageAttachments.length === 0 &&
       fileAttachments.length === 0
     ) {
-      if (parsed.steer) showToast(t("session.queue.steerNeedsText"));
+      if (intent === "steer") showToast(t("session.queue.steerNeedsText"));
       return;
     }
-    /**
-     * 默认 Enter = 稍后（followUp）；显式 /steer 才插话。空闲时 pi 忽略该字段，
-     * 值仍取 followUp：phase 滞后竞态下（本地以为空闲、pi 实际在流式）默认 Enter 不能打断当前轮。
-     */
-    const intent: QueueIntent = parsed.steer ? "steer" : "followUp";
     // 软门禁：不拦发送；同模型首次附图发送时 toast 一次风险说明
     if (imageAttachments.length > 0) {
       const toastMsg = imageCapabilityToast(imageCapability);
@@ -536,15 +542,9 @@ export function TaskInput({
       setStaleConfirm(true);
       return;
     }
-    // 文件芯片已序列化为 @displayPath，与用户文字穿插；补绝对路径便于 agent 定位
-    // 条附件（docs/design/25）只进路径附注，历史侧落为底部 files 芯片
-    const finalText = formatFileMentionPrompt(
-      text,
-      orderedFiles,
-      fileAttachments.map((file) => file.path),
-    );
     const images = imageAttachments.map(toPiImageContent);
     const contextPayload = {
+      draft: record.capture(),
       ...(ordered.length > 0 ? { items: ordered, consoleErrors: browser.errors } : {}),
       ...(images.length > 0
         ? {

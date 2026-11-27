@@ -29,6 +29,15 @@ export const NAV_MOTION = {
   easeBack: "back.out(1.6)",
 } as const;
 
+/** 协作画布：布局过渡与单次状态传递，单位秒。 */
+export const AGENT_GRAPH_MOTION = {
+  transfer: NAV_MOTION.quoteFlash,
+  stagger: NAV_MOTION.revealDelay,
+  layout: NAV_MOTION.collapseEnter,
+  ease: NAV_MOTION.easeOut,
+  state: { flow: 3.6, error: 0.9, queued: 1.8 },
+} as const;
+
 /** Buddy 思考节奏：先抬眼、停顿，再缓慢回正；点阵三轮与头部一轮同时收口。 */
 export const BUDDY_THINKING_MOTION = {
   cycle: 6.3,

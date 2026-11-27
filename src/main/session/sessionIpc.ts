@@ -32,6 +32,7 @@ import {
   PI_IPC,
   SESSION_IPC,
 } from "../../shared/ipc";
+import { readPromptImages } from "../../shared/promptImages";
 import { envelope, envelopeAsync } from "../ipc/envelope";
 import { getSettings } from "../settings/settings";
 import { buildContextBreakdown } from "./contextBreakdown";
@@ -330,20 +331,7 @@ export function registerSessionIpc(): void {
         }
         const streamingBehavior =
           rawBehavior === "steer" || rawBehavior === "followUp" ? rawBehavior : undefined;
-        // 与渲染层 MAX_ATTACH_IMAGES 对齐的纵深防御：坏客户端也灌不进无限图
-        const MAX_PROMPT_IMAGES = 8;
-        const images = Array.isArray(req?.images)
-          ? req.images
-              .filter(
-                (img): img is NonNullable<typeof img> =>
-                  !!img &&
-                  typeof img === "object" &&
-                  (img as { type?: unknown }).type === "image" &&
-                  typeof (img as { data?: unknown }).data === "string" &&
-                  typeof (img as { mimeType?: unknown }).mimeType === "string",
-              )
-              .slice(0, MAX_PROMPT_IMAGES)
-          : [];
+        const images = readPromptImages(req?.images);
         if (text.trim().length === 0 && images.length === 0) {
           throw new Error("输入不能为空");
         }
