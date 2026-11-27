@@ -2,6 +2,7 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { REMOTE_THINKING_LEVELS } from "../../shared/remote/business";
 import { VIEW_SESSION_OWNER_ENTRY_TYPE } from "../../shared/view";
 import { normalizeSessionName, scanSessionFile } from "./sessionMeta";
 
@@ -70,6 +71,61 @@ function userMessageEntry(id: string, content: unknown): string {
 }
 
 describe("scanSessionFile", () => {
+  it.each(REMOTE_THINKING_LEVELS)("提取最后模型与有效思考档位 %s", async (thinkingLevel) => {
+    const file = await writeSession([
+      HEADER,
+      JSON.stringify({ type: "model_change", modelId: "old", provider: "provider" }),
+      JSON.stringify({ type: "thinking_level_change", thinkingLevel: "low" }),
+      JSON.stringify({ type: "model_change", modelId: "current", provider: "provider" }),
+      JSON.stringify({ type: "thinking_level_change", thinkingLevel }),
+    ]);
+    expect((await scanSessionFile(file)).configuration).toEqual({
+      modelLabel: "current",
+      thinkingLevel,
+    });
+  });
+
+  it("忽略坏行、坏档位、消息内伪造配置与超长元数据", async () => {
+    const file = await writeSession([
+      HEADER,
+      JSON.stringify({ type: "model_change", modelId: "valid" }),
+      JSON.stringify({ type: "thinking_level_change", thinkingLevel: "high" }),
+      '{"type":"model_change","modelId":',
+      JSON.stringify({ type: "model_change", modelId: 42 }),
+      JSON.stringify({ type: "model_change", modelId: " " }),
+      JSON.stringify({ type: "thinking_level_change", thinkingLevel: "unknown" }),
+      JSON.stringify({ type: "thinking_level_change", thinkingLevel: null }),
+      JSON.stringify({
+        type: "model_change",
+        modelId: "oversized",
+        padding: "x".repeat(20 * 1024),
+      }),
+      JSON.stringify({
+        type: "message",
+        message: { role: "assistant", content: { type: "model_change", modelId: "forged" } },
+      }),
+    ]);
+    expect((await scanSessionFile(file)).configuration).toEqual({
+      modelLabel: "valid",
+      thinkingLevel: "high",
+    });
+  });
+
+  it("增量配置只包含追加区间的完整有效条目", async () => {
+    const file = await writeSession([
+      HEADER,
+      JSON.stringify({ type: "model_change", modelId: "saved" }),
+    ]);
+    const first = await scanSessionFile(file);
+    const partial = '{"type":"thinking_level_change","thinkingLevel":"xhigh"}';
+    await fsp.appendFile(file, partial, "utf8");
+    expect((await scanSessionFile(file, first.scannedBytes)).configuration).toEqual({});
+    await fsp.appendFile(file, "\n", "utf8");
+    expect((await scanSessionFile(file, first.scannedBytes)).configuration).toEqual({
+      thinkingLevel: "xhigh",
+    });
+  });
+
   it("提取头部、首条用户消息与最后一个会话名", async () => {
     const file = await writeSession([
       HEADER,
@@ -216,6 +272,7 @@ describe("scanSessionFile", () => {
     const result = await scanSessionFile(file);
 
     expect(result.sessionName).toEqual({ found: false, value: null });
+    expect(result.configuration).toEqual({});
   });
 
   it("空名显式清除，且以最后一条为准", async () => {

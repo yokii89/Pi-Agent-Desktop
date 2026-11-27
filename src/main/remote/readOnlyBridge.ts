@@ -20,6 +20,7 @@ import {
   MAX_FRAME_BYTES,
   MAX_PROMPT_LENGTH,
   PROJECT_PAGE_SIZE,
+  type RemoteSessionConfiguration,
   type RequestFrame,
 } from "../../shared/remote/business";
 import { type HistoryView, historyPage, historyRevision } from "./historySync";
@@ -30,7 +31,7 @@ export interface RemoteProject {
   name: string;
   description: { "zh-CN": string; "en-US": string };
 }
-export interface RemoteSession {
+export interface RemoteSession extends RemoteSessionConfiguration {
   id: string;
   projectId: string;
   title: string;

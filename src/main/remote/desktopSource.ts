@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import type { SessionPushMessage } from "../../shared/ipc";
+import {
+  REMOTE_THINKING_LEVELS,
+  type RemoteSessionConfiguration,
+} from "../../shared/remote/business";
 import { pendingUiRequests } from "../session/extensionUi";
 import { getPiAgentDir } from "../session/piInfo";
 import {
@@ -13,7 +17,7 @@ import {
   setSessionName,
 } from "../session/piSession";
 import { ensureSessionReady, listRuntimeSnapshots } from "../session/runtimeCoordinator";
-import { encodeCwdToSessionDir, listSessions } from "../session/sessionHistory";
+import { encodeCwdToSessionDir, getSessionMeta, listSessions } from "../session/sessionHistory";
 import { SESSION_PREVIEW_MAX_LENGTH } from "../session/sessionMeta";
 import { getSettings } from "../settings/settings";
 import { completedHistory, EMPTY_TAIL, RemoteHistoryReader } from "./historySync";
@@ -34,6 +38,31 @@ const idForCreate = (creationKey: string) =>
   `remote_${createHash("sha256").update(creationKey).digest("hex").slice(0, 48)}`;
 const sessionRoot = () => path.join(getPiAgentDir(), "sessions");
 const sessionDirectory = (cwd: string) => path.join(sessionRoot(), encodeCwdToSessionDir(cwd));
+
+function remoteConfiguration(configuration: {
+  modelLabel?: unknown;
+  thinkingLevel?: unknown;
+}): RemoteSessionConfiguration {
+  const result: RemoteSessionConfiguration = {};
+  if (typeof configuration.modelLabel === "string" && configuration.modelLabel.trim())
+    result.modelLabel = sanitizeRemoteText(configuration.modelLabel).slice(0, 256);
+  const level = REMOTE_THINKING_LEVELS.find((value) => value === configuration.thinkingLevel);
+  if (level !== undefined) result.thinkingLevel = level;
+  return result;
+}
+
+function stateConfiguration(state: unknown): RemoteSessionConfiguration {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return {};
+  const current = state as { model?: unknown; thinkingLevel?: unknown };
+  const model =
+    current.model && typeof current.model === "object"
+      ? (current.model as { name?: unknown; id?: unknown })
+      : null;
+  return remoteConfiguration({
+    modelLabel: typeof model?.name === "string" && model.name.trim() ? model.name : model?.id,
+    thinkingLevel: current.thinkingLevel,
+  });
+}
 
 /** Only sanitized public DTOs leave the desktop main process. */
 export class DesktopReadOnlySource implements ReadOnlySource {
@@ -58,6 +87,8 @@ export class DesktopReadOnlySource implements ReadOnlySource {
         "tool_execution_start",
         "tool_execution_end",
         "session_name_changed",
+        "session_info_changed",
+        "thinking_level_changed",
       ].includes(update.type),
     );
   }
@@ -108,9 +139,22 @@ export class DesktopReadOnlySource implements ReadOnlySource {
         if (!getSettings().projects.some((p) => p.id === project.id && p.dir === project.dir))
           continue;
         const id = publicId(project.id, s.file);
-        refs.set(id, { file: s.file, projectId: project.id, root: project.dir });
         const live = runtime.find((r) => r.sessionFile === s.file);
         const liveId = liveSessionIdForFile(s.file);
+        let configuration = (await getSessionMeta(s.file)).configuration;
+        if (liveId) {
+          try {
+            configuration = {
+              ...configuration,
+              ...stateConfiguration(await fetchSessionState(liveId)),
+            };
+          } catch {
+            // A process may exit while listing; use its saved session configuration.
+          }
+        }
+        if (!getSettings().projects.some((p) => p.id === project.id && p.dir === project.dir))
+          continue;
+        refs.set(id, { file: s.file, projectId: project.id, root: project.dir });
         const title = sanitizeRemoteText(s.sessionName || s.firstUserMessage || "PiDesk").slice(
           0,
           256,
@@ -121,6 +165,7 @@ export class DesktopReadOnlySource implements ReadOnlySource {
             this.runtimeSessions.delete(this.runtimeSessions.keys().next().value as string);
         }
         result.push({
+          ...remoteConfiguration(configuration),
           id,
           projectId: project.id,
           title,
@@ -237,9 +282,15 @@ export class DesktopReadOnlySource implements ReadOnlySource {
       state && typeof state === "object" ? (state as { sessionFile?: unknown }).sessionFile : null;
     if (typeof file !== "string" || !file) throw new Error("STATE_UNAVAILABLE");
     const id = publicId(projectId, file);
-    this.refs.set(id, { file, projectId, root: project.dir });
     const sessions = await listSessions(project.dir);
     const summary = sessions.find((item) => item.file === file);
+    const configuration = {
+      ...remoteConfiguration((await getSessionMeta(file)).configuration),
+      ...stateConfiguration(state),
+    };
+    if (!getSettings().projects.some((p) => p.id === projectId && p.dir === project.dir))
+      throw new Error("RESOURCE_UNAVAILABLE");
+    this.refs.set(id, { file, projectId, root: project.dir });
     const sessionTitle = sanitizeRemoteText(summary?.sessionName || title).slice(0, 256);
     this.runtimeSessions.set(started.sessionId, {
       id,
@@ -248,6 +299,7 @@ export class DesktopReadOnlySource implements ReadOnlySource {
       root: project.dir,
     });
     return {
+      ...configuration,
       id,
       projectId,
       title: sessionTitle,

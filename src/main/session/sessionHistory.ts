@@ -3,6 +3,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { shell } from "electron";
 import type { SessionSummary } from "../../shared/ipc";
+import type { RemoteSessionConfiguration } from "../../shared/remote/business";
 import type { ViewSessionOwner } from "../../shared/view";
 import { getSettings, updateSettings } from "../settings/settings";
 import { getPiAgentDir } from "./piInfo";
@@ -29,6 +30,7 @@ interface SessionMeta {
   latestUserMessage: string | null;
   sessionName: string | null;
   viewOwner: ViewSessionOwner | null;
+  configuration: RemoteSessionConfiguration;
   lastActivityAt: number | null;
 }
 
@@ -48,6 +50,7 @@ const EMPTY_META: SessionMeta = {
   latestUserMessage: null,
   sessionName: null,
   viewOwner: null,
+  configuration: {},
   lastActivityAt: null,
 };
 
@@ -84,6 +87,7 @@ export async function getSessionMeta(file: string): Promise<SessionMeta> {
           : cached.latestUserMessage,
         sessionName: scan.sessionName.found ? scan.sessionName.value : cached.sessionName,
         viewOwner: scan.viewOwner ?? cached.viewOwner,
+        configuration: { ...cached.configuration, ...scan.configuration },
         lastActivityAt: scan.lastActivityAt ?? cached.lastActivityAt,
         scannedBytes: Math.max(cached.scannedBytes, scan.scannedBytes),
       };
@@ -100,6 +104,7 @@ export async function getSessionMeta(file: string): Promise<SessionMeta> {
       latestUserMessage: scan.latestUserMessage.value,
       sessionName: scan.sessionName.found ? scan.sessionName.value : null,
       viewOwner: scan.viewOwner,
+      configuration: scan.configuration,
       lastActivityAt: scan.lastActivityAt,
       scannedBytes: scan.scannedBytes,
     };

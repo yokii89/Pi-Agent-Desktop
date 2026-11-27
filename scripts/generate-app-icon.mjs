@@ -76,9 +76,50 @@ const previewDir = process.env.PREVIEW_DIR;
 const previewSide = Number(process.env.PREVIEW_SIDE);
 const sizes = JSON.parse(process.env.SIZES);
 
+function visibleBounds(image) {
+  const { width, height } = image.getSize();
+  const bitmap = image.toBitmap();
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (bitmap[(y * width + x) * 4 + 3] === 0) continue;
+      left = Math.min(left, x);
+      top = Math.min(top, y);
+      right = Math.max(right, x);
+      bottom = Math.max(bottom, y);
+    }
+  }
+  if (right < left) throw new Error("图标没有可见内容");
+  return { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
+}
+
+function enlargePreview(image, minimumSide) {
+  const bounds = visibleBounds(image);
+  const side = Math.max(bounds.width, bounds.height);
+  if (side >= minimumSide) return image;
+  const width = Math.round(bounds.width * minimumSide / side);
+  const height = Math.round(bounds.height * minimumSide / side);
+  const resized = image.crop(bounds).resize({ width, height, quality: "best" }).toBitmap();
+  const canvas = Buffer.alloc(previewSide * previewSide * 4);
+  const left = Math.floor((previewSide - width) / 2);
+  const top = Math.floor((previewSide - height) / 2);
+  for (let y = 0; y < height; y++) {
+    resized.copy(canvas, ((top + y) * previewSide + left) * 4, y * width * 4, (y + 1) * width * 4);
+  }
+  return nativeImage.createFromBitmap(canvas, { width: previewSide, height: previewSide });
+}
+
 app.whenReady().then(() => {
   const output = [];
   try {
+    // 透明留白不同，较小预览的可见区域向经典粉对齐；较大图标保留原样。
+    const reference = nativeImage.createFromPath(sources.find(source => source.id === "classic").path)
+      .resize({ width: previewSide, height: previewSide, quality: "best" });
+    const referenceBounds = visibleBounds(reference);
+    const minimumSide = Math.max(referenceBounds.width, referenceBounds.height);
     for (const source of sources) {
       const image = nativeImage.createFromPath(source.path);
       if (image.isEmpty()) throw new Error("无法渲染图标：" + source.id);
@@ -86,7 +127,10 @@ app.whenReady().then(() => {
       fs.writeFileSync(path.join(outDir, source.id + ".png"), master.toPNG());
       fs.writeFileSync(
         path.join(previewDir, source.id + ".png"),
-        master.resize({ width: previewSide, height: previewSide, quality: "best" }).toPNG(),
+        enlargePreview(
+          master.resize({ width: previewSide, height: previewSide, quality: "best" }),
+          minimumSide,
+        ).toPNG(),
       );
       output.push({
         id: source.id,

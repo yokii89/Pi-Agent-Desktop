@@ -1,4 +1,8 @@
 import { createReadStream } from "node:fs";
+import {
+  REMOTE_THINKING_LEVELS,
+  type RemoteSessionConfiguration,
+} from "../../shared/remote/business";
 import { VIEW_SESSION_OWNER_ENTRY_TYPE, type ViewSessionOwner } from "../../shared/view";
 
 export interface SessionHeader {
@@ -29,6 +33,8 @@ export interface SessionScanResult {
   sessionName: SessionNameScan;
   /** 本次扫描区间内最后一个有效的面板归属；无效条目不会清除已有归属。 */
   viewOwner: ViewSessionOwner | null;
+  /** Valid configuration changes in this scan interval only. */
+  configuration: RemoteSessionConfiguration;
   /**
    * 本次扫描区间内最后一条 message 条目的时间（Unix ms）。
    * 只用来表示「会话最近活跃」，改名 / 切模型这类元数据追加不算。
@@ -54,6 +60,10 @@ const TIMESTAMP_FIELD = '"timestamp":"';
 
 /** 条目时间戳固定出现在 id / parentId 之后，256 字节足够覆盖前缀。 */
 const TIMESTAMP_PREFIX_BYTES = 256;
+
+// Configuration entries are small; never decode a message body to find metadata.
+const CONFIGURATION_MAX_BYTES = 16 * 1024;
+const CONFIGURATION_PREFIX = /^\s*\{\s*"type"\s*:\s*"(?:model_change|thinking_level_change)"/;
 
 /** 与 pi `appendSessionInfo` / `getSessionName` 一致：换行压成空格、trim，空串视为未命名。 */
 export function normalizeSessionName(value: unknown): string | null {
@@ -120,6 +130,7 @@ export async function scanSessionFile(file: string, startOffset = 0): Promise<Se
   let header: SessionHeader | null = null;
   let firstUserMessage: string | null = null;
   const latestUserMessageLine: { value: Buffer | null } = { value: null };
+  const configuration: RemoteSessionConfiguration = {};
   let nameFound = false;
   let nameValue: string | null = null;
   let viewOwner: ViewSessionOwner | null = null;
@@ -141,6 +152,30 @@ export async function scanSessionFile(file: string, startOffset = 0): Promise<Se
         } catch {
           // 首行损坏时保持 header=null
         }
+      }
+    }
+    if (
+      line.length <= CONFIGURATION_MAX_BYTES &&
+      CONFIGURATION_PREFIX.test(line.subarray(0, TIMESTAMP_PREFIX_BYTES).toString("utf8"))
+    ) {
+      try {
+        const entry = JSON.parse(line.toString("utf8")) as {
+          type?: unknown;
+          modelId?: unknown;
+          thinkingLevel?: unknown;
+        };
+        if (
+          entry.type === "model_change" &&
+          typeof entry.modelId === "string" &&
+          entry.modelId.trim()
+        )
+          configuration.modelLabel = entry.modelId;
+        if (entry.type === "thinking_level_change") {
+          const level = REMOTE_THINKING_LEVELS.find((value) => value === entry.thinkingLevel);
+          if (level !== undefined) configuration.thinkingLevel = level;
+        }
+      } catch {
+        // Ignore incomplete or malformed metadata without losing the last valid configuration.
       }
     }
     const userRoleAtStart = line.subarray(0, 512).includes(USER_ROLE_NEEDLE);
@@ -257,6 +292,7 @@ export async function scanSessionFile(file: string, startOffset = 0): Promise<Se
     latestUserMessage,
     sessionName: { found: nameFound, value: nameValue },
     viewOwner,
+    configuration,
     lastActivityAt: Number.isNaN(parsedActivity) ? null : parsedActivity,
     scannedBytes,
   };

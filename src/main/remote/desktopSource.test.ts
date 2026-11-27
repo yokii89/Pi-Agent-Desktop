@@ -1,5 +1,6 @@
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { RemoteSessionConfiguration } from "../../shared/remote/business";
 
 const f = vi.hoisted(() => ({
   projects: [
@@ -12,6 +13,9 @@ const f = vi.hoisted(() => ({
   fetch: vi.fn(),
   liveId: vi.fn(),
   hasSession: vi.fn(),
+  meta: vi.fn(),
+  state: vi.fn(),
+  ensure: vi.fn(),
 }));
 vi.mock("../settings/settings", () => ({ getSettings: () => ({ projects: f.projects }) }));
 vi.mock("../session/piInfo", () => ({ getPiAgentDir: () => "C:/pi" }));
@@ -19,11 +23,12 @@ vi.mock("../session/sessionHistory", () => ({
   encodeCwdToSessionDir: (cwd: string) =>
     `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`,
   listSessions: f.list,
+  getSessionMeta: f.meta,
 }));
 vi.mock("../session/runtimeCoordinator", () => ({
   listRuntimeSnapshots: () => [],
   getRuntimeState: () => "busy",
-  ensureSessionReady: vi.fn(),
+  ensureSessionReady: f.ensure,
 }));
 vi.mock("../session/extensionUi", () => ({ pendingUiRequests: () => [] }));
 vi.mock("../session/piSession", () => ({
@@ -31,7 +36,7 @@ vi.mock("../session/piSession", () => ({
   hasSession: f.hasSession,
   fetchSessionMessages: f.fetch,
   abortSession: vi.fn(),
-  fetchSessionState: vi.fn(),
+  fetchSessionState: f.state,
   promptSession: vi.fn(),
   respondSessionUi: vi.fn(),
   setSessionName: vi.fn(),
@@ -75,6 +80,7 @@ beforeEach(() => {
   f.list.mockResolvedValue([summary()]);
   f.guard.mockImplementation(async (file: string) => file);
   f.liveId.mockReturnValue(null);
+  f.meta.mockResolvedValue({ configuration: {} });
   f.history.mockResolvedValue([{ id: "m_0_0", role: "user", text: "disk", state: "done" }]);
 });
 
@@ -104,6 +110,152 @@ describe("desktop remote catalog integration", () => {
 
     expect(session.title).toBe("Hello");
     expect(session.preview).toBe("查看 [local path]");
+  });
+  it("prefers live configuration and only exposes the visible fields", async () => {
+    f.meta.mockResolvedValue({ configuration: { modelLabel: "saved", thinkingLevel: "low" } });
+    f.liveId.mockReturnValue("live-1");
+    f.state.mockResolvedValue({
+      model: { name: "Actual model", id: "model-id", apiKey: "private" },
+      thinkingLevel: "max",
+      sessionFile: summary().file,
+      credentials: "private",
+    });
+
+    const [session] = await new DesktopReadOnlySource().sessions(["allowed"]);
+
+    expect(f.meta).toHaveBeenCalledWith(summary().file);
+    expect(f.state).toHaveBeenCalledExactlyOnceWith("live-1");
+    expect(session).toEqual({
+      id: expect.any(String),
+      projectId: "allowed",
+      title: "Hello",
+      status: "idle",
+      updatedAt: 1,
+      preview: "latest prompt",
+      modelLabel: "Actual model",
+      thinkingLevel: "max",
+    });
+  });
+  it("falls back to saved configuration when the live state read fails", async () => {
+    f.meta.mockResolvedValue({ configuration: { modelLabel: "saved", thinkingLevel: "off" } });
+    f.liveId.mockReturnValue("live-1");
+    f.state.mockRejectedValue(new Error("process exited"));
+
+    const [session] = await new DesktopReadOnlySource().sessions(["allowed"]);
+
+    expect(session).toMatchObject({ modelLabel: "saved", thinkingLevel: "off" });
+    expect(f.ensure).not.toHaveBeenCalled();
+  });
+  it.each<[unknown, RemoteSessionConfiguration]>([
+    [
+      { model: { id: "model-id" }, thinkingLevel: "xhigh" },
+      { modelLabel: "model-id", thinkingLevel: "xhigh" },
+    ],
+    [
+      { model: { name: " ", id: "model-id" }, thinkingLevel: "high" },
+      { modelLabel: "model-id", thinkingLevel: "high" },
+    ],
+    [{ model: { name: 42, id: null }, thinkingLevel: "invalid" }, {}],
+    [{ model: null, thinkingLevel: 42 }, {}],
+    [null, {}],
+  ])(
+    "uses the model id fallback and rejects malformed live values: %j",
+    async (state, expected) => {
+      f.liveId.mockReturnValue("live-1");
+      f.state.mockResolvedValue(state);
+      const [session] = await new DesktopReadOnlySource().sessions(["allowed"]);
+      expect(session.modelLabel).toBe(expected.modelLabel);
+      expect(session.thinkingLevel).toBe(expected.thinkingLevel);
+    },
+  );
+  it("lists saved cold configuration without starting pi or requesting live state", async () => {
+    f.meta.mockResolvedValue({ configuration: { modelLabel: "saved", thinkingLevel: "medium" } });
+    const [session] = await new DesktopReadOnlySource().sessions(["allowed"]);
+    expect(session).toMatchObject({ modelLabel: "saved", thinkingLevel: "medium" });
+    expect(f.state).not.toHaveBeenCalled();
+    expect(f.ensure).not.toHaveBeenCalled();
+  });
+  it("omits unknown configuration for old sessions", async () => {
+    const [session] = await new DesktopReadOnlySource().sessions(["allowed"]);
+    expect(session).not.toHaveProperty("modelLabel");
+    expect(session).not.toHaveProperty("thinkingLevel");
+  });
+  it.each([false, true])(
+    "sanitizes and bounds model labels from disk or live state (%s)",
+    async (live) => {
+      const modelLabel = `model C:\\Users\\secret\\private.txt ${"x".repeat(300)}`;
+      if (live) {
+        f.liveId.mockReturnValue("live-1");
+        f.state.mockResolvedValue({ model: { name: modelLabel } });
+      } else f.meta.mockResolvedValue({ configuration: { modelLabel } });
+      const [session] = await new DesktopReadOnlySource().sessions(["allowed"]);
+      expect(session.modelLabel).toBe(`model [local path] ${"x".repeat(300)}`.slice(0, 256));
+    },
+  );
+  it("refreshes configuration for thinking and session info events, including batches", async () => {
+    const source = new DesktopReadOnlySource();
+    f.liveId.mockReturnValue("live-1");
+    f.state.mockResolvedValue({ model: { name: "Actual" }, thinkingLevel: "low" });
+    expect((await source.sessions(["allowed"]))[0].thinkingLevel).toBe("low");
+    expect(
+      source.observe({
+        sessionId: "live-1",
+        type: "event",
+        payload: { type: "thinking_level_changed", level: "high" },
+      }),
+    ).toBe(true);
+    f.state.mockResolvedValue({ model: { name: "Actual" }, thinkingLevel: "high" });
+    expect((await source.sessions(["allowed"]))[0].thinkingLevel).toBe("high");
+    expect(
+      source.observe({
+        sessionId: "live-1",
+        type: "eventBatch",
+        payload: [{ type: "thinking_level_changed", level: "high" }],
+      }),
+    ).toBe(true);
+    expect(
+      source.observe({
+        sessionId: "live-1",
+        type: "event",
+        payload: { type: "session_info_changed", name: "Renamed" },
+      }),
+    ).toBe(true);
+    expect(source.observe({ sessionId: "live-1", type: "eventBatch", payload: [] })).toBe(false);
+  });
+  it.each(["removed", "replaced"])(
+    "hides projects %s while fetching live configuration",
+    async (change) => {
+      const source = new DesktopReadOnlySource();
+      f.liveId.mockReturnValue("live-1");
+      f.state.mockImplementation(async () => {
+        f.projects = change === "removed" ? [] : [{ id: "allowed", name: "New", dir: "C:/new" }];
+        return { model: { name: "Must not escape" }, thinkingLevel: "high" };
+      });
+      expect(await source.sessions(["allowed"])).toEqual([]);
+      expect(await source.notificationSession("live-1", ["allowed"])).toBeNull();
+    },
+  );
+  it("reuses the create state read for the returned configuration", async () => {
+    f.ensure.mockResolvedValue({ sessionId: "created" });
+    f.state.mockResolvedValue({
+      sessionFile: summary().file,
+      model: { name: "Created model" },
+      thinkingLevel: "minimal",
+    });
+    const session = await new DesktopReadOnlySource().create("allowed", "New", "creation-key");
+    expect(session).toMatchObject({ modelLabel: "Created model", thinkingLevel: "minimal" });
+    expect(f.state).toHaveBeenCalledExactlyOnceWith("created");
+  });
+  it("rejects creation if the project is replaced during metadata loading", async () => {
+    f.ensure.mockResolvedValue({ sessionId: "created" });
+    f.state.mockResolvedValue({ sessionFile: summary().file });
+    f.meta.mockImplementation(async () => {
+      f.projects = [{ id: "allowed", name: "New", dir: "C:/new" }];
+      return { configuration: {} };
+    });
+    await expect(
+      new DesktopReadOnlySource().create("allowed", "New", "creation-key"),
+    ).rejects.toThrow("RESOURCE_UNAVAILABLE");
   });
   it("maps runtime sessions to notifications only within their configured project scope", async () => {
     const source = new DesktopReadOnlySource();
