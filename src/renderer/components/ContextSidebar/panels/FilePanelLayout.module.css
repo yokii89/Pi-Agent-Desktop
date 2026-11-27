@@ -1,0 +1,51 @@
+.layout {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.layout[data-split="true"] {
+  display: grid;
+}
+
+.pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pane[hidden],
+.divider[hidden] {
+  display: none;
+}
+
+.divider {
+  position: relative;
+  width: var(--file-panel-divider-width);
+  min-height: 0;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.divider::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--color-border);
+}
+
+.divider:hover::before,
+.divider:focus-visible::before,
+.divider[data-dragging="true"]::before {
+  width: var(--file-panel-divider-line-width);
+  background: var(--color-accent-border);
+  transform: translateX(-50%);
+}

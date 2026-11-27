@@ -6,6 +6,14 @@
   min-width: 0;
 }
 
+.layoutToggle {
+  flex-shrink: 0;
+}
+
+.layoutToggle[aria-pressed="true"] {
+  background: var(--color-accent-subtle);
+}
+
 .searchRow {
   display: flex;
   align-items: center;
@@ -94,6 +102,12 @@
   gap: var(--spacing-xs);
   margin: var(--spacing-sm);
   min-width: 0;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.previewHeader > button {
+  flex-shrink: 0;
 }
 
 .previewPath {

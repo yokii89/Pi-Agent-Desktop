@@ -1,5 +1,4 @@
-/* 文件面板内查找条：贴在预览头部下方的一条窄行，不吃滚动区高度 */
-
+/* Shared Ctrl+F field. Inline previews keep the compact bar; PDF and Office use its floating variant. */
 .bar {
   display: flex;
   align-items: center;
@@ -15,6 +14,23 @@
   border-color: var(--color-accent-border);
 }
 
+.bar[data-floating] {
+  margin: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.bar[data-floating]:focus-within {
+  box-shadow: inset 0 -1px var(--color-accent-border);
+}
+
+.icon {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
 .input {
   flex: 1;
   min-width: 0;
@@ -28,7 +44,7 @@
   color: var(--color-text-muted);
 }
 
-/* 计数用等宽数字：跳命中时宽度不跳，箭头按钮不会左右挪 */
+/* Tabular digits prevent the action buttons from shifting as the active result changes. */
 .count {
   flex-shrink: 0;
   color: var(--color-text-muted);

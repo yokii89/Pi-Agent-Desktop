@@ -12,7 +12,7 @@ import { revealInNearestScroller } from "../utils/revealInScroller";
 const HIGHLIGHT_ALL = "pidesk-find";
 const HIGHLIGHT_ACTIVE = "pidesk-find-active";
 
-interface PreviewFindState {
+export interface PreviewFindState {
   open: boolean;
   query: string;
   /** 命中总数。 */

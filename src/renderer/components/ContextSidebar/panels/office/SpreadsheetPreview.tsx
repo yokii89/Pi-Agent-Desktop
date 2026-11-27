@@ -1,5 +1,5 @@
 import { Copy } from "@phosphor-icons/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
   OFFICE_PARSE_TIMEOUT_MS,
   OFFICE_SEARCH_MAX_RESULTS,
@@ -40,11 +40,13 @@ export function SpreadsheetPreview({
   onFailure,
   onSearchProvider,
   searchOpen,
+  searchControl,
 }: {
   data: Uint8Array;
   onFailure: (issue: OfficePreviewIssue) => void;
   onSearchProvider: (provider: OfficeSearchProvider | null) => void;
   searchOpen: boolean;
+  searchControl: ReactNode;
 }) {
   const t = useT();
   const { showToast } = useUiStore();
@@ -200,8 +202,8 @@ export function SpreadsheetPreview({
   };
   return (
     <>
-      {sheets.length > 0 && (
-        <div className={styles.toolbar}>
+      <div className={styles.sheetToolbar}>
+        {sheets.length > 0 && (
           <Select
             ariaLabel={t("panels.files.office.sheet")}
             rootClassName={styles.sheetSelect}
@@ -209,6 +211,9 @@ export function SpreadsheetPreview({
             options={sheets.map((name, i) => ({ value: String(i), label: name }))}
             onChange={selectSheet}
           />
+        )}
+        <div className={styles.sheetActions}>
+          {searchControl}
           <IconButton
             title={t("panels.files.office.copyCells")}
             disabled={!sheet?.rows.length}
@@ -217,7 +222,7 @@ export function SpreadsheetPreview({
             <Copy size={16} weight="regular" />
           </IconButton>
         </div>
-      )}
+      </div>
       {!sheet ? (
         <p className={styles.note} role="status">
           {t("panels.files.office.loading")}
@@ -226,20 +231,24 @@ export function SpreadsheetPreview({
         <p className={styles.note}>{t("panels.files.csvEmpty")}</p>
       ) : (
         <>
-          <p className={styles.note}>
-            {t(
-              sheet.truncated
-                ? "panels.files.office.sheetTruncated"
-                : "panels.files.office.sheetSize",
-              {
-                rows: sheet.rows.length,
-                columns: sheet.columns.length,
-                totalRows: sheet.totalRows,
-                totalColumns: sheet.totalColumns,
-              },
-            )}
-          </p>
-          <p className={styles.note}>{t("panels.files.office.range", { range: sheet.range })}</p>
+          <div className={styles.sheetMetadata}>
+            <p className={styles.sheetSize}>
+              {t(
+                sheet.truncated
+                  ? "panels.files.office.sheetTruncated"
+                  : "panels.files.office.sheetSize",
+                {
+                  rows: sheet.rows.length,
+                  columns: sheet.columns.length,
+                  totalRows: sheet.totalRows,
+                  totalColumns: sheet.totalColumns,
+                },
+              )}
+            </p>
+            <p className={styles.sheetRange}>
+              {t("panels.files.office.range", { range: sheet.range })}
+            </p>
+          </div>
           <SpreadsheetTable
             sheet={sheet}
             name={sheets[index]}

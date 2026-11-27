@@ -1,7 +1,8 @@
 import { CaretLeft, CaretRight, Copy } from "@phosphor-icons/react";
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask, TextLayer } from "pdfjs-dist";
-import { useEffect, useRef, useState } from "react";
+import { type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { FsReadPdfResult } from "../../../../shared/ipc";
+import type { PreviewFindState } from "../../../hooks/usePreviewFind";
 import { useT } from "../../../hooks/useT";
 import { useUiStore } from "../../../stores/uiStore";
 import { copyTextToClipboard } from "../../../utils/clipboard";
@@ -10,9 +11,17 @@ import { getPdfResourceOptions } from "../../../utils/pdfResources";
 import { previewPageStep } from "../../../utils/previewPageKeys";
 import panelStyles from "./FilePanel.module.css";
 import styles from "./PdfPreview.module.css";
+import { PreviewFindBar } from "./PreviewFindBar";
+import { SearchPopover, type SearchPopoverHandle } from "./SearchPopover";
 
 interface PdfPreviewProps {
   result: FsReadPdfResult;
+  find: PreviewFindState;
+  ref?: Ref<PdfPreviewHandle>;
+}
+
+export interface PdfPreviewHandle {
+  openSearch(): void;
 }
 
 /** 单页文本项（含字形定位的那一支；标记内容项会被过滤掉）。 */
@@ -53,7 +62,7 @@ function pageText(items: readonly PdfTextItem[]): string {
  * PDF 只读预览：按页把页面画进 canvas，再叠一层透明文本层（pdfjs TextLayer）
  * ——没有文本层就只能看不能选，也复制不出任何内容。
  */
-export function PdfPreview({ result }: PdfPreviewProps) {
+export function PdfPreview({ result, find, ref }: PdfPreviewProps) {
   const t = useT();
   const { showToast } = useUiStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -64,6 +73,12 @@ export function PdfPreview({ result }: PdfPreviewProps) {
   const [page, setPage] = useState(1);
   const [availableWidth, setAvailableWidth] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const searchRef = useRef<SearchPopoverHandle>(null);
+  useImperativeHandle(ref, () => ({ openSearch: () => searchRef.current?.openSearch() }), []);
+
+  useEffect(() => {
+    if (error) find.close();
+  }, [error, find.close]);
 
   useEffect(() => {
     const element = canvasWrapRef.current;
@@ -203,37 +218,57 @@ export function PdfPreview({ result }: PdfPreviewProps) {
   if (error) return <p className={panelStyles.noMatch}>{error}</p>;
   return (
     <div className={styles.wrap}>
-      {documentState && (
-        <div className={styles.toolbar}>
-          <button
-            type="button"
-            className={styles.button}
-            disabled={page <= 1}
-            onClick={() => setPage((value) => value - 1)}
-            title={t("panels.files.backPrevious")}
-          >
-            <CaretLeft size={16} weight="regular" />
-          </button>
-          <span>{t("panels.files.pdfPage", { page, total: documentState.numPages })}</span>
-          <button
-            type="button"
-            className={styles.button}
-            disabled={page >= documentState.numPages}
-            onClick={() => setPage((value) => value + 1)}
-            title={t("panels.files.forwardNext")}
-          >
-            <CaretRight size={16} weight="regular" />
-          </button>
-          <button
-            type="button"
-            className={styles.button}
-            onClick={copyPage}
-            title={t("panels.files.copyPageText")}
-          >
-            <Copy size={16} weight="regular" />
-          </button>
-        </div>
-      )}
+      <div className={styles.toolbar}>
+        {documentState && (
+          <>
+            <button
+              type="button"
+              className={styles.button}
+              disabled={page <= 1}
+              onClick={() => setPage((value) => value - 1)}
+              title={t("panels.files.backPrevious")}
+            >
+              <CaretLeft size={16} weight="regular" />
+            </button>
+            <span>{t("panels.files.pdfPage", { page, total: documentState.numPages })}</span>
+            <button
+              type="button"
+              className={styles.button}
+              disabled={page >= documentState.numPages}
+              onClick={() => setPage((value) => value + 1)}
+              title={t("panels.files.forwardNext")}
+            >
+              <CaretRight size={16} weight="regular" />
+            </button>
+            <button
+              type="button"
+              className={styles.button}
+              onClick={copyPage}
+              title={t("panels.files.copyPageText")}
+            >
+              <Copy size={16} weight="regular" />
+            </button>
+          </>
+        )}
+        <SearchPopover
+          ref={searchRef}
+          title={t("panels.files.office.searchTitle")}
+          onOpenChange={(open) => (open ? find.openFind() : find.close())}
+        >
+          {(close, focusTick) => (
+            <PreviewFindBar
+              query={find.query}
+              count={find.count}
+              current={find.current}
+              focusTick={focusTick}
+              floating
+              onQuery={find.setQuery}
+              onStep={find.step}
+              onClose={close}
+            />
+          )}
+        </SearchPopover>
+      </div>
       <div className={styles.canvasWrap} ref={canvasWrapRef}>
         {documentState ? (
           <div className={styles.page}>

@@ -281,6 +281,9 @@
    * 宿主区若贴着侧栏左缘，把手在页面区域就收不到 pointerdown。
    */
   --context-sidebar-resize-gutter: 8px;
+  /* 工作区文件目录与预览之间的内部拖拽条。 */
+  --file-panel-divider-width: 8px;
+  --file-panel-divider-line-width: 2px;
   /**
    * 悬浮输入栏实测高度（SessionArea 运行时写入 --session-input-height）。
    * 此默认值仅作首帧兜底；多行/附件/建议面板长高后必须跟上，否则末尾正文会被压住（docs/design/10 C4）。
