@@ -6,7 +6,6 @@ import {
 } from "../../../shared/wallpaper";
 import { useT } from "../../hooks/useT";
 import { useUiStore } from "../../stores/uiStore";
-import { prefersReducedMotion } from "../../utils/animation";
 import styles from "./WallpaperBackground.module.css";
 
 /**
@@ -43,9 +42,13 @@ export function WallpaperBackground({
     if (kind !== "video") return;
     const video = videoRef.current;
     if (!video) return;
+    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const play = (): void => {
-      // 尊重"减少动态"：只显示首帧，不自动播放
-      if (prefersReducedMotion() || document.hidden) return;
+      // 尊重"减少动态"：只显示首帧；系统偏好变化时立即暂停或恢复
+      if (motionPreference.matches || document.hidden) {
+        video.pause();
+        return;
+      }
       void video.play().catch(() => {});
     };
     const onVisibility = (): void => {
@@ -55,9 +58,11 @@ export function WallpaperBackground({
     play();
     video.addEventListener("loadeddata", play);
     document.addEventListener("visibilitychange", onVisibility);
+    motionPreference.addEventListener("change", play);
     return () => {
       video.removeEventListener("loadeddata", play);
       document.removeEventListener("visibilitychange", onVisibility);
+      motionPreference.removeEventListener("change", play);
     };
   }, [kind]);
 
@@ -73,7 +78,8 @@ export function WallpaperBackground({
           muted
           loop
           playsInline
-          preload="auto"
+          // 播放按需缓冲；避免 auto 对大视频提前读取大量媒体数据。
+          preload="metadata"
           onError={reportFailure}
         />
       ) : (
