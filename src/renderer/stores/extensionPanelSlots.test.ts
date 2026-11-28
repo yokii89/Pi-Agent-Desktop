@@ -1,9 +1,53 @@
 import { describe, expect, it } from "vitest";
+import type { ViewAgentNode, ViewNode } from "../../shared/view";
 import {
   type ExtensionViewEntry,
   filterViewsForSession,
+  shouldAutoOpenPanel,
   upsertSlotted,
 } from "./extensionViewStore";
+
+describe("shouldAutoOpenPanel", () => {
+  const mainAgent: ViewAgentNode = {
+    id: "main",
+    label: "Main",
+    description: "",
+    state: "running",
+    kind: "main",
+  };
+  const childAgent: ViewAgentNode = {
+    id: "child",
+    parentId: "main",
+    label: "Child",
+    description: "",
+    state: "running",
+    kind: "agent",
+  };
+  const workspace = (agents: ViewAgentNode[]): ViewNode => ({
+    type: "agent-workspace",
+    id: "workspace",
+    agents,
+    events: [],
+  });
+
+  it("does not auto-open the Subagents panel for the main agent alone", () => {
+    expect(shouldAutoOpenPanel({ panelId: "subagents", root: workspace([mainAgent]) })).toBe(false);
+  });
+
+  it("auto-opens the Subagents panel after a child agent appears, including nested workspaces", () => {
+    const root: ViewNode = {
+      type: "column",
+      children: [{ type: "card", children: [workspace([mainAgent, childAgent])] }],
+    };
+    expect(shouldAutoOpenPanel({ panelId: "subagents", root })).toBe(true);
+  });
+
+  it("does not change auto-open behavior for other panels", () => {
+    expect(shouldAutoOpenPanel({ panelId: "review-tools", root: workspace([mainAgent]) })).toBe(
+      true,
+    );
+  });
+});
 
 function panel(overrides: Partial<ExtensionViewEntry> = {}): ExtensionViewEntry {
   return {

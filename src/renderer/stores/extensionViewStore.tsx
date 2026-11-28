@@ -19,6 +19,7 @@ import type {
   ExtensionViewPush,
   ExtensionViewState,
   ViewAction,
+  ViewNode,
   ViewPlacementHint,
 } from "../../shared/view";
 import { ACCESS_MODE_ACTIONS } from "../../shared/view";
@@ -325,6 +326,26 @@ export function upsertSlotted(
   return [...rest, entry];
 }
 
+function containsSubagent(node: ViewNode): boolean {
+  switch (node.type) {
+    case "agent-workspace":
+      return node.agents.some((agent) => agent.kind !== "main");
+    case "column":
+    case "row":
+    case "card":
+      return node.children.some(containsSubagent);
+    case "tabs":
+      return node.tabs.some((tab) => tab.children.some(containsSubagent));
+    default:
+      return false;
+  }
+}
+
+/** Keep the Subagents panel from stealing focus until the session has a child agent. */
+export function shouldAutoOpenPanel(panel: Pick<ExtensionViewEntry, "panelId" | "root">): boolean {
+  return panel.panelId !== "subagents" || containsSubagent(panel.root);
+}
+
 const ExtensionViewStoreContext = createContext<ExtensionViewStoreValue | null>(null);
 
 const EMPTY_SESSION_IDS: ReadonlySet<string> = new Set();
@@ -401,6 +422,7 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
   const [activeViewSessionId, setActiveViewSessionId] = useState<string | null>(null);
   const { openSidebarTab, hiddenSidebarPanelIds, dispatch } = useUiStore();
   const knownPanelIdsRef = useRef(new Set<string>());
+  const deferredPanelAutoOpenIdsRef = useRef(new Set<string>());
   const activeViewSessionIdRef = useRef(activeViewSessionId);
   activeViewSessionIdRef.current = activeViewSessionId;
 
@@ -747,21 +769,35 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
   const lastActivatedAccessModeIdRef = useRef<string | null>(null);
 
   // 新 panel 打开时展开右栏并聚焦该页签——仅当该 panel 属于当前 active 会话（B6）。
-  // 用户手动关过页签的 panelId 不再自动抢焦点（关闭 = 只隐藏，live View 仍在跑）；
-  // active 从 ref 读取：只在「新 panel 出现」时判定，切换 active 不回头抢焦点。
+  // 子 Agent 页签先延后到首个子 agent 出现；用户手动关闭过的页签不抢焦点。
+  // active 从 ref 读取：切换 active 不回头抢焦点。
   useEffect(() => {
     const active = activeViewSessionIdRef.current;
+    const deferredIds = deferredPanelAutoOpenIdsRef.current;
     for (const panel of panels) {
-      if (knownPanelIdsRef.current.has(panel.id)) continue;
-      knownPanelIdsRef.current.add(panel.id);
-      if (!viewBelongsToSession(panel, active)) continue;
+      const isNew = !knownPanelIdsRef.current.has(panel.id);
+      const isDeferred = deferredIds.has(panel.id);
+      if (isNew) knownPanelIdsRef.current.add(panel.id);
+      if (!isNew && !isDeferred) continue;
+
       const panelId = panel.panelId ?? `ext-${panel.id}`;
-      if (hiddenSidebarPanelIds.includes(panelId)) continue;
+      if (!viewBelongsToSession(panel, active) || hiddenSidebarPanelIds.includes(panelId)) {
+        deferredIds.delete(panel.id);
+        continue;
+      }
+      if (!shouldAutoOpenPanel(panel)) {
+        if (isNew) deferredIds.add(panel.id);
+        continue;
+      }
+      deferredIds.delete(panel.id);
       openSidebarTab(extensionPanelTabId(panelId));
     }
     const alive = new Set(panels.map((p) => p.id));
     for (const id of knownPanelIdsRef.current) {
-      if (!alive.has(id)) knownPanelIdsRef.current.delete(id);
+      if (!alive.has(id)) {
+        knownPanelIdsRef.current.delete(id);
+        deferredIds.delete(id);
+      }
     }
   }, [panels, openSidebarTab, hiddenSidebarPanelIds]);
 
