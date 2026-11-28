@@ -50,7 +50,8 @@ import {
 import type { ViewFormBridge } from "./ViewNodeRenderer";
 
 function StateIcon({ state }: { state: BashJobState }) {
-  if (state === "running") return <CircleNotch size={16} weight="regular" />;
+  if (state === "running")
+    return <CircleNotch size={16} weight="regular" className={styles.spinner} />;
   if (state === "failed") return <XCircle size={16} weight="regular" />;
   if (state === "killed") return <Stop size={16} weight="regular" />;
   if (state === "orphaned") return <LinkBreak size={16} weight="regular" />;
@@ -205,11 +206,6 @@ export function BashWorkspaceView({
       <div className={styles.panes}>
         <aside className={styles.jobsPane} aria-label={t("bashWorkspace.session")}>
           <div className={styles.jobsHeader}>
-            <div className={styles.sectionLabel}>
-              <TerminalWindow size={16} weight="regular" />
-              <strong>{t("bashWorkspace.session")}</strong>
-              <span>{t("bashWorkspace.total", { count: node.counts.total })}</span>
-            </div>
             <label className={styles.searchBox}>
               <MagnifyingGlass size={16} weight="regular" />
               <input
@@ -309,10 +305,6 @@ export function BashWorkspaceView({
               </IconButton>
             </nav>
           ) : null}
-          <div className={styles.jobsFooter}>
-            <Info size={16} weight="regular" />
-            <span>{t("bashWorkspace.silenceHint")}</span>
-          </div>
         </aside>
         <section className={styles.detailPane} aria-label={t("bashWorkspace.details")}>
           {!job || !reading ? (

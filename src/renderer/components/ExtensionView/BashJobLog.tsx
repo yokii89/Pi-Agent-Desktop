@@ -83,7 +83,6 @@ export function BashJobLog({
       ? t("bashWorkspace.silent")
       : undefined,
     ready && node.outputTruncated ? t("bashWorkspace.truncated") : undefined,
-    ready && node.outputMore ? t("bashWorkspace.more") : undefined,
   ].filter((value): value is string => Boolean(value));
 
   return (

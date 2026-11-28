@@ -97,10 +97,6 @@ export const bashWorkspaceMessages = defineMessages({
     "zh-CN": "尝试其他关键词或切回「全部」。",
     "en-US": "Try another search or switch to All.",
   },
-  "bashWorkspace.silenceHint": {
-    "zh-CN": "静默表示暂无输出，作业可能仍在运行。",
-    "en-US": "A quiet job may still be running.",
-  },
   "bashWorkspace.silent": {
     "zh-CN": "已超过 5 分钟没有新输出。静默不代表卡死，作业仍处于运行状态。",
     "en-US":
@@ -114,11 +110,6 @@ export const bashWorkspaceMessages = defineMessages({
   "bashWorkspace.truncated": {
     "zh-CN": "部分早期输出已被日志缓冲淘汰或截断。",
     "en-US": "Some earlier output was evicted or truncated by the log buffer.",
-  },
-  "bashWorkspace.more": {
-    "zh-CN": "面板仅显示最近的日志片段；筛选、复制与导出只作用于此片段。",
-    "en-US":
-      "Only the latest output window is displayed. Filtering, copying, and exporting apply to this window.",
   },
   "bashWorkspace.failedNotice": {
     "zh-CN": "作业以退出码 {code} 结束。请在日志中查看失败原因。",
