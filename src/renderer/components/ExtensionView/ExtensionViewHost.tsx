@@ -1,5 +1,6 @@
 import { useExtensionViewStore } from "../../stores/extensionViewStore";
 import { AgentWorkspaceWindowMount } from "./AgentWorkspaceWindowMount";
+import { BashWorkspaceWindowMount } from "./BashWorkspaceWindowMount";
 import { ModalMount } from "./ModalMount";
 import { WidgetMount } from "./WidgetMount";
 
@@ -12,9 +13,13 @@ export function ExtensionViewHost() {
   const { visibleModals, floatingWorkspaces } = useExtensionViewStore();
   return (
     <>
-      {floatingWorkspaces.map((entry) => (
-        <AgentWorkspaceWindowMount key={entry.id} entry={entry} />
-      ))}
+      {floatingWorkspaces.map((entry) =>
+        entry.root.type === "bash-workspace" ? (
+          <BashWorkspaceWindowMount key={entry.id} entry={entry} />
+        ) : (
+          <AgentWorkspaceWindowMount key={entry.id} entry={entry} />
+        ),
+      )}
       {visibleModals.map((entry) => (
         <ModalMount key={entry.id} entry={entry} />
       ))}

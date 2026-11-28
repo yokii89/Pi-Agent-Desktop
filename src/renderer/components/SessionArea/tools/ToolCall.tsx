@@ -12,6 +12,7 @@ import type { TranslateFn } from "../../../../shared/i18n";
 import { useCollapseAnimation } from "../../../hooks/useCollapseAnimation";
 import { useNowTick } from "../../../hooks/useNowTick";
 import { useT } from "../../../hooks/useT";
+import { useRevealSessionTools } from "../../../hooks/useRevealSessionTools";
 import type { ToolAssistantBlock } from "../../../stores/sessionTranscript";
 import type { ToolKind } from "../../../stores/toolPayload";
 import { detectCommandBrand } from "../../../utils/commandIcon";
@@ -141,6 +142,7 @@ interface ToolCallProps {
 export const ToolCall = memo(function ToolCall({ block, railed, defaultOpen }: ToolCallProps) {
   const t = useT();
   const [open, setOpen] = useState(defaultOpen ?? false);
+  useRevealSessionTools([block], setOpen);
   const { ref, innerRef, rendered } = useCollapseAnimation<HTMLDivElement, HTMLDivElement>(open);
   const expandable = Boolean(block.result || block.argsText || block.status === "running");
   const running = block.status === "running";
@@ -180,6 +182,7 @@ export const ToolCall = memo(function ToolCall({ block, railed, defaultOpen }: T
 
   return (
     <div
+      data-tool-call-id={block.toolCallId}
       className={`${styles.call} ${railed ? styles.railed : ""} ${open ? styles.open : ""} ${
         running ? "toolFlowRunning" : ""
       }`}

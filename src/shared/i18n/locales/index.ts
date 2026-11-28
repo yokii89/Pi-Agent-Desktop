@@ -1,6 +1,7 @@
 import { pairingMessages } from "../../remote/labels";
 import type { Catalog, LocaleId, MessageDefs } from "../types";
 import { agentWorkspaceMessages } from "./agentWorkspace";
+import { bashWorkspaceMessages } from "./bashWorkspace";
 import { browserMessages } from "./browser";
 import { chromeMessages } from "./chrome";
 import { commandPaletteMessages } from "./commandPalette";
@@ -25,6 +26,7 @@ import { windowMessages } from "./window";
 const ALL_DEFS: MessageDefs = {
   ...pairingMessages,
   ...agentWorkspaceMessages,
+  ...bashWorkspaceMessages,
   ...commonMessages,
   ...settingsMessages,
   ...remoteSettingsMessages,

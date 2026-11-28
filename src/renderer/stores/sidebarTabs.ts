@@ -3,7 +3,7 @@
  *
  * 页签身份统一为 `ext:<panelId>`；关闭扩展页签只隐藏 live View，不发送 dismiss。
  */
-export type RightSidebarTab = "review" | "files" | "browser" | "procs" | `ext:${string}`;
+export type RightSidebarTab = "review" | "files" | "browser" | `ext:${string}`;
 
 export interface SidebarTabsState {
   rightSidebarOpen: boolean;
@@ -16,6 +16,19 @@ export interface SidebarTabsState {
 
 export function extensionPanelIdOf(tab: RightSidebarTab): string | null {
   return tab.startsWith("ext:") ? tab.slice("ext:".length) : null;
+}
+
+/** Drop the retired built-in process tab from any pre-migration layout snapshot. */
+export function discardLegacyProcTab(state: SidebarTabsState): SidebarTabsState {
+  const legacyIndex = state.rightSidebarTabs.findIndex((tab) => String(tab) === "procs");
+  const activeIsLegacy = String(state.rightSidebarTab) === "procs";
+  if (legacyIndex < 0 && !activeIsLegacy) return state;
+
+  const tabs = state.rightSidebarTabs.filter((tab) => String(tab) !== "procs");
+  const rightSidebarTab = activeIsLegacy
+    ? (tabs[legacyIndex] ?? tabs[legacyIndex - 1] ?? tabs[0] ?? null)
+    : state.rightSidebarTab;
+  return { ...state, rightSidebarTabs: tabs, rightSidebarTab };
 }
 
 /**

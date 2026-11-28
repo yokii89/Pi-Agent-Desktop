@@ -25,7 +25,6 @@ import { ReviewPanel } from "../ReviewWindow/ReviewPanel";
 import styles from "./ContextSidebar.module.css";
 import { BrowserPanel } from "./panels/BrowserPanel";
 import { FilePanel } from "./panels/FilePanel";
-import { ProcPanel } from "./panels/ProcPanel";
 import { SidebarActions } from "./SidebarActions";
 import { SidebarLauncher } from "./SidebarLauncher";
 import { SidebarTabBar } from "./SidebarTabBar";
@@ -456,7 +455,6 @@ export function ContextSidebar() {
             )}
             {activeTab === "review" && reviewMode === "docked" && <ReviewPanel />}
             {activeTab === "browser" && browserEnabled && <BrowserPanel />}
-            {activeTab === "procs" && <ProcPanel />}
             {activePanel && <PanelMount entry={activePanel} />}
             {!activePanel && activeCatalogPanel && (
               <CatalogPanelBody

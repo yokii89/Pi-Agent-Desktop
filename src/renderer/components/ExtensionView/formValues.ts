@@ -89,6 +89,10 @@ export function collectFormValues(root: ViewNode, previous?: FormValues): FormVa
         });
         return;
       }
+      case "bash-workspace": {
+        take(node.id, () => ({ ...node.value }));
+        return;
+      }
       case "tabs":
         for (const tab of node.tabs) {
           for (const child of tab.children) walk(child);

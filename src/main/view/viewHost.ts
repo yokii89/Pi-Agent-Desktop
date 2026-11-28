@@ -1099,6 +1099,27 @@ export function reportViewLayout(viewId: string, width: unknown, height?: unknow
 }
 
 /** 渲染层用户事件 → 对应连接上的 Client；dismiss 会同步销毁视图。 */
+/** Resolve diagnostics against the live authenticated owner, never renderer-supplied PIDs or paths. */
+export function getBashJobContext(viewId: string, jobId: string): {
+  sessionId: string;
+  job: import("../../shared/view").ViewBashJob;
+} {
+  const view = views.get(viewId);
+  const connection = view ? connections.get(view.connectionId) : undefined;
+  if (
+    !view?.sessionId ||
+    !connection?.authenticated ||
+    connection.role === "worker" ||
+    connection.sessionId !== view.sessionId ||
+    view.root.type !== "bash-workspace"
+  ) {
+    throw new Error("Bash workspace is no longer available");
+  }
+  const job = view.root.jobs.find((item) => item.id === jobId);
+  if (!job) throw new Error("Job is not present in this workspace");
+  return { sessionId: view.sessionId, job };
+}
+
 export function sendViewEvent(viewId: string, event: ViewEvent): void {
   const view = views.get(viewId);
   if (!view) return;

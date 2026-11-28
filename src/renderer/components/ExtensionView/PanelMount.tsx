@@ -7,6 +7,7 @@ import { extensionPanelTabId, useExtensionViewStore } from "../../stores/extensi
 import { useUiStore } from "../../stores/uiStore";
 import { Button } from "../ui/Button";
 import { AgentWorkspaceView } from "./AgentWorkspaceView";
+import { BashWorkspaceView } from "./BashWorkspaceView";
 import styles from "./ExtensionView.module.css";
 import { type ViewFormBridge, ViewNodeRenderer } from "./ViewNodeRenderer";
 
@@ -31,11 +32,14 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
     floatWorkspace,
     dockWorkspace,
     getWorkspaceMemory,
+    getBashWorkspaceMemory,
   } = useExtensionViewStore();
   const { dispatch } = useUiStore();
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const isAgentWorkspace = entry.root.type === "agent-workspace";
-  const floating = isAgentWorkspace && floatingWorkspaceIds.has(entry.id);
+  const isBashWorkspace = entry.root.type === "bash-workspace";
+  const isWorkspace = isAgentWorkspace || isBashWorkspace;
+  const floating = isWorkspace && floatingWorkspaceIds.has(entry.id);
   useExtensionViewLayout(entry.id, bodyRef, !floating);
 
   const bridge = useMemo<ViewFormBridge>(
@@ -61,8 +65,12 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
   if (floating) {
     return (
       <div className={styles.workspacePlaceholder}>
-        <p data-selectable-text="">{t("agentWorkspace.floatingHint")}</p>
-        <Button onClick={() => dockWorkspace(entry.id)}>{t("agentWorkspace.collapse")}</Button>
+        <p data-selectable-text="">
+          {t(isBashWorkspace ? "bashWorkspace.floatingHint" : "agentWorkspace.floatingHint")}
+        </p>
+        <Button onClick={() => dockWorkspace(entry.id)}>
+          {t(isBashWorkspace ? "bashWorkspace.collapse" : "agentWorkspace.collapse")}
+        </Button>
       </div>
     );
   }
@@ -78,7 +86,7 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
       ) : null}
       <div
         ref={bodyRef}
-        className={[styles.panelBody, isAgentWorkspace ? styles.workspaceBody : ""].join(" ")}
+        className={[styles.panelBody, isWorkspace ? styles.workspaceBody : ""].join(" ")}
         data-panel-scroll=""
         data-selectable-text=""
       >
@@ -91,11 +99,21 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
             floating={false}
             onToggleFloating={() => floatWorkspace(entry.id)}
           />
+        ) : entry.root.type === "bash-workspace" ? (
+          <BashWorkspaceView
+            key={entry.id}
+            viewId={entry.id}
+            node={entry.root}
+            bridge={bridge}
+            memory={getBashWorkspaceMemory(entry.id, entry.root.id)}
+            floating={false}
+            onToggleFloating={() => floatWorkspace(entry.id)}
+          />
         ) : (
           <ViewNodeRenderer key={entry.id} node={entry.root} bridge={bridge} />
         )}
       </div>
-      {entry.actions.length > 0 ? (
+      {entry.actions.length > 0 && !isBashWorkspace ? (
         <div className={styles.panelFooter}>
           {entry.actions.map((action) => {
             const variant =
@@ -117,7 +135,7 @@ export function PanelMount({ entry }: { entry: ExtensionViewEntry }) {
           })}
         </div>
       ) : null}
-      {!isAgentWorkspace ? (
+      {!isWorkspace ? (
         <div className={styles.panelCloseRow}>
           <Button variant="default" className={styles.ghostAction} onClick={endPanel}>
             {t("ui.view.closePanel")}

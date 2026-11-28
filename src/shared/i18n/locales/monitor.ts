@@ -8,7 +8,6 @@ export const monitorMessages = defineMessages({
   "monitor.listSeparator": { "zh-CN": "、", "en-US": ", " },
 
   "monitor.section.env": { "zh-CN": "环境信息", "en-US": "Environment" },
-  "monitor.section.procs": { "zh-CN": "后台进程", "en-US": "Background" },
   "monitor.section.capabilities": { "zh-CN": "技能与 MCP", "en-US": "Skills & MCP" },
   "monitor.section.sources": { "zh-CN": "来源", "en-US": "Sources" },
 

@@ -137,6 +137,21 @@ export function measureViewTree(root: ViewNode, limits: ViewBudgetLimits): ViewT
       return;
     }
 
+    if (type === "bash-workspace") {
+      // Charge capped raw jobs before validation/deduplication, matching the
+      // Host even for malformed snapshots and duplicate job ids.
+      const jobs = Array.isArray(record.jobs) ? record.jobs : [];
+      budget.truncatedOptionItems += Math.max(0, jobs.length - limits.maxOptionItems);
+      for (let i = 0; i < Math.min(jobs.length, limits.maxOptionItems); i += 1) {
+        budget.nodes += 1;
+        if (budget.nodes > limits.maxNodes) {
+          budget.hitNodeBudget = true;
+          return;
+        }
+      }
+      return;
+    }
+
     if (type === "select" || type === "list") {
       const items = record.options ?? record.items;
       if (Array.isArray(items) && items.length > limits.maxOptionItems) {

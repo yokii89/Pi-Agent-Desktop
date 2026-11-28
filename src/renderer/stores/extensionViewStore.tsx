@@ -26,6 +26,10 @@ import {
   type AgentWorkspaceMemory,
   createAgentWorkspaceMemory,
 } from "../components/ExtensionView/agentWorkspaceMemory";
+import {
+  type BashWorkspaceMemory,
+  createBashWorkspaceMemory,
+} from "../components/ExtensionView/bashWorkspaceState";
 import { collectFormValues, type FormValues } from "../components/ExtensionView/formValues";
 import {
   activateContribution as activateContributionIpc,
@@ -259,6 +263,7 @@ interface ExtensionViewStoreValue {
   floatWorkspace: (id: string) => void;
   dockWorkspace: (id: string) => void;
   getWorkspaceMemory: (id: string, nodeId: string) => AgentWorkspaceMemory;
+  getBashWorkspaceMemory: (id: string, nodeId: string) => BashWorkspaceMemory;
   visibleSidebars: ExtensionViewEntry[];
   /**
    * 仅当 blocking 视图归属该 sessionId（或未绑定会话）时阻断发送。
@@ -346,6 +351,9 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
   const workspaceMemories = useRef(
     new Map<string, { nodeId: string; memory: AgentWorkspaceMemory }>(),
   );
+  const bashWorkspaceMemories = useRef(
+    new Map<string, { nodeId: string; memory: BashWorkspaceMemory }>(),
+  );
   const [sidebars, setSidebars] = useState<ExtensionViewEntry[]>([]);
   const [settingsViews, setSettingsViews] = useState<ExtensionViewEntry[]>([]);
   /** access-mode 注册表：按视图 id 去重，随会话回收（docs/design/14）。 */
@@ -404,10 +412,18 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
     return memory;
   }, []);
 
+  const getBashWorkspaceMemory = useCallback((id: string, nodeId: string): BashWorkspaceMemory => {
+    const cached = bashWorkspaceMemories.current.get(id);
+    if (cached?.nodeId === nodeId) return cached.memory;
+    const memory = createBashWorkspaceMemory();
+    bashWorkspaceMemories.current.set(id, { nodeId, memory });
+    return memory;
+  }, []);
+
   const floatWorkspace = useCallback(
     (id: string): void => {
       const panel = panels.find((entry) => entry.id === id);
-      if (panel?.root.type !== "agent-workspace") return;
+      if (panel?.root.type !== "agent-workspace" && panel?.root.type !== "bash-workspace") return;
       setFloatingWorkspaceIds((previous) => new Set(previous).add(id));
       dispatch({
         type: "closeSidebarTab",
@@ -434,7 +450,9 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const workspaces = new Map(
       panels
-        .filter((entry) => entry.root.type === "agent-workspace")
+        .filter(
+          (entry) => entry.root.type === "agent-workspace" || entry.root.type === "bash-workspace",
+        )
         .map((entry) => [entry.id, entry.root]),
     );
     for (const [id, cached] of workspaceMemories.current) {
@@ -442,6 +460,11 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
       if (root?.type !== "agent-workspace" || root.id !== cached.nodeId) {
         workspaceMemories.current.delete(id);
       }
+    }
+    for (const [id, cached] of bashWorkspaceMemories.current) {
+      const root = workspaces.get(id);
+      if (root?.type !== "bash-workspace" || root.id !== cached.nodeId)
+        bashWorkspaceMemories.current.delete(id);
     }
     setFloatingWorkspaceIds((previous) => {
       const next = new Set([...previous].filter((id) => workspaces.has(id)));
@@ -936,7 +959,9 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
     const visibleModals = filterViewsForSession(modals, active);
     const visiblePanels = filterViewsForSession(panels, active);
     const floatingWorkspaces = visiblePanels.filter(
-      (entry) => floatingWorkspaceIds.has(entry.id) && entry.root.type === "agent-workspace",
+      (entry) =>
+        floatingWorkspaceIds.has(entry.id) &&
+        (entry.root.type === "agent-workspace" || entry.root.type === "bash-workspace"),
     );
     const visibleSidebars = filterViewsForSession(sidebars, active);
     const visibleWidgets = filterSlotsForSession(widgetSlots, active);
@@ -1054,6 +1079,7 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
       floatWorkspace,
       dockWorkspace,
       getWorkspaceMemory,
+      getBashWorkspaceMemory,
       visibleSidebars,
       catalogPanelRows,
       sendBlockedReason,
@@ -1088,6 +1114,7 @@ export function ExtensionViewProvider({ children }: { children: ReactNode }) {
     floatWorkspace,
     dockWorkspace,
     getWorkspaceMemory,
+    getBashWorkspaceMemory,
     sidebars,
     settingsViews,
     accessModes,

@@ -30,7 +30,6 @@ import { procService } from "./services/procService";
 import { ComposerProvider } from "./stores/composerStore";
 import { ExtensionViewProvider, useExtensionViewStore } from "./stores/extensionViewStore";
 import { InspectorProvider } from "./stores/inspectorStore";
-import { bindProcOutputStream, bindProcStream } from "./stores/procStore";
 import { ProjectProvider } from "./stores/projectStore";
 import { ReviewProvider } from "./stores/reviewStore";
 import { SessionBrowserProvider } from "./stores/SessionBrowserProvider";
@@ -98,21 +97,13 @@ function UpdateStatusBridge() {
   return null;
 }
 
-/** 后台进程登记流（docs/design/37）：独立 push 通道，按 sessionId 分桶。 */
+/** 后台进程退出保护：保留上次异常退出残留服务提示，具体生命周期由主进程管理。 */
 function ProcStreamBridge() {
   const { showToast } = useUiStore();
   useEffect(() => {
-    const off = bindProcStream();
-    // 方案 B：作业日志增量推送（pidesk:proc:output，proc 独立域）
-    const offOutput = bindProcOutputStream();
-    // §5.4 P0：上次非正常退出时提示可能残留服务
     void procService.residualNotice().then((hit) => {
       if (hit) showToast(t("proc.residual.warning"));
     });
-    return () => {
-      off();
-      offOutput();
-    };
   }, [showToast]);
   return null;
 }

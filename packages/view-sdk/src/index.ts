@@ -35,6 +35,7 @@ export {
 } from "./accessMode.js";
 export {
   supportsAgentWorkspace,
+  supportsBashWorkspace,
   supportsCapability,
   supportsOptionPreview,
   supportsPanelLauncher,
@@ -137,6 +138,12 @@ export {
   type ViewAgentNode,
   type ViewAgentState,
   type ViewAgentWorkspaceNode,
+  type ViewBashJob,
+  type ViewBashJobMode,
+  type ViewBashJobStatus,
+  type ViewBashWorkspaceFilter,
+  type ViewBashWorkspaceNode,
+  type ViewBashWorkspaceValue,
   type ViewClosedPayload,
   type ViewClosedReason,
   type ViewClosePayload,

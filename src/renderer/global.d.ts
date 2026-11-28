@@ -458,6 +458,10 @@ export interface PideskGlobalApi {
     syncPreview(): Promise<IpcResult<GitHubSyncPreview>>;
   };
   view: {
+    bashRuntime(
+      req: import("../shared/bashWorkspace").BashJobRequest,
+    ): Promise<IpcResult<import("../shared/bashWorkspace").BashJobRuntime>>;
+    bashOpenLog(req: import("../shared/bashWorkspace").BashJobRequest): Promise<IpcResult<null>>;
     onOutput(callback: (message: ExtensionViewPush) => void): () => void;
     sendEvent(req: { id: string; event: ViewEvent }): Promise<IpcResult<null>>;
     reportLayout(req: { id: string; width: number; height?: number }): Promise<IpcResult<null>>;

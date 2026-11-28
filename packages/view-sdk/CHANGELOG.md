@@ -1,5 +1,28 @@
 # @pidesk/view-sdk
 
+## 0.7.0 — Unreleased (local source only)
+
+- Consolidate Bash management into extension workspaces. Add optional original-call,
+  OS creation identity/liveness, and stable saved-log-owner metadata. Host diagnostics
+  resolve a live authenticated View/job and do not grant arbitrary PID/path access.
+  Restored liveness remains separate from the original exit/output lifecycle.
+
+- Add the opt-in `bash-workspace` node and public `ViewBashJob`,
+  `ViewBashWorkspaceValue`, and `ViewBashWorkspaceNode` types. Workspace state
+  changes use the ordinary `{ nodeId, value }` event with the complete value
+  object; stop requests use the declared `stopActionId` and remain ordinary
+  actions for the extension/Host to confirm and authorize.
+- Add capability `view-bash-workspace` and `supportsBashWorkspace(client)`.
+  Older Hosts without the capability require a basic-node/TUI fallback; existing
+  `view/v1` messages and nodes are unchanged.
+- Host validation rejects missing/basic malformed workspace shapes, drops
+  malformed/duplicate jobs, verifies selections and output ownership, and never
+  retains an orphaned exit code. Workspace strings use the existing UTF-8 limit;
+  each capped raw job entry consumes one node even if discarded. SDK preflight
+  mirrors the Host budget.
+- Bump only this SDK package from 0.6.0 to 0.7.0 (additive backward-compatible
+  capability); no host app version change or publication is included.
+
 ## 0.6.0 — Unreleased (local source only)
 
 - Add the optional `agent-workspace` node and public `ViewAgentState`,

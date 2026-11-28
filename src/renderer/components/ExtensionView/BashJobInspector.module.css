@@ -1,0 +1,232 @@
+.inspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.sectionHead h3,
+.subTitle {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.subTitle {
+  margin-top: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.note {
+  margin: 0;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9em), 1fr));
+  gap: var(--spacing-sm) var(--spacing-md);
+  margin: var(--spacing-sm) 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.metaGrid > div {
+  min-width: 0;
+}
+
+.metaGrid dt {
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-text-muted);
+}
+
+.metaGrid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.memory {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.spark {
+  width: 5em;
+  height: 1.5em;
+  color: var(--color-spark);
+}
+
+.spark polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.processTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.processTable th,
+.processTable td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.processTable thead th {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.processTable th:first-child {
+  text-align: left;
+}
+
+.processTable tbody th {
+  font-weight: 400;
+}
+
+.processName {
+  display: block;
+  padding-left: calc(var(--process-depth, 0) * var(--spacing-md));
+  max-width: 24em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portList {
+  margin: var(--spacing-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.port {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.portInfo {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.portLine,
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.portLine {
+  flex-wrap: wrap;
+}
+
+.portLine code,
+.command,
+.output {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+}
+
+.portState {
+  color: var(--color-text-muted);
+}
+
+.actions {
+  flex-shrink: 0;
+  gap: var(--spacing-xs);
+}
+
+.command,
+.output {
+  margin: 0;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-code-bg);
+  line-height: 1.6;
+  tab-size: 4;
+}
+
+.command {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.output {
+  max-height: 24em;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+}
+
+.error {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  color: var(--color-danger);
+  overflow-wrap: anywhere;
+}
+
+.error > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.textButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.textButton:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+.textButton:disabled {
+  cursor: default;
+  color: var(--color-text-muted);
+}
+
+.textButton:focus-visible,
+.output:focus-visible {
+  outline: 1px solid var(--color-accent-border);
+  outline-offset: 1px;
+}

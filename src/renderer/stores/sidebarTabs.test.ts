@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   closeSidebarTab,
+  discardLegacyProcTab,
   extensionPanelIdOf,
   openSidebarTab,
   type SidebarTabsState,
@@ -112,6 +113,25 @@ describe("closeSidebarTab", () => {
   it("关闭不存在的页签返回原引用", () => {
     const current = state({ rightSidebarTabs: ["files"], rightSidebarTab: "files" });
     expect(closeSidebarTab(current, "browser")).toBe(current);
+  });
+});
+
+describe("discardLegacyProcTab", () => {
+  it("移除旧内置页签，并在旧页签激活时选取相邻页签", () => {
+    const legacy = {
+      ...state(),
+      rightSidebarTabs: ["files", "procs", "browser"],
+      rightSidebarTab: "procs",
+    } as unknown as SidebarTabsState;
+    expect(discardLegacyProcTab(legacy)).toMatchObject({
+      rightSidebarTabs: ["files", "browser"],
+      rightSidebarTab: "browser",
+    });
+  });
+
+  it("没有旧页签时保留原引用", () => {
+    const current = state({ rightSidebarTabs: ["files"], rightSidebarTab: "files" });
+    expect(discardLegacyProcTab(current)).toBe(current);
   });
 });
 

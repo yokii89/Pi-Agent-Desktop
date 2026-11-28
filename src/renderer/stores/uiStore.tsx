@@ -66,6 +66,7 @@ import { settingsService } from "../services/settingsService";
 import { applyAccentColor } from "../utils/applyAccentColor";
 import {
   closeSidebarTab as closeTab,
+  discardLegacyProcTab,
   openSidebarTab as openTab,
   type RightSidebarTab,
   type SidebarTabsState,
@@ -358,6 +359,8 @@ function applyTabState(state: UiState, next: SidebarTabsState): UiState {
 }
 
 function uiReducer(state: UiState, action: UiAction): UiState {
+  const sidebarState = discardLegacyProcTab(state);
+  if (sidebarState !== state) state = { ...state, ...sidebarState };
   switch (action.type) {
     case "navigate": {
       if (state.page === action.page) return state;

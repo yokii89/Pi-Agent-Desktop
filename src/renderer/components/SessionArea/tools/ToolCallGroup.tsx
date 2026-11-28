@@ -2,6 +2,7 @@ import { WarningDiamondIcon } from "@phosphor-icons/react";
 import { memo, useState } from "react";
 import { useCollapseAnimation } from "../../../hooks/useCollapseAnimation";
 import { useT } from "../../../hooks/useT";
+import { useRevealSessionTools } from "../../../hooks/useRevealSessionTools";
 import type { AssistantBlock, ToolAssistantBlock } from "../../../stores/sessionTranscript";
 import { ToolCall, ToolGlyph } from "./ToolCall";
 import styles from "./ToolCallGroup.module.css";
@@ -24,6 +25,7 @@ export const ToolCallGroup = memo(function ToolCallGroup({
   const t = useT();
   const multi = blocks.length >= 2;
   const [open, setOpen] = useState(false);
+  useRevealSessionTools(blocks, setOpen);
   const { ref, innerRef, rendered } = useCollapseAnimation<HTMLDivElement, HTMLDivElement>(open);
 
   if (!multi) {

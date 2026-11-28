@@ -153,8 +153,78 @@ export interface ViewAgentWorkspaceNode {
   loadEarlierActionId?: string;
 }
 
+/** Bash job lifecycle state; orphaned jobs have no authoritative exit code. */
+export type ViewBashJobStatus = "running" | "exited" | "killed" | "orphaned";
+export type ViewBashJobMode = "finish" | "detach" | "long";
+export type ViewBashWorkspaceFilter = "all" | "running" | "ended" | "orphaned";
+
+/** Serializable snapshot of one extension-owned Bash job. */
+export interface ViewBashJob {
+  id: string;
+  label?: string;
+  command: string;
+  mode: ViewBashJobMode;
+  status: ViewBashJobStatus;
+  reason: string;
+  pid?: number;
+  startedAt: number;
+  lastOutputAt: number;
+  exitedAt?: number;
+  exitCode?: number;
+  killedBy?: "timeout" | "user" | "model";
+  detached: boolean;
+  outputBytes: number;
+  outputLines: number;
+  /** Original Bash call in the owning session transcript. */
+  sourceToolCallId?: string;
+  /** OS creation identity; a restored PID alone never authorizes a stop. */
+  processIdentity?: string;
+  processStartedAt?: number;
+  /** A restored process can be alive without an observable job exit or output stream. */
+  processState?: "alive" | "gone" | "unknown";
+  /** Stable persisted log owner, including jobs retained across /new. */
+  logSessionId?: string;
+  logAvailable?: boolean;
+}
+
+/** User-controlled browse state, sent with the standard View change event. */
+export interface ViewBashWorkspaceValue {
+  selectedId?: string;
+  query: string;
+  filter: ViewBashWorkspaceFilter;
+  page: number;
+}
+
+/**
+ * Read-only Bash job browser with one explicitly-owned output window.
+ * Jobs and each raw capped job entry cost one View node (invalid/duplicate
+ * entries included); the workspace itself costs one node. Strings use the
+ * normal per-string UTF-8 budget. `stopActionId` is an ordinary action id and
+ * grants no authority; the extension/Host must confirm and verify ownership.
+ */
+export interface ViewBashWorkspaceNode {
+  type: "bash-workspace";
+  id: string;
+  jobs: ViewBashJob[];
+  value: ViewBashWorkspaceValue;
+  counts: { total: number; running: number; ended: number; orphaned: number };
+  matchedJobs: number;
+  pageCount: number;
+  outputJobId?: string;
+  output: string;
+  cursor: string;
+  outputStartLine: number;
+  outputTruncated: boolean;
+  outputMore: boolean;
+  partial: boolean;
+  stopActionId?: string;
+  stoppingJobId?: string;
+  notice?: string;
+}
+
 export type ViewNode =
   | ViewAgentWorkspaceNode
+  | ViewBashWorkspaceNode
   | {
       type: "text";
       content: string;
@@ -435,8 +505,10 @@ export interface ViewHelloPayload {
  * `panel-tab-badge`：`placementHint.panelBadge` 会渲染到侧栏页签与启动页
  * （docs/06 R7）。旧 Host 忽略字段，页签条不变。
  *
- * `view-agent-workspace`：声明式 Agent 协作图与单 Agent 事件流（docs/design/149）。
- * 旧 Host 会降级为 unknown，扩展必须先探测并保留基础节点/TUI 回退。
+ * `view-agent-workspace`：声明式 Agent 协作图与单 Agent 事件流（docs/design/149）；旧 Host 降级为 unknown，客户端应先探测并回退。
+ * `view-bash-workspace`：只读 Bash 作业浏览与单一归属的输出窗口；工作区状态通过
+ * 标准 change 事件更新，停止使用 `stopActionId` 发出既有 action，不提供执行命令能力。
+ * 旧 Host 将新节点降级为 unknown；SDK 必须探测能力并提供回退。
  *
  * `panel-header`：`placementHint.panelHeader` 会渲染在面板滚动容器之上
  * （docs/06 R9）。旧 Host 忽略字段，状态行继续随正文滚动。
@@ -451,6 +523,7 @@ export type ViewHostCapability =
   | "view-option-preview"
   | "view-readonly-list"
   | "view-agent-workspace"
+  | "view-bash-workspace"
   | "view-layout"
   | "panel-tab-badge"
   | "panel-header";
@@ -470,6 +543,7 @@ export const VIEW_HOST_CAPABILITIES: readonly ViewHostCapability[] = [
   "view-option-preview",
   "view-readonly-list",
   "view-agent-workspace",
+  "view-bash-workspace",
   "view-layout",
   "panel-tab-badge",
   "panel-header",
@@ -726,4 +800,8 @@ export const VIEW_IPC = {
   layout: "pidesk:view:layout",
   /** 原子激活 Contribution（docs/design/16 §7）。 */
   activateContribution: "pidesk:view:activateContribution",
+  /** Read-only diagnostics for a job in an authenticated, live Bash workspace. */
+  bashRuntime: "pidesk:view:bashRuntime",
+  /** Open only the derived, saved .log of a job in that workspace. */
+  bashOpenLog: "pidesk:view:bashOpenLog",
 } as const;

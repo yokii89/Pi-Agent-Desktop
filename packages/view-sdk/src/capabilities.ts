@@ -76,6 +76,14 @@ export function supportsAgentWorkspace(client: DesktopViewClient | null | undefi
 }
 
 /**
+ * Bash job browser with an explicitly-owned output window (docs/design/09).
+ * Older Hosts degrade the node to `unknown`; keep a TUI/basic-node fallback.
+ */
+export function supportsBashWorkspace(client: DesktopViewClient | null | undefined): boolean {
+  return supportsCapability(client, "view-bash-workspace");
+}
+
+/**
  * The Host renders panel contributions as launcher features + closable tabs
  * (docs/design/66).
  *

@@ -10,8 +10,8 @@ import {
   Sparkle,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
-import { useOpenProcPanel } from "../../hooks/useOpenProcPanel";
-import { useProcActions } from "../../hooks/useProcActions";
+import { useBashJobs } from "../../hooks/useBashJobs";
+import { useOpenBashJob } from "../../hooks/useOpenBashJob";
 import { useT } from "../../hooks/useT";
 import { fsService } from "../../services/fsService";
 import { useReviewStore } from "../../stores/reviewStore";
@@ -20,7 +20,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { pathBasename } from "../../utils/paths";
 import { formatClockTime } from "../../utils/time";
 import { CommitDialog } from "../CommitDialog/CommitDialog";
-import { MonitorProcs } from "./MonitorProcs";
+import { MonitorBashJobs } from "./MonitorBashJobs";
 import { MonitorRow, MonitorSection } from "./MonitorRow";
 import styles from "./SessionMonitor.module.css";
 import {
@@ -45,7 +45,7 @@ interface SessionMonitorProps {
  * 接住侧栏让出的那块空间，于是文档流列宽在开/关侧栏之间不跳。
  *
  * 内容全部派生自已有 store：会话条目（摘要 / 来源）、审查域的**工作区汇总**
- * （项目全部未提交改动，不是本轮差集）、git 分支与推送、后台进程登记、
+ * （项目全部未提交改动，不是本轮差集）、git 分支与推送、扩展 Bash 作业投影、
  * `get_commands` 的技能清单、mcp.json 快照。
  * 不新增 pi RPC，也不做任何持久化——恢复会话后重新派生即可。
  */
@@ -59,9 +59,9 @@ export function SessionMonitor({ active }: SessionMonitorProps) {
     refreshIfStale,
     setFilterMode,
   } = useReviewStore();
-  const { openReviewDocked, openSidebarTab, showToast } = useUiStore();
-  const procs = useProcActions(meta.activeSessionId);
-  const openProcPanel = useOpenProcPanel();
+  const { openReviewDocked, showToast } = useUiStore();
+  const bashJobs = useBashJobs(meta.activeSessionId);
+  const { openJob: openBashJob, openWorkspace: openBashWorkspace } = useOpenBashJob();
   const [commitOpen, setCommitOpen] = useState(false);
   const [envReloadTick, setEnvReloadTick] = useState(0);
 
@@ -224,13 +224,14 @@ export function SessionMonitor({ active }: SessionMonitorProps) {
             ) : null}
           </MonitorSection>
 
-          {procs.all.length > 0 ? (
-            <MonitorSection title={t("monitor.section.procs")}>
-              <MonitorProcs
-                procs={procs}
-                processAlive={meta.processAlive}
-                onOpen={openProcPanel}
-                onOpenAll={() => openSidebarTab("procs")}
+          {bashJobs.total > 0 ? (
+            <MonitorSection
+              title={`${t("bashWorkspace.title")} · ${t("bashWorkspace.total", { count: bashJobs.total })}`}
+            >
+              <MonitorBashJobs
+                {...bashJobs}
+                onOpen={openBashJob}
+                onOpenWorkspace={openBashWorkspace}
               />
             </MonitorSection>
           ) : null}

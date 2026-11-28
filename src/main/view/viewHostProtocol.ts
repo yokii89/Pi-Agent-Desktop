@@ -22,6 +22,7 @@ import {
   VIEW_OPTION_PREVIEW_MAX_CHARS,
 } from "../../shared/view";
 import { sanitizeAgentWorkspace } from "./viewAgentWorkspace";
+import { sanitizeBashWorkspace } from "./viewBashWorkspace";
 
 /**
  * 已知槽位表。写成 `Record<ViewPlacement, true>` 而不是 `||` 比较链：给
@@ -537,6 +538,19 @@ export function sanitizeTree(raw: unknown): { root: ViewNode } | { error: string
           }
         }
         return sanitizeAgentWorkspace(record, truncateString);
+      }
+      case "bash-workspace": {
+        // Charge every capped raw job entry before validation/deduplication;
+        // measureViewTree mirrors this exact accounting.
+        const jobs = Array.isArray(record.jobs) ? record.jobs : [];
+        for (let i = 0; i < Math.min(jobs.length, VIEW_LIMITS.maxOptionItems); i += 1) {
+          nodeCount += 1;
+          if (nodeCount > VIEW_LIMITS.maxNodes) {
+            overflow = "nodes";
+            return null;
+          }
+        }
+        return sanitizeBashWorkspace(record, truncateString);
       }
       case "table": {
         if (typeof record.id !== "string") {

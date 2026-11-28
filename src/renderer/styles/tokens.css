@@ -62,6 +62,14 @@
 
   --file-search-width: 360px;
 
+  /* Bash Workspace geometry; colors and typography reuse the shared theme. */
+  --bash-jobs-list-width: 300px;
+  --bash-jobs-list-compact-width: 238px;
+  --bash-jobs-line-gutter: 56px;
+  --bash-jobs-compact-line-gutter: 40px;
+  --bash-jobs-compact-list-height: 120px;
+  --bash-jobs-notice-max-height: 80px;
+
   /* 文件预览与就地编辑器共用的代码表面规格。 */
   --code-font-family: var(--font-family-mono);
   --code-font-size: var(--font-size-sm);

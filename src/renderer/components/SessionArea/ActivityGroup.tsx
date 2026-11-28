@@ -2,6 +2,7 @@ import { GearSix, WarningDiamondIcon } from "@phosphor-icons/react";
 import { memo, useMemo, useState } from "react";
 import { useCollapseAnimation } from "../../hooks/useCollapseAnimation";
 import { useT } from "../../hooks/useT";
+import { useRevealSessionTools } from "../../hooks/useRevealSessionTools";
 import type { AssistantBlock, ToolAssistantBlock } from "../../stores/sessionTranscript";
 import styles from "./ActivityGroup.module.css";
 import { ReasoningBlock } from "./ReasoningBlock";
@@ -21,6 +22,7 @@ import { aggregateChangeStats, summarizeTools } from "./tools/toolSummary";
 export const ActivityGroup = memo(function ActivityGroup({ blocks }: { blocks: AssistantBlock[] }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  useRevealSessionTools(blocks, setOpen);
   const { ref, innerRef, rendered } = useCollapseAnimation<HTMLDivElement, HTMLDivElement>(open);
 
   const toolBlocks = useMemo(

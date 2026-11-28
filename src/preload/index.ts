@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import type { BashJobRequest, BashJobRuntime } from "../shared/bashWorkspace";
 import type { AppIconId } from "../shared/appIcon";
 import type {
   ActivateContributionRequest,
@@ -835,6 +836,10 @@ contextBridge.exposeInMainWorld("pidesk", {
   },
 
   view: {
+    bashRuntime: (req: BashJobRequest): Promise<IpcResult<BashJobRuntime>> =>
+      ipcRenderer.invoke(VIEW_IPC.bashRuntime, req),
+    bashOpenLog: (req: BashJobRequest): Promise<IpcResult<null>> =>
+      ipcRenderer.invoke(VIEW_IPC.bashOpenLog, req),
     /** 订阅扩展视图 open / update / closed 推送。 */
     onOutput: (callback: (message: ExtensionViewPush) => void): (() => void) =>
       subscribe<ExtensionViewPush>(VIEW_IPC.output, callback),

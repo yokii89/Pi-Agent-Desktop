@@ -7,6 +7,7 @@ import { OptionList, type OptionRow } from "../ui/OptionList";
 import { Segmented } from "../ui/Segmented";
 import { Select } from "../ui/Select";
 import { AgentWorkspaceView } from "./AgentWorkspaceView";
+import { BashWorkspaceView } from "./BashWorkspaceView";
 import {
   formatCell,
   resolveAlign,
@@ -210,6 +211,8 @@ export function ViewNodeRenderer({ node, bridge }: ViewNodeRendererProps) {
       return <TableView node={node} />;
     case "agent-workspace":
       return <AgentWorkspaceView node={node} bridge={bridge} />;
+    case "bash-workspace":
+      return <BashWorkspaceView node={node} bridge={bridge} />;
     case "unknown":
       return (
         <div className={styles.unknownNode} role="note">

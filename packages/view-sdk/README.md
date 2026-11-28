@@ -2,9 +2,11 @@
 
 Client SDK for the **PiDesk extension View protocol** (`view/v1`).
 
-The local source version is **0.6.0 (unpublished)**. The Agent workspace additions
-require a Host advertising `view-agent-workspace`; the package version alone
-does not establish Host support. This source change does not publish a package.
+The local source version is **0.7.0 (unpublished)**. Bash workspace support is
+opt-in and requires a Host advertising `view-bash-workspace`; the SDK package
+version alone does not establish Host support. This additive capability keeps
+`view/v1` and existing nodes compatible. Older Hosts need an existing-node/TUI
+fallback. This source change does not publish a package.
 
 **Maintainers:** changes to public APIs, protocols, placements, and extension
 lifecycle must follow the SDK development standards (Chinese), including the
@@ -148,6 +150,8 @@ await desktop.open(spec, {
 | `supportsPanelLauncher(client)` | `hello.capabilities` includes `panel-launcher` (launcher + closable panel tabs, see below) |
 | `supportsOptionPreview(client)` | `hello.capabilities` includes `view-option-preview` (`ViewListOption.preview`, see below) |
 | `supportsAgentWorkspace(client)` | `hello.capabilities` includes `view-agent-workspace` (Agent graph and owned event stream) |
+| `supportsBashWorkspace(client)` | `hello.capabilities` includes `view-bash-workspace` (Bash job browser and owned output) |
+| `ViewBashJob` / `ViewBashWorkspaceValue` / `ViewBashWorkspaceNode` | Serializable Bash job, view state, and owned-output contract |
 | `ViewAgentState` / `ViewAgentNode` / `ViewAgentEvent` / `ViewAgentWorkspaceNode` | Serializable Agent workspace contract; exported from the public entry |
 | `VIEW_SESSION_OWNER_ENTRY_TYPE` / `ViewSessionOwner` | pi JSONL custom-entry metadata for a child session’s explicit panel/root-session presentation owner; not a View message or authority |
 | `ACCESS_MODE_ACTIONS` | `mode:activate` / `mode:deactivate` action ids the Host sends back |
@@ -464,6 +468,80 @@ returns a `column`/`row` tree that keeps **all** cells of every row (the leading
 cell is `body`, the rest `caption`); `labelKey` only decides which column leads
 and no longer drops the other columns. If a genuinely narrow rail only has room
 for one cell per row, pass `compact: true` instead of relying on `labelKey`.
+
+### Bash workspace (`bash-workspace`)
+
+A read-only snapshot of extension-owned Bash jobs and one explicitly-owned output
+window (PiDesk docs/design/150). SDK 0.7.0 exports `ViewBashJob`,
+`ViewBashWorkspaceValue`, `ViewBashWorkspaceNode`, and
+`supportsBashWorkspace`. It does not execute commands, expose arbitrary paths,
+or authorize stopping a process.
+
+```ts
+import {
+  connectDesktopView, supportsBashWorkspace,
+  type ViewBashWorkspaceNode,
+} from "@pidesk/view-sdk";
+
+const desktop = connectDesktopView();
+if (desktop) {
+  await desktop.ensureConnected();
+  if (supportsBashWorkspace(desktop)) {
+    const root: ViewBashWorkspaceNode = {
+      type: "bash-workspace", id: "bash-jobs", jobs: [],
+      value: { query: "", filter: "all", page: 0 },
+      counts: { total: 0, running: 0, ended: 0, orphaned: 0 },
+      matchedJobs: 0, pageCount: 1,
+      output: "", cursor: "", outputStartLine: 1,
+      outputTruncated: false, outputMore: false, partial: false,
+    };
+    await desktop.openLive({ root, placement: "panel" }, {
+      onEvent(event, view) {
+        if (event.type === "change" && event.nodeId === root.id) {
+          // Bash workspace changes carry the complete {selectedId, query, filter, page} value.
+          root.value = event.value as ViewBashWorkspaceNode["value"];
+          view.update({ root });
+        }
+        if (event.type === "action" && event.actionId === "stop-job") {
+          // Confirm, then verify ownership in the extension/Host before stopping.
+        }
+      },
+    });
+  } else {
+    // Render existing basic nodes or fall back to a TUI.
+  }
+}
+```
+
+- `jobs` requires stable IDs, a valid `mode` / `status`, command/reason,
+  finite timestamps and nonnegative integer output counters. Optional process
+  and exit metadata is validated; orphaned jobs never carry an exit code.
+- Optional `sourceToolCallId` associates a job with its original call.
+  `processIdentity` / `processStartedAt` preserve an OS creation identity, while
+  `processState` (`alive`, `gone`, `unknown`) describes a separately checked
+  restored process. This never establishes an exit code or reattaches output.
+  Publish a stop action for an orphan only after verifying ownership and identity,
+  and verify again when the action executes. Legacy snapshots without identity
+  remain readable and cannot authorize a restored-process stop.
+- Optional `logSessionId` is the stable saved-log owner, including across `/new`;
+  `logAvailable` enables the Host saved-log affordance. These are metadata, not
+  arbitrary filesystem paths. Host diagnostics and log opening resolve the live
+  authenticated View and job, and stay scoped to that session and log directory.
+  The Host has no separate built-in process-management page.
+- `value` is one complete object on every change. `selectedId` is retained only
+  when it identifies a valid job; query/filter/page remain usable when no jobs
+  match. Output is shown only when `outputJobId` belongs to a retained job;
+  missing/invalid ownership clears both output and cursor rather than guessing.
+  `outputStartLine` is a 1-based display line.
+- `stopActionId` and `stoppingJobId` are data/action identifiers, not authority.
+  The extension/Host owns confirmation and job-ownership checks. The node has no
+  command execution or arbitrary file-write API.
+- Each raw capped job entry costs one View node, including invalid/duplicate
+  entries; strings use the normal per-string UTF-8 limit. Duplicate View control
+  IDs follow the normal first-control-wins rule.
+- Probe the capability after handshake. If absent (including older Hosts),
+  render an existing-node/TUI fallback; the new node may display as `unknown`.
+  Existing Views and the `view/v1` envelope remain compatible.
 
 ### Agent workspace (`agent-workspace`)
 
@@ -923,7 +1001,10 @@ patch ops ≤ 32 · option preview ≤ 4000 chars. Unknown `type` becomes a diag
 A `table` row counts as **one** node against `maxNodes` (cells are not nodes), so
 a full 200-row table costs ~201 nodes. Each `tabs` entry also costs one.
 An `agent-workspace` costs one plus one per capped raw Agent/event entry,
-including invalid/duplicate entries; its arrays each use `maxOptionItems`.
+including invalid/duplicate entries; its arrays each use `maxOptionItems`. A
+`bash-workspace` costs one plus one per capped raw job entry, including invalid
+and duplicate entries. All workspace entries consume `maxNodes`; strings use
+the existing UTF-8 limit.
 
 **These numbers are exported, not prose.** `VIEW_LIMITS` is the compile-time
 default; `client.limits` returns the Host's live budget from `hello.limits` and

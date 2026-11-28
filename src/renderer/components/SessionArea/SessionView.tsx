@@ -18,6 +18,9 @@ import {
   type SnapshotEntry,
 } from "../../stores/sessionTranscript";
 import { useUiStore } from "../../stores/uiStore";
+import { completeSessionToolReveal, useSessionToolReveal } from "../../stores/sessionToolReveal";
+import { prefersReducedMotion } from "../../utils/animation";
+import { NAV_MOTION } from "../../utils/motionTokens";
 import { StreamMount } from "../ExtensionView/StreamMount";
 import { AgentRunHeader } from "./AgentRunHeader";
 import { AssistantFooter } from "./AssistantFooter";
@@ -118,6 +121,29 @@ export function SessionView() {
     scrollRef,
     contentRef,
   );
+  const reveal = useSessionToolReveal();
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    if (!reveal || reveal.sessionId !== activeSessionId || !scroll) return;
+    // Leave follow mode before expanding nested groups, or their height changes pull us to the end.
+    jumpToOffset(scroll.scrollTop, "auto");
+    const timer = setTimeout(() => {
+      const target = Array.from(scroll.querySelectorAll<HTMLElement>("[data-tool-call-id]")).find(
+        (element) => element.dataset.toolCallId === reveal.toolCallId,
+      );
+      if (target) {
+        const offset =
+          scroll.scrollTop +
+          target.getBoundingClientRect().top -
+          scroll.getBoundingClientRect().top -
+          scroll.clientHeight / 3;
+        jumpToOffset(offset, prefersReducedMotion() ? "auto" : "smooth");
+        target.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+      }
+      completeSessionToolReveal(reveal.revision);
+    }, prefersReducedMotion() ? 0 : NAV_MOTION.collapseEnter * 3000);
+    return () => clearTimeout(timer);
+  }, [reveal, activeSessionId, jumpToOffset]);
   const showSkeleton = switchingTo !== null && !transcriptReady;
   // 切换中：磁盘历史已上屏、进程尚未就绪 → 细提示，可滚动只读
   const showRestoreHint = switchingTo !== null && transcriptReady && !processAlive;
