@@ -15,6 +15,7 @@ const EDITOR_LANGUAGES: Record<EditorLanguageId, () => Promise<Extension>> = {
   html: async () => (await import("@codemirror/lang-html")).html(),
   markdown: async () => (await import("@codemirror/lang-markdown")).markdown(),
   python: async () => (await import("@codemirror/lang-python")).python(),
+  tex: async () => StreamLanguage.define((await import("@codemirror/legacy-modes/mode/stex")).stex),
   yaml: async () => (await import("@codemirror/lang-yaml")).yaml(),
   xml: async () => (await import("@codemirror/lang-xml")).xml(),
   sql: async () => (await import("@codemirror/lang-sql")).sql(),

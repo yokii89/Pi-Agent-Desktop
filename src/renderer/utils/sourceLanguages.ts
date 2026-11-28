@@ -8,6 +8,7 @@ export type EditorLanguageId =
   | "html"
   | "markdown"
   | "python"
+  | "tex"
   | "yaml"
   | "xml"
   | "sql"
@@ -53,6 +54,7 @@ const LANGUAGES = {
   vue: { shikiLanguage: "vue", editorLanguage: "html" },
   svelte: { shikiLanguage: "svelte", editorLanguage: "html" },
   python: { shikiLanguage: "python", editorLanguage: "python" },
+  tex: { shikiLanguage: "latex", editorLanguage: "tex" },
   ruby: { shikiLanguage: "ruby", editorLanguage: "ruby" },
   php: { shikiLanguage: "php", editorLanguage: "php" },
   shell: { shikiLanguage: "bash", editorLanguage: "shell" },
@@ -110,6 +112,30 @@ const EXTENSION_LANGUAGE: Record<string, LanguageKey> = {
   vue: "vue",
   svelte: "svelte",
   py: "python",
+  tex: "tex",
+  latex: "tex",
+  ltx: "tex",
+  sty: "tex",
+  cls: "tex",
+  clo: "tex",
+  def: "tex",
+  dtx: "tex",
+  ins: "tex",
+  tikz: "tex",
+  pgf: "tex",
+  pdf_tex: "tex",
+  bbl: "tex",
+  aux: "tex",
+  toc: "tex",
+  lof: "tex",
+  lot: "tex",
+  nav: "tex",
+  snm: "tex",
+  vrb: "tex",
+  bbx: "tex",
+  cbx: "tex",
+  lbx: "tex",
+  dbx: "tex",
   rb: "ruby",
   php: "php",
   sh: "shell",
