@@ -250,6 +250,11 @@ export const panelMessages = defineMessages({
     "en-US": "The document could not be read. It may be damaged or contain unsupported content.",
   },
   "panels.files.pdfPage": { "zh-CN": "第 {page} / {total} 页", "en-US": "Page {page} of {total}" },
+  "panels.files.pdfPreview": { "zh-CN": "PDF 预览", "en-US": "PDF preview" },
+  "panels.files.pdfZoomIn": { "zh-CN": "放大", "en-US": "Zoom in" },
+  "panels.files.pdfZoomOut": { "zh-CN": "缩小", "en-US": "Zoom out" },
+  "panels.files.pdfActualSize": { "zh-CN": "恢复 100%", "en-US": "Reset to 100%" },
+  "panels.files.pdfFitWidth": { "zh-CN": "适应宽度", "en-US": "Fit to width" },
   "panels.files.pdfLoadFailed": {
     "zh-CN": "PDF 无法读取或文件已损坏",
     "en-US": "PDF could not be loaded or is damaged",

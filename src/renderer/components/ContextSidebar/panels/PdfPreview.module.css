@@ -7,12 +7,27 @@
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
+  flex: none;
   align-items: center;
   justify-content: center;
   gap: var(--spacing-sm);
   padding: 0 var(--spacing-sm) var(--spacing-sm);
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  white-space: nowrap;
+}
+
+.zoomValue {
+  min-width: 5ch;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .button {
@@ -33,27 +48,31 @@
 }
 
 .canvasWrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: var(--spacing-sm);
-  text-align: center;
+  scrollbar-gutter: stable;
   background: var(--color-bg-surface);
 }
 
 /* 画布与文本层同尺寸叠放（宽高由 PdfPreview 按 viewport 写内联值） */
 .page {
   position: relative;
-  display: inline-block;
-  vertical-align: top;
-  background: white;
+  flex: none;
+  margin-inline: auto;
+  background: var(--color-document-paper);
   box-shadow: var(--shadow-overlay);
 }
 
 .page canvas {
   display: block;
   max-width: none;
-  background: white;
+  background: var(--color-document-paper);
 }
 
 /*
@@ -78,6 +97,18 @@
   forced-color-adjust: none;
   transform-origin: 0 0;
   z-index: 1;
+}
+
+.textLayer[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+
+.textLayer[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+
+.textLayer[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
 }
 
 .textLayer > :not(.markedContent),

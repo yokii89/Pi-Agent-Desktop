@@ -51,6 +51,9 @@ app.whenReady().then(async () => {
     const result = await win.webContents.executeJavaScript(
       `window.runPdfRegression(${readFileSync(fixtures, "utf8")})`,
     );
+    const interactionImage = await win.webContents.capturePage();
+    writeFileSync(report.replace(/\.json$/, "-interaction.png"), interactionImage.toPNG());
+    await win.webContents.executeJavaScript("window.cleanupPdfInteractionRegression()");
     const cspViolations = await win.webContents.executeJavaScript("window.pdfCspViolations ?? []");
     violations.push(...cspViolations);
     writeFileSync(report, JSON.stringify({ result, warnings, requests, violations }, null, 2));

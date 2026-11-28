@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -10,7 +10,13 @@ import { pdfFixtures } from "./fixtures.ts";
 const require = createRequire(import.meta.url);
 const root = path.resolve("temp/pdf-preview");
 const output = path.join(root, "离线 preview", "dist");
-await mkdir(root, { recursive: true });
+await mkdir(path.join(root, "styles"), { recursive: true });
+// The application asset plugins read shared styles relative to Vite's root.
+await Promise.all(
+  ["tokens.css", "remoteAuthCallback.css"].map((name) =>
+    copyFile(path.resolve("src/renderer/styles", name), path.join(root, "styles", name)),
+  ),
+);
 const csp = (await readFile("src/renderer/index.html", "utf8")).match(
   /content="(default-src[^"]+)"/,
 )?.[1];

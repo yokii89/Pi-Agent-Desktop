@@ -4,7 +4,12 @@ export function pdfFixtures(
 ): { name: string; text: string; data: number[]; color?: number[] }[] {
   const dingbatMap =
     "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /DingbatsUnicode def\n/CMapType 2 def\n1 begincodespacerange\n<00> <FF>\nendcodespacerange\n4 beginbfchar\n<21> <2701>\n<22> <2702>\n<23> <2703>\n<24> <2704>\nendbfchar\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend";
-  function pdf(fonts: string[], content: string, resources = "/Font << /F1 5 0 R >>"): number[] {
+  function pdf(
+    fonts: string[],
+    content: string,
+    resources = "/Font << /F1 5 0 R >>",
+    secondPage = false,
+  ): number[] {
     const objects = [
       "<< /Type /Catalog /Pages 2 0 R >>",
       "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -12,6 +17,12 @@ export function pdfFixtures(
       `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
       ...fonts,
     ];
+    if (secondPage) {
+      objects[1] = `<< /Type /Pages /Kids [3 0 R ${objects.length + 1} 0 R] /Count 2 >>`;
+      objects.push(
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 480 240] /Rotate 90 /Resources << ${resources} >> /Contents 4 0 R >>`,
+      );
+    }
     let body = "%PDF-1.7\n";
     const offsets = [0];
     for (const [index, object] of objects.entries()) {
@@ -74,6 +85,8 @@ export function pdfFixtures(
       data: pdf(
         ["<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"],
         "BT /F1 28 Tf 30 140 Td (PDF preview 123) Tj ET",
+        undefined,
+        true,
       ),
     },
     {

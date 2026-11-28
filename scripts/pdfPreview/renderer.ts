@@ -1,5 +1,6 @@
 import { loadPdfJs } from "../../src/renderer/utils/pdfLoader";
 import { getPdfResourceOptions } from "../../src/renderer/utils/pdfResources";
+import { runPdfInteractionRegression } from "./interaction";
 
 type Fixture = { name: string; text: string; data: number[]; color?: number[] };
 
@@ -95,7 +96,10 @@ async function run(fixtures: Fixture[]) {
     )) as Uint8Array<ArrayBuffer>,
   );
   await font.load();
-  return { results, options, wasmBytes: wasm.length, iccBytes: icc.length };
+  const interactionFixture = fixtures.find((fixture) => fixture.name === "latin");
+  if (!interactionFixture) throw new Error("Missing interactive PDF fixture");
+  const interaction = await runPdfInteractionRegression(interactionFixture);
+  return { results, options, wasmBytes: wasm.length, iccBytes: icc.length, interaction };
 }
 
 Object.assign(window, { runPdfRegression: run });
